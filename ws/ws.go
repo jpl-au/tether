@@ -1,6 +1,6 @@
 // Package ws provides a WebSocket transport for fluent-poly.
 //
-// Pass ws.Upgrade as the Upgrade field in poly.Config.
+// Pass ws.Upgrade() as the Upgrade field in poly.Config.
 package ws
 
 import (
@@ -14,24 +14,27 @@ import (
 	poly "github.com/jpl-au/fluent-poly"
 )
 
-// Upgrade upgrades an HTTP request to a WebSocket connection and returns
-// a Transport backed by it. Pass this function as the Upgrade field in
-// poly.Config.
+// Upgrade returns an upgrade function for use in poly.Config. When called
+// with no arguments, all origins are accepted (suitable for development).
+// Pass origin patterns to restrict connections in production.
 //
-//	poly.New(poly.Config[MyState]{
-//	    Upgrade: ws.Upgrade,
-//	    ...
-//	})
-func Upgrade(w http.ResponseWriter, r *http.Request) (poly.Transport, error) {
-	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
-		// Allow any origin during development. Production deployments
-		// should set InsecureSkipVerify to false and configure origins.
-		InsecureSkipVerify: true,
-	})
-	if err != nil {
-		return nil, err
+//	Upgrade: ws.Upgrade(),                          // development
+//	Upgrade: ws.Upgrade("https://example.com"),     // production
+func Upgrade(origins ...string) func(http.ResponseWriter, *http.Request) (poly.Transport, error) {
+	return func(w http.ResponseWriter, r *http.Request) (poly.Transport, error) {
+		opts := &websocket.AcceptOptions{}
+		if len(origins) == 0 {
+			opts.InsecureSkipVerify = true
+		} else {
+			opts.OriginPatterns = origins
+		}
+
+		conn, err := websocket.Accept(w, r, opts)
+		if err != nil {
+			return nil, err
+		}
+		return &transport{conn: conn, ctx: r.Context()}, nil
 	}
-	return &transport{conn: conn, ctx: r.Context()}, nil
 }
 
 type transport struct {
