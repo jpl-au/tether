@@ -14,6 +14,7 @@
 
   var root = null;
   var endpoint = "";
+  var sessionID = "";
   var ws = null;
   var retryDelay = 1000;
   var maxRetryDelay = 30000;
@@ -26,6 +27,7 @@
     if (!root) return;
 
     endpoint = root.getAttribute("data-poly-endpoint") || "";
+    sessionID = root.getAttribute("data-poly-session") || "";
     connect();
     bindEvents();
   });
@@ -35,6 +37,7 @@
   function connect() {
     var protocol = location.protocol === "https:" ? "wss:" : "ws:";
     var url = protocol + "//" + location.host + endpoint;
+    if (sessionID) url += "?session=" + sessionID;
 
     ws = new WebSocket(url);
 

@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"log/slog"
 	"net/http"
+	"sync"
 
 	jit "github.com/jpl-au/fluent-jit"
 )
@@ -49,11 +50,23 @@ func New[S any](cfg Config[S]) http.Handler {
 	if cfg.Logger == nil {
 		cfg.Logger = slog.Default()
 	}
-	return &handler[S]{cfg: cfg}
+	return &handler[S]{
+		cfg:      cfg,
+		pending:  make(map[string]*pendingSession[S]),
+	}
+}
+
+// pendingSession holds a pre-warmed session created during the initial
+// GET request, waiting for the WebSocket to attach.
+type pendingSession[S any] struct {
+	state  S
+	differ *jit.Differ
 }
 
 type handler[S any] struct {
-	cfg Config[S]
+	cfg     Config[S]
+	mu      sync.Mutex
+	pending map[string]*pendingSession[S]
 }
 
 func (h *handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -65,19 +78,26 @@ func (h *handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.serveInitialPage(w, r)
 }
 
-// serveInitialPage renders the full HTML and injects the client runtime.
+// serveInitialPage renders the full HTML, pre-warms a session, and
+// injects the client runtime. The session ID is embedded in the root
+// element so the client can attach to it on WebSocket connect.
 func (h *handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 	state := h.cfg.InitialState(r)
 	tree := h.cfg.Render(state)
 
-	// Use a differ to do the initial render so snapshots are captured,
-	// but we don't store this differ — the session creates its own.
 	differ := jit.NewDiffer()
 	html := differ.Render(tree)
+
+	id := newID()
+	h.mu.Lock()
+	h.pending[id] = &pendingSession[S]{state: state, differ: differ}
+	h.mu.Unlock()
 
 	var buf bytes.Buffer
 	buf.WriteString(`<div data-poly-root data-poly-endpoint="`)
 	buf.WriteString(r.URL.Path)
+	buf.WriteString(`" data-poly-session="`)
+	buf.WriteString(id)
 	buf.WriteString(`">`)
 	buf.Write(html)
 	buf.WriteString("</div>\n<script src=\"/_poly/idiomorph.min.js\"></script>\n<script src=\"/_poly/fluent-poly.js\"></script>\n")
@@ -87,6 +107,8 @@ func (h *handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 }
 
 // serveSession upgrades the connection and runs the session event loop.
+// If a session ID is provided via the query string, the pre-warmed session
+// from the GET request is reused. Otherwise a fresh session is created.
 func (h *handler[S]) serveSession(w http.ResponseWriter, r *http.Request) {
 	transport, err := h.cfg.Upgrade(w, r)
 	if err != nil {
@@ -94,11 +116,30 @@ func (h *handler[S]) serveSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	state := h.cfg.InitialState(r)
-	differ := jit.NewDiffer()
+	id := r.URL.Query().Get("session")
+	var state S
+	var differ *jit.Differ
+
+	h.mu.Lock()
+	if ps, ok := h.pending[id]; ok {
+		state = ps.state
+		differ = ps.differ
+		delete(h.pending, id)
+	}
+	h.mu.Unlock()
+
+	if differ == nil {
+		// No pre-warmed session found — create a fresh one.
+		id = newID()
+		state = h.cfg.InitialState(r)
+		differ = jit.NewDiffer()
+
+		tree := h.cfg.Render(state)
+		differ.Render(tree)
+	}
 
 	sess := &Session[S]{
-		id:        newID(),
+		id:        id,
 		state:     state,
 		render:    h.cfg.Render,
 		handle:    h.cfg.Handle,
@@ -115,16 +156,10 @@ func (h *handler[S]) serveSession(w http.ResponseWriter, r *http.Request) {
 		sess.onDisconnect = func() { fn(sess) }
 	}
 
-	// Seed the differ with the initial render so the first diff has
-	// a baseline to compare against.
-	tree := sess.render(sess.state)
-	differ.Render(tree)
-
 	if h.cfg.OnConnect != nil {
 		h.cfg.OnConnect(sess)
 	}
 
-	// Block on the event loop — this goroutine is owned by the HTTP server
 	sess.run()
 }
 
