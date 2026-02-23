@@ -89,6 +89,13 @@
         applyMorph(msg.morphs[i]);
       }
     }
+    if (msg.url) {
+      if (msg.replace) {
+        history.replaceState({}, "", msg.url);
+      } else {
+        history.pushState({}, "", msg.url);
+      }
+    }
   }
 
   // --- Client state preservation ---
@@ -186,6 +193,36 @@
       bindEventType(eventTypes[i][0], eventTypes[i][1]);
     }
     root.addEventListener("click", handleToggles);
+    root.addEventListener("click", handleLinks);
+
+    window.addEventListener("popstate", function () {
+      sendNavigate(location.pathname + location.search);
+    });
+  }
+
+  // --- Client-side navigation ---
+  //
+  // Anchors with data-poly-link are intercepted. Instead of a full page
+  // load the JS pushes the URL into the browser history and sends a
+  // navigate event to the server so HandleParams can update state.
+
+  function handleLinks(e) {
+    var link = e.target.closest("a[data-poly-link]");
+    if (!link) return;
+
+    var href = link.getAttribute("href");
+    if (!href || href.indexOf("://") !== -1 || href.indexOf("//") === 0) return;
+
+    e.preventDefault();
+    history.pushState({}, "", href);
+    sendNavigate(href);
+  }
+
+  function sendNavigate(url) {
+    var idx = url.indexOf("?");
+    var path = idx === -1 ? url : url.substring(0, idx);
+    var search = idx === -1 ? "" : url.substring(idx + 1);
+    sendEvent("navigate", "", { path: path, search: search });
   }
 
   function bindEventType(domEvent, dataAttr) {

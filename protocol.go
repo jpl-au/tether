@@ -4,10 +4,13 @@ import jit "github.com/jpl-au/fluent-jit"
 
 // Update is the server-side representation of changes to send to the client.
 // It contains content patches (targeted key updates) and/or morphs
-// (structural DOM changes applied via idiomorph).
+// (structural DOM changes applied via idiomorph). URL fields allow
+// the server to push browser URL changes alongside DOM updates.
 type Update struct {
 	Patches []jit.Patch
 	Morphs  []Morph
+	URL     string // if non-empty, push/replace browser URL
+	Replace bool   // true for replaceState, false for pushState
 }
 
 // Morph represents a structural change to a keyed container or the root.
@@ -20,10 +23,13 @@ type Morph struct {
 // UpdateMessage is the JSON envelope sent over the wire.
 // Patches and morphs are sent together so the client can apply them
 // in a single pass — content updates first, then structural changes.
+// URL fields allow the server to push browser URL changes.
 type UpdateMessage struct {
 	Type    string       `json:"type"`
 	Patches []PatchEntry `json:"patches,omitempty"`
 	Morphs  []MorphEntry `json:"morphs,omitempty"`
+	URL     string       `json:"url,omitempty"`
+	Replace bool         `json:"replace,omitempty"`
 }
 
 // PatchEntry is a single key+html pair within an update message.
@@ -64,6 +70,9 @@ func EncodeUpdate(update Update) UpdateMessage {
 			}
 		}
 	}
+
+	msg.URL = update.URL
+	msg.Replace = update.Replace
 
 	return msg
 }

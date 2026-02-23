@@ -59,6 +59,16 @@ func Blur[E settable[E]](el E, action string) E {
 	return el.SetData("poly-blur", action)
 }
 
+// --- Navigation ---
+
+// Link marks an anchor element for client-side navigation. When clicked,
+// the JS runtime intercepts the click, updates the browser URL via
+// pushState, and sends a navigate event to the server instead of
+// performing a full page load.
+func Link[E settable[E]](el E) E {
+	return el.SetData("poly-link", "")
+}
+
 // --- Client-side directives ---
 //
 // These run entirely in the browser. The server never learns about

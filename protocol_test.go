@@ -86,6 +86,64 @@ func TestEncodeUpdateWithMorphs(t *testing.T) {
 	}
 }
 
+func TestEncodeUpdateWithURL(t *testing.T) {
+	update := Update{
+		URL:     "/profile",
+		Replace: false,
+	}
+
+	msg := EncodeUpdate(update)
+
+	if msg.URL != "/profile" {
+		t.Errorf("URL should be %q, got %q", "/profile", msg.URL)
+	}
+	if msg.Replace {
+		t.Error("Replace should be false")
+	}
+
+	data, err := json.Marshal(msg)
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+
+	var decoded map[string]any
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+	if decoded["url"] != "/profile" {
+		t.Errorf("decoded url should be %q, got %v", "/profile", decoded["url"])
+	}
+}
+
+func TestEncodeUpdateWithURLReplace(t *testing.T) {
+	update := Update{
+		URL:     "/current",
+		Replace: true,
+	}
+
+	msg := EncodeUpdate(update)
+
+	if msg.URL != "/current" {
+		t.Errorf("URL should be %q, got %q", "/current", msg.URL)
+	}
+	if !msg.Replace {
+		t.Error("Replace should be true")
+	}
+
+	data, err := json.Marshal(msg)
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+
+	var decoded map[string]any
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+	if decoded["replace"] != true {
+		t.Errorf("decoded replace should be true, got %v", decoded["replace"])
+	}
+}
+
 func TestEventUnmarshal(t *testing.T) {
 	raw := `{"type":"click","action":"increment","data":{"value":"42"}}`
 

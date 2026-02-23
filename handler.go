@@ -52,6 +52,12 @@ type Config[S any] struct {
 	// Handle processes a client event and returns the new state.
 	Handle HandleFunc[S]
 
+	// HandleParams processes a URL change and returns updated state.
+	// Called on initial page load (after InitialState) and when the
+	// browser navigates via link click or back/forward. If nil,
+	// navigation events fall through to Handle.
+	HandleParams func(state S, params Params) S
+
 	// OnConnect is called when a session is established. Optional.
 	OnConnect func(session *Session[S])
 
@@ -169,6 +175,12 @@ func (h *handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 	h.mu.Unlock()
 
 	state := h.cfg.InitialState(r)
+	if h.cfg.HandleParams != nil {
+		state = h.cfg.HandleParams(state, Params{
+			Path:  r.URL.Path,
+			Query: r.URL.Query(),
+		})
+	}
 	tree := h.cfg.Render(state)
 
 	differ := jit.NewDiffer()
@@ -231,6 +243,12 @@ func (h *handler[S]) serveSession(w http.ResponseWriter, r *http.Request) {
 	if differ == nil {
 		id = newID()
 		state = h.cfg.InitialState(r)
+		if h.cfg.HandleParams != nil {
+			state = h.cfg.HandleParams(state, Params{
+				Path:  r.URL.Path,
+				Query: r.URL.Query(),
+			})
+		}
 		differ = jit.NewDiffer()
 
 		tree := h.cfg.Render(state)
@@ -243,6 +261,7 @@ func (h *handler[S]) serveSession(w http.ResponseWriter, r *http.Request) {
 		state:        state,
 		render:       h.cfg.Render,
 		handle:       h.cfg.Handle,
+		handleParams: h.cfg.HandleParams,
 		differ:       differ,
 		transport:    transport,
 		logger:       h.cfg.Logger,

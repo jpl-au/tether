@@ -3,6 +3,7 @@ package poly
 import (
 	"io"
 	"log/slog"
+	"net/url"
 	"sync"
 	"time"
 
@@ -22,10 +23,11 @@ type HandleFunc[S any] func(state S, event Event) S
 // connects gets its own Session with its own state and diff engine.
 // Sessions are not shared across connections.
 type Session[S any] struct {
-	id        string
-	state     S
-	render    RenderFunc[S]
-	handle    HandleFunc[S]
+	id           string
+	state        S
+	render       RenderFunc[S]
+	handle       HandleFunc[S]
+	handleParams func(S, Params) S
 	differ       *jit.Differ
 	transport    Transport
 	logger       *slog.Logger
@@ -98,7 +100,40 @@ func (s *Session[S]) Update(fn func(S) S) {
 
 // handleEvent processes a single event. Caller must hold s.mu.
 func (s *Session[S]) handleEvent(ev Event) {
+	if ev.Type == "navigate" && s.handleParams != nil {
+		params := Params{Path: ev.Data["path"]}
+		if search := ev.Data["search"]; search != "" {
+			params.Query, _ = url.ParseQuery(search)
+		}
+		s.applyState(s.handleParams(s.state, params))
+		return
+	}
 	s.applyState(s.handle(s.state, ev))
+}
+
+// Navigate pushes a URL change to the client. The browser calls
+// history.pushState, adding a history entry. Safe to call from
+// any goroutine.
+func (s *Session[S]) Navigate(rawURL string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.sendURL(rawURL, false)
+}
+
+// ReplaceURL updates the browser URL without adding a history entry.
+// The browser calls history.replaceState. Safe to call from any
+// goroutine.
+func (s *Session[S]) ReplaceURL(rawURL string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.sendURL(rawURL, true)
+}
+
+func (s *Session[S]) sendURL(rawURL string, replace bool) {
+	update := Update{URL: rawURL, Replace: replace}
+	if err := s.transport.SendUpdate(update); err != nil {
+		s.logger.Error("send URL error", "session", s.id, "err", err)
+	}
 }
 
 // applyState sets the new state, diffs the rendered tree, and sends

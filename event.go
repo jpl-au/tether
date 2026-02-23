@@ -1,5 +1,7 @@
 package poly
 
+import "net/url"
+
 // Event represents a client-side DOM event sent to the server.
 // Type is the DOM event name (e.g. "click", "input", "submit").
 // Action is the value from the data-poly-* attribute that triggered the event.
@@ -9,4 +11,12 @@ type Event struct {
 	Type   string            `json:"type"`
 	Action string            `json:"action"`
 	Data   map[string]string `json:"data,omitempty"`
+}
+
+// Params carries URL information from a navigation event. HandleParams
+// receives this when the browser navigates (link click, back/forward,
+// initial page load).
+type Params struct {
+	Path  string
+	Query url.Values
 }

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	poly "github.com/jpl-au/fluent-poly"
+	"github.com/jpl-au/fluent/html5/a"
 	"github.com/jpl-au/fluent/html5/button"
 	"github.com/jpl-au/fluent/html5/form"
 	"github.com/jpl-au/fluent/html5/input"
@@ -34,6 +35,18 @@ func TestInputRendersDataAttribute(t *testing.T) {
 
 	if !strings.Contains(html, `data-poly-input="update"`) {
 		t.Errorf("expected data-poly-input attribute in HTML:\n%s", html)
+	}
+}
+
+func TestLinkRendersDataAttribute(t *testing.T) {
+	el := poly.Link(a.Link("/profile", "Profile"))
+	html := string(el.Render())
+
+	if !strings.Contains(html, `data-poly-link=""`) {
+		t.Errorf("expected data-poly-link attribute in HTML:\n%s", html)
+	}
+	if !strings.Contains(html, `href="/profile"`) {
+		t.Errorf("expected href attribute in HTML:\n%s", html)
 	}
 }
 

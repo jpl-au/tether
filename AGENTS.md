@@ -74,6 +74,55 @@ button.Text("+").SetData("poly-click", "increment")
 
 The generic helpers (`Click`, `Submit`, `Input`, `Change`, `KeyDown`, `Focus`, `Blur`) are defined in `bind.go`. They use a structural type constraint so they work with any Fluent element without coupling the two packages.
 
+### URL routing
+
+Bidirectional sync between Go state and the browser URL. Anchors with `data-poly-link` are intercepted by the JS runtime — instead of a full page load, the URL is pushed via `history.pushState` and a navigate event is sent to the server.
+
+```go
+// Config — HandleParams processes URL changes on initial load and navigation
+HandleParams: func(state State, params poly.Params) State {
+    state.Page = params.Path
+    return state
+},
+
+// Mark an anchor for client-side navigation
+poly.Link(a.Link("/profile", "Profile"))
+
+// Equivalent using SetData directly
+a.Link("/profile", "Profile").SetData("poly-link", "")
+```
+
+`HandleParams` is called:
+1. On initial page load (after `InitialState`), with the request URL
+2. On link clicks within `[data-poly-link]` anchors
+3. On browser back/forward (popstate)
+
+If `HandleParams` is nil, navigation events fall through to `Handle` as `Event{Type: "navigate", Data: {"path": "...", "search": "..."}}`.
+
+**Server-initiated URL updates:**
+
+```go
+// Push a new URL (adds history entry)
+session.Navigate("/success")
+
+// Replace current URL (no history entry)
+session.ReplaceURL("/current?saved=true")
+```
+
+URL updates can accompany DOM patches/morphs in the same message, or be sent standalone.
+
+**Wire format — navigate event from client:**
+
+```json
+{"type":"navigate","action":"","data":{"path":"/profile","search":"tab=settings"}}
+```
+
+**Wire format — URL command from server:**
+
+```json
+{"type":"update","url":"/profile","replace":false}
+```
+
 ### Client-side directives
 
 Client-side toggles run entirely in the browser without a server round-trip. They are intended for ephemeral UI state like menus, modals, and accordions.
@@ -118,7 +167,7 @@ Tests live alongside the code they test (`session_test.go`, `protocol_test.go`, 
 
 `client/fluent-poly.js` is plain JS with no build step or bundler. It uses `Idiomorph.morph()` from the bundled `idiomorph.min.js` (0BSD licence). Both are embedded via `go:embed` in `embed.go` and served by `ServeClient()`.
 
-Supported event bindings (data attributes): `data-poly-click`, `data-poly-input`, `data-poly-submit`, `data-poly-change`, `data-poly-keydown`, `data-poly-focus`, `data-poly-blur`.
+Supported event bindings (data attributes): `data-poly-click`, `data-poly-input`, `data-poly-submit`, `data-poly-change`, `data-poly-keydown`, `data-poly-focus`, `data-poly-blur`, `data-poly-link`.
 
 Input events are debounced at 300ms by default, configurable per element via `data-poly-debounce="500"`. Throttling is available via `data-poly-throttle="1000"`.
 
