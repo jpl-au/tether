@@ -4,6 +4,7 @@ import (
 	"io"
 	"log/slog"
 	"sync"
+	"time"
 
 	jit "github.com/jpl-au/fluent-jit"
 	"github.com/jpl-au/fluent/node"
@@ -25,10 +26,12 @@ type Session[S any] struct {
 	state     S
 	render    RenderFunc[S]
 	handle    HandleFunc[S]
-	differ    *jit.Differ
-	transport Transport
-	logger    *slog.Logger
-	mu        sync.Mutex
+	differ       *jit.Differ
+	transport    Transport
+	logger       *slog.Logger
+	createdAt    time.Time
+	lastActivity time.Time
+	mu           sync.Mutex
 
 	// Optional callbacks from Config
 	onDisconnect func()
@@ -68,9 +71,17 @@ func (s *Session[S]) run() {
 		}
 
 		s.mu.Lock()
+		s.lastActivity = time.Now()
 		s.handleEvent(ev)
 		s.mu.Unlock()
 	}
+}
+
+// Close terminates the session by closing its transport. The event loop
+// will exit and the onDisconnect callback will fire. Safe to call from
+// any goroutine; safe to call more than once.
+func (s *Session[S]) Close() {
+	s.transport.Close()
 }
 
 // Update applies a state change from outside the event loop and pushes

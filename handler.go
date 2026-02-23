@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"sync"
+	"time"
 
 	jit "github.com/jpl-au/fluent-jit"
 )
@@ -40,6 +41,18 @@ type Config[S any] struct {
 
 	// Logger is used for session errors. Defaults to slog.Default().
 	Logger *slog.Logger
+
+	// MaxSessions limits the total number of concurrent sessions
+	// (pending + active). Zero means unlimited.
+	MaxSessions int
+
+	// IdleTimeout closes sessions that receive no client events within
+	// this duration. Zero means no idle timeout.
+	IdleTimeout time.Duration
+
+	// MaxLifetime closes sessions after this duration regardless of
+	// activity. Zero means no maximum lifetime.
+	MaxLifetime time.Duration
 }
 
 // New creates an http.Handler that manages poly sessions.
@@ -50,23 +63,37 @@ func New[S any](cfg Config[S]) http.Handler {
 	if cfg.Logger == nil {
 		cfg.Logger = slog.Default()
 	}
-	return &handler[S]{
-		cfg:      cfg,
-		pending:  make(map[string]*pendingSession[S]),
+	h := &handler[S]{
+		cfg:     cfg,
+		pending: make(map[string]*pendingSession[S]),
+		active:  make(map[string]*Session[S]),
 	}
+
+	// Start a background reaper if any timeouts are configured.
+	if cfg.IdleTimeout > 0 || cfg.MaxLifetime > 0 {
+		go h.reap()
+	}
+
+	return h
 }
 
 // pendingSession holds a pre-warmed session created during the initial
 // GET request, waiting for the WebSocket to attach.
 type pendingSession[S any] struct {
-	state  S
-	differ *jit.Differ
+	state     S
+	differ    *jit.Differ
+	createdAt time.Time
 }
+
+// pendingTimeout is the maximum time a pending session waits for a
+// WebSocket connection before being discarded.
+const pendingTimeout = 30 * time.Second
 
 type handler[S any] struct {
 	cfg     Config[S]
 	mu      sync.Mutex
 	pending map[string]*pendingSession[S]
+	active  map[string]*Session[S]
 }
 
 func (h *handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -82,6 +109,14 @@ func (h *handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // injects the client runtime. The session ID is embedded in the root
 // element so the client can attach to it on WebSocket connect.
 func (h *handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
+	h.mu.Lock()
+	if h.cfg.MaxSessions > 0 && len(h.pending)+len(h.active) >= h.cfg.MaxSessions {
+		h.mu.Unlock()
+		http.Error(w, "too many sessions", http.StatusServiceUnavailable)
+		return
+	}
+	h.mu.Unlock()
+
 	state := h.cfg.InitialState(r)
 	tree := h.cfg.Render(state)
 
@@ -89,8 +124,9 @@ func (h *handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 	html := differ.Render(tree)
 
 	id := newID()
+	now := time.Now()
 	h.mu.Lock()
-	h.pending[id] = &pendingSession[S]{state: state, differ: differ}
+	h.pending[id] = &pendingSession[S]{state: state, differ: differ, createdAt: now}
 	h.mu.Unlock()
 
 	var buf bytes.Buffer
@@ -138,22 +174,35 @@ func (h *handler[S]) serveSession(w http.ResponseWriter, r *http.Request) {
 		differ.Render(tree)
 	}
 
+	now := time.Now()
 	sess := &Session[S]{
-		id:        id,
-		state:     state,
-		render:    h.cfg.Render,
-		handle:    h.cfg.Handle,
-		differ:    differ,
-		transport: transport,
-		logger:    h.cfg.Logger,
+		id:           id,
+		state:        state,
+		render:       h.cfg.Render,
+		handle:       h.cfg.Handle,
+		differ:       differ,
+		transport:    transport,
+		logger:       h.cfg.Logger,
+		createdAt:    now,
+		lastActivity: now,
 	}
 
 	if h.cfg.Equal != nil {
 		sess.equal = h.cfg.Equal
 	}
-	if h.cfg.OnDisconnect != nil {
-		fn := h.cfg.OnDisconnect
-		sess.onDisconnect = func() { fn(sess) }
+
+	// Register the session and wire up cleanup on disconnect.
+	h.mu.Lock()
+	h.active[id] = sess
+	h.mu.Unlock()
+
+	sess.onDisconnect = func() {
+		h.mu.Lock()
+		delete(h.active, id)
+		h.mu.Unlock()
+		if h.cfg.OnDisconnect != nil {
+			h.cfg.OnDisconnect(sess)
+		}
 	}
 
 	if h.cfg.OnConnect != nil {
@@ -161,6 +210,47 @@ func (h *handler[S]) serveSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sess.run()
+}
+
+// reap periodically removes expired pending sessions and closes idle
+// or long-lived active sessions. Runs in a background goroutine.
+func (h *handler[S]) reap() {
+	ticker := time.NewTicker(15 * time.Second)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		now := time.Now()
+		h.mu.Lock()
+
+		// Remove pending sessions that were never claimed.
+		for id, ps := range h.pending {
+			if now.Sub(ps.createdAt) > pendingTimeout {
+				delete(h.pending, id)
+			}
+		}
+
+		// Collect active sessions that should be closed.
+		var expired []*Session[S]
+		for id, sess := range h.active {
+			sess.mu.Lock()
+			idle := h.cfg.IdleTimeout > 0 && now.Sub(sess.lastActivity) > h.cfg.IdleTimeout
+			aged := h.cfg.MaxLifetime > 0 && now.Sub(sess.createdAt) > h.cfg.MaxLifetime
+			sess.mu.Unlock()
+
+			if idle || aged {
+				expired = append(expired, sess)
+				delete(h.active, id)
+			}
+		}
+
+		h.mu.Unlock()
+
+		// Close outside the lock to avoid holding it during I/O.
+		for _, sess := range expired {
+			h.cfg.Logger.Info("closing session", "session", sess.ID(), "idle", h.cfg.IdleTimeout > 0, "aged", h.cfg.MaxLifetime > 0)
+			sess.Close()
+		}
+	}
 }
 
 // ServeClient returns an http.Handler that serves the embedded client JS files.
