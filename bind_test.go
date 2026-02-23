@@ -1,0 +1,56 @@
+package poly_test
+
+import (
+	"strings"
+	"testing"
+
+	poly "github.com/jpl-au/fluent-poly"
+	"github.com/jpl-au/fluent/html5/button"
+	"github.com/jpl-au/fluent/html5/form"
+	"github.com/jpl-au/fluent/html5/input"
+)
+
+func TestClickRendersDataAttribute(t *testing.T) {
+	el := poly.Click(button.Text("+"), "increment")
+	html := string(el.Render())
+
+	if !strings.Contains(html, `data-poly-click="increment"`) {
+		t.Errorf("expected data-poly-click attribute in HTML:\n%s", html)
+	}
+}
+
+func TestSubmitRendersDataAttribute(t *testing.T) {
+	el := poly.Submit(form.New(), "save")
+	html := string(el.Render())
+
+	if !strings.Contains(html, `data-poly-submit="save"`) {
+		t.Errorf("expected data-poly-submit attribute in HTML:\n%s", html)
+	}
+}
+
+func TestInputRendersDataAttribute(t *testing.T) {
+	el := poly.Input(input.Text("name", ""), "update")
+	html := string(el.Render())
+
+	if !strings.Contains(html, `data-poly-input="update"`) {
+		t.Errorf("expected data-poly-input attribute in HTML:\n%s", html)
+	}
+}
+
+func TestClickChains(t *testing.T) {
+	// Verify the return type preserves chainability
+	el := poly.Click(button.Text("+"), "increment").
+		Style("cursor: pointer").
+		Class("btn")
+	html := string(el.Render())
+
+	if !strings.Contains(html, `data-poly-click="increment"`) {
+		t.Errorf("missing data-poly-click in HTML:\n%s", html)
+	}
+	if !strings.Contains(html, `style="cursor: pointer"`) {
+		t.Errorf("missing style in HTML:\n%s", html)
+	}
+	if !strings.Contains(html, `class="btn"`) {
+		t.Errorf("missing class in HTML:\n%s", html)
+	}
+}
