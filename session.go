@@ -29,9 +29,10 @@ type Session[S any] struct {
 	differ       *jit.Differ
 	transport    Transport
 	logger       *slog.Logger
-	createdAt    time.Time
-	lastActivity time.Time
-	mu           sync.Mutex
+	createdAt      time.Time
+	lastActivity   time.Time
+	disconnectedAt time.Time
+	mu             sync.Mutex
 
 	// Optional callbacks from Config
 	onDisconnect func()

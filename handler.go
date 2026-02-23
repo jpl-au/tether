@@ -53,26 +53,37 @@ type Config[S any] struct {
 	// MaxLifetime closes sessions after this duration regardless of
 	// activity. Zero means no maximum lifetime.
 	MaxLifetime time.Duration
+
+	// ReconnectTimeout is how long a disconnected session is kept so the
+	// client can reattach. Zero defaults to 30 seconds. Set to -1 to
+	// disable reconnection (sessions are destroyed on disconnect).
+	ReconnectTimeout time.Duration
 }
 
 // New creates an http.Handler that manages poly sessions.
 //
 // GET requests receive the initial HTML page with the client JS injected.
 // Requests with an Upgrade header start a session event loop.
+// defaultReconnectTimeout is used when ReconnectTimeout is zero.
+const defaultReconnectTimeout = 30 * time.Second
+
 func New[S any](cfg Config[S]) http.Handler {
 	if cfg.Logger == nil {
 		cfg.Logger = slog.Default()
 	}
+	if cfg.ReconnectTimeout == 0 {
+		cfg.ReconnectTimeout = defaultReconnectTimeout
+	}
 	h := &handler[S]{
-		cfg:     cfg,
-		pending: make(map[string]*pendingSession[S]),
-		active:  make(map[string]*Session[S]),
+		cfg:          cfg,
+		pending:      make(map[string]*pendingSession[S]),
+		active:       make(map[string]*Session[S]),
+		disconnected: make(map[string]*Session[S]),
 	}
 
-	// Start a background reaper if any timeouts are configured.
-	if cfg.IdleTimeout > 0 || cfg.MaxLifetime > 0 {
-		go h.reap()
-	}
+	// The reaper always runs to clean up pending and disconnected
+	// sessions. It also enforces idle and lifetime limits when set.
+	go h.reap()
 
 	return h
 }
@@ -90,10 +101,11 @@ type pendingSession[S any] struct {
 const pendingTimeout = 30 * time.Second
 
 type handler[S any] struct {
-	cfg     Config[S]
-	mu      sync.Mutex
-	pending map[string]*pendingSession[S]
-	active  map[string]*Session[S]
+	cfg          Config[S]
+	mu           sync.Mutex
+	pending      map[string]*pendingSession[S]
+	active       map[string]*Session[S]
+	disconnected map[string]*Session[S]
 }
 
 func (h *handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -110,7 +122,7 @@ func (h *handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // element so the client can attach to it on WebSocket connect.
 func (h *handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 	h.mu.Lock()
-	if h.cfg.MaxSessions > 0 && len(h.pending)+len(h.active) >= h.cfg.MaxSessions {
+	if h.cfg.MaxSessions > 0 && len(h.pending)+len(h.active)+len(h.disconnected) >= h.cfg.MaxSessions {
 		h.mu.Unlock()
 		http.Error(w, "too many sessions", http.StatusServiceUnavailable)
 		return
@@ -143,8 +155,10 @@ func (h *handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 }
 
 // serveSession upgrades the connection and runs the session event loop.
-// If a session ID is provided via the query string, the pre-warmed session
-// from the GET request is reused. Otherwise a fresh session is created.
+// It checks three pools in order:
+//  1. Disconnected sessions (reconnecting client)
+//  2. Pending sessions (initial page load)
+//  3. Fresh session (fallback)
 func (h *handler[S]) serveSession(w http.ResponseWriter, r *http.Request) {
 	transport, err := h.cfg.Upgrade(w, r)
 	if err != nil {
@@ -153,6 +167,20 @@ func (h *handler[S]) serveSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	id := r.URL.Query().Get("session")
+
+	// Try to reattach to a disconnected session.
+	h.mu.Lock()
+	if sess, ok := h.disconnected[id]; ok {
+		delete(h.disconnected, id)
+		h.active[id] = sess
+		h.mu.Unlock()
+
+		h.reattach(sess, transport)
+		return
+	}
+	h.mu.Unlock()
+
+	// Try to claim a pending (pre-warmed) session.
 	var state S
 	var differ *jit.Differ
 
@@ -165,7 +193,6 @@ func (h *handler[S]) serveSession(w http.ResponseWriter, r *http.Request) {
 	h.mu.Unlock()
 
 	if differ == nil {
-		// No pre-warmed session found — create a fresh one.
 		id = newID()
 		state = h.cfg.InitialState(r)
 		differ = jit.NewDiffer()
@@ -191,19 +218,11 @@ func (h *handler[S]) serveSession(w http.ResponseWriter, r *http.Request) {
 		sess.equal = h.cfg.Equal
 	}
 
-	// Register the session and wire up cleanup on disconnect.
 	h.mu.Lock()
 	h.active[id] = sess
 	h.mu.Unlock()
 
-	sess.onDisconnect = func() {
-		h.mu.Lock()
-		delete(h.active, id)
-		h.mu.Unlock()
-		if h.cfg.OnDisconnect != nil {
-			h.cfg.OnDisconnect(sess)
-		}
-	}
+	h.wireDisconnect(sess)
 
 	if h.cfg.OnConnect != nil {
 		h.cfg.OnConnect(sess)
@@ -212,8 +231,51 @@ func (h *handler[S]) serveSession(w http.ResponseWriter, r *http.Request) {
 	sess.run()
 }
 
-// reap periodically removes expired pending sessions and closes idle
-// or long-lived active sessions. Runs in a background goroutine.
+// reattach connects a new transport to a disconnected session and
+// sends a full re-render so the client is in sync.
+func (h *handler[S]) reattach(sess *Session[S], transport Transport) {
+	sess.mu.Lock()
+	sess.transport = transport
+	sess.lastActivity = time.Now()
+	sess.disconnectedAt = time.Time{}
+
+	// Re-render current state and send to the client so it catches up.
+	tree := sess.render(sess.state)
+	html := sess.differ.Render(tree)
+	sess.mu.Unlock()
+
+	if err := transport.SendFull(html); err != nil {
+		sess.logger.Error("reattach send error", "session", sess.id, "err", err)
+	}
+
+	h.wireDisconnect(sess)
+	sess.run()
+}
+
+// wireDisconnect sets the onDisconnect callback for a session. On
+// disconnect, the session is moved to the disconnected pool (if
+// reconnection is enabled) or removed entirely.
+func (h *handler[S]) wireDisconnect(sess *Session[S]) {
+	sess.onDisconnect = func() {
+		h.mu.Lock()
+		delete(h.active, sess.id)
+
+		if h.cfg.ReconnectTimeout > 0 {
+			sess.mu.Lock()
+			sess.disconnectedAt = time.Now()
+			sess.mu.Unlock()
+			h.disconnected[sess.id] = sess
+		}
+		h.mu.Unlock()
+
+		if h.cfg.OnDisconnect != nil {
+			h.cfg.OnDisconnect(sess)
+		}
+	}
+}
+
+// reap periodically removes expired pending and disconnected sessions,
+// and closes idle or long-lived active sessions.
 func (h *handler[S]) reap() {
 	ticker := time.NewTicker(15 * time.Second)
 	defer ticker.Stop()
@@ -226,6 +288,18 @@ func (h *handler[S]) reap() {
 		for id, ps := range h.pending {
 			if now.Sub(ps.createdAt) > pendingTimeout {
 				delete(h.pending, id)
+			}
+		}
+
+		// Remove disconnected sessions past the reconnect window.
+		if h.cfg.ReconnectTimeout > 0 {
+			for id, sess := range h.disconnected {
+				sess.mu.Lock()
+				expired := now.Sub(sess.disconnectedAt) > h.cfg.ReconnectTimeout
+				sess.mu.Unlock()
+				if expired {
+					delete(h.disconnected, id)
+				}
 			}
 		}
 
@@ -245,9 +319,8 @@ func (h *handler[S]) reap() {
 
 		h.mu.Unlock()
 
-		// Close outside the lock to avoid holding it during I/O.
 		for _, sess := range expired {
-			h.cfg.Logger.Info("closing session", "session", sess.ID(), "idle", h.cfg.IdleTimeout > 0, "aged", h.cfg.MaxLifetime > 0)
+			h.cfg.Logger.Info("closing session", "session", sess.ID())
 			sess.Close()
 		}
 	}
