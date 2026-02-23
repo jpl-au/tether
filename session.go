@@ -2,7 +2,7 @@ package poly
 
 import (
 	"io"
-	"log"
+	"log/slog"
 	"sync"
 
 	jit "github.com/jpl-au/fluent-jit"
@@ -27,6 +27,7 @@ type Session[S any] struct {
 	handle    HandleFunc[S]
 	differ    *jit.Differ
 	transport Transport
+	logger    *slog.Logger
 	mu        sync.Mutex
 
 	// Optional callbacks from Config
@@ -62,7 +63,7 @@ func (s *Session[S]) run() {
 			if err == io.EOF {
 				return
 			}
-			log.Printf("poly: session %s receive error: %v", s.id, err)
+			s.logger.Error("receive error", "session", s.id, "err", err)
 			return
 		}
 
@@ -91,14 +92,14 @@ func (s *Session[S]) handleEvent(ev Event) {
 		// uses idiomorph to morph the entire root, preserving DOM state.
 		html := s.differ.Render(tree)
 		if err := s.transport.SendFull(html); err != nil {
-			log.Printf("poly: session %s send full error: %v", s.id, err)
+			s.logger.Error("send full error", "session", s.id, "err", err)
 		}
 		return
 	}
 
 	if len(patches) > 0 {
 		if err := s.transport.SendPatches(patches); err != nil {
-			log.Printf("poly: session %s send patches error: %v", s.id, err)
+			s.logger.Error("send patches error", "session", s.id, "err", err)
 		}
 	}
 }

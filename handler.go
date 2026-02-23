@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/hex"
+	"log/slog"
 	"net/http"
 
 	jit "github.com/jpl-au/fluent-jit"
@@ -35,6 +36,9 @@ type Config[S any] struct {
 	// Equal compares two states. If provided and returns true, the diff
 	// is skipped entirely for that event. Optional.
 	Equal func(a, b S) bool
+
+	// Logger is used for session errors. Defaults to slog.Default().
+	Logger *slog.Logger
 }
 
 // New creates an http.Handler that manages poly sessions.
@@ -42,6 +46,9 @@ type Config[S any] struct {
 // GET requests receive the initial HTML page with the client JS injected.
 // Requests with an Upgrade header start a session event loop.
 func New[S any](cfg Config[S]) http.Handler {
+	if cfg.Logger == nil {
+		cfg.Logger = slog.Default()
+	}
 	return &handler[S]{cfg: cfg}
 }
 
@@ -97,6 +104,7 @@ func (h *handler[S]) serveSession(w http.ResponseWriter, r *http.Request) {
 		handle:    h.cfg.Handle,
 		differ:    differ,
 		transport: transport,
+		logger:    h.cfg.Logger,
 	}
 
 	if h.cfg.Equal != nil {
