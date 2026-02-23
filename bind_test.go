@@ -37,6 +37,51 @@ func TestInputRendersDataAttribute(t *testing.T) {
 	}
 }
 
+func TestToggleClassRendersDataAttribute(t *testing.T) {
+	el := poly.ToggleClass(button.Text("Menu"), "is-open")
+	html := string(el.Render())
+
+	if !strings.Contains(html, `data-poly-toggle-class="is-open"`) {
+		t.Errorf("expected data-poly-toggle-class attribute in HTML:\n%s", html)
+	}
+}
+
+func TestToggleTargetRendersDataAttribute(t *testing.T) {
+	el := poly.ToggleTarget(button.Text("Menu"), "#nav")
+	html := string(el.Render())
+
+	if !strings.Contains(html, `data-poly-toggle-target="#nav"`) {
+		t.Errorf("expected data-poly-toggle-target attribute in HTML:\n%s", html)
+	}
+}
+
+func TestToggleAttrRendersDataAttribute(t *testing.T) {
+	el := poly.ToggleAttr(button.Text("Toggle"), "hidden")
+	html := string(el.Render())
+
+	if !strings.Contains(html, `data-poly-toggle-attr="hidden"`) {
+		t.Errorf("expected data-poly-toggle-attr attribute in HTML:\n%s", html)
+	}
+}
+
+func TestToggleClassWithTargetChains(t *testing.T) {
+	el := poly.ToggleClass(
+		poly.ToggleTarget(button.Text("Menu"), "#nav"),
+		"is-open",
+	).Style("cursor: pointer")
+	html := string(el.Render())
+
+	if !strings.Contains(html, `data-poly-toggle-class="is-open"`) {
+		t.Errorf("missing data-poly-toggle-class in HTML:\n%s", html)
+	}
+	if !strings.Contains(html, `data-poly-toggle-target="#nav"`) {
+		t.Errorf("missing data-poly-toggle-target in HTML:\n%s", html)
+	}
+	if !strings.Contains(html, `style="cursor: pointer"`) {
+		t.Errorf("missing style in HTML:\n%s", html)
+	}
+}
+
 func TestClickChains(t *testing.T) {
 	// Verify the return type preserves chainability
 	el := poly.Click(button.Text("+"), "increment").

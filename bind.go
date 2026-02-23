@@ -58,3 +58,30 @@ func Focus[E settable[E]](el E, action string) E {
 func Blur[E settable[E]](el E, action string) E {
 	return el.SetData("poly-blur", action)
 }
+
+// --- Client-side directives ---
+//
+// These run entirely in the browser. The server never learns about
+// the toggle state — it is ephemeral and exists only in the client DOM.
+// When a server morph arrives, the JS runtime preserves client-managed
+// classes and attributes via an Idiomorph beforeNodeMorphed hook.
+
+// ToggleClass binds a client-side class toggle. On click, the JS runtime
+// toggles the named CSS class without a server round-trip. Multiple
+// classes can be space-separated.
+func ToggleClass[E settable[E]](el E, class string) E {
+	return el.SetData("poly-toggle-class", class)
+}
+
+// ToggleTarget directs a toggle at a different element. The value is a
+// CSS selector. Without this, toggles apply to the element itself.
+func ToggleTarget[E settable[E]](el E, selector string) E {
+	return el.SetData("poly-toggle-target", selector)
+}
+
+// ToggleAttr binds a client-side boolean attribute toggle. On click, the
+// JS runtime adds or removes the named attribute (e.g. "hidden",
+// "aria-expanded") without a server round-trip.
+func ToggleAttr[E settable[E]](el E, attr string) E {
+	return el.SetData("poly-toggle-attr", attr)
+}

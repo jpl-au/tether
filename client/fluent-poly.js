@@ -91,6 +91,54 @@
     }
   }
 
+  // --- Client state preservation ---
+  //
+  // Client-side toggles (data-poly-toggle-class, data-poly-toggle-attr)
+  // modify the DOM without the server knowing. When a server morph arrives,
+  // the new HTML won't contain the toggled classes or attributes. The
+  // beforeNodeMorphed hook copies client-managed state onto the incoming
+  // node so Idiomorph merges it into the live DOM.
+
+  function preserveClientState(oldNode, newNode) {
+    var trackedClasses = oldNode.getAttribute("data-poly-client-classes");
+    if (trackedClasses) {
+      var names = trackedClasses.split(/\s+/);
+      for (var i = 0; i < names.length; i++) {
+        if (!names[i]) continue;
+        if (oldNode.classList.contains(names[i])) {
+          newNode.classList.add(names[i]);
+        } else {
+          newNode.classList.remove(names[i]);
+        }
+      }
+      newNode.setAttribute("data-poly-client-classes", trackedClasses);
+    }
+
+    var trackedAttrs = oldNode.getAttribute("data-poly-client-attrs");
+    if (trackedAttrs) {
+      var names = trackedAttrs.split(/\s+/);
+      for (var i = 0; i < names.length; i++) {
+        if (!names[i]) continue;
+        if (oldNode.hasAttribute(names[i])) {
+          newNode.setAttribute(names[i], "");
+        } else {
+          newNode.removeAttribute(names[i]);
+        }
+      }
+      newNode.setAttribute("data-poly-client-attrs", trackedAttrs);
+    }
+  }
+
+  var morphCallbacks = {
+    beforeNodeMorphed: function (oldNode, newNode) {
+      if (oldNode.nodeType !== 1) return true;
+      preserveClientState(oldNode, newNode);
+      return true;
+    }
+  };
+
+  // --- Patching and morphing ---
+
   function applyPatch(patch) {
     var el = document.querySelector('[data-poly-key="' + patch.key + '"]');
     if (!el) return;
@@ -100,7 +148,7 @@
     var newEl = template.content.firstElementChild;
     if (!newEl) return;
 
-    Idiomorph.morph(el, newEl);
+    Idiomorph.morph(el, newEl, {callbacks: morphCallbacks});
   }
 
   function applyMorph(morph) {
@@ -113,11 +161,11 @@
       // Empty key targets the root element. Use innerHTML mode so
       // idiomorph morphs root's children without replacing root itself
       // (which carries data-poly-root, data-poly-session, etc.).
-      if (root) Idiomorph.morph(root, newEl, {morphStyle: "innerHTML"});
+      if (root) Idiomorph.morph(root, newEl, {morphStyle: "innerHTML", callbacks: morphCallbacks});
     } else {
       // Scoped morph targets a keyed container.
       var el = document.querySelector('[data-poly-key="' + morph.key + '"]');
-      if (el) Idiomorph.morph(el, newEl);
+      if (el) Idiomorph.morph(el, newEl, {callbacks: morphCallbacks});
     }
   }
 
@@ -137,6 +185,7 @@
     for (var i = 0; i < eventTypes.length; i++) {
       bindEventType(eventTypes[i][0], eventTypes[i][1]);
     }
+    root.addEventListener("click", handleToggles);
   }
 
   function bindEventType(domEvent, dataAttr) {
@@ -209,5 +258,60 @@
       action: action,
       data: data
     }));
+  }
+
+  // --- Client-side toggles ---
+  //
+  // Toggle directives run entirely in the browser. The server never
+  // learns about them. When a server morph arrives, the Idiomorph
+  // beforeNodeMorphed hook (see morphCallbacks above) copies the
+  // client-managed state onto the incoming node so it survives.
+
+  function handleToggles(e) {
+    var trigger = e.target.closest("[data-poly-toggle-class], [data-poly-toggle-attr]");
+    if (!trigger) return;
+
+    var targetSelector = trigger.getAttribute("data-poly-toggle-target");
+    var target = targetSelector ? document.querySelector(targetSelector) : trigger;
+    if (!target) return;
+
+    var toggleClass = trigger.getAttribute("data-poly-toggle-class");
+    if (toggleClass) {
+      var classes = toggleClass.split(/\s+/);
+      for (var i = 0; i < classes.length; i++) {
+        if (classes[i]) target.classList.toggle(classes[i]);
+      }
+      trackClientClasses(target, classes);
+    }
+
+    var toggleAttr = trigger.getAttribute("data-poly-toggle-attr");
+    if (toggleAttr) {
+      if (target.hasAttribute(toggleAttr)) {
+        target.removeAttribute(toggleAttr);
+      } else {
+        target.setAttribute(toggleAttr, "");
+      }
+      trackClientAttrs(target, toggleAttr);
+    }
+  }
+
+  function trackClientClasses(el, classNames) {
+    var tracked = el.getAttribute("data-poly-client-classes") || "";
+    var set = tracked ? tracked.split(/\s+/) : [];
+    for (var i = 0; i < classNames.length; i++) {
+      if (classNames[i] && set.indexOf(classNames[i]) === -1) {
+        set.push(classNames[i]);
+      }
+    }
+    el.setAttribute("data-poly-client-classes", set.join(" "));
+  }
+
+  function trackClientAttrs(el, attrName) {
+    var tracked = el.getAttribute("data-poly-client-attrs") || "";
+    var set = tracked ? tracked.split(/\s+/) : [];
+    if (attrName && set.indexOf(attrName) === -1) {
+      set.push(attrName);
+    }
+    el.setAttribute("data-poly-client-attrs", set.join(" "));
   }
 })();

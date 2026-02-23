@@ -74,6 +74,25 @@ button.Text("+").SetData("poly-click", "increment")
 
 The generic helpers (`Click`, `Submit`, `Input`, `Change`, `KeyDown`, `Focus`, `Blur`) are defined in `bind.go`. They use a structural type constraint so they work with any Fluent element without coupling the two packages.
 
+### Client-side directives
+
+Client-side toggles run entirely in the browser without a server round-trip. They are intended for ephemeral UI state like menus, modals, and accordions.
+
+```go
+// Toggle a CSS class on the element itself
+poly.ToggleClass(button.Text("Menu"), "is-open")
+
+// Toggle a CSS class on a different element
+poly.ToggleClass(poly.ToggleTarget(button.Text("Menu"), "#nav"), "is-open")
+
+// Toggle visibility via the hidden attribute
+poly.ToggleAttr(poly.ToggleTarget(button.Text("Show Help"), "#help"), "hidden")
+```
+
+Helpers: `ToggleClass`, `ToggleTarget`, `ToggleAttr`. Data attributes: `data-poly-toggle-class`, `data-poly-toggle-target`, `data-poly-toggle-attr`.
+
+Client-managed state survives server morphs via an Idiomorph `beforeNodeMorphed` hook. The JS runtime tracks which classes and attributes are client-managed using `data-poly-client-classes` and `data-poly-client-attrs` on the target element. If the element is removed entirely (not morphed), the client state is lost — this is by design.
+
 **Performance:** The generic helpers are ~47% slower than raw `SetData` and add 2 extra allocations per element. Rendered output is identical once built — the overhead is purely in element creation, caused by Go's shape-based generic dispatch preventing full inlining. For performance-sensitive code, prefer `SetData` directly. Run `go test -bench=BenchmarkBind -benchmem` to compare.
 
 **PGO:** [Profile-Guided Optimization](https://go.dev/doc/pgo) improves speed ~5-10% for both generic and direct paths but cannot eliminate the allocation gap — that's structural to Go's shape-based generics. Applications consuming fluent-poly should collect a CPU profile from production and place it as `default.pgo` in their main package. Do not commit a `default.pgo` into this library — PGO profiles are application-specific.
