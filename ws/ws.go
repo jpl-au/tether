@@ -10,7 +10,6 @@ import (
 	"net/http"
 
 	"github.com/coder/websocket"
-	jit "github.com/jpl-au/fluent-jit"
 	poly "github.com/jpl-au/fluent-poly"
 )
 
@@ -37,13 +36,15 @@ func Upgrade(origins ...string) func(http.ResponseWriter, *http.Request) (poly.T
 	}
 }
 
+// transport implements poly.Transport over a single WebSocket connection.
 type transport struct {
 	conn *websocket.Conn
 	ctx  context.Context
 }
 
-func (t *transport) SendPatches(patches []jit.Patch) error {
-	msg := poly.EncodePatch(patches)
+// SendUpdate encodes the update as JSON and writes it as a text message.
+func (t *transport) SendUpdate(update poly.Update) error {
+	msg := poly.EncodeUpdate(update)
 	data, err := json.Marshal(msg)
 	if err != nil {
 		return err
@@ -51,15 +52,9 @@ func (t *transport) SendPatches(patches []jit.Patch) error {
 	return t.conn.Write(t.ctx, websocket.MessageText, data)
 }
 
-func (t *transport) SendFull(html []byte) error {
-	msg := poly.EncodeFull(html)
-	data, err := json.Marshal(msg)
-	if err != nil {
-		return err
-	}
-	return t.conn.Write(t.ctx, websocket.MessageText, data)
-}
-
+// ReceiveEvent blocks until the client sends a JSON event message.
+// Normal and going-away WebSocket closes are mapped to io.EOF so the
+// session event loop treats them as clean disconnects.
 func (t *transport) ReceiveEvent() (poly.Event, error) {
 	_, data, err := t.conn.Read(t.ctx)
 	if err != nil {
@@ -79,6 +74,7 @@ func (t *transport) ReceiveEvent() (poly.Event, error) {
 	return ev, nil
 }
 
+// Close sends a normal closure frame and terminates the connection.
 func (t *transport) Close() error {
 	return t.conn.Close(websocket.StatusNormalClosure, "session closed")
 }

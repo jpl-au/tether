@@ -76,12 +76,18 @@
   // --- Message handling ---
 
   function applyMessage(msg) {
-    if (msg.type === "patch" && msg.patches) {
+    if (msg.type !== "update") return;
+
+    // Apply content patches first, then structural morphs.
+    if (msg.patches) {
       for (var i = 0; i < msg.patches.length; i++) {
         applyPatch(msg.patches[i]);
       }
-    } else if (msg.type === "full" && msg.html) {
-      applyFull(msg.html);
+    }
+    if (msg.morphs) {
+      for (var i = 0; i < msg.morphs.length; i++) {
+        applyMorph(msg.morphs[i]);
+      }
     }
   }
 
@@ -97,15 +103,22 @@
     Idiomorph.morph(el, newEl);
   }
 
-  function applyFull(html) {
-    if (!root) return;
-
+  function applyMorph(morph) {
     var template = document.createElement("template");
-    template.innerHTML = html;
-    var newRoot = template.content.firstElementChild;
-    if (!newRoot) return;
+    template.innerHTML = morph.html;
+    var newEl = template.content.firstElementChild;
+    if (!newEl) return;
 
-    Idiomorph.morph(root, newRoot);
+    if (!morph.key) {
+      // Empty key targets the root element. Use innerHTML mode so
+      // idiomorph morphs root's children without replacing root itself
+      // (which carries data-poly-root, data-poly-session, etc.).
+      if (root) Idiomorph.morph(root, newEl, {morphStyle: "innerHTML"});
+    } else {
+      // Scoped morph targets a keyed container.
+      var el = document.querySelector('[data-poly-key="' + morph.key + '"]');
+      if (el) Idiomorph.morph(el, newEl);
+    }
   }
 
   // --- Event delegation ---
@@ -134,7 +147,10 @@
       var action = target.getAttribute("data-" + dataAttr);
       if (!action) return;
 
-      // Prevent default for submit events
+      // Prevent default for submit events and reset the form after
+      // sending so the input fields clear. The server re-renders with
+      // empty values but the form isn't inside a Dynamic key, so the
+      // client needs to clear it locally.
       if (domEvent === "submit") {
         e.preventDefault();
       }
@@ -176,6 +192,12 @@
       }
 
       sendEvent(domEvent, action, data);
+
+      // Clear form fields after submit so the user can type again
+      // without manually selecting and deleting the old input.
+      if (domEvent === "submit") {
+        target.reset();
+      }
     }, domEvent === "focus" || domEvent === "blur");
   }
 

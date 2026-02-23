@@ -1,15 +1,38 @@
+// Package poly is a reactive server-driven UI layer for Go. It connects
+// Fluent node trees to the browser via a persistent transport (typically
+// WebSocket), sending only the parts that changed as targeted patches.
+// The client morphs the DOM in place using idiomorph, preserving input
+// focus, scroll position, and form state.
+//
+// The central type is [Config], which wires together state, rendering,
+// and event handling for a single page. Pass it to [New] to get an
+// [http.Handler] that manages the full session lifecycle: initial HTML
+// render, transport upgrade, event loop, diffing, reconnection, and
+// idle/lifetime reaping.
+//
+// Updates flow through a unified protocol. Each message is a single
+// "update" type containing either content patches (targeted key updates)
+// or structural morphs (DOM changes applied via idiomorph). The
+// [Transport] interface abstracts the wire — see the ws sub-package for
+// the WebSocket implementation.
+//
+// Event binding helpers ([Click], [Submit], [Input], [Change], [KeyDown],
+// [Focus], [Blur]) attach data-poly-* attributes to Fluent elements so
+// the client JS knows which DOM events to forward.
 package poly
 
 import (
 	"bytes"
 	"crypto/rand"
 	"encoding/hex"
+	"io"
 	"log/slog"
 	"net/http"
 	"sync"
 	"time"
 
 	jit "github.com/jpl-au/fluent-jit"
+	"github.com/jpl-au/fluent/node"
 )
 
 // Config configures a poly handler. The type parameter S is the session
@@ -58,6 +81,14 @@ type Config[S any] struct {
 	// client can reattach. Zero defaults to 30 seconds. Set to -1 to
 	// disable reconnection (sessions are destroyed on disconnect).
 	ReconnectTimeout time.Duration
+
+	// Layout wraps the poly content in a full HTML document. The argument
+	// is a node that renders the poly root div and client scripts. Return
+	// a complete document tree (e.g. html.New(head.New(...), body.New(content))).
+	//
+	// When nil, the handler outputs a bare HTML fragment (the poly root
+	// div and scripts only), which puts the browser in quirks mode.
+	Layout func(content node.Node) node.Node
 }
 
 // New creates an http.Handler that manages poly sessions.
@@ -88,8 +119,9 @@ func New[S any](cfg Config[S]) http.Handler {
 	return h
 }
 
-// pendingSession holds a pre-warmed session created during the initial
-// GET request, waiting for the WebSocket to attach.
+// pendingSession holds a pre-warmed session created during the initial GET
+// request. The state and differ are seeded so that the WebSocket can attach
+// without repeating the initial render.
 type pendingSession[S any] struct {
 	state     S
 	differ    *jit.Differ
@@ -100,6 +132,9 @@ type pendingSession[S any] struct {
 // WebSocket connection before being discarded.
 const pendingTimeout = 30 * time.Second
 
+// handler is the core HTTP handler. It maintains three pools of sessions:
+// pending (pre-warmed, waiting for WebSocket), active (connected and
+// processing events), and disconnected (waiting for client to reconnect).
 type handler[S any] struct {
 	cfg          Config[S]
 	mu           sync.Mutex
@@ -108,6 +143,8 @@ type handler[S any] struct {
 	disconnected map[string]*Session[S]
 }
 
+// ServeHTTP routes requests: WebSocket upgrades start a session event
+// loop, plain GET requests serve the initial HTML page.
 func (h *handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Header.Get("Upgrade") == "websocket" {
 		h.serveSession(w, r)
@@ -121,6 +158,8 @@ func (h *handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // injects the client runtime. The session ID is embedded in the root
 // element so the client can attach to it on WebSocket connect.
 func (h *handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
+	h.cfg.Logger.Info("serving initial page")
+
 	h.mu.Lock()
 	if h.cfg.MaxSessions > 0 && len(h.pending)+len(h.active)+len(h.disconnected) >= h.cfg.MaxSessions {
 		h.mu.Unlock()
@@ -141,17 +180,14 @@ func (h *handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 	h.pending[id] = &pendingSession[S]{state: state, differ: differ, createdAt: now}
 	h.mu.Unlock()
 
-	var buf bytes.Buffer
-	buf.WriteString(`<div data-poly-root data-poly-endpoint="`)
-	buf.WriteString(r.URL.Path)
-	buf.WriteString(`" data-poly-session="`)
-	buf.WriteString(id)
-	buf.WriteString(`">`)
-	buf.Write(html)
-	buf.WriteString("</div>\n<script src=\"/_poly/idiomorph.min.js\"></script>\n<script src=\"/_poly/fluent-poly.js\"></script>\n")
+	content := &polyBody{html: html, endpoint: r.URL.Path, session: id}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	buf.WriteTo(w)
+	if h.cfg.Layout != nil {
+		h.cfg.Layout(content).Render(w)
+	} else {
+		content.Render(w)
+	}
 }
 
 // serveSession upgrades the connection and runs the session event loop.
@@ -244,7 +280,10 @@ func (h *handler[S]) reattach(sess *Session[S], transport Transport) {
 	html := sess.differ.Render(tree)
 	sess.mu.Unlock()
 
-	if err := transport.SendFull(html); err != nil {
+	update := Update{
+		Morphs: []Morph{{Key: "", HTML: html}},
+	}
+	if err := transport.SendUpdate(update); err != nil {
 		sess.logger.Error("reattach send error", "session", sess.id, "err", err)
 	}
 
@@ -332,6 +371,40 @@ func ServeClient() http.Handler {
 	return http.FileServer(http.FS(clientFiles()))
 }
 
+// polyBody is a node.Node that renders the poly root div (with the
+// pre-rendered session content inside) and the client script tags.
+// It exists so the Layout function receives a composable node rather
+// than raw bytes.
+type polyBody struct {
+	html     []byte
+	endpoint string
+	session  string
+}
+
+func (p *polyBody) Render(w ...io.Writer) []byte {
+	var buf bytes.Buffer
+	p.RenderBuilder(&buf)
+	if len(w) > 0 && w[0] != nil {
+		buf.WriteTo(w[0])
+		return nil
+	}
+	return buf.Bytes()
+}
+
+func (p *polyBody) RenderBuilder(buf *bytes.Buffer) {
+	buf.WriteString(`<div data-poly-root data-poly-endpoint="`)
+	buf.WriteString(p.endpoint)
+	buf.WriteString(`" data-poly-session="`)
+	buf.WriteString(p.session)
+	buf.WriteString(`">`)
+	buf.Write(p.html)
+	buf.WriteString("</div>\n<script src=\"/_poly/idiomorph.min.js\"></script>\n<script src=\"/_poly/fluent-poly.js\"></script>\n")
+}
+
+func (p *polyBody) Nodes() []node.Node { return nil }
+
+// newID generates a cryptographically random 32-character hex string
+// for use as a session identifier.
 func newID() string {
 	b := make([]byte, 16)
 	rand.Read(b)

@@ -13,6 +13,8 @@ package poly
 // The generic constraint ensures these only compile on types that have
 // a chainable SetData method (i.e. any Fluent element).
 
+// settable is the structural type constraint for event binding helpers.
+// Any Fluent element with a chainable SetData method satisfies it.
 type settable[E any] interface {
 	SetData(string, string) E
 }

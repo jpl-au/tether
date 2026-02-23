@@ -5,6 +5,9 @@ import (
 	"io/fs"
 )
 
+// clientFS embeds the client-side JS runtime and the idiomorph library.
+// These files are served by ServeClient() at the /_poly/ mount point.
+//
 //go:embed client/fluent-poly.js client/idiomorph.min.js
 var clientFS embed.FS
 

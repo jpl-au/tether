@@ -2,48 +2,68 @@ package poly
 
 import jit "github.com/jpl-au/fluent-jit"
 
-// PatchMessage is the JSON envelope for targeted patches sent to the client.
-// The server sends these when only specific keyed elements have changed.
-type PatchMessage struct {
-	Type    string       `json:"type"`
-	Patches []PatchEntry `json:"patches"`
+// Update is the server-side representation of changes to send to the client.
+// It contains content patches (targeted key updates) and/or morphs
+// (structural DOM changes applied via idiomorph).
+type Update struct {
+	Patches []jit.Patch
+	Morphs  []Morph
 }
 
-// PatchEntry is a single key+html pair within a patch message.
+// Morph represents a structural change to a keyed container or the root.
+// An empty Key targets the root element.
+type Morph struct {
+	Key  string
+	HTML []byte
+}
+
+// UpdateMessage is the JSON envelope sent over the wire.
+// Patches and morphs are sent together so the client can apply them
+// in a single pass — content updates first, then structural changes.
+type UpdateMessage struct {
+	Type    string       `json:"type"`
+	Patches []PatchEntry `json:"patches,omitempty"`
+	Morphs  []MorphEntry `json:"morphs,omitempty"`
+}
+
+// PatchEntry is a single key+html pair within an update message.
 type PatchEntry struct {
 	Key  string `json:"key"`
 	HTML string `json:"html"`
 }
 
-// FullMessage is the JSON envelope for a complete re-render sent to the client.
-type FullMessage struct {
-	Type string `json:"type"`
+// MorphEntry is a single key+html pair for a structural morph.
+// An empty key targets the root element.
+type MorphEntry struct {
+	Key  string `json:"key"`
 	HTML string `json:"html"`
 }
 
-// EncodePatch builds a PatchMessage from jit.Patch values.
+// EncodeUpdate builds an UpdateMessage from an Update.
 // Transport implementations use this to create the wire format
 // before marshalling to JSON.
-func EncodePatch(patches []jit.Patch) PatchMessage {
-	entries := make([]PatchEntry, len(patches))
-	for i, p := range patches {
-		entries[i] = PatchEntry{
-			Key:  p.Key,
-			HTML: string(p.HTML),
+func EncodeUpdate(update Update) UpdateMessage {
+	msg := UpdateMessage{Type: "update"}
+
+	if len(update.Patches) > 0 {
+		msg.Patches = make([]PatchEntry, len(update.Patches))
+		for i, p := range update.Patches {
+			msg.Patches[i] = PatchEntry{
+				Key:  p.Key,
+				HTML: string(p.HTML),
+			}
 		}
 	}
-	return PatchMessage{
-		Type:    "patch",
-		Patches: entries,
-	}
-}
 
-// EncodeFull builds a FullMessage from raw HTML bytes.
-// Transport implementations use this to create the wire format
-// before marshalling to JSON.
-func EncodeFull(html []byte) FullMessage {
-	return FullMessage{
-		Type: "full",
-		HTML: string(html),
+	if len(update.Morphs) > 0 {
+		msg.Morphs = make([]MorphEntry, len(update.Morphs))
+		for i, m := range update.Morphs {
+			msg.Morphs[i] = MorphEntry{
+				Key:  m.Key,
+				HTML: string(m.HTML),
+			}
+		}
 	}
+
+	return msg
 }

@@ -2,6 +2,7 @@ package poly
 
 import (
 	"io"
+	"log/slog"
 	"sync"
 	"testing"
 
@@ -11,27 +12,41 @@ import (
 	"github.com/jpl-au/fluent/node"
 )
 
-// mockTransport records sent messages and replays queued events,
+// patchUpdates returns all updates that contained patches (no morphs).
+func patchUpdates(updates []Update) []Update {
+	var result []Update
+	for _, u := range updates {
+		if len(u.Patches) > 0 && len(u.Morphs) == 0 {
+			result = append(result, u)
+		}
+	}
+	return result
+}
+
+// morphUpdates returns all updates that contained morphs.
+func morphUpdates(updates []Update) []Update {
+	var result []Update
+	for _, u := range updates {
+		if len(u.Morphs) > 0 {
+			result = append(result, u)
+		}
+	}
+	return result
+}
+
+// mockTransport records sent updates and replays queued events,
 // allowing session event loop tests without a real connection.
 type mockTransport struct {
 	mu      sync.Mutex
 	events  []Event
-	patches [][]jit.Patch
-	fulls   [][]byte
+	updates []Update
 	closed  bool
 }
 
-func (m *mockTransport) SendPatches(patches []jit.Patch) error {
+func (m *mockTransport) SendUpdate(update Update) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.patches = append(m.patches, patches)
-	return nil
-}
-
-func (m *mockTransport) SendFull(html []byte) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.fulls = append(m.fulls, html)
+	m.updates = append(m.updates, update)
 	return nil
 }
 
@@ -101,14 +116,15 @@ func TestSessionSendsPatchOnChange(t *testing.T) {
 	mt.mu.Lock()
 	defer mt.mu.Unlock()
 
-	if len(mt.patches) != 1 {
-		t.Fatalf("expected 1 patch send, got %d", len(mt.patches))
+	pUpdates := patchUpdates(mt.updates)
+	if len(pUpdates) != 1 {
+		t.Fatalf("expected 1 patch update, got %d", len(pUpdates))
 	}
-	if len(mt.patches[0]) != 1 {
-		t.Fatalf("expected 1 patch in first send, got %d", len(mt.patches[0]))
+	if len(pUpdates[0].Patches) != 1 {
+		t.Fatalf("expected 1 patch in first update, got %d", len(pUpdates[0].Patches))
 	}
-	if mt.patches[0][0].Key != "count" {
-		t.Errorf("patch key should be %q, got %q", "count", mt.patches[0][0].Key)
+	if pUpdates[0].Patches[0].Key != "count" {
+		t.Errorf("patch key should be %q, got %q", "count", pUpdates[0].Patches[0].Key)
 	}
 	if !mt.closed {
 		t.Error("transport should be closed after event loop exits")
@@ -141,8 +157,8 @@ func TestSessionNoPatchWhenUnchanged(t *testing.T) {
 	mt.mu.Lock()
 	defer mt.mu.Unlock()
 
-	if len(mt.patches) != 0 {
-		t.Errorf("expected no patches when state unchanged, got %d", len(mt.patches))
+	if len(patchUpdates(mt.updates)) != 0 {
+		t.Errorf("expected no patch updates when state unchanged, got %d", len(patchUpdates(mt.updates)))
 	}
 }
 
@@ -174,11 +190,8 @@ func TestSessionEqualSkipsDiff(t *testing.T) {
 	mt.mu.Lock()
 	defer mt.mu.Unlock()
 
-	if len(mt.patches) != 0 {
-		t.Errorf("expected no patches when Equal returns true, got %d", len(mt.patches))
-	}
-	if len(mt.fulls) != 0 {
-		t.Errorf("expected no full renders when Equal returns true, got %d", len(mt.fulls))
+	if len(mt.updates) != 0 {
+		t.Errorf("expected no updates when Equal returns true, got %d", len(mt.updates))
 	}
 }
 
@@ -209,8 +222,9 @@ func TestSessionMultipleEvents(t *testing.T) {
 	mt.mu.Lock()
 	defer mt.mu.Unlock()
 
-	if len(mt.patches) != 3 {
-		t.Fatalf("expected 3 patch sends, got %d", len(mt.patches))
+	pUpdates := patchUpdates(mt.updates)
+	if len(pUpdates) != 3 {
+		t.Fatalf("expected 3 patch updates, got %d", len(pUpdates))
 	}
 
 	// Final state should be Count: 3
@@ -258,6 +272,7 @@ func TestSessionStructuralChange(t *testing.T) {
 		handle:    handle,
 		differ:    differ,
 		transport: mt,
+		logger:    slog.Default(),
 	}
 
 	tree := sess.render(sess.state)
@@ -268,12 +283,13 @@ func TestSessionStructuralChange(t *testing.T) {
 	mt.mu.Lock()
 	defer mt.mu.Unlock()
 
-	// Structural change — should send a full render, not patches
-	if len(mt.fulls) != 1 {
-		t.Fatalf("expected 1 full render for structural change, got %d", len(mt.fulls))
+	// Structural change — should send a morph, not patches
+	mUpdates := morphUpdates(mt.updates)
+	if len(mUpdates) != 1 {
+		t.Fatalf("expected 1 morph update for structural change, got %d", len(mUpdates))
 	}
-	if len(mt.patches) != 0 {
-		t.Errorf("expected no patches for structural change, got %d", len(mt.patches))
+	if len(patchUpdates(mt.updates)) != 0 {
+		t.Errorf("expected no patch updates for structural change, got %d", len(patchUpdates(mt.updates)))
 	}
 }
 

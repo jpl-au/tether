@@ -102,7 +102,7 @@ func (s *Session[S]) handleEvent(ev Event) {
 }
 
 // applyState sets the new state, diffs the rendered tree, and sends
-// patches to the client. Caller must hold s.mu.
+// an update to the client. Caller must hold s.mu.
 func (s *Session[S]) applyState(newState S) {
 	if s.equal != nil && s.equal(s.state, newState) {
 		return
@@ -111,20 +111,31 @@ func (s *Session[S]) applyState(newState S) {
 	s.state = newState
 	tree := s.render(s.state)
 
-	patches, structural := s.differ.Diff(tree)
-	if structural {
-		// Keys were added or removed — full re-render. The client
-		// uses idiomorph to morph the entire root, preserving DOM state.
+	patches, change := s.differ.Diff(tree)
+	if change != nil {
+		// Keys were added, removed, or reordered — morph the root.
+		// The client uses idiomorph to morph the entire root, preserving
+		// focus, scroll position, and form state.
 		html := s.differ.Render(tree)
-		if err := s.transport.SendFull(html); err != nil {
-			s.logger.Error("send full error", "session", s.id, "err", err)
+		s.logger.Warn("structural change, sending root morph",
+			"session", s.id,
+			"change", change.String(),
+			"bytes", len(html),
+			"tip", "wrap conditional elements in a keyed container to scope this morph",
+		)
+		update := Update{
+			Morphs: []Morph{{Key: "", HTML: html}},
+		}
+		if err := s.transport.SendUpdate(update); err != nil {
+			s.logger.Error("send update error", "session", s.id, "err", err)
 		}
 		return
 	}
 
 	if len(patches) > 0 {
-		if err := s.transport.SendPatches(patches); err != nil {
-			s.logger.Error("send patches error", "session", s.id, "err", err)
+		update := Update{Patches: patches}
+		if err := s.transport.SendUpdate(update); err != nil {
+			s.logger.Error("send update error", "session", s.id, "err", err)
 		}
 	}
 }

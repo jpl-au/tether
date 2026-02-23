@@ -34,9 +34,31 @@ Transport implementations live in sub-packages. The `Config.Upgrade` field accep
 2. `Transport.ReceiveEvent()` deserialises it to an `Event`
 3. `Session.handleEvent()` calls the user's `Handle` function with the current state
 4. The returned state is rendered to a new node tree and diffed against the previous render
-5. If keys changed (structural): `Transport.SendFull()` sends the full HTML
-6. If only values changed: `Transport.SendPatches()` sends targeted patches
-7. Client JS morphs the DOM in place via idiomorph
+5. `Transport.SendUpdate()` sends a unified update message containing either:
+   - **Patches** — targeted content updates for keyed elements that changed
+   - **Morphs** — structural DOM changes (e.g. root morph when keys are added/removed/reordered)
+6. Client JS applies patches first (targeted `Idiomorph.morph` on keyed elements), then morphs (root or scoped `Idiomorph.morph`)
+
+### Wire format
+
+All updates use a single `"update"` message type:
+
+```json
+{"type":"update","patches":[{"key":"count","html":"<span>43</span>"}]}
+{"type":"update","morphs":[{"key":"","html":"<div>...</div>"}]}
+```
+
+An empty `key` in morphs targets the root element. A non-empty key targets a specific keyed container (for scoped morphs).
+
+### Structural change diagnostics
+
+When a structural change is detected (keys added, removed, or reordered), the session logs a warning with actionable details:
+
+```
+WARN structural change, sending root morph session=abc change="key 'help' added" bytes=15234 tip="wrap conditional elements in a keyed container to scope this morph"
+```
+
+The `change` field comes from `jit.StructuralChange.String()`, which reports exactly which keys were added, removed, or if they were reordered. The `tip` guides the developer toward wrapping conditional elements in a stable keyed container to avoid full-page morphs.
 
 ## Event binding
 
@@ -71,7 +93,7 @@ The generic helpers (`Click`, `Submit`, `Input`, `Change`, `KeyDown`, `Focus`, `
 
 Tests live alongside the code they test (`session_test.go`, `protocol_test.go`, `bind_test.go`). The `bind_test.go` tests use `package poly_test` (black-box) because they verify the public API with real Fluent elements.
 
-`session_test.go` uses a `mockTransport` that replays queued events and records sent messages. Use this pattern for any new session behaviour tests.
+`session_test.go` uses a `mockTransport` that replays queued events and records sent `Update` values. Helper functions `patchUpdates()` and `morphUpdates()` filter recorded updates by type for assertions. Use this pattern for any new session behaviour tests.
 
 ## Client JS
 
@@ -89,5 +111,5 @@ Input events are debounced at 300ms by default, configurable per element via `da
 
 ## Security
 
-- `ws.Upgrade` currently sets `InsecureSkipVerify: true` for development. Production deployments must configure allowed origins.
+- `ws.Upgrade()` sets `InsecureSkipVerify: true` for development. Pass origin patterns for production: `ws.Upgrade("https://example.com")`.
 - Event data comes from the client — always validate in the `Handle` function.

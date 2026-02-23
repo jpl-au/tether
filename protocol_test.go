@@ -7,16 +7,18 @@ import (
 	jit "github.com/jpl-au/fluent-jit"
 )
 
-func TestEncodePatch(t *testing.T) {
-	patches := []jit.Patch{
-		{Key: "count", HTML: []byte(`<span data-poly-key="count">42</span>`)},
-		{Key: "name", HTML: []byte(`<span data-poly-key="name">Alice</span>`)},
+func TestEncodeUpdateWithPatches(t *testing.T) {
+	update := Update{
+		Patches: []jit.Patch{
+			{Key: "count", HTML: []byte(`<span data-poly-key="count">42</span>`)},
+			{Key: "name", HTML: []byte(`<span data-poly-key="name">Alice</span>`)},
+		},
 	}
 
-	msg := EncodePatch(patches)
+	msg := EncodeUpdate(update)
 
-	if msg.Type != "patch" {
-		t.Errorf("type should be %q, got %q", "patch", msg.Type)
+	if msg.Type != "update" {
+		t.Errorf("type should be %q, got %q", "update", msg.Type)
 	}
 	if len(msg.Patches) != 2 {
 		t.Fatalf("expected 2 patches, got %d", len(msg.Patches))
@@ -26,6 +28,9 @@ func TestEncodePatch(t *testing.T) {
 	}
 	if msg.Patches[1].Key != "name" {
 		t.Errorf("second patch key should be %q, got %q", "name", msg.Patches[1].Key)
+	}
+	if msg.Morphs != nil {
+		t.Error("patches-only update should have nil morphs")
 	}
 
 	// Verify it serialises to valid JSON
@@ -38,20 +43,33 @@ func TestEncodePatch(t *testing.T) {
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		t.Fatalf("failed to unmarshal: %v", err)
 	}
-	if decoded["type"] != "patch" {
-		t.Errorf("decoded type should be %q, got %v", "patch", decoded["type"])
+	if decoded["type"] != "update" {
+		t.Errorf("decoded type should be %q, got %v", "update", decoded["type"])
 	}
 }
 
-func TestEncodeFull(t *testing.T) {
+func TestEncodeUpdateWithMorphs(t *testing.T) {
 	html := []byte(`<div data-poly-root><span>hello</span></div>`)
-	msg := EncodeFull(html)
-
-	if msg.Type != "full" {
-		t.Errorf("type should be %q, got %q", "full", msg.Type)
+	update := Update{
+		Morphs: []Morph{{Key: "", HTML: html}},
 	}
-	if msg.HTML != string(html) {
-		t.Errorf("HTML mismatch: got %q", msg.HTML)
+
+	msg := EncodeUpdate(update)
+
+	if msg.Type != "update" {
+		t.Errorf("type should be %q, got %q", "update", msg.Type)
+	}
+	if len(msg.Morphs) != 1 {
+		t.Fatalf("expected 1 morph, got %d", len(msg.Morphs))
+	}
+	if msg.Morphs[0].Key != "" {
+		t.Errorf("root morph key should be empty, got %q", msg.Morphs[0].Key)
+	}
+	if msg.Morphs[0].HTML != string(html) {
+		t.Errorf("morph HTML mismatch: got %q", msg.Morphs[0].HTML)
+	}
+	if msg.Patches != nil {
+		t.Error("morphs-only update should have nil patches")
 	}
 
 	data, err := json.Marshal(msg)
@@ -63,8 +81,8 @@ func TestEncodeFull(t *testing.T) {
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		t.Fatalf("failed to unmarshal: %v", err)
 	}
-	if decoded["type"] != "full" {
-		t.Errorf("decoded type should be %q, got %v", "full", decoded["type"])
+	if decoded["type"] != "update" {
+		t.Errorf("decoded type should be %q, got %v", "update", decoded["type"])
 	}
 }
 

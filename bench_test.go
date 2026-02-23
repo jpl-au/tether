@@ -57,19 +57,19 @@ func BenchmarkSetDataDirectRenderOnly(b *testing.B) {
 // Protocol encoding
 // ---------------------------------------------------------------------------
 
-func BenchmarkEncodePatch1(b *testing.B) {
-	benchEncodePatch(b, 1)
+func BenchmarkEncodeUpdatePatches1(b *testing.B) {
+	benchEncodeUpdatePatches(b, 1)
 }
 
-func BenchmarkEncodePatch10(b *testing.B) {
-	benchEncodePatch(b, 10)
+func BenchmarkEncodeUpdatePatches10(b *testing.B) {
+	benchEncodeUpdatePatches(b, 10)
 }
 
-func BenchmarkEncodePatch100(b *testing.B) {
-	benchEncodePatch(b, 100)
+func BenchmarkEncodeUpdatePatches100(b *testing.B) {
+	benchEncodeUpdatePatches(b, 100)
 }
 
-func benchEncodePatch(b *testing.B, n int) {
+func benchEncodeUpdatePatches(b *testing.B, n int) {
 	patches := make([]jit.Patch, n)
 	for i := range patches {
 		key := fmt.Sprintf("key-%d", i)
@@ -78,19 +78,23 @@ func benchEncodePatch(b *testing.B, n int) {
 			HTML: []byte(fmt.Sprintf(`<span data-poly-key="%s">value %d</span>`, key, i)),
 		}
 	}
+	update := Update{Patches: patches}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		msg := EncodePatch(patches)
+		msg := EncodeUpdate(update)
 		data, _ := json.Marshal(msg)
 		_ = data
 	}
 }
 
-func BenchmarkEncodeFull(b *testing.B) {
+func BenchmarkEncodeUpdateMorph(b *testing.B) {
 	html := []byte(`<div data-poly-root><span data-poly-key="count">42</span><span data-poly-key="name">Alice</span></div>`)
+	update := Update{
+		Morphs: []Morph{{Key: "", HTML: html}},
+	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		msg := EncodeFull(html)
+		msg := EncodeUpdate(update)
 		data, _ := json.Marshal(msg)
 		_ = data
 	}
@@ -123,8 +127,7 @@ type discardTransport struct {
 	events []Event
 }
 
-func (d *discardTransport) SendPatches(_ []jit.Patch) error { return nil }
-func (d *discardTransport) SendFull(_ []byte) error         { return nil }
+func (d *discardTransport) SendUpdate(_ Update) error { return nil }
 func (d *discardTransport) ReceiveEvent() (Event, error) {
 	d.mu.Lock()
 	if len(d.events) == 0 {
@@ -197,8 +200,8 @@ func benchDiffScale(b *testing.B, n int) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		tree := render(i + 1)
-		patches, structural := differ.Diff(tree)
-		if structural {
+		patches, change := differ.Diff(tree)
+		if change != nil {
 			differ.Render(tree)
 		}
 		_ = patches

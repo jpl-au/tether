@@ -18,7 +18,7 @@ import (
 )
 
 mux.Handle("/counter", poly.New(poly.Config[CounterState]{
-    Upgrade: ws.Upgrade,
+    Upgrade: ws.Upgrade(),
     InitialState: func(r *http.Request) CounterState {
         return CounterState{Count: 0}
     },
@@ -41,6 +41,28 @@ mux.Handle("/_poly/", http.StripPrefix("/_poly/", poly.ServeClient()))
 ```
 
 No WebSocket boilerplate. No JavaScript to write. No diff algorithm to understand.
+
+## How updates reach the browser
+
+fluent-poly uses a unified update protocol. Every message sent to the client is a single `"update"` type containing either **patches** (targeted content updates) or **morphs** (structural DOM changes):
+
+```json
+{"type":"update","patches":[{"key":"count","html":"<span>43</span>"}]}
+{"type":"update","morphs":[{"key":"","html":"<div>...</div>"}]}
+```
+
+When only content changes (the common case), patches target specific keyed elements. When the structure changes — keys added, removed, or reordered — the server sends a root morph and the client uses [idiomorph](https://github.com/bigskysoftware/idiomorph) to update the entire root while preserving focus, scroll position, and form state.
+
+### Structural change diagnostics
+
+When a structural change triggers a root morph, the server logs a warning with details:
+
+```
+WARN structural change, sending root morph session=abc change="key 'help' added" bytes=15234
+     tip="wrap conditional elements in a keyed container to scope this morph"
+```
+
+This tells you exactly what changed and how to avoid the cost. Wrapping conditional elements in a stable keyed container keeps morphs scoped instead of full-page.
 
 ## Event binding
 
