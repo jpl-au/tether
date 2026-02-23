@@ -73,12 +73,25 @@ func (s *Session[S]) run() {
 	}
 }
 
+// Update applies a state change from outside the event loop and pushes
+// the resulting diff to the client. Safe to call from any goroutine.
+// Use this for server-initiated updates like timers, database changes,
+// or broadcasts from other sessions.
+func (s *Session[S]) Update(fn func(S) S) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.applyState(fn(s.state))
+}
+
 // handleEvent processes a single event. Caller must hold s.mu.
 func (s *Session[S]) handleEvent(ev Event) {
-	newState := s.handle(s.state, ev)
+	s.applyState(s.handle(s.state, ev))
+}
 
-	// If an Equal function is provided and the state hasn't changed,
-	// skip the diff entirely — nothing to send.
+// applyState sets the new state, diffs the rendered tree, and sends
+// patches to the client. Caller must hold s.mu.
+func (s *Session[S]) applyState(newState S) {
 	if s.equal != nil && s.equal(s.state, newState) {
 		return
 	}
