@@ -40,6 +40,7 @@
 
     ws.onopen = function () {
       retryDelay = 1000;
+      if (root) root.classList.remove("poly-disconnected");
     };
 
     ws.onmessage = function (e) {
@@ -53,6 +54,7 @@
     };
 
     ws.onclose = function () {
+      if (root) root.classList.add("poly-disconnected");
       scheduleReconnect();
     };
 
