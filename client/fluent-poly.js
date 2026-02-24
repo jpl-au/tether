@@ -336,6 +336,18 @@ window.Poly.hooks = window.Poly.hooks || {};
   }
 
   function replayQueuedEvents() {
+    // When a service worker is active, delegate replay to it via
+    // Background Sync. The worker replays events for all sessions and
+    // is already listening for the sync event. Replaying from both the
+    // main thread and the worker would cause duplicate POSTs.
+    if (navigator.serviceWorker && navigator.serviceWorker.controller && "SyncManager" in window) {
+      navigator.serviceWorker.ready.then(function (reg) {
+        reg.sync.register("poly-event-sync");
+      });
+      return;
+    }
+
+    // No active worker — replay from the main thread as a fallback.
     openEventDB().then(function (db) {
       var tx = db.transaction(EVENT_STORE, "readonly");
       var store = tx.objectStore(EVENT_STORE);
