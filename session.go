@@ -1,6 +1,7 @@
 package poly
 
 import (
+	"errors"
 	"io"
 	"log/slog"
 	"net/url"
@@ -88,7 +89,7 @@ func (s *Session[S]) run() {
 	for {
 		ev, err := s.transport.ReceiveEvent()
 		if err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				return
 			}
 			s.logger.Error("receive error", "session", s.id, "err", err)
