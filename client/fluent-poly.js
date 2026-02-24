@@ -367,6 +367,10 @@
         data.value = target.value || "";
       } else if (domEvent === "keydown") {
         data.key = e.key || "";
+        if (e.ctrlKey) data.ctrl = "true";
+        if (e.shiftKey) data.shift = "true";
+        if (e.altKey) data.alt = "true";
+        if (e.metaKey) data.meta = "true";
       } else if (domEvent === "submit") {
         var formData = new FormData(target);
         formData.forEach(function (value, key) {
