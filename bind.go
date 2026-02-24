@@ -146,10 +146,11 @@ func Preserve[E settable[E]](el E) E {
 
 // AutoFocus marks an element to receive focus after the next server
 // update. The JS runtime calls focus() on the first element with
-// data-poly-focus after applying patches and morphs. Only one element
-// should have this attribute at a time.
+// data-poly-autofocus after applying patches and morphs. Only one
+// element should have this attribute at a time. This uses a separate
+// attribute from the Focus event binding to avoid collisions.
 func AutoFocus[E settable[E]](el E) E {
-	return el.SetData("poly-focus", "")
+	return el.SetData("poly-autofocus", "")
 }
 
 // --- JS hooks ---

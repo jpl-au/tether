@@ -40,6 +40,7 @@ window.Poly.hooks = window.Poly.hooks || {};
   var connectionMode = "ws";
   var eventSource = null;
   var wsOpened = false;
+  var sseOpened = false;
 
   // --- Initialisation ---
 
@@ -82,9 +83,17 @@ window.Poly.hooks = window.Poly.hooks || {};
     ws = new WebSocket(url);
 
     ws.onopen = function () {
+      // On reconnect, sync the current URL with the server in case
+      // the user navigated via back/forward while disconnected. The
+      // browser's popstate fires even when offline, changing the URL
+      // without notifying the server.
+      var isReconnect = wsOpened;
       wsOpened = true;
       retryDelay = initialRetryDelay;
       if (root) root.classList.remove("poly-disconnected");
+      if (isReconnect) {
+        sendNavigate(location.pathname + location.search);
+      }
     };
 
     ws.onmessage = function (e) {
@@ -121,8 +130,15 @@ window.Poly.hooks = window.Poly.hooks || {};
     eventSource = new EventSource(url);
 
     eventSource.onopen = function () {
+      // On reconnect, sync the current URL with the server in case
+      // the user navigated via back/forward while disconnected.
+      var isReconnect = sseOpened;
+      sseOpened = true;
       retryDelay = initialRetryDelay;
       if (root) root.classList.remove("poly-disconnected");
+      if (isReconnect) {
+        sendNavigate(location.pathname + location.search);
+      }
     };
 
     eventSource.onmessage = function (e) {
@@ -184,7 +200,9 @@ window.Poly.hooks = window.Poly.hooks || {};
       }
 
       // Set focus on the designated element after all DOM updates.
-      var focusEl = root.querySelector("[data-poly-focus]");
+      // Uses data-poly-autofocus (not data-poly-focus, which is the
+      // event binding attribute for the Focus helper).
+      var focusEl = root.querySelector("[data-poly-autofocus]");
       if (focusEl) focusEl.focus();
     });
   }
@@ -332,14 +350,13 @@ window.Poly.hooks = window.Poly.hooks || {};
         }
       }
 
+      var fallbackTimer = setTimeout(remove, transitionTimeout);
+
       oldNode.addEventListener("transitionend", function handler() {
         oldNode.removeEventListener("transitionend", handler);
+        clearTimeout(fallbackTimer);
         remove();
       });
-
-      // Fallback: remove if transitionend never fires (e.g. no CSS
-      // transition defined, or transition property removed).
-      setTimeout(remove, transitionTimeout);
 
       return false; // prevent immediate removal
     },
@@ -432,15 +449,19 @@ window.Poly.hooks = window.Poly.hooks || {};
     if (!href || href.indexOf("://") !== -1 || href.indexOf("//") === 0) return;
 
     e.preventDefault();
-    history.pushState({}, "", href);
-    sendNavigate(href);
+    // Only push to history if the event was actually sent to the
+    // server. If the transport is down, changing the URL would create
+    // a mismatch between the browser URL and the server's state.
+    if (sendNavigate(href)) {
+      history.pushState({}, "", href);
+    }
   }
 
   function sendNavigate(url) {
     var idx = url.indexOf("?");
     var path = idx === -1 ? url : url.substring(0, idx);
     var search = idx === -1 ? "" : url.substring(idx + 1);
-    sendEvent("navigate", "", { path: path, search: search });
+    return sendEvent("navigate", "", { path: path, search: search }) !== null;
   }
 
   function bindEventType(domEvent, dataAttr) {
@@ -468,6 +489,13 @@ window.Poly.hooks = window.Poly.hooks || {};
       // Collect event-specific data
       if (domEvent === "input" || domEvent === "change") {
         data.value = target.value || "";
+        // Checkboxes and radios always report their value attribute
+        // (default "on"), which doesn't tell the server whether the
+        // control is checked or unchecked. Send the checked state so
+        // the server can distinguish between the two.
+        if (target.type === "checkbox" || target.type === "radio") {
+          data.checked = target.checked ? "true" : "false";
+        }
       } else if (domEvent === "keydown") {
         data.key = e.key || "";
         if (e.ctrlKey) data.ctrl = "true";

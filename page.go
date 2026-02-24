@@ -41,7 +41,7 @@ func (p *polyBody) RenderBuilder(buf *bytes.Buffer) {
 	buf.WriteString(`<div data-poly-root data-poly-endpoint="`)
 	buf.WriteString(html.EscapeString(p.endpoint))
 	buf.WriteString(`" data-poly-session="`)
-	buf.WriteString(p.session)
+	buf.WriteString(html.EscapeString(p.session))
 	buf.WriteString(`"`)
 	switch p.transport {
 	case SSEOnly:
