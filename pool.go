@@ -67,6 +67,8 @@ func (h *handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 	content := &polyBody{html: html, endpoint: r.URL.Path, session: id, transport: h.cfg.Mode}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	// Prevent session ID leakage via Referer header on external links.
+	w.Header().Set("Referrer-Policy", "same-origin")
 	if h.cfg.Layout != nil {
 		h.cfg.Layout(content).Render(w)
 	} else {

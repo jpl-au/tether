@@ -26,6 +26,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -195,6 +196,17 @@ func (h *handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // transport). WebSocket transports do not — they receive events on
 // the WebSocket connection directly.
 func (h *handler[S]) handlePostEvent(w http.ResponseWriter, r *http.Request) {
+	// Reject cross-origin POSTs to prevent CSRF. The session ID is a
+	// 128-bit bearer token which is hard to guess, but Origin checking
+	// adds defence in depth against ID leakage.
+	if origin := r.Header.Get("Origin"); origin != "" {
+		u, err := url.Parse(origin)
+		if err != nil || u.Host != r.Host {
+			http.Error(w, "origin not allowed", http.StatusForbidden)
+			return
+		}
+	}
+
 	id := r.URL.Query().Get("session")
 	if id == "" {
 		http.Error(w, "missing session", http.StatusBadRequest)
