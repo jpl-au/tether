@@ -259,19 +259,34 @@ group.Broadcast(func(s State) State {
 })
 ```
 
-## SSE transport
+## Transport mode
 
-Fallback for environments where WebSocket is unreliable:
+Control which transports the handler accepts with the `Mode` field:
 
 ```go
+// WebSocket only (default — Mode can be omitted)
 poly.New(poly.Config[State]{
+    Upgrade: ws.Upgrade(),
+    // ...
+})
+
+// SSE only
+poly.New(poly.Config[State]{
+    Mode:     poly.SSEOnly,
+    Fallback: sse.Upgrade(),
+    // ...
+})
+
+// WebSocket with SSE fallback
+poly.New(poly.Config[State]{
+    Mode:     poly.WebSocketWithFallback,
     Upgrade:  ws.Upgrade(),
     Fallback: sse.Upgrade(),
     // ...
 })
 ```
 
-The client tries WebSocket first and falls back to SSE+POST automatically. Same wire format, same API.
+Same wire format, same API regardless of transport.
 
 ## Performance note
 

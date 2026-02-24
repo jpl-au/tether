@@ -347,31 +347,52 @@ group.Broadcast(func(s State) State {
 
 `Broadcast` snapshots the session pointers before calling `Update` on each, so the group lock is not held while acquiring session locks. `Add`, `Remove`, `Broadcast`, and `Len` are all safe to call from any goroutine.
 
-## SSE transport
+## Transport mode
 
-An alternative to WebSocket for environments where proxies strip upgrade headers or WebSocket connections are unreliable. Server-to-client updates are sent as Server-Sent Events; client-to-server events are sent as HTTP POST.
+The `Mode` field on `Config` controls which transports the handler accepts. It is an enum (`TransportMode`) with three values:
+
+| Mode | Constant | Behaviour |
+|------|----------|-----------|
+| WebSocket only | `poly.WebSocketOnly` | Default. Only WebSocket upgrades are accepted. `Fallback` is ignored. |
+| SSE only | `poly.SSEOnly` | Only SSE+POST. `Upgrade` is ignored; `Fallback` must be set. |
+| Auto fallback | `poly.WebSocketWithFallback` | Tries WebSocket first; falls back to SSE+POST if the initial connection fails. Both `Upgrade` and `Fallback` must be set. |
 
 ```go
-// WebSocket primary, SSE fallback
+// WebSocket only (default — Mode can be omitted)
 poly.New(poly.Config[State]{
+    Upgrade: ws.Upgrade(),
+    // ...
+})
+
+// SSE only
+poly.New(poly.Config[State]{
+    Mode:     poly.SSEOnly,
+    Fallback: sse.Upgrade(),
+    // ...
+})
+
+// WebSocket with SSE fallback
+poly.New(poly.Config[State]{
+    Mode:     poly.WebSocketWithFallback,
     Upgrade:  ws.Upgrade(),
     Fallback: sse.Upgrade(),
     // ...
 })
 ```
 
-When `Fallback` is set, the handler accepts three additional request types:
-- **GET + `Accept: text/event-stream`** — opens an SSE stream via the fallback upgrade function
-- **POST + `?session=ID`** — routes the JSON event body to the active session's transport via the `EventPusher` interface
-- **Initial HTML** — includes `data-poly-sse` on the root element so the client JS knows SSE is available
+### How it works
 
-The `EventPusher` interface (in `transport.go`) is implemented by transports that receive events externally rather than through the transport connection itself. The SSE transport implements it; the WebSocket transport does not.
+The initial HTML includes a `data-poly-transport` attribute on the root element with the value `"ws"`, `"sse"`, or `"auto"`. The client JS reads this to determine the connection strategy:
 
-**Client fallback:** The JS runtime tries WebSocket first. If the first connection attempt fails and `data-poly-sse` is present on the root element, it switches to SSE+POST permanently for that page load. In SSE mode, events are sent via `fetch(url, {method: "POST"})` to the same endpoint with `?session=ID`.
+- **`ws`** — connects via WebSocket only; reconnects via WebSocket on disconnect.
+- **`sse`** — connects via SSE+POST only; never attempts WebSocket.
+- **`auto`** — tries WebSocket first. If the first attempt fails, switches to SSE+POST permanently for that page load.
+
+When SSE is active, events are sent via `fetch(url, {method: "POST"})` to the same endpoint with `?session=ID`. The `EventPusher` interface (in `transport.go`) is implemented by transports that receive events externally rather than through the transport connection itself. The SSE transport implements it; the WebSocket transport does not.
 
 **SSE reconnection:** `EventSource` has built-in reconnection. When the SSE connection drops, the session moves to the disconnected pool. On reconnect, the existing `reattach` flow sends a full re-render morph — no `Last-Event-ID` replay is needed.
 
-**Wire format:** Identical JSON to WebSocket. Server updates are SSE `data:` lines. Client events are POST bodies. The same `Update` and `Event` types are used regardless of transport.
+**Wire format:** Identical JSON regardless of transport. Server updates are WebSocket messages or SSE `data:` lines. Client events are WebSocket frames or POST bodies. The same `Update` and `Event` types are used.
 
 ## Complete helper reference
 

@@ -14,10 +14,10 @@ import (
 // It exists so the Layout function receives a composable node rather
 // than raw bytes.
 type polyBody struct {
-	html     []byte
-	endpoint string
-	session  string
-	sse      bool
+	html      []byte
+	endpoint  string
+	session   string
+	transport TransportMode
 }
 
 func (p *polyBody) Render(w ...io.Writer) []byte {
@@ -36,8 +36,13 @@ func (p *polyBody) RenderBuilder(buf *bytes.Buffer) {
 	buf.WriteString(`" data-poly-session="`)
 	buf.WriteString(p.session)
 	buf.WriteString(`"`)
-	if p.sse {
-		buf.WriteString(` data-poly-sse`)
+	switch p.transport {
+	case SSEOnly:
+		buf.WriteString(` data-poly-transport="sse"`)
+	case WebSocketWithFallback:
+		buf.WriteString(` data-poly-transport="auto"`)
+	default:
+		buf.WriteString(` data-poly-transport="ws"`)
 	}
 	buf.WriteString(`>`)
 	buf.Write(p.html)

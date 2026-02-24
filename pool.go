@@ -64,7 +64,7 @@ func (h *handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 	h.pending[id] = &pendingSession[S]{state: state, differ: differ, createdAt: now}
 	h.mu.Unlock()
 
-	content := &polyBody{html: html, endpoint: r.URL.Path, session: id, sse: h.cfg.Fallback != nil}
+	content := &polyBody{html: html, endpoint: r.URL.Path, session: id, transport: h.cfg.Mode}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if h.cfg.Layout != nil {

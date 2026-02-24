@@ -32,9 +32,9 @@ window.Poly.hooks = window.Poly.hooks || {};
   var debounceTimers = {};
   var leavingNodes = new Set();
   var pendingElements = [];
+  var transportMode = "ws"; // "ws", "sse", or "auto" — set from data-poly-transport
   var connectionMode = "ws";
   var eventSource = null;
-  var sseAvailable = false;
   var wsOpened = false;
 
   // --- Initialisation ---
@@ -45,16 +45,17 @@ window.Poly.hooks = window.Poly.hooks || {};
 
     endpoint = root.getAttribute("data-poly-endpoint") || "";
     sessionID = root.getAttribute("data-poly-session") || "";
-    sseAvailable = root.hasAttribute("data-poly-sse");
+    transportMode = root.getAttribute("data-poly-transport") || "ws";
+    connectionMode = (transportMode === "sse") ? "sse" : "ws";
     connect();
     bindEvents();
   });
 
   // --- Connection ---
   //
-  // Tries WebSocket first. If the initial attempt fails and the server
-  // signalled SSE availability (data-poly-sse), falls back to SSE+POST.
-  // Once in SSE mode, EventSource handles reconnection automatically.
+  // Connects according to transportMode: "ws" uses WebSocket only,
+  // "sse" uses SSE+POST only, "auto" tries WebSocket first and falls
+  // back to SSE+POST if the initial WebSocket connection fails.
 
   function connect() {
     if (connectionMode === "sse") {
@@ -89,9 +90,9 @@ window.Poly.hooks = window.Poly.hooks || {};
 
     ws.onclose = function () {
       if (root) root.classList.add("poly-disconnected");
-      // If the WebSocket never connected and SSE is available,
-      // switch to SSE+POST permanently for this page.
-      if (!wsOpened && sseAvailable) {
+      // If the WebSocket never connected and the server allows SSE
+      // fallback (transportMode "auto"), switch to SSE+POST permanently.
+      if (!wsOpened && transportMode === "auto") {
         connectionMode = "sse";
         connectSSE();
       } else {

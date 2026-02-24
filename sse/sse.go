@@ -5,7 +5,8 @@
 // requests and are routed to the transport's event channel by the
 // poly handler via the EventPusher interface.
 //
-// Pass sse.Upgrade() as the Fallback field in poly.Config.
+// Pass sse.Upgrade() as the Fallback field in poly.Config and set Mode
+// to SSEOnly or WebSocketWithFallback.
 package sse
 
 import (
