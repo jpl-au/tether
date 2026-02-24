@@ -337,28 +337,40 @@ window.Poly.hooks = window.Poly.hooks || {};
 
   function replayQueuedEvents() {
     openEventDB().then(function (db) {
-      var tx = db.transaction(EVENT_STORE, "readwrite");
+      var tx = db.transaction(EVENT_STORE, "readonly");
       var store = tx.objectStore(EVENT_STORE);
-      var req = store.getAll();
-      req.onsuccess = function () {
-        store.clear();
-        var events = req.result;
+      var allReq = store.getAll();
+      var keysReq = store.getAllKeys();
+      tx.oncomplete = function () {
+        var events = allReq.result;
+        var keys = keysReq.result;
         var url = location.protocol + "//" + location.host + endpoint;
         for (var i = 0; i < events.length; i++) {
           // Only replay events for the current session.
           if (events[i].sessionID !== sessionID) continue;
-          fetch(url, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-Poly-Session": sessionID
-            },
-            body: events[i].payload
-          });
+          replayAndDeleteEvent(db, keys[i], events[i].payload, url);
         }
       };
     }).catch(function () {
       // IndexedDB unavailable — nothing to replay.
+    });
+  }
+
+  function replayAndDeleteEvent(db, key, payload, url) {
+    fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Poly-Session": sessionID
+      },
+      body: payload
+    }).then(function (resp) {
+      if (resp.ok) {
+        var tx = db.transaction(EVENT_STORE, "readwrite");
+        tx.objectStore(EVENT_STORE).delete(key);
+      }
+    }).catch(function () {
+      // Still failing — leave in IndexedDB for the next attempt.
     });
   }
 

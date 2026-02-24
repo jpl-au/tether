@@ -26,6 +26,20 @@ func TestServeClientWorkerHeader(t *testing.T) {
 		}
 	})
 
+	t.Run("poly-worker.js has content-hash cache version", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/poly-worker.js", nil)
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+
+		body := w.Body.String()
+		if strings.Contains(body, `"poly-v1"`) {
+			t.Error("worker JS should not contain hardcoded poly-v1 version")
+		}
+		if !strings.Contains(body, `"poly-`) {
+			t.Error("worker JS should contain a poly- prefixed cache version")
+		}
+	})
+
 	t.Run("fluent-poly.js does not get Service-Worker-Allowed header", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/fluent-poly.js", nil)
 		w := httptest.NewRecorder()

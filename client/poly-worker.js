@@ -147,26 +147,30 @@ function queueEventInDB(ev) {
 function drainAndReplay() {
   return openEventDB().then(function (db) {
     return new Promise(function (resolve, reject) {
-      var tx = db.transaction(EVENT_STORE, "readwrite");
+      var tx = db.transaction(EVENT_STORE, "readonly");
       var store = tx.objectStore(EVENT_STORE);
-      var req = store.getAll();
-      req.onsuccess = function () {
-        store.clear();
-        var events = req.result;
+      var allReq = store.getAll();
+      var keysReq = store.getAllKeys();
+      tx.oncomplete = function () {
+        var events = allReq.result;
+        var keys = keysReq.result;
         var now = Date.now();
         var sends = [];
         for (var i = 0; i < events.length; i++) {
-          if (now - events[i].ts > EVENT_MAX_AGE_MS) continue;
-          sends.push(replayEvent(events[i]));
+          if (now - events[i].ts > EVENT_MAX_AGE_MS) {
+            deleteFromEventDB(db, keys[i]);
+            continue;
+          }
+          sends.push(replayEvent(db, keys[i], events[i]));
         }
         resolve(Promise.all(sends));
       };
-      req.onerror = function () { reject(req.error); };
+      tx.onerror = function () { reject(tx.error); };
     });
   });
 }
 
-function replayEvent(ev) {
+function replayEvent(db, key, ev) {
   return fetch(ev.endpoint, {
     method: "POST",
     headers: {
@@ -174,10 +178,16 @@ function replayEvent(ev) {
       "X-Poly-Session": ev.sessionID
     },
     body: ev.payload
+  }).then(function (resp) {
+    if (resp.ok) deleteFromEventDB(db, key);
   }).catch(function () {
-    // Still failing — re-queue for the next sync attempt.
-    return queueEventInDB(ev);
+    // Still failing — leave in IndexedDB for the next sync attempt.
   });
+}
+
+function deleteFromEventDB(db, key) {
+  var tx = db.transaction(EVENT_STORE, "readwrite");
+  tx.objectStore(EVENT_STORE).delete(key);
 }
 
 self.addEventListener("sync", function (e) {

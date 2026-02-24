@@ -583,14 +583,21 @@ func (h *Handler[S]) handlePushSubscribe(w http.ResponseWriter, r *http.Request)
 // HTML page can load fluent-poly.js and idiomorph. The handler adds a
 // Service-Worker-Allowed header when serving poly-worker.js so the service
 // worker can control the entire origin despite being served from /_poly/.
+//
+// The service worker's CACHE_VERSION is set to a content hash of the
+// embedded files so cache invalidation happens automatically when the
+// library is rebuilt with new client code.
 func ServeClient() http.Handler {
 	fs := http.FileServer(http.FS(clientFiles()))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Service workers are scoped to their serving directory by
-		// default. This header allows the worker served from /_poly/
-		// to control the entire origin.
+		// The service worker needs the content-hash cache version
+		// injected and the scope header set, so it is served directly
+		// rather than through the static file server.
 		if r.URL.Path == "/poly-worker.js" || r.URL.Path == "poly-worker.js" {
 			w.Header().Set("Service-Worker-Allowed", "/")
+			w.Header().Set("Content-Type", "application/javascript")
+			w.Write(workerJS())
+			return
 		}
 		fs.ServeHTTP(w, r)
 	})
