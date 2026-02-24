@@ -3,6 +3,7 @@ package poly
 import (
 	"bytes"
 	"crypto/rand"
+	"html"
 	"io"
 
 	"github.com/jpl-au/fluent/node"
@@ -32,7 +33,7 @@ func (p *polyBody) Render(w ...io.Writer) []byte {
 
 func (p *polyBody) RenderBuilder(buf *bytes.Buffer) {
 	buf.WriteString(`<div data-poly-root data-poly-endpoint="`)
-	buf.WriteString(p.endpoint)
+	buf.WriteString(html.EscapeString(p.endpoint))
 	buf.WriteString(`" data-poly-session="`)
 	buf.WriteString(p.session)
 	buf.WriteString(`"`)
