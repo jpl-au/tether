@@ -95,6 +95,24 @@ func TestToggleClassWithTargetChains(t *testing.T) {
 	}
 }
 
+func TestTransitionRendersDataAttribute(t *testing.T) {
+	el := poly.Transition(button.Text("Item"), "fade")
+	html := string(el.Render())
+
+	if !strings.Contains(html, `data-poly-transition="fade"`) {
+		t.Errorf("expected data-poly-transition attribute in HTML:\n%s", html)
+	}
+}
+
+func TestPreserveRendersDataAttribute(t *testing.T) {
+	el := poly.Preserve(form.New())
+	html := string(el.Render())
+
+	if !strings.Contains(html, `data-poly-preserve=""`) {
+		t.Errorf("expected data-poly-preserve attribute in HTML:\n%s", html)
+	}
+}
+
 func TestClickChains(t *testing.T) {
 	// Verify the return type preserves chainability
 	el := poly.Click(button.Text("+"), "increment").

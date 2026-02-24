@@ -14,3 +14,11 @@ type Transport interface {
 	// Close terminates the connection.
 	Close() error
 }
+
+// EventPusher is implemented by transports that receive client events
+// through an external channel (e.g. HTTP POST) rather than through
+// the transport connection itself (e.g. WebSocket frames). The handler
+// uses this to route incoming POST requests to the correct session.
+type EventPusher interface {
+	PushEvent(Event) error
+}

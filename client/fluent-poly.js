@@ -19,6 +19,11 @@
   var retryDelay = 1000;
   var maxRetryDelay = 30000;
   var debounceTimers = {};
+  var leavingNodes = new Set();
+  var connectionMode = "ws";
+  var eventSource = null;
+  var sseAvailable = false;
+  var wsOpened = false;
 
   // --- Initialisation ---
 
@@ -28,13 +33,26 @@
 
     endpoint = root.getAttribute("data-poly-endpoint") || "";
     sessionID = root.getAttribute("data-poly-session") || "";
+    sseAvailable = root.hasAttribute("data-poly-sse");
     connect();
     bindEvents();
   });
 
-  // --- WebSocket connection ---
+  // --- Connection ---
+  //
+  // Tries WebSocket first. If the initial attempt fails and the server
+  // signalled SSE availability (data-poly-sse), falls back to SSE+POST.
+  // Once in SSE mode, EventSource handles reconnection automatically.
 
   function connect() {
+    if (connectionMode === "sse") {
+      connectSSE();
+    } else {
+      connectWS();
+    }
+  }
+
+  function connectWS() {
     var protocol = location.protocol === "https:" ? "wss:" : "ws:";
     var url = protocol + "//" + location.host + endpoint;
     if (sessionID) url += "?session=" + sessionID;
@@ -42,6 +60,7 @@
     ws = new WebSocket(url);
 
     ws.onopen = function () {
+      wsOpened = true;
       retryDelay = 1000;
       if (root) root.classList.remove("poly-disconnected");
     };
@@ -58,11 +77,45 @@
 
     ws.onclose = function () {
       if (root) root.classList.add("poly-disconnected");
-      scheduleReconnect();
+      // If the WebSocket never connected and SSE is available,
+      // switch to SSE+POST permanently for this page.
+      if (!wsOpened && sseAvailable) {
+        connectionMode = "sse";
+        connectSSE();
+      } else {
+        scheduleReconnect();
+      }
     };
 
     ws.onerror = function () {
       ws.close();
+    };
+  }
+
+  function connectSSE() {
+    var url = location.protocol + "//" + location.host + endpoint;
+    if (sessionID) url += "?session=" + sessionID;
+
+    eventSource = new EventSource(url);
+
+    eventSource.onopen = function () {
+      retryDelay = 1000;
+      if (root) root.classList.remove("poly-disconnected");
+    };
+
+    eventSource.onmessage = function (e) {
+      var msg;
+      try {
+        msg = JSON.parse(e.data);
+      } catch (_) {
+        return;
+      }
+      applyMessage(msg);
+    };
+
+    eventSource.onerror = function () {
+      if (root) root.classList.add("poly-disconnected");
+      // EventSource reconnects automatically — no manual retry needed.
     };
   }
 
@@ -137,10 +190,76 @@
   }
 
   var morphCallbacks = {
+    beforeNodeAdded: function (newNode) {
+      if (newNode.nodeType !== 1) return true;
+      var name = newNode.getAttribute("data-poly-transition");
+      if (name) {
+        newNode.classList.add("poly-" + name + "-enter");
+      }
+      return true;
+    },
+
+    afterNodeAdded: function (newNode) {
+      if (newNode.nodeType !== 1) return;
+      var name = newNode.getAttribute("data-poly-transition");
+      if (!name) return;
+      // Force reflow so the browser registers the enter class,
+      // then remove it to trigger the CSS transition.
+      newNode.offsetHeight;
+      newNode.classList.remove("poly-" + name + "-enter");
+    },
+
     beforeNodeMorphed: function (oldNode, newNode) {
       if (oldNode.nodeType !== 1) return true;
+
+      // Cancel any pending leave transition — the element is being
+      // morphed back in rather than removed.
+      if (leavingNodes.has(oldNode)) {
+        leavingNodes.delete(oldNode);
+        var name = oldNode.getAttribute("data-poly-transition");
+        if (name) {
+          oldNode.classList.remove("poly-" + name + "-leave");
+        }
+      }
+
       preserveClientState(oldNode, newNode);
       return true;
+    },
+
+    beforeNodeRemoved: function (oldNode) {
+      if (oldNode.nodeType !== 1) return true;
+      var name = oldNode.getAttribute("data-poly-transition");
+      if (!name) return true;
+
+      // Already leaving — let it finish
+      if (leavingNodes.has(oldNode)) return false;
+
+      leavingNodes.add(oldNode);
+      oldNode.classList.add("poly-" + name + "-leave");
+
+      function remove() {
+        leavingNodes.delete(oldNode);
+        if (oldNode.parentNode) {
+          oldNode.parentNode.removeChild(oldNode);
+        }
+      }
+
+      oldNode.addEventListener("transitionend", function handler() {
+        oldNode.removeEventListener("transitionend", handler);
+        remove();
+      });
+
+      // Fallback: remove after 5s if transitionend never fires
+      // (e.g. no CSS transition defined, or transition property removed)
+      setTimeout(remove, 5000);
+
+      return false; // prevent immediate removal
+    },
+
+    afterNodeRemoved: function (oldNode) {
+      if (oldNode.nodeType === 1) {
+        leavingNodes.delete(oldNode);
+      }
     }
   };
 
@@ -279,22 +398,31 @@
 
       sendEvent(domEvent, action, data);
 
-      // Clear form fields after submit so the user can type again
-      // without manually selecting and deleting the old input.
-      if (domEvent === "submit") {
+      // Clear form fields after submit unless the form opts out via
+      // data-poly-preserve (used when the server controls field values
+      // through a Dynamic key).
+      if (domEvent === "submit" && !target.hasAttribute("data-poly-preserve")) {
         target.reset();
       }
     }, domEvent === "focus" || domEvent === "blur");
   }
 
   function sendEvent(type, action, data) {
-    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    var payload = JSON.stringify({type: type, action: action, data: data});
 
-    ws.send(JSON.stringify({
-      type: type,
-      action: action,
-      data: data
-    }));
+    if (connectionMode === "sse") {
+      var url = location.protocol + "//" + location.host + endpoint;
+      if (sessionID) url += "?session=" + sessionID;
+      fetch(url, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: payload
+      });
+      return;
+    }
+
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    ws.send(payload);
   }
 
   // --- Client-side toggles ---

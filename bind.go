@@ -95,3 +95,23 @@ func ToggleTarget[E settable[E]](el E, selector string) E {
 func ToggleAttr[E settable[E]](el E, attr string) E {
 	return el.SetData("poly-toggle-attr", attr)
 }
+
+// --- Form helpers ---
+
+// Preserve prevents the JS runtime from resetting a form's fields after
+// submit. Use this when the form is inside a Dynamic key and the server
+// controls field values — the morph will clear fields on success and
+// preserve them on validation failure.
+func Preserve[E settable[E]](el E) E {
+	return el.SetData("poly-preserve", "")
+}
+
+// --- Transitions ---
+
+// Transition annotates an element with a CSS transition name. When the
+// element is added to the DOM during a morph, the JS runtime applies
+// poly-{name}-enter and removes it next frame. When removed, it applies
+// poly-{name}-leave and waits for transitionend before removing the node.
+func Transition[E settable[E]](el E, name string) E {
+	return el.SetData("poly-transition", name)
+}
