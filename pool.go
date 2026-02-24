@@ -41,8 +41,13 @@ type Handler[S any] struct {
 func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 	h.cfg.Logger.Info("serving initial page")
 
+	// Disconnected sessions are excluded from the limit because they
+	// are not actively consuming transport resources — they are just
+	// holding state in memory while waiting for the client to reconnect.
+	// Including them would cause new connections to be rejected during
+	// brief network interruptions when many clients disconnect at once.
 	h.mu.Lock()
-	if h.cfg.MaxSessions > 0 && len(h.pending)+len(h.active)+len(h.disconnected) >= h.cfg.MaxSessions {
+	if h.cfg.MaxSessions > 0 && len(h.pending)+len(h.active) >= h.cfg.MaxSessions {
 		h.mu.Unlock()
 		http.Error(w, "too many sessions", http.StatusServiceUnavailable)
 		return
@@ -120,10 +125,11 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 	if differ == nil {
 		// This path handles direct transport connections without a prior
 		// GET (e.g. bogus or missing session ID). Enforce MaxSessions
-		// here too, otherwise this path bypasses the limit.
+		// here too, otherwise this path bypasses the limit. Disconnected
+		// sessions are excluded for the same reason as serveInitialPage.
 		if h.cfg.MaxSessions > 0 {
 			h.mu.Lock()
-			full := len(h.pending)+len(h.active)+len(h.disconnected) >= h.cfg.MaxSessions
+			full := len(h.pending)+len(h.active) >= h.cfg.MaxSessions
 			h.mu.Unlock()
 			if full {
 				transport.Close()
