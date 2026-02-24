@@ -337,7 +337,13 @@ func (h *Handler[S]) handlePostEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pusher, ok := sess.transport.(EventPusher)
+	// Read transport under the session lock because reattach writes
+	// it concurrently when a disconnected session reconnects.
+	sess.mu.Lock()
+	t := sess.transport
+	sess.mu.Unlock()
+
+	pusher, ok := t.(EventPusher)
 	if !ok {
 		http.Error(w, "transport does not accept events", http.StatusMethodNotAllowed)
 		return
