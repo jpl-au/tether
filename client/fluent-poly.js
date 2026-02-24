@@ -153,12 +153,14 @@ window.Poly.hooks = window.Poly.hooks || {};
   function applyMessage(msg) {
     if (msg.type !== "update") return;
 
-    restorePending(msg.event_id);
-
     // Batch all DOM mutations into a single animation frame so the
     // browser coalesces reflows and repaints. Without this, each
-    // patch and morph triggers a separate layout pass.
+    // patch and morph triggers a separate layout pass. restorePending
+    // runs inside the frame so it is synchronised with the DOM changes
+    // it correlates with.
     requestAnimationFrame(function () {
+      restorePending(msg.event_id);
+
       // Apply content patches first, then structural morphs.
       if (msg.patches) {
         for (var i = 0; i < msg.patches.length; i++) {

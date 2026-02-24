@@ -1,6 +1,9 @@
 package poly
 
-import "errors"
+import (
+	"errors"
+	"time"
+)
 
 // ErrEventBufferFull is returned by [EventPusher].PushEvent when the
 // internal event buffer is at capacity. PushEvent is non-blocking by
@@ -46,4 +49,13 @@ type Transport interface {
 // arrive on the socket.
 type EventPusher interface {
 	PushEvent(Event) error
+}
+
+// Heartbeater is an optional interface for transports that need
+// periodic keep-alive writes to prevent intermediate proxies from
+// closing idle connections. The SSE transport implements this; the
+// WebSocket transport does not need it because the WebSocket protocol
+// has its own ping/pong frames.
+type Heartbeater interface {
+	StartHeartbeat(interval time.Duration)
 }

@@ -20,6 +20,7 @@ import (
 	"io"
 	"net/http"
 	"sync"
+	"time"
 
 	poly "github.com/jpl-au/fluent-poly"
 )
@@ -149,6 +150,33 @@ func (t *transport) PushEvent(ev poly.Event) error {
 	default:
 		return poly.ErrEventBufferFull
 	}
+}
+
+// StartHeartbeat sends SSE comment lines at the given interval to
+// prevent intermediate proxies from closing idle connections. SSE
+// comments (lines starting with `:`) are silently discarded by the
+// EventSource client and cost almost nothing on the wire.
+func (t *transport) StartHeartbeat(interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	go func() {
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				t.wmu.Lock()
+				_, err := fmt.Fprintf(t.w, ": heartbeat\n\n")
+				if err != nil {
+					t.wmu.Unlock()
+					t.Close()
+					return
+				}
+				t.flusher.Flush()
+				t.wmu.Unlock()
+			case <-t.done:
+				return
+			}
+		}
+	}()
 }
 
 // Close terminates the transport. Safe to call from any goroutine and

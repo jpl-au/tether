@@ -105,6 +105,12 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		return
 	}
 
+	// Start keep-alive writes for transports that need them (SSE).
+	// WebSocket has its own ping/pong and does not implement this.
+	if hb, ok := transport.(Heartbeater); ok && h.cfg.HeartbeatInterval > 0 {
+		hb.StartHeartbeat(h.cfg.HeartbeatInterval)
+	}
+
 	id := r.URL.Query().Get("session")
 
 	// Try to reattach to a disconnected session.

@@ -1,6 +1,8 @@
 package poly
 
-import "sync"
+import (
+	"sync"
+)
 
 // Group tracks a set of sessions for broadcasting state updates.
 // Add sessions in OnConnect and remove them in OnDisconnect:
@@ -58,22 +60,25 @@ func (g *Group[S]) Len() int {
 }
 
 // Broadcast applies fn to every session in the group via
-// [Session.Update]. Each session receives its own current state, so
-// the function can produce session-specific output (e.g. highlighting
-// a user's own messages differently). The group lock is released before
-// calling Update to avoid holding two locks simultaneously. Safe to
-// call from any goroutine.
+// [Session.Update]. Each session is updated concurrently so a slow
+// render in one session does not block delivery to the rest. Broadcast
+// returns after all updates have completed. Safe to call from any
+// goroutine.
 func (g *Group[S]) Broadcast(fn func(S) S) {
 	g.mu.Lock()
-	// Snapshot the session pointers so we don't hold the group lock
-	// while calling Update (which acquires each session's lock).
 	targets := make([]*Session[S], 0, len(g.sessions))
 	for _, s := range g.sessions {
 		targets = append(targets, s)
 	}
 	g.mu.Unlock()
 
+	var wg sync.WaitGroup
+	wg.Add(len(targets))
 	for _, s := range targets {
-		s.Update(fn)
+		go func() {
+			defer wg.Done()
+			s.Update(fn)
+		}()
 	}
+	wg.Wait()
 }

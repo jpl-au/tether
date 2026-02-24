@@ -205,6 +205,13 @@ type Config[S any] struct {
 	// transition is defined. Zero defaults to 5 seconds.
 	TransitionTimeout time.Duration
 
+	// HeartbeatInterval controls how often the SSE transport sends a
+	// keep-alive comment to prevent intermediate proxies (AWS ALB,
+	// Nginx, Cloudflare) from closing idle connections. Has no effect
+	// on WebSocket transports which have their own ping/pong frames.
+	// Zero defaults to 20 seconds. Set to -1 to disable heartbeats.
+	HeartbeatInterval time.Duration
+
 	// OnStructuralChange is called whenever the diff engine detects that
 	// the render tree's structure has changed (Dynamic keys added,
 	// removed, or reordered). Structural changes force a full root morph
@@ -234,6 +241,8 @@ const defaultReconnectTimeout = 30 * time.Second
 const defaultMaxEventBytes = 64 << 10 // 64 KB
 
 const defaultReaperInterval = 15 * time.Second
+
+const defaultHeartbeatInterval = 20 * time.Second
 
 // Defaults for the client-side JS runtime. These are passed to the
 // browser as data attributes on the poly root element.
@@ -276,6 +285,9 @@ func New[S any](cfg Config[S]) *Handler[S] {
 	}
 	if cfg.TransitionTimeout == 0 {
 		cfg.TransitionTimeout = defaultTransitionTimeout
+	}
+	if cfg.HeartbeatInterval == 0 {
+		cfg.HeartbeatInterval = defaultHeartbeatInterval
 	}
 	h := &Handler[S]{
 		cfg:          cfg,

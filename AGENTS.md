@@ -360,7 +360,7 @@ group.Broadcast(func(s State) State {
 })
 ```
 
-`Broadcast` snapshots the session pointers before calling `Update` on each, so the group lock is not held while acquiring session locks. `Add`, `Remove`, `Broadcast`, and `Len` are all safe to call from any goroutine.
+`Broadcast` snapshots the session pointers, releases the group lock, then updates all sessions concurrently via goroutines. This prevents a slow render in one session from blocking delivery to the rest. `Broadcast` returns after all updates have completed. `Add`, `Remove`, `Broadcast`, and `Len` are all safe to call from any goroutine.
 
 ## Transport mode
 
@@ -413,6 +413,8 @@ The initial HTML includes a `data-poly-transport` attribute on the root element 
 When SSE is active, events are sent via `fetch(url, {method: "POST"})` to the same endpoint with `?session=ID`. The `EventPusher` interface (in `transport.go`) is implemented by transports that receive events externally rather than through the transport connection itself. The SSE transport implements it; the WebSocket transport does not.
 
 **SSE buffer size:** `sse.Upgrade()` accepts an optional buffer size parameter (default 16). When the internal event channel is full, `PushEvent` returns `ErrEventBufferFull` and the HTTP handler responds with 429. Increase the buffer for high-frequency event streams: `sse.Upgrade(64)`.
+
+**SSE heartbeat:** The SSE transport sends keep-alive comments (`: heartbeat\n\n`) at `HeartbeatInterval` (default 20s) to prevent intermediate proxies (AWS ALB, Nginx, Cloudflare) from closing idle connections. SSE comments are silently discarded by the EventSource client. Set `HeartbeatInterval` to `-1` to disable. WebSocket transports have their own ping/pong frames and do not use this.
 
 **SSE reconnection:** `EventSource` has built-in reconnection. When the SSE connection drops, the session moves to the disconnected pool. On reconnect, the existing `reattach` flow sends a full re-render morph — no `Last-Event-ID` replay is needed.
 

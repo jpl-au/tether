@@ -270,6 +270,8 @@ group.Broadcast(func(s State) State {
 })
 ```
 
+Sessions are updated concurrently so a slow render in one session does not block delivery to the rest. `Broadcast` returns after all updates have completed.
+
 ## Transport mode
 
 Control which transports the handler accepts with the `Mode` field:
@@ -305,6 +307,8 @@ poly.New(poly.Config[State]{
 ```
 
 Same wire format, same API regardless of transport.
+
+SSE connections send keep-alive comments at `HeartbeatInterval` (default 20s) to prevent proxies from closing idle connections.
 
 ## Performance note
 
