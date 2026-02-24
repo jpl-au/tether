@@ -3,6 +3,7 @@ package poly
 import (
 	"log/slog"
 	"testing"
+	"testing/synctest"
 )
 
 func TestGroupAddAndLen(t *testing.T) {
@@ -40,44 +41,50 @@ func TestGroupRemove(t *testing.T) {
 }
 
 func TestGroupBroadcastUpdatesAllSessions(t *testing.T) {
-	g := NewGroup[counterState]()
+	synctest.Test(t, func(t *testing.T) {
+		g := NewGroup[counterState]()
 
-	mt1 := &mockTransport{events: []Event{}}
-	sess1 := newTestSession(counterState{Count: 0}, mt1)
-	sess1.logger = slog.Default()
+		mt1 := &mockTransport{events: []Event{}}
+		sess1 := newTestSession(counterState{Count: 0}, mt1)
+		sess1.logger = slog.Default()
 
-	mt2 := &mockTransport{events: []Event{}}
-	sess2 := newTestSession(counterState{Count: 10}, mt2)
-	sess2.id = "test-2"
-	sess2.logger = slog.Default()
+		mt2 := &mockTransport{events: []Event{}}
+		sess2 := newTestSession(counterState{Count: 10}, mt2)
+		sess2.id = "test-2"
+		sess2.logger = slog.Default()
 
-	g.Add(sess1)
-	g.Add(sess2)
+		g.Add(sess1)
+		g.Add(sess2)
 
-	g.Broadcast(func(s counterState) counterState {
-		s.Count += 5
-		return s
+		g.Broadcast(func(s counterState) counterState {
+			s.Count += 5
+			return s
+		})
+
+		// Broadcast is fire-and-forget — wait for the spawned
+		// goroutines to acquire the session locks and complete.
+		synctest.Wait()
+
+		if sess1.state.Count != 5 {
+			t.Errorf("expected sess1 Count 5, got %d", sess1.state.Count)
+		}
+		if sess2.state.Count != 15 {
+			t.Errorf("expected sess2 Count 15, got %d", sess2.state.Count)
+		}
+
+		// Both transports should have received an update.
+		mt1.mu.Lock()
+		if len(mt1.updates) != 1 {
+			t.Errorf("expected 1 update on mt1, got %d", len(mt1.updates))
+		}
+		mt1.mu.Unlock()
+
+		mt2.mu.Lock()
+		if len(mt2.updates) != 1 {
+			t.Errorf("expected 1 update on mt2, got %d", len(mt2.updates))
+		}
+		mt2.mu.Unlock()
 	})
-
-	if sess1.state.Count != 5 {
-		t.Errorf("expected sess1 Count 5, got %d", sess1.state.Count)
-	}
-	if sess2.state.Count != 15 {
-		t.Errorf("expected sess2 Count 15, got %d", sess2.state.Count)
-	}
-
-	// Both transports should have received an update.
-	mt1.mu.Lock()
-	if len(mt1.updates) != 1 {
-		t.Errorf("expected 1 update on mt1, got %d", len(mt1.updates))
-	}
-	mt1.mu.Unlock()
-
-	mt2.mu.Lock()
-	if len(mt2.updates) != 1 {
-		t.Errorf("expected 1 update on mt2, got %d", len(mt2.updates))
-	}
-	mt2.mu.Unlock()
 }
 
 func TestGroupBroadcastEmptyGroupIsNoop(t *testing.T) {

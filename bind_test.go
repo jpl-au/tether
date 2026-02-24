@@ -117,8 +117,8 @@ func TestAutoFocusRendersDataAttribute(t *testing.T) {
 	el := poly.AutoFocus(input.Text("name", ""))
 	html := string(el.Render())
 
-	if !strings.Contains(html, `data-poly-focus=""`) {
-		t.Errorf("expected data-poly-focus attribute in HTML:\n%s", html)
+	if !strings.Contains(html, `data-poly-autofocus=""`) {
+		t.Errorf("expected data-poly-autofocus attribute in HTML:\n%s", html)
 	}
 }
 

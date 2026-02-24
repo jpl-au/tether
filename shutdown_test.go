@@ -3,6 +3,7 @@ package poly
 import (
 	"context"
 	"testing"
+	"testing/synctest"
 	"time"
 )
 
@@ -35,26 +36,26 @@ func TestShutdownClosesActiveSessions(t *testing.T) {
 }
 
 func TestShutdownStopsReaper(t *testing.T) {
-	h := &Handler[counterState]{
-		cfg:          Config[counterState]{ReaperInterval: defaultReaperInterval},
-		pending:      make(map[string]*pendingSession[counterState]),
-		active:       make(map[string]*Session[counterState]),
-		disconnected: make(map[string]*Session[counterState]),
-		done:         make(chan struct{}),
-	}
+	synctest.Test(t, func(t *testing.T) {
+		h := &Handler[counterState]{
+			cfg:          Config[counterState]{ReaperInterval: defaultReaperInterval},
+			pending:      make(map[string]*pendingSession[counterState]),
+			active:       make(map[string]*Session[counterState]),
+			disconnected: make(map[string]*Session[counterState]),
+			done:         make(chan struct{}),
+		}
 
-	reaperDone := make(chan struct{})
-	go func() {
-		h.reap()
-		close(reaperDone)
-	}()
+		reaperDone := false
+		go func() {
+			h.reap()
+			reaperDone = true
+		}()
 
-	close(h.done)
+		close(h.done)
+		synctest.Wait()
 
-	select {
-	case <-reaperDone:
-		// Reaper exited as expected.
-	case <-time.After(2 * time.Second):
-		t.Fatal("reaper did not exit after done channel closed")
-	}
+		if !reaperDone {
+			t.Fatal("reaper did not exit after done channel closed")
+		}
+	})
 }
