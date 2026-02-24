@@ -113,6 +113,15 @@ func TestPreserveRendersDataAttribute(t *testing.T) {
 	}
 }
 
+func TestConfirmRendersDataAttribute(t *testing.T) {
+	el := poly.Confirm(poly.Click(button.Text("Delete"), "delete"), "Are you sure?")
+	html := string(el.Render())
+
+	if !strings.Contains(html, `data-poly-confirm="Are you sure?"`) {
+		t.Errorf("expected data-poly-confirm attribute in HTML:\n%s", html)
+	}
+}
+
 func TestDebounceRendersDataAttribute(t *testing.T) {
 	el := poly.Debounce(poly.Input(input.Text("q", ""), "search"), 500)
 	html := string(el.Render())

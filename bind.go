@@ -112,6 +112,15 @@ func Throttle[E settable[E]](el E, ms int) E {
 	return el.SetData("poly-throttle", strconv.Itoa(ms))
 }
 
+// --- Confirmation ---
+
+// Confirm attaches a confirmation prompt to an event-bound element.
+// The JS runtime shows window.confirm with the given message before
+// sending the event. If the user cancels, the event is dropped.
+func Confirm[E settable[E]](el E, message string) E {
+	return el.SetData("poly-confirm", message)
+}
+
 // --- Form helpers ---
 
 // Preserve prevents the JS runtime from resetting a form's fields after

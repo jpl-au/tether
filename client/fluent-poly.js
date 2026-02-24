@@ -355,6 +355,10 @@
       var action = target.getAttribute("data-" + dataAttr);
       if (!action) return;
 
+      // Show a confirmation dialog if the element requests one.
+      var confirmMsg = target.getAttribute("data-poly-confirm");
+      if (confirmMsg && !window.confirm(confirmMsg)) return;
+
       // Prevent default for submit events and reset the form after
       // sending so the input fields clear. The server re-renders with
       // empty values but the form isn't inside a Dynamic key, so the
