@@ -117,6 +117,19 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 	h.mu.Unlock()
 
 	if differ == nil {
+		// This path handles direct transport connections without a prior
+		// GET (e.g. bogus or missing session ID). Enforce MaxSessions
+		// here too, otherwise this path bypasses the limit.
+		if h.cfg.MaxSessions > 0 {
+			h.mu.Lock()
+			full := len(h.pending)+len(h.active)+len(h.disconnected) >= h.cfg.MaxSessions
+			h.mu.Unlock()
+			if full {
+				transport.Close()
+				return
+			}
+		}
+
 		id = newID()
 		state = h.cfg.InitialState(r)
 		if h.cfg.HandleParams != nil {
