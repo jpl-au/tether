@@ -502,6 +502,12 @@ window.Poly.hooks = window.Poly.hooks || {};
           "X-Poly-Session": sessionID
         },
         body: payload
+      }).then(function (resp) {
+        // Restore loading state on non-2xx responses so the button
+        // does not stay permanently disabled.
+        if (!resp.ok) restorePending(id);
+      }).catch(function () {
+        restorePending(id);
       });
       return id;
     }
