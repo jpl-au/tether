@@ -179,6 +179,32 @@ type Config[S any] struct {
 	// 30 seconds.
 	PendingTimeout time.Duration
 
+	// ReaperInterval controls how often the background goroutine
+	// checks for expired sessions (idle, lifetime, pending, and
+	// disconnected). Shorter intervals detect expiry sooner at the
+	// cost of slightly more CPU. Zero defaults to 15 seconds.
+	ReaperInterval time.Duration
+
+	// RetryDelay is the initial delay before the client JS attempts to
+	// reconnect after a WebSocket close. The delay doubles on each
+	// failed attempt up to MaxRetryDelay. Zero defaults to 1 second.
+	RetryDelay time.Duration
+
+	// MaxRetryDelay caps the exponential backoff for client reconnection
+	// attempts. Zero defaults to 30 seconds.
+	MaxRetryDelay time.Duration
+
+	// DefaultDebounce is the debounce interval applied to input events
+	// when the element does not specify data-poly-debounce. Zero
+	// defaults to 300 milliseconds.
+	DefaultDebounce time.Duration
+
+	// TransitionTimeout is how long the client waits for a CSS
+	// transitionend event before forcibly removing a leaving element.
+	// This prevents nodes from getting stuck in the DOM when no CSS
+	// transition is defined. Zero defaults to 5 seconds.
+	TransitionTimeout time.Duration
+
 	// OnStructuralChange is called whenever the diff engine detects that
 	// the render tree's structure has changed (Dynamic keys added,
 	// removed, or reordered). Structural changes force a full root morph
@@ -207,6 +233,17 @@ const defaultReconnectTimeout = 30 * time.Second
 // defaultMaxEventBytes is used when MaxEventBytes is zero.
 const defaultMaxEventBytes = 64 << 10 // 64 KB
 
+const defaultReaperInterval = 15 * time.Second
+
+// Defaults for the client-side JS runtime. These are passed to the
+// browser as data attributes on the poly root element.
+const (
+	defaultRetryDelay        = 1000 * time.Millisecond
+	defaultMaxRetryDelay     = 30 * time.Second
+	defaultDefaultDebounce   = 300 * time.Millisecond
+	defaultTransitionTimeout = 5 * time.Second
+)
+
 // New creates a [Handler] from the given configuration and starts a
 // background reaper goroutine that enforces IdleTimeout, MaxLifetime,
 // and ReconnectTimeout. The reaper runs for the lifetime of the handler;
@@ -224,6 +261,21 @@ func New[S any](cfg Config[S]) *Handler[S] {
 	}
 	if cfg.PendingTimeout == 0 {
 		cfg.PendingTimeout = defaultPendingTimeout
+	}
+	if cfg.ReaperInterval == 0 {
+		cfg.ReaperInterval = defaultReaperInterval
+	}
+	if cfg.RetryDelay == 0 {
+		cfg.RetryDelay = defaultRetryDelay
+	}
+	if cfg.MaxRetryDelay == 0 {
+		cfg.MaxRetryDelay = defaultMaxRetryDelay
+	}
+	if cfg.DefaultDebounce == 0 {
+		cfg.DefaultDebounce = defaultDefaultDebounce
+	}
+	if cfg.TransitionTimeout == 0 {
+		cfg.TransitionTimeout = defaultTransitionTimeout
 	}
 	h := &Handler[S]{
 		cfg:          cfg,

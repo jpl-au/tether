@@ -36,7 +36,7 @@ func TestShutdownClosesActiveSessions(t *testing.T) {
 
 func TestShutdownStopsReaper(t *testing.T) {
 	h := &Handler[counterState]{
-		cfg:          Config[counterState]{},
+		cfg:          Config[counterState]{ReaperInterval: defaultReaperInterval},
 		pending:      make(map[string]*pendingSession[counterState]),
 		active:       make(map[string]*Session[counterState]),
 		disconnected: make(map[string]*Session[counterState]),

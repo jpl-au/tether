@@ -64,6 +64,17 @@ WARN structural change, sending root morph session=abc change="key 'help' added"
 
 This tells you exactly what changed and how to avoid the cost. Wrapping conditional elements in a stable keyed container keeps morphs scoped instead of full-page.
 
+For production telemetry, use the `OnStructuralChange` callback:
+
+```go
+poly.New(poly.Config[State]{
+    OnStructuralChange: func(s *poly.Session[State], c poly.StructuralChange) {
+        metrics.Counter("structural_changes").Inc()
+    },
+    // ...
+})
+```
+
 ## Event binding
 
 Convenience helpers wrap `SetData` so you don't need to remember the `poly-*` convention strings:
@@ -88,7 +99,7 @@ Keydown events include modifier keys (`ctrl`, `shift`, `alt`, `meta`) in `Event.
 
 ### Timing control
 
-Input events are debounced at 300ms by default. Override with `poly.Debounce`:
+Input events are debounced at `DefaultDebounce` (default 300ms). Override with `poly.Debounce`:
 
 ```go
 poly.Debounce(poly.Input(input.Text("q", ""), "search"), 150)
@@ -219,7 +230,7 @@ poly.Transition(div.New(children...), "fade")
 .poly-fade-leave { opacity: 0; }
 ```
 
-Enter: `poly-{name}-enter` is added before insertion and removed next frame. Leave: `poly-{name}-leave` is added and the node waits for `transitionend` before removal (5s fallback).
+Enter: `poly-{name}-enter` is added before insertion and removed next frame. Leave: `poly-{name}-leave` is added and the node waits for `transitionend` before removal (`TransitionTimeout` fallback, default 5s).
 
 ## JS hooks
 
@@ -274,6 +285,13 @@ poly.New(poly.Config[State]{
 poly.New(poly.Config[State]{
     Mode:     poly.SSEOnly,
     Fallback: sse.Upgrade(),
+    // ...
+})
+
+// SSE with larger event buffer for high-frequency streams
+poly.New(poly.Config[State]{
+    Mode:     poly.SSEOnly,
+    Fallback: sse.Upgrade(64), // default is 16
     // ...
 })
 

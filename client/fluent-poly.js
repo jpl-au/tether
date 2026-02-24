@@ -27,8 +27,11 @@ window.Poly.hooks = window.Poly.hooks || {};
   var endpoint = "";
   var sessionID = "";
   var ws = null;
-  var retryDelay = 1000;
-  var maxRetryDelay = 30000;
+  var retryDelay = 0;
+  var initialRetryDelay = 0;
+  var maxRetryDelay = 0;
+  var defaultDebounce = 0;
+  var transitionTimeout = 0;
   var debounceTimers = {};
   var leavingNodes = new Set();
   var pendingElements = {};
@@ -47,6 +50,11 @@ window.Poly.hooks = window.Poly.hooks || {};
     endpoint = root.getAttribute("data-poly-endpoint") || "";
     sessionID = root.getAttribute("data-poly-session") || "";
     transportMode = root.getAttribute("data-poly-transport") || "ws";
+    initialRetryDelay = parseInt(root.getAttribute("data-poly-retry-delay")) || 1000;
+    retryDelay = initialRetryDelay;
+    maxRetryDelay = parseInt(root.getAttribute("data-poly-max-retry-delay")) || 30000;
+    defaultDebounce = parseInt(root.getAttribute("data-poly-debounce-default")) || 300;
+    transitionTimeout = parseInt(root.getAttribute("data-poly-transition-timeout")) || 5000;
     connectionMode = (transportMode === "sse") ? "sse" : "ws";
     connect();
     bindEvents();
@@ -75,7 +83,7 @@ window.Poly.hooks = window.Poly.hooks || {};
 
     ws.onopen = function () {
       wsOpened = true;
-      retryDelay = 1000;
+      retryDelay = initialRetryDelay;
       if (root) root.classList.remove("poly-disconnected");
     };
 
@@ -113,7 +121,7 @@ window.Poly.hooks = window.Poly.hooks || {};
     eventSource = new EventSource(url);
 
     eventSource.onopen = function () {
-      retryDelay = 1000;
+      retryDelay = initialRetryDelay;
       if (root) root.classList.remove("poly-disconnected");
     };
 
@@ -327,9 +335,9 @@ window.Poly.hooks = window.Poly.hooks || {};
         remove();
       });
 
-      // Fallback: remove after 5s if transitionend never fires
-      // (e.g. no CSS transition defined, or transition property removed)
-      setTimeout(remove, 5000);
+      // Fallback: remove if transitionend never fires (e.g. no CSS
+      // transition defined, or transition property removed).
+      setTimeout(remove, transitionTimeout);
 
       return false; // prevent immediate removal
     },
@@ -462,7 +470,7 @@ window.Poly.hooks = window.Poly.hooks || {};
 
       // Debounce input events
       if (domEvent === "input") {
-        var delay = parseInt(target.getAttribute("data-poly-debounce")) || 300;
+        var delay = parseInt(target.getAttribute("data-poly-debounce")) || defaultDebounce;
         var timerKey = dataAttr + ":" + action;
 
         clearTimeout(debounceTimers[timerKey]);

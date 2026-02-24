@@ -72,7 +72,16 @@ func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 	h.pending[id] = &pendingSession[S]{state: state, differ: differ, createdAt: now}
 	h.mu.Unlock()
 
-	content := &polyBody{html: html, endpoint: r.URL.Path, session: id, transport: h.cfg.Mode}
+	content := &polyBody{
+		html:              html,
+		endpoint:          r.URL.Path,
+		session:           id,
+		transport:         h.cfg.Mode,
+		retryDelay:        h.cfg.RetryDelay,
+		maxRetryDelay:     h.cfg.MaxRetryDelay,
+		defaultDebounce:   h.cfg.DefaultDebounce,
+		transitionTimeout: h.cfg.TransitionTimeout,
+	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	// Prevent session ID leakage via Referer header on external links.
@@ -269,7 +278,7 @@ func (h *Handler[S]) Shutdown(ctx context.Context) error {
 // reap runs in a background goroutine, enforcing the lifecycle limits
 // set in Config. It exits when the done channel is closed by Shutdown.
 func (h *Handler[S]) reap() {
-	ticker := time.NewTicker(15 * time.Second)
+	ticker := time.NewTicker(h.cfg.ReaperInterval)
 	defer ticker.Stop()
 
 	for {

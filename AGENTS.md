@@ -53,7 +53,7 @@ Transport implementations live in sub-packages. The `Config.Upgrade` field accep
 5. `Transport.SendUpdate()` sends a unified update message containing either:
    - **Patches** — targeted content updates for keyed elements that changed
    - **Morphs** — structural DOM changes (e.g. root morph when keys are added/removed/reordered)
-6. Client JS applies patches first (targeted `Idiomorph.morph` on keyed elements), then morphs (root or scoped `Idiomorph.morph`)
+6. Client JS applies patches first (targeted `Idiomorph.morph` on keyed elements), then morphs (root or scoped `Idiomorph.morph`). All DOM writes are batched inside a single `requestAnimationFrame` callback so the browser coalesces reflows into one paint pass
 
 ### Panic recovery
 
@@ -80,6 +80,21 @@ WARN structural change, sending root morph session=abc change="key 'help' added"
 ```
 
 The `change` field comes from `jit.StructuralChange.String()`, which reports exactly which keys were added, removed, or if they were reordered. The `tip` guides the developer toward wrapping conditional elements in a stable keyed container to avoid full-page morphs.
+
+For production telemetry, use the `OnStructuralChange` callback on `Config`:
+
+```go
+poly.New(poly.Config[State]{
+    OnStructuralChange: func(s *poly.Session[State], c poly.StructuralChange) {
+        metrics.Counter("structural_changes").Inc()
+        log.Printf("keys added=%v removed=%v reordered=%v bytes=%d",
+            c.Added, c.Removed, c.Reordered, c.Bytes)
+    },
+    // ...
+})
+```
+
+The callback runs under the session lock, so keep it fast — offload expensive work to a goroutine. The `StructuralChange` struct has `Added`, `Removed` (key slices), `Reordered` (bool), and `Bytes` (re-rendered HTML size).
 
 ## Event binding
 
@@ -110,7 +125,7 @@ func handle(s state, ev poly.Event) state {
 
 ### Timing control
 
-Input events are debounced at 300ms by default. Override per element:
+Input events are debounced at `DefaultDebounce` (default 300ms). Override per element:
 
 ```go
 poly.Debounce(poly.Input(input.Text("q", ""), "search"), 150) // 150ms
@@ -322,7 +337,7 @@ The JS runtime applies CSS classes following a naming convention — the develop
 
 **Leave lifecycle:** When Idiomorph wants to remove a node with `data-poly-transition="fade"`, the runtime prevents immediate removal, adds `poly-fade-leave`, and waits for `transitionend` before removing the node from the DOM.
 
-**Fallback timeout:** If `transitionend` never fires (no CSS transition defined, `display: none`, etc.), the node is removed after 5 seconds rather than leaking.
+**Fallback timeout:** If `transitionend` never fires (no CSS transition defined, `display: none`, etc.), the node is removed after `TransitionTimeout` (default 5 seconds) rather than leaking.
 
 **Leave cancellation:** If a morph arrives that includes an element currently playing a leave transition, the leave is cancelled and the element is morphed normally. This handles rapid state changes (e.g. user toggles something twice quickly).
 
@@ -371,6 +386,13 @@ poly.New(poly.Config[State]{
     // ...
 })
 
+// SSE with larger event buffer for high-frequency streams
+poly.New(poly.Config[State]{
+    Mode:     poly.SSEOnly,
+    Fallback: sse.Upgrade(64),
+    // ...
+})
+
 // WebSocket with SSE fallback
 poly.New(poly.Config[State]{
     Mode:     poly.WebSocketWithFallback,
@@ -389,6 +411,8 @@ The initial HTML includes a `data-poly-transport` attribute on the root element 
 - **`auto`** — tries WebSocket first. If the first attempt fails, switches to SSE+POST permanently for that page load.
 
 When SSE is active, events are sent via `fetch(url, {method: "POST"})` to the same endpoint with `?session=ID`. The `EventPusher` interface (in `transport.go`) is implemented by transports that receive events externally rather than through the transport connection itself. The SSE transport implements it; the WebSocket transport does not.
+
+**SSE buffer size:** `sse.Upgrade()` accepts an optional buffer size parameter (default 16). When the internal event channel is full, `PushEvent` returns `ErrEventBufferFull` and the HTTP handler responds with 429. Increase the buffer for high-frequency event streams: `sse.Upgrade(64)`.
 
 **SSE reconnection:** `EventSource` has built-in reconnection. When the SSE connection drops, the session moves to the disconnected pool. On reconnect, the existing `reattach` flow sends a full re-render morph — no `Last-Event-ID` replay is needed.
 
@@ -470,6 +494,8 @@ Supported data attributes:
 
 **Lifecycle:** `data-poly-hook`, `data-poly-transition`
 
+**Configuration (set by server, read by JS):** `data-poly-retry-delay`, `data-poly-max-retry-delay`, `data-poly-debounce-default`, `data-poly-transition-timeout`
+
 **Internal (managed by JS):** `data-poly-client-classes`, `data-poly-client-attrs`
 
 ## Dependencies
@@ -490,6 +516,7 @@ Supported data attributes:
 
 These are architectural trade-offs, not bugs. They are documented here so future contributors understand the decisions.
 
+- **MaxSessions counts pending + active only.** Disconnected sessions (waiting for client reconnect) are excluded from the limit because they hold no transport resources. This prevents a network blip from blocking new connections while clients wait to reconnect.
 - **Session lock granularity:** The session mutex is held during the entire render/diff/send cycle. This is necessary for correctness (state, differ, and transport are coupled), but it means `Render` functions should be computationally cheap. A slow `Render` will block concurrent `Session.Update` calls.
 - **WebSocket backpressure:** `SendUpdate` writes synchronously. If the client is slow to read, the write will block, stalling the session event loop. This is inherent to the synchronous transport interface. For most applications the browser reads faster than the server writes, so this is not a practical concern.
 - **Loading state restoration:** `restorePending()` restores all disabled elements when any server update arrives. If two events are in flight simultaneously (A and B), the response for A will re-enable the element disabled by B. A full fix requires event correlation IDs (protocol change). In practice this is rare because events are debounced/throttled and server responses are fast.
