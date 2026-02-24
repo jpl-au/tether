@@ -357,6 +357,9 @@ window.Poly.hooks = window.Poly.hooks || {};
 
     var template = document.createElement("template");
     template.innerHTML = patch.html;
+    if (template.content.childElementCount > 1) {
+      console.warn("fluent-poly: patch for key '" + patch.key + "' contains multiple root elements. Only the first will be used. Wrap them in a single container.");
+    }
     var newEl = template.content.firstElementChild;
     if (!newEl) return;
 
@@ -366,6 +369,9 @@ window.Poly.hooks = window.Poly.hooks || {};
   function applyMorph(morph) {
     var template = document.createElement("template");
     template.innerHTML = morph.html;
+    if (template.content.childElementCount > 1) {
+      console.warn("fluent-poly: morph for key '" + morph.key + "' contains multiple root elements. Only the first will be used. Wrap them in a single container.");
+    }
     var newEl = template.content.firstElementChild;
     if (!newEl) return;
 
