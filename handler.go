@@ -179,6 +179,12 @@ type Config[S any] struct {
 // brief network interruptions without keeping abandoned sessions alive.
 const defaultReconnectTimeout = 30 * time.Second
 
+// maxEventBytes caps the POST body size for client events. Events carry
+// a type, action, and a map of string values (typically form fields), so
+// 64 KB is generous. This prevents a malicious client from exhausting
+// server memory with an oversized payload.
+const maxEventBytes = 64 << 10 // 64 KB
+
 // New creates a [Handler] from the given configuration and starts a
 // background reaper goroutine that enforces IdleTimeout, MaxLifetime,
 // and ReconnectTimeout. The reaper runs for the lifetime of the handler;
@@ -320,6 +326,10 @@ func (h *Handler[S]) handlePostEvent(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "transport does not accept events", http.StatusMethodNotAllowed)
 		return
 	}
+
+	// Cap the request body to prevent a malicious client from sending
+	// a multi-gigabyte payload and exhausting server memory.
+	r.Body = http.MaxBytesReader(w, r.Body, maxEventBytes)
 
 	var ev Event
 	if err := json.NewDecoder(r.Body).Decode(&ev); err != nil {
