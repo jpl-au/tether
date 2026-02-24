@@ -60,6 +60,10 @@ func Upgrade(bufferSize ...int) func(http.ResponseWriter, *http.Request) (poly.T
 		w.Header().Set("Cache-Control", "no-cache")
 		w.Header().Set("Connection", "keep-alive")
 		w.WriteHeader(http.StatusOK)
+
+		// Set the EventSource reconnection interval so the browser
+		// retries promptly if the stream drops before our JS loads.
+		fmt.Fprintf(w, "retry: 1000\n\n")
 		flusher.Flush()
 
 		t := &transport{

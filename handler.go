@@ -259,6 +259,22 @@ const (
 // call [Handler.Shutdown] to stop it and close all active sessions
 // before the process exits.
 func New[S any](cfg Config[S]) *Handler[S] {
+	if cfg.InitialState == nil {
+		panic("poly: Config.InitialState is required")
+	}
+	if cfg.Render == nil {
+		panic("poly: Config.Render is required")
+	}
+	if cfg.Handle == nil {
+		panic("poly: Config.Handle is required")
+	}
+	if cfg.Mode != SSEOnly && cfg.Upgrade == nil {
+		panic("poly: Config.Upgrade is required for WebSocket mode")
+	}
+	if cfg.Mode != WebSocketOnly && cfg.Fallback == nil {
+		panic("poly: Config.Fallback is required for SSE mode")
+	}
+
 	if cfg.Logger == nil {
 		cfg.Logger = slog.Default()
 	}
