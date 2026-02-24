@@ -113,6 +113,15 @@ func TestPreserveRendersDataAttribute(t *testing.T) {
 	}
 }
 
+func TestHookRendersDataAttribute(t *testing.T) {
+	el := poly.Hook(button.Text("Chart"), "chart")
+	html := string(el.Render())
+
+	if !strings.Contains(html, `data-poly-hook="chart"`) {
+		t.Errorf("expected data-poly-hook attribute in HTML:\n%s", html)
+	}
+}
+
 func TestDisableRendersDataAttribute(t *testing.T) {
 	el := poly.Disable(poly.Click(button.Text("Save"), "save"), "Saving...")
 	html := string(el.Render())

@@ -9,6 +9,17 @@
 // data-poly-endpoint, opens a WebSocket, binds event delegation, and
 // starts applying patches.
 
+// Poly.hooks is the public API for JS interop. Developers register
+// named hooks with mounted/updated/destroyed callbacks:
+//
+//   Poly.hooks.chart = {
+//     mounted: function(el) { /* init chart library */ },
+//     updated: function(el) { /* refresh chart */ },
+//     destroyed: function(el) { /* teardown */ }
+//   };
+window.Poly = window.Poly || {};
+window.Poly.hooks = window.Poly.hooks || {};
+
 (function () {
   "use strict";
 
@@ -158,6 +169,21 @@
     }
   }
 
+  // --- JS hooks ---
+  //
+  // Elements with data-poly-hook="name" receive lifecycle callbacks
+  // when they are added, morphed, or removed from the DOM. Hooks are
+  // registered on the global Poly.hooks object.
+
+  function callHook(el, lifecycle) {
+    var name = el.getAttribute("data-poly-hook");
+    if (!name) return;
+    var hook = window.Poly.hooks[name];
+    if (hook && typeof hook[lifecycle] === "function") {
+      hook[lifecycle](el);
+    }
+  }
+
   // --- Loading / pending states ---
   //
   // Elements with data-poly-disable are disabled while an event is in
@@ -236,6 +262,7 @@
 
     afterNodeAdded: function (newNode) {
       if (newNode.nodeType !== 1) return;
+      callHook(newNode, "mounted");
       var name = newNode.getAttribute("data-poly-transition");
       if (!name) return;
       // Force reflow so the browser registers the enter class,
@@ -261,8 +288,14 @@
       return true;
     },
 
+    afterNodeMorphed: function (oldNode) {
+      if (oldNode.nodeType !== 1) return;
+      callHook(oldNode, "updated");
+    },
+
     beforeNodeRemoved: function (oldNode) {
       if (oldNode.nodeType !== 1) return true;
+      callHook(oldNode, "destroyed");
       var name = oldNode.getAttribute("data-poly-transition");
       if (!name) return true;
 
