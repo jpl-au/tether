@@ -42,6 +42,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/jpl-au/fluent/node"
@@ -587,18 +588,29 @@ func (h *Handler[S]) handlePushSubscribe(w http.ResponseWriter, r *http.Request)
 // The service worker's CACHE_VERSION is set to a content hash of the
 // embedded files so cache invalidation happens automatically when the
 // library is rebuilt with new client code.
-func ServeClient() http.Handler {
-	fs := http.FileServer(http.FS(clientFiles()))
+//
+// The optional precache parameter lists additional app-specific asset URLs
+// (e.g. "/styles.css", "/logo.svg") that the service worker should cache
+// on install alongside the poly runtime files.
+func ServeClient(precache ...string) http.Handler {
+	fileServer := http.FileServer(http.FS(clientFiles()))
+
+	var workerOnce sync.Once
+	var workerBody []byte
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// The service worker needs the content-hash cache version
 		// injected and the scope header set, so it is served directly
 		// rather than through the static file server.
 		if r.URL.Path == "/poly-worker.js" || r.URL.Path == "poly-worker.js" {
+			workerOnce.Do(func() {
+				workerBody = buildWorkerJS(precache)
+			})
 			w.Header().Set("Service-Worker-Allowed", "/")
 			w.Header().Set("Content-Type", "application/javascript")
-			w.Write(workerJS())
+			w.Write(workerBody)
 			return
 		}
-		fs.ServeHTTP(w, r)
+		fileServer.ServeHTTP(w, r)
 	})
 }

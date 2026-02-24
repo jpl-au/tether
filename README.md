@@ -36,7 +36,8 @@ mux.Handle("/counter", poly.New(poly.Config[CounterState]{
     },
 }))
 
-// Serve the client JS runtime
+// Serve the client JS runtime.
+// Optional: pass asset URLs to precache in the service worker.
 mux.Handle("/_poly/", http.StripPrefix("/_poly/", poly.ServeClient()))
 ```
 
@@ -323,6 +324,15 @@ poly.New(poly.Config[State]{
 
 The service worker caches the JS runtime (`fluent-poly.js`, `idiomorph.min.js`) using a cache-first strategy, and caches page HTML using a network-first strategy. On subsequent visits, the JS loads from cache. If the server is unreachable, the last cached page is served instead of a browser error.
 
+To precache additional app-specific assets (CSS, icons, fonts), pass their URLs to `ServeClient`:
+
+```go
+mux.Handle("/_poly/", http.StripPrefix("/_poly/", poly.ServeClient(
+    "/styles.css",
+    "/logo.svg",
+)))
+```
+
 A reconnecting indicator bar appears automatically when the connection drops and disappears when it reconnects. This works with all transport modes, regardless of the `Worker` setting.
 
 ## Push notifications
@@ -349,6 +359,7 @@ poly.New(poly.Config[State]{
 push.Send(sub, push.Notification{
     Title: "New message",
     Body:  "You have a new reply.",
+    Tag:   "chat",     // groups related notifications
 }, push.Options{
     VAPIDPublicKey:  pub,
     VAPIDPrivateKey: priv,

@@ -10,13 +10,14 @@ var PRECACHE_URLS = [
   "/_poly/fluent-poly.js",
   "/_poly/idiomorph.min.js"
 ];
+var PRECACHE_EXTRA = [];
 
 // --- Install: precache static assets ---
 
 self.addEventListener("install", function (e) {
   e.waitUntil(
     caches.open(CACHE_VERSION).then(function (cache) {
-      return cache.addAll(PRECACHE_URLS);
+      return cache.addAll(PRECACHE_URLS.concat(PRECACHE_EXTRA));
     })
   );
   self.skipWaiting();
@@ -93,6 +94,8 @@ self.addEventListener("push", function (e) {
     body: data.body || "",
     icon: data.icon || "",
     badge: data.badge || "",
+    tag: data.tag || undefined,
+    renotify: !!data.renotify,
     data: { url: data.url || "/" }
   };
   e.waitUntil(self.registration.showNotification(title, opts));

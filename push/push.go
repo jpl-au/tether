@@ -35,11 +35,13 @@ import (
 // The fields map to the Notification API options that the service
 // worker passes to showNotification().
 type Notification struct {
-	Title string `json:"title"`
-	Body  string `json:"body,omitempty"`
-	Icon  string `json:"icon,omitempty"`
-	Badge string `json:"badge,omitempty"`
-	URL   string `json:"url,omitempty"`
+	Title    string `json:"title"`
+	Body     string `json:"body,omitempty"`
+	Icon     string `json:"icon,omitempty"`
+	Badge    string `json:"badge,omitempty"`
+	URL      string `json:"url,omitempty"`
+	Tag      string `json:"tag,omitempty"`      // Groups related notifications; replaces previous with same tag.
+	Renotify bool   `json:"renotify,omitempty"` // Re-alert (vibration/sound) when replacing a tagged notification.
 }
 
 // Options configures VAPID authentication for push requests. The same

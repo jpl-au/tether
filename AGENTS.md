@@ -518,12 +518,12 @@ Supported data attributes:
 
 The service worker provides:
 
-- **Asset caching:** Cache-first for `/_poly/*` GET requests (JS runtime files). On install, precaches `fluent-poly.js` and `idiomorph.min.js`.
+- **Asset caching:** Cache-first for `/_poly/*` GET requests (JS runtime files). On install, precaches `fluent-poly.js` and `idiomorph.min.js`, plus any extra URLs passed to `ServeClient(precache ...string)`.
 - **Page caching:** Network-first for navigation requests. Caches successful HTML responses; serves the cached version when offline.
 - **Push event handling:** Receives push messages and shows notifications via `showNotification()`. Handles `notificationclick` for URL navigation.
 - **Background sync:** Replays failed SSE POST events from IndexedDB when connectivity returns (Chromium only; other browsers replay on tab reconnect).
 
-Cache is keyed by `CACHE_VERSION = "poly-v1"`. Old caches are deleted on activate.
+Cache is keyed by a content hash of the embedded files (injected at serve time). Old caches are deleted on activate.
 
 ### Reconnecting indicator
 
@@ -562,7 +562,7 @@ type PushSubscriptionKeys struct {
 **Sending notifications:** Use the `push` subpackage:
 
 ```go
-push.Send(sub, push.Notification{Title: "Hello"}, push.Options{
+push.Send(sub, push.Notification{Title: "Hello", Tag: "chat"}, push.Options{
     VAPIDPublicKey:  pub,
     VAPIDPrivateKey: priv,
     Subject:         "mailto:admin@example.com",

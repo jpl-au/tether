@@ -51,6 +51,38 @@ func TestServeClientWorkerHeader(t *testing.T) {
 	})
 }
 
+func TestServeClientPrecache(t *testing.T) {
+	handler := ServeClient("/styles.css", "/logo.svg")
+
+	req := httptest.NewRequest("GET", "/poly-worker.js", nil)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	body := w.Body.String()
+	if !strings.Contains(body, "/styles.css") {
+		t.Error("worker JS should contain precache URL /styles.css")
+	}
+	if !strings.Contains(body, "/logo.svg") {
+		t.Error("worker JS should contain precache URL /logo.svg")
+	}
+	if strings.Contains(body, "PRECACHE_EXTRA = []") {
+		t.Error("worker JS should have replaced the empty PRECACHE_EXTRA placeholder")
+	}
+}
+
+func TestServeClientNoPrecache(t *testing.T) {
+	handler := ServeClient()
+
+	req := httptest.NewRequest("GET", "/poly-worker.js", nil)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	body := w.Body.String()
+	if !strings.Contains(body, "PRECACHE_EXTRA = []") {
+		t.Error("worker JS should keep empty PRECACHE_EXTRA when no precache URLs given")
+	}
+}
+
 func TestPolyBodyWorkerAttribute(t *testing.T) {
 	t.Run("worker true emits data-poly-worker", func(t *testing.T) {
 		body := &polyBody{

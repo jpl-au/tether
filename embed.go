@@ -5,8 +5,8 @@ import (
 	"crypto/sha256"
 	"embed"
 	"encoding/hex"
+	"encoding/json"
 	"io/fs"
-	"sync"
 )
 
 // clientFS embeds the client-side JS runtime and the idiomorph library.
@@ -28,32 +28,34 @@ func clientFiles() fs.FS {
 	return sub
 }
 
-var workerCache struct {
-	once sync.Once
-	body []byte
-}
-
-// workerJS returns the service worker JS with the cache version set to
-// a content hash of the embedded client files. The version is injected
-// at serve time so the browser's service worker update check detects
-// changes whenever the library is rebuilt with new client code.
-func workerJS() []byte {
-	workerCache.once.Do(func() {
-		h := sha256.New()
-		fs.WalkDir(clientFS, ".", func(path string, d fs.DirEntry, err error) error {
-			if err != nil || d.IsDir() {
-				return err
-			}
-			data, _ := fs.ReadFile(clientFS, path)
-			h.Write(data)
-			return nil
-		})
-		version := hex.EncodeToString(h.Sum(nil))[:12]
-
-		raw, _ := fs.ReadFile(clientFiles(), "poly-worker.js")
-		workerCache.body = bytes.Replace(raw,
-			[]byte(`"poly-v1"`),
-			[]byte(`"poly-`+version+`"`), 1)
+// buildWorkerJS returns the service worker JS with the cache version set
+// to a content hash of the embedded client files and any extra precache
+// URLs injected. The version is injected at serve time so the browser's
+// service worker update check detects changes whenever the library is
+// rebuilt with new client code.
+func buildWorkerJS(precache []string) []byte {
+	h := sha256.New()
+	fs.WalkDir(clientFS, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		data, _ := fs.ReadFile(clientFS, path)
+		h.Write(data)
+		return nil
 	})
-	return workerCache.body
+	version := hex.EncodeToString(h.Sum(nil))[:12]
+
+	raw, _ := fs.ReadFile(clientFiles(), "poly-worker.js")
+	body := bytes.Replace(raw,
+		[]byte(`"poly-v1"`),
+		[]byte(`"poly-`+version+`"`), 1)
+
+	if len(precache) > 0 {
+		extra, _ := json.Marshal(precache)
+		body = bytes.Replace(body,
+			[]byte("var PRECACHE_EXTRA = [];"),
+			[]byte("var PRECACHE_EXTRA = "+string(extra)+";"), 1)
+	}
+
+	return body
 }
