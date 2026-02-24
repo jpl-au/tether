@@ -48,14 +48,14 @@ type HandleFunc[S any] func(state S, event Event) S
 // server-initiated updates from background goroutines, timers, or
 // database change listeners.
 type Session[S any] struct {
-	id           string
-	state        S
-	render       RenderFunc[S]
-	handle       HandleFunc[S]
-	handleParams func(S, Params) S
-	differ       *jit.Differ
-	transport    Transport
-	logger       *slog.Logger
+	id             string
+	state          S
+	render         RenderFunc[S]
+	handle         HandleFunc[S]
+	handleParams   func(S, Params) S
+	differ         *jit.Differ
+	transport      Transport
+	logger         *slog.Logger
 	createdAt      time.Time
 	lastActivity   time.Time
 	disconnectedAt time.Time

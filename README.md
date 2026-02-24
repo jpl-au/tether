@@ -310,6 +310,62 @@ Same wire format, same API regardless of transport.
 
 SSE connections send keep-alive comments at `HeartbeatInterval` (default 20s) to prevent proxies from closing idle connections.
 
+## Service worker
+
+Enable the service worker for asset caching and offline page shells:
+
+```go
+poly.New(poly.Config[State]{
+    Worker: true,
+    // ...
+})
+```
+
+The service worker caches the JS runtime (`fluent-poly.js`, `idiomorph.min.js`) using a cache-first strategy, and caches page HTML using a network-first strategy. On subsequent visits, the JS loads from cache. If the server is unreachable, the last cached page is served instead of a browser error.
+
+A reconnecting indicator bar appears automatically when the connection drops and disappears when it reconnects. This works with all transport modes, regardless of the `Worker` setting.
+
+## Push notifications
+
+Reach users even when their tab is closed:
+
+```go
+import "github.com/jpl-au/fluent-poly/push"
+
+// Generate VAPID keys once during setup (store them securely).
+pub, priv, err := push.GenerateVAPIDKeys()
+
+poly.New(poly.Config[State]{
+    Push: &poly.PushConfig[State]{
+        VAPIDPublicKey: pub,
+        OnSubscribe: func(sess *poly.Session[State], sub poly.PushSubscription) {
+            // Store sub.Endpoint and sub.Keys for later use.
+        },
+    },
+    // ...
+})
+
+// Send a notification from anywhere.
+push.Send(sub, push.Notification{
+    Title: "New message",
+    Body:  "You have a new reply.",
+}, push.Options{
+    VAPIDPublicKey:  pub,
+    VAPIDPrivateKey: priv,
+    Subject:         "mailto:admin@example.com",
+})
+```
+
+Setting `Push` implicitly enables the service worker. The client subscribes automatically when the push manager is available and sends the subscription to the server via `OnSubscribe`.
+
+The `push` subpackage implements the Web Push protocol (RFC 8291 + RFC 8292) with VAPID JWT signing and aes128gcm payload encryption. It depends on `golang.org/x/crypto` for HKDF key derivation.
+
+## Event resilience (SSE)
+
+In SSE mode, events that fail to send (due to network interruptions) are automatically queued in IndexedDB and replayed when the connection is restored. This happens transparently — the user does not need to redo their action.
+
+When the service worker is active and the browser supports Background Sync (Chromium), queued events are replayed even if the tab was closed. On other browsers, replay occurs when the tab reopens and the SSE connection restores.
+
 ## Performance note
 
 The generic helpers are ~47% slower than calling `SetData` directly. For performance-sensitive render paths, use `SetData`:

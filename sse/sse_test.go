@@ -27,9 +27,9 @@ func newMockWriter() *mockWriter {
 }
 
 func (w *mockWriter) Header() http.Header         { return w.headers }
-func (w *mockWriter) WriteHeader(statusCode int)   { w.status = statusCode }
-func (w *mockWriter) Write(b []byte) (int, error)  { return w.buf.Write(b) }
-func (w *mockWriter) Flush()                       { w.flushed++ }
+func (w *mockWriter) WriteHeader(statusCode int)  { w.status = statusCode }
+func (w *mockWriter) Write(b []byte) (int, error) { return w.buf.Write(b) }
+func (w *mockWriter) Flush()                      { w.flushed++ }
 
 func newTestTransport() (*transport, *mockWriter) {
 	w := newMockWriter()

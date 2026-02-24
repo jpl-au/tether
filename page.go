@@ -25,6 +25,8 @@ type polyBody struct {
 	maxRetryDelay     time.Duration
 	defaultDebounce   time.Duration
 	transitionTimeout time.Duration
+	worker            bool
+	pushKey           string
 }
 
 func (p *polyBody) Render(w ...io.Writer) []byte {
@@ -61,7 +63,16 @@ func (p *polyBody) RenderBuilder(buf *bytes.Buffer) {
 	buf.WriteString(strconv.FormatInt(p.defaultDebounce.Milliseconds(), 10))
 	buf.WriteString(`" data-poly-transition-timeout="`)
 	buf.WriteString(strconv.FormatInt(p.transitionTimeout.Milliseconds(), 10))
-	buf.WriteString(`">`)
+	buf.WriteString(`"`)
+	if p.worker {
+		buf.WriteString(` data-poly-worker`)
+	}
+	if p.pushKey != "" {
+		buf.WriteString(` data-poly-push-key="`)
+		buf.WriteString(html.EscapeString(p.pushKey))
+		buf.WriteString(`"`)
+	}
+	buf.WriteString(`>`)
 	buf.Write(p.html)
 	buf.WriteString("</div>\n<script src=\"/_poly/idiomorph.min.js\"></script>\n<script src=\"/_poly/fluent-poly.js\"></script>\n")
 }

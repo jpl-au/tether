@@ -59,6 +59,22 @@ window.Poly.hooks = window.Poly.hooks || {};
     connectionMode = (transportMode === "sse") ? "sse" : "ws";
     connect();
     bindEvents();
+
+    // Register service worker when enabled by the server. The worker
+    // provides asset caching, offline page shells, push notification
+    // handling, and background sync for SSE event resilience.
+    if (root.hasAttribute("data-poly-worker") && "serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/_poly/poly-worker.js", { scope: "/" })
+        .then(function (reg) {
+          var pushKey = root.getAttribute("data-poly-push-key");
+          if (pushKey && "PushManager" in window) {
+            subscribePush(reg, pushKey);
+          }
+        })
+        .catch(function (err) {
+          console.warn("fluent-poly: service worker registration failed:", err);
+        });
+    }
   });
 
   // --- Connection ---
@@ -91,6 +107,7 @@ window.Poly.hooks = window.Poly.hooks || {};
       wsOpened = true;
       retryDelay = initialRetryDelay;
       if (root) root.classList.remove("poly-disconnected");
+      hideReconnectBar();
       if (isReconnect) {
         sendNavigate(location.pathname + location.search);
       } else {
@@ -110,6 +127,7 @@ window.Poly.hooks = window.Poly.hooks || {};
 
     ws.onclose = function () {
       if (root) root.classList.add("poly-disconnected");
+      showReconnectBar();
       // If the WebSocket never connected and the server allows SSE
       // fallback (transportMode "auto"), switch to SSE+POST permanently.
       if (!wsOpened && transportMode === "auto") {
@@ -138,7 +156,9 @@ window.Poly.hooks = window.Poly.hooks || {};
       sseOpened = true;
       retryDelay = initialRetryDelay;
       if (root) root.classList.remove("poly-disconnected");
+      hideReconnectBar();
       if (isReconnect) {
+        replayQueuedEvents();
         sendNavigate(location.pathname + location.search);
       } else {
         mountExistingHooks();
@@ -157,6 +177,7 @@ window.Poly.hooks = window.Poly.hooks || {};
 
     eventSource.onerror = function () {
       if (root) root.classList.add("poly-disconnected");
+      showReconnectBar();
       // EventSource reconnects automatically — no manual retry needed.
     };
   }
@@ -166,6 +187,179 @@ window.Poly.hooks = window.Poly.hooks || {};
       retryDelay = Math.min(retryDelay * 2, maxRetryDelay);
       connect();
     }, retryDelay);
+  }
+
+  // --- Reconnecting indicator ---
+  //
+  // A fixed bar at the top of the viewport that slides in when the
+  // transport disconnects and slides out on reconnect. Created lazily
+  // on first disconnect so there is no DOM cost when the connection
+  // stays healthy. Developers can override the appearance via the
+  // .poly-reconnecting CSS class.
+
+  var reconnectBar = null;
+
+  function createReconnectBar() {
+    var bar = document.createElement("div");
+    bar.className = "poly-reconnecting";
+    bar.setAttribute("role", "status");
+    bar.setAttribute("aria-live", "polite");
+    bar.textContent = "Reconnecting\u2026";
+    bar.style.cssText = [
+      "position:fixed",
+      "top:0",
+      "left:0",
+      "right:0",
+      "z-index:2147483647",
+      "background:#ef4444",
+      "color:#fff",
+      "text-align:center",
+      "padding:6px 12px",
+      "font:14px/1.4 system-ui,sans-serif",
+      "transform:translateY(-100%)",
+      "transition:transform .3s ease",
+      "pointer-events:none"
+    ].join(";");
+    document.body.appendChild(bar);
+    return bar;
+  }
+
+  function showReconnectBar() {
+    if (!reconnectBar) reconnectBar = createReconnectBar();
+    // Force reflow before changing the transform so the browser
+    // registers the initial off-screen position.
+    reconnectBar.offsetHeight;
+    reconnectBar.style.transform = "translateY(0)";
+  }
+
+  function hideReconnectBar() {
+    if (reconnectBar) {
+      reconnectBar.style.transform = "translateY(-100%)";
+    }
+  }
+
+  // --- Push notification subscription ---
+  //
+  // When the server provides a VAPID public key via data-poly-push-key,
+  // the client subscribes to push notifications through the service
+  // worker's PushManager. The subscription is sent to the server so it
+  // can deliver notifications later via the push subpackage.
+
+  function subscribePush(reg, vapidKey) {
+    reg.pushManager.getSubscription().then(function (sub) {
+      if (sub) {
+        // Already subscribed — send to server in case it restarted.
+        sendPushSubscription(sub);
+        return;
+      }
+      return reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidKey)
+      }).then(function (sub) {
+        sendPushSubscription(sub);
+      });
+    }).catch(function (err) {
+      console.warn("fluent-poly: push subscription failed:", err);
+    });
+  }
+
+  function sendPushSubscription(sub) {
+    var url = location.protocol + "//" + location.host + endpoint;
+    fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Poly-Session": sessionID,
+        "X-Poly-Push-Subscribe": "true"
+      },
+      body: JSON.stringify(sub.toJSON())
+    }).catch(function (err) {
+      console.warn("fluent-poly: push subscription POST failed:", err);
+    });
+  }
+
+  // Convert a base64url-encoded string to a Uint8Array for the
+  // PushManager.subscribe applicationServerKey parameter.
+  function urlBase64ToUint8Array(base64String) {
+    var padding = "=".repeat((4 - base64String.length % 4) % 4);
+    var base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+    var raw = atob(base64);
+    var arr = new Uint8Array(raw.length);
+    for (var i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+    return arr;
+  }
+
+  // --- SSE event resilience ---
+  //
+  // When an SSE POST event fails (network down, server restarting),
+  // the event payload is queued in IndexedDB for replay on reconnect.
+  // If Background Sync is available, a sync is also registered so the
+  // service worker can replay events even if the tab was closed.
+
+  var EVENT_DB_NAME = "poly-events";
+  var EVENT_DB_VERSION = 1;
+  var EVENT_STORE = "queue";
+
+  function openEventDB() {
+    return new Promise(function (resolve, reject) {
+      if (!("indexedDB" in window)) { reject(new Error("no IndexedDB")); return; }
+      var req = indexedDB.open(EVENT_DB_NAME, EVENT_DB_VERSION);
+      req.onupgradeneeded = function (e) {
+        e.target.result.createObjectStore(EVENT_STORE, { autoIncrement: true });
+      };
+      req.onsuccess = function (e) { resolve(e.target.result); };
+      req.onerror = function (e) { reject(e.target.error); };
+    });
+  }
+
+  function queueFailedEvent(payload) {
+    openEventDB().then(function (db) {
+      var tx = db.transaction(EVENT_STORE, "readwrite");
+      tx.objectStore(EVENT_STORE).add({
+        sessionID: sessionID,
+        endpoint: location.protocol + "//" + location.host + endpoint,
+        payload: payload,
+        ts: Date.now()
+      });
+    }).then(function () {
+      // Register background sync so the service worker can replay
+      // queued events even if the tab is closed before reconnect.
+      if ("serviceWorker" in navigator && "SyncManager" in window) {
+        navigator.serviceWorker.ready.then(function (reg) {
+          reg.sync.register("poly-event-sync");
+        });
+      }
+    }).catch(function () {
+      // IndexedDB unavailable — event is lost. The user will need
+      // to repeat the action after reconnect.
+    });
+  }
+
+  function replayQueuedEvents() {
+    openEventDB().then(function (db) {
+      var tx = db.transaction(EVENT_STORE, "readwrite");
+      var store = tx.objectStore(EVENT_STORE);
+      var req = store.getAll();
+      req.onsuccess = function () {
+        store.clear();
+        var events = req.result;
+        var url = location.protocol + "//" + location.host + endpoint;
+        for (var i = 0; i < events.length; i++) {
+          // Only replay events for the current session.
+          if (events[i].sessionID !== sessionID) continue;
+          fetch(url, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Poly-Session": sessionID
+            },
+            body: events[i].payload
+          });
+        }
+      };
+    }).catch(function () {
+      // IndexedDB unavailable — nothing to replay.
+    });
   }
 
   // --- Message handling ---
@@ -593,6 +787,7 @@ window.Poly.hooks = window.Poly.hooks || {};
         if (!resp.ok) restorePending(id);
       }).catch(function () {
         restorePending(id);
+        queueFailedEvent(payload);
       });
       return id;
     }

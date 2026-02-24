@@ -72,6 +72,11 @@ func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 	h.pending[id] = &pendingSession[S]{state: state, differ: differ, createdAt: now}
 	h.mu.Unlock()
 
+	var pushKey string
+	if h.cfg.Push != nil {
+		pushKey = h.cfg.Push.VAPIDPublicKey
+	}
+
 	content := &polyBody{
 		html:              html,
 		endpoint:          r.URL.Path,
@@ -81,6 +86,8 @@ func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 		maxRetryDelay:     h.cfg.MaxRetryDelay,
 		defaultDebounce:   h.cfg.DefaultDebounce,
 		transitionTimeout: h.cfg.TransitionTimeout,
+		worker:            h.cfg.Worker,
+		pushKey:           pushKey,
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

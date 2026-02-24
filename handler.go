@@ -237,6 +237,50 @@ type Config[S any] struct {
 	// When nil, the handler outputs a bare HTML fragment (the poly root
 	// div and scripts only), which puts the browser in quirks mode.
 	Layout func(content node.Node) node.Node
+
+	// Worker enables the service worker for asset caching, offline page
+	// shells, and push notification support. When true, the client JS
+	// registers /_poly/poly-worker.js as a service worker with scope
+	// "/". Implicitly true when Push is configured. Default false.
+	Worker bool
+
+	// Push enables Web Push notification support. When set, Worker is
+	// implicitly true. Clients subscribe to push notifications after
+	// connecting, and the subscription is delivered via OnSubscribe.
+	// Use the push subpackage to send notifications. Optional.
+	Push *PushConfig[S]
+}
+
+// PushConfig enables Web Push notifications for the page. When set on
+// [Config], the service worker is implicitly enabled because push
+// notifications require a service worker to receive messages when no
+// tab is open.
+type PushConfig[S any] struct {
+	// VAPIDPublicKey is the base64url-encoded ECDSA P-256 public key
+	// used to authenticate the application with the push service.
+	// Generate a key pair with [push.GenerateVAPIDKeys].
+	VAPIDPublicKey string
+
+	// OnSubscribe is called when a client sends its push subscription
+	// to the server. Store the subscription to send notifications later
+	// via [push.Send]. The callback runs in its own goroutine so it is
+	// safe to perform I/O (e.g. database writes). Optional.
+	OnSubscribe func(session *Session[S], sub PushSubscription)
+}
+
+// PushSubscription holds the endpoint and encryption keys the browser
+// provides after a successful pushManager.subscribe() call. Store this
+// server-side to send notifications later via the push subpackage.
+type PushSubscription struct {
+	Endpoint string               `json:"endpoint"`
+	Keys     PushSubscriptionKeys `json:"keys"`
+}
+
+// PushSubscriptionKeys holds the client-side ECDH public key and
+// authentication secret needed to encrypt push message payloads.
+type PushSubscriptionKeys struct {
+	P256dh string `json:"p256dh"`
+	Auth   string `json:"auth"`
 }
 
 // defaultReconnectTimeout gives the client enough time to recover from
@@ -279,6 +323,10 @@ func New[S any](cfg Config[S]) *Handler[S] {
 	}
 	if cfg.Mode != WebSocketOnly && cfg.Fallback == nil {
 		panic("poly: Config.Fallback is required for SSE mode")
+	}
+
+	if cfg.Push != nil {
+		cfg.Worker = true
 	}
 
 	if cfg.Logger == nil {
@@ -333,6 +381,14 @@ func New[S any](cfg Config[S]) *Handler[S] {
 // transport paths are active. Requests that don't match any transport
 // path fall through to the initial page render.
 func (h *Handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Push subscription registrations arrive as POST with a special
+	// header, regardless of transport mode. Handle them before the
+	// mode switch to avoid being mistaken for an SSE event.
+	if r.Method == "POST" && r.Header.Get("X-Poly-Push-Subscribe") == "true" {
+		h.handlePushSubscribe(w, r)
+		return
+	}
+
 	switch h.cfg.Mode {
 	case SSEOnly:
 		if strings.Contains(r.Header.Get("Accept"), "text/event-stream") {
@@ -483,8 +539,59 @@ func (h *Handler[S]) handlePostEvent(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// handlePushSubscribe receives a push subscription from the client JS
+// after a successful PushManager.subscribe() call. The subscription is
+// delivered to the PushConfig.OnSubscribe callback along with the
+// session that sent it.
+func (h *Handler[S]) handlePushSubscribe(w http.ResponseWriter, r *http.Request) {
+	if h.cfg.Push == nil || h.cfg.Push.OnSubscribe == nil {
+		http.Error(w, "push not configured", http.StatusNotFound)
+		return
+	}
+	if !h.originAllowed(r) {
+		http.Error(w, "origin not allowed", http.StatusForbidden)
+		return
+	}
+
+	id := r.Header.Get("X-Poly-Session")
+	if id == "" {
+		http.Error(w, "missing session", http.StatusBadRequest)
+		return
+	}
+
+	h.mu.Lock()
+	sess, ok := h.active[id]
+	h.mu.Unlock()
+	if !ok {
+		http.Error(w, "session not found", http.StatusNotFound)
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, h.cfg.MaxEventBytes)
+
+	var sub PushSubscription
+	if err := json.NewDecoder(r.Body).Decode(&sub); err != nil {
+		http.Error(w, "invalid subscription", http.StatusBadRequest)
+		return
+	}
+
+	go h.cfg.Push.OnSubscribe(sess, sub)
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // ServeClient serves the embedded client runtime. Mount at /_poly/ so the
-// HTML page can load fluent-poly.js and idiomorph.
+// HTML page can load fluent-poly.js and idiomorph. The handler adds a
+// Service-Worker-Allowed header when serving poly-worker.js so the service
+// worker can control the entire origin despite being served from /_poly/.
 func ServeClient() http.Handler {
-	return http.FileServer(http.FS(clientFiles()))
+	fs := http.FileServer(http.FS(clientFiles()))
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Service workers are scoped to their serving directory by
+		// default. This header allows the worker served from /_poly/
+		// to control the entire origin.
+		if r.URL.Path == "/poly-worker.js" || r.URL.Path == "poly-worker.js" {
+			w.Header().Set("Service-Worker-Allowed", "/")
+		}
+		fs.ServeHTTP(w, r)
+	})
 }

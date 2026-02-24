@@ -24,7 +24,8 @@ Local development uses `replace` directives in `go.mod` pointing to sibling dire
 poly/           Root — Transport, Session, Config, Event, Group, protocol, bind helpers
 poly/ws/        WebSocket transport (only package importing coder/websocket)
 poly/sse/       SSE+POST transport (no external dependencies)
-poly/client/    Embedded JS files (fluent-poly.js, idiomorph.min.js)
+poly/push/      Web Push notification sending (RFC 8291 + RFC 8292)
+poly/client/    Embedded JS files (fluent-poly.js, idiomorph.min.js, poly-worker.js)
 ```
 
 Source files in the root package, split by concern:
@@ -40,6 +41,7 @@ transport.go    Transport and EventPusher interfaces
 event.go        Event and Params types
 bind.go         Generic event binding helpers
 embed.go        Client JS embedding
+push/push.go    Web Push protocol — Send(), GenerateVAPIDKeys(), VAPID auth, aes128gcm encryption
 ```
 
 Transport implementations live in sub-packages. The `Config.Upgrade` field accepts any function that returns a `Transport`, keeping the root package transport-agnostic. `Config.Fallback` provides a secondary transport (typically SSE) used when the primary is unavailable.
@@ -470,10 +472,12 @@ activity_test.go    Server-initiated update refreshes lastActivity
 reap_test.go        Reaper lifecycle tests (uses testing/synctest fake clock)
 shutdown_test.go    Graceful shutdown and reaper termination (uses testing/synctest)
 origin_test.go      Origin checking and CSRF protection
+worker_test.go      Service worker header, polyBody attributes, push subscribe handler
 bind_test.go        Event binding helpers (package poly_test, black-box)
 protocol_test.go    Wire format encoding
 bench_test.go       Performance benchmarks
 sse/sse_test.go     SSE transport
+push/push_test.go   VAPID key generation, JWT signing, Send end-to-end
 ```
 
 `mock_test.go` defines `mockTransport` (replays queued events, records sent `Update` values) and `newTestSession` (creates a session with a seeded differ). Helper functions `patchUpdates()` and `morphUpdates()` filter recorded updates by type. Use these for any new session behaviour tests.
@@ -504,13 +508,83 @@ Supported data attributes:
 
 **Developer warnings:** The client logs `console.warn` if a patch or morph contains multiple root elements. Only the first element is used — wrap siblings in a container to avoid silent data loss.
 
+**Service worker:** `data-poly-worker` (boolean — registers the service worker), `data-poly-push-key` (VAPID public key for push subscription)
+
 **Internal (managed by JS):** `data-poly-client-classes`, `data-poly-client-attrs`
+
+## Service worker
+
+`client/poly-worker.js` is registered by the client JS when `data-poly-worker` is present on the root element. Set `Config.Worker = true` (or configure `Push`) to enable it.
+
+The service worker provides:
+
+- **Asset caching:** Cache-first for `/_poly/*` GET requests (JS runtime files). On install, precaches `fluent-poly.js` and `idiomorph.min.js`.
+- **Page caching:** Network-first for navigation requests. Caches successful HTML responses; serves the cached version when offline.
+- **Push event handling:** Receives push messages and shows notifications via `showNotification()`. Handles `notificationclick` for URL navigation.
+- **Background sync:** Replays failed SSE POST events from IndexedDB when connectivity returns (Chromium only; other browsers replay on tab reconnect).
+
+Cache is keyed by `CACHE_VERSION = "poly-v1"`. Old caches are deleted on activate.
+
+### Reconnecting indicator
+
+A fixed bar at the top of the viewport shows "Reconnecting…" when the transport connection drops. It applies to all transport modes regardless of the `Worker` setting. Styled with inline styles, overridable via the `.poly-reconnecting` class. Uses `role="status"` and `aria-live="polite"` for accessibility.
+
+## Push notifications
+
+`Config.Push` enables Web Push support. Setting it implicitly enables `Worker`.
+
+**Go types:**
+
+```go
+type PushConfig[S any] struct {
+    VAPIDPublicKey string
+    OnSubscribe    func(session *Session[S], sub PushSubscription)
+}
+
+type PushSubscription struct {
+    Endpoint string               `json:"endpoint"`
+    Keys     PushSubscriptionKeys `json:"keys"`
+}
+
+type PushSubscriptionKeys struct {
+    P256dh string `json:"p256dh"`
+    Auth   string `json:"auth"`
+}
+```
+
+**Subscription flow:**
+
+1. Client JS reads `data-poly-push-key` from the root element
+2. Calls `pushManager.subscribe()` with the VAPID key
+3. POSTs subscription JSON to the poly endpoint with `X-Poly-Push-Subscribe: true` and `X-Poly-Session` headers
+4. Server calls `OnSubscribe(session, sub)` in a goroutine
+
+**Sending notifications:** Use the `push` subpackage:
+
+```go
+push.Send(sub, push.Notification{Title: "Hello"}, push.Options{
+    VAPIDPublicKey:  pub,
+    VAPIDPrivateKey: priv,
+    Subject:         "mailto:admin@example.com",
+})
+```
+
+`push.Send` handles ECDH key agreement, HKDF key derivation (`golang.org/x/crypto/hkdf`), AES-128-GCM payload encryption, and VAPID JWT signing. Returns `push.ErrSubscriptionExpired` for HTTP 410 responses.
+
+## Event resilience (SSE)
+
+In SSE mode, failed POST events are queued in IndexedDB (`poly-events` object store) and replayed on reconnect. The replay happens before the navigate event so the server processes queued events first.
+
+When the service worker is active and Background Sync is available, a `poly-event-sync` sync tag is registered so queued events replay even if the tab was closed. Events older than 60 seconds are discarded as stale.
+
+IndexedDB helpers (`openEventDB`, `queueFailedEvent`, `drainEvents`) are shared between the main thread and the service worker.
 
 ## Dependencies
 
 - `github.com/coder/websocket` — WebSocket library, used only in `ws/` sub-package.
 - `github.com/jpl-au/fluent` — HTML node tree library
 - `github.com/jpl-au/fluent-jit` — diff engine for dynamic nodes
+- `golang.org/x/crypto` — HKDF key derivation, used only in `push/` sub-package
 
 ## Security
 
