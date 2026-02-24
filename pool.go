@@ -32,6 +32,7 @@ type Handler[S any] struct {
 	active       map[string]*Session[S]
 	disconnected map[string]*Session[S]
 	done         chan struct{}
+	closeOnce    sync.Once
 }
 
 // serveInitialPage handles the initial GET request. It pre-warms the
@@ -224,9 +225,10 @@ func (h *Handler[S]) wireDisconnect(sess *Session[S]) {
 }
 
 // Shutdown closes all active sessions and stops the background reaper.
-// It blocks until every session has exited or ctx is cancelled.
+// It blocks until every session has exited or ctx is cancelled. Safe
+// to call more than once.
 func (h *Handler[S]) Shutdown(ctx context.Context) error {
-	close(h.done)
+	h.closeOnce.Do(func() { close(h.done) })
 
 	h.mu.Lock()
 	sessions := make([]*Session[S], 0, len(h.active))
