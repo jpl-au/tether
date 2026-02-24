@@ -93,6 +93,8 @@ window.Poly.hooks = window.Poly.hooks || {};
       if (root) root.classList.remove("poly-disconnected");
       if (isReconnect) {
         sendNavigate(location.pathname + location.search);
+      } else {
+        mountExistingHooks();
       }
     };
 
@@ -138,6 +140,8 @@ window.Poly.hooks = window.Poly.hooks || {};
       if (root) root.classList.remove("poly-disconnected");
       if (isReconnect) {
         sendNavigate(location.pathname + location.search);
+      } else {
+        mountExistingHooks();
       }
     };
 
@@ -222,6 +226,29 @@ window.Poly.hooks = window.Poly.hooks || {};
     }
   }
 
+  // callHookDeep invokes a lifecycle callback on the element itself and
+  // on any descendant hook elements. Idiomorph only fires afterNodeAdded
+  // for the top-level node — descendants are already part of its innerHTML
+  // and need to be scanned separately.
+  function callHookDeep(el, lifecycle) {
+    callHook(el, lifecycle);
+    var hookEls = el.querySelectorAll("[data-poly-hook]");
+    for (var i = 0; i < hookEls.length; i++) {
+      callHook(hookEls[i], lifecycle);
+    }
+  }
+
+  // mountExistingHooks scans the DOM for hook elements that were rendered
+  // in the initial HTML (before any morph). Called once on first connect
+  // so hooks fire even when the page loads directly onto a hooked view.
+  function mountExistingHooks() {
+    if (!root) return;
+    var hookEls = root.querySelectorAll("[data-poly-hook]");
+    for (var i = 0; i < hookEls.length; i++) {
+      callHook(hookEls[i], "mounted");
+    }
+  }
+
   // --- Loading / pending states ---
   //
   // Elements with data-poly-disable are disabled while an event is in
@@ -300,7 +327,7 @@ window.Poly.hooks = window.Poly.hooks || {};
 
     afterNodeAdded: function (newNode) {
       if (newNode.nodeType !== 1) return;
-      callHook(newNode, "mounted");
+      callHookDeep(newNode, "mounted");
       var name = newNode.getAttribute("data-poly-transition");
       if (!name) return;
       // Force reflow so the browser registers the enter class,
@@ -333,7 +360,7 @@ window.Poly.hooks = window.Poly.hooks || {};
 
     beforeNodeRemoved: function (oldNode) {
       if (oldNode.nodeType !== 1) return true;
-      callHook(oldNode, "destroyed");
+      callHookDeep(oldNode, "destroyed");
       var name = oldNode.getAttribute("data-poly-transition");
       if (!name) return true;
 
