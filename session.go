@@ -76,9 +76,10 @@ func (s *Session[S]) ID() string {
 
 // State returns the current session state. The value is read under the
 // session lock, so it reflects the state as of the most recently
-// completed event or Update call. Because Go copies values on return,
-// the caller gets a snapshot — mutations to it do not affect the
-// session. Use [Session.Update] to apply state changes.
+// completed event or Update call. The returned value is a shallow copy —
+// treat it as read-only. Mutating slices, maps, or pointer fields in
+// the returned value will corrupt the session's internal state. Use
+// [Session.Update] to apply state changes safely.
 func (s *Session[S]) State() S {
 	s.mu.Lock()
 	defer s.mu.Unlock()

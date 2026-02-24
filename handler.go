@@ -38,6 +38,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -398,9 +399,23 @@ func (h *Handler[S]) originAllowed(r *http.Request) bool {
 		return false
 	}
 	// No AllowedOrigins configured — fall back to same-host check
-	// as basic CSRF protection.
+	// as basic CSRF protection. Compare hostnames only so that
+	// Origin: http://localhost matches Host: localhost:8080.
 	u, err := url.Parse(origin)
-	return err == nil && u.Host == r.Host
+	if err != nil {
+		return false
+	}
+	return stripPort(u.Host) == stripPort(r.Host)
+}
+
+// stripPort returns the host portion of a host:port string. If there
+// is no port, the input is returned unchanged.
+func stripPort(hostport string) string {
+	host, _, err := net.SplitHostPort(hostport)
+	if err != nil {
+		return hostport
+	}
+	return host
 }
 
 // handlePostEvent receives a client event via HTTP POST. This is the

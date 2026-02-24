@@ -423,6 +423,11 @@ window.Poly.hooks = window.Poly.hooks || {};
     var link = e.target.closest("a[data-poly-link]");
     if (!link) return;
 
+    // Let the browser handle modifier clicks (new tab, new window)
+    // and links that explicitly target another frame.
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    if (link.getAttribute("target") === "_blank") return;
+
     var href = link.getAttribute("href");
     if (!href || href.indexOf("://") !== -1 || href.indexOf("//") === 0) return;
 
@@ -472,7 +477,11 @@ window.Poly.hooks = window.Poly.hooks || {};
       } else if (domEvent === "submit") {
         var formData = new FormData(target);
         formData.forEach(function (value, key) {
-          data[key] = value;
+          if (data[key]) {
+            data[key] += "," + value;
+          } else {
+            data[key] = value;
+          }
         });
       }
 
@@ -499,7 +508,7 @@ window.Poly.hooks = window.Poly.hooks || {};
       }
 
       var eid = sendEvent(domEvent, action, data);
-      disablePending(target, eid);
+      if (eid) disablePending(target, eid);
 
       // Clear form fields after submit unless the form opts out via
       // data-poly-preserve (used when the server controls field values
@@ -533,7 +542,7 @@ window.Poly.hooks = window.Poly.hooks || {};
       return id;
     }
 
-    if (!ws || ws.readyState !== WebSocket.OPEN) return id;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return null;
     ws.send(payload);
     return id;
   }
