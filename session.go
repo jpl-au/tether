@@ -231,6 +231,13 @@ func (s *Session[S]) sendURL(rawURL string, replace bool) {
 // Caller must hold s.mu.
 func (s *Session[S]) applyState(newState S, eventID string) {
 	if s.equal != nil && s.equal(s.state, newState) {
+		// Still echo the eventID so the client can restore any loading
+		// state (e.g. a disabled button) even when nothing changed.
+		if eventID != "" {
+			if err := s.transport.SendUpdate(Update{EventID: eventID}); err != nil {
+				s.logger.Error("send update error", "session", s.id, "err", err)
+			}
+		}
 		return
 	}
 
@@ -259,6 +266,16 @@ func (s *Session[S]) applyState(newState S, eventID string) {
 	if len(patches) > 0 {
 		update := Update{Patches: patches, EventID: eventID}
 		if err := s.transport.SendUpdate(update); err != nil {
+			s.logger.Error("send update error", "session", s.id, "err", err)
+		}
+		return
+	}
+
+	// No patches and no structural change — the rendered tree is
+	// identical. Still echo the eventID so the client can restore
+	// any loading state (e.g. a disabled button).
+	if eventID != "" {
+		if err := s.transport.SendUpdate(Update{EventID: eventID}); err != nil {
 			s.logger.Error("send update error", "session", s.id, "err", err)
 		}
 	}
