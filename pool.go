@@ -204,6 +204,12 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 // A full re-render is sent because the client's DOM may have diverged
 // while disconnected.
 func (h *Handler[S]) reattach(sess *Session[S], transport Transport) {
+	// The old transport's heartbeat goroutine stopped when it closed.
+	// Start a fresh one for the new transport.
+	if hb, ok := transport.(Heartbeater); ok && h.cfg.HeartbeatInterval > 0 {
+		hb.StartHeartbeat(h.cfg.HeartbeatInterval)
+	}
+
 	sess.mu.Lock()
 	sess.transport = transport
 	sess.lastActivity = time.Now()
@@ -265,11 +271,16 @@ func (h *Handler[S]) Shutdown(ctx context.Context) error {
 	clear(h.disconnected)
 	h.mu.Unlock()
 
+	var wg sync.WaitGroup
+	for _, sess := range sessions {
+		wg.Go(func() {
+			sess.Close()
+		})
+	}
+
 	done := make(chan struct{})
 	go func() {
-		for _, sess := range sessions {
-			sess.Close()
-		}
+		wg.Wait()
 		close(done)
 	}()
 
@@ -397,9 +408,13 @@ func (h *Handler[S]) reapActive(now time.Time) {
 		}
 		h.mu.Unlock()
 
+		var wg sync.WaitGroup
 		for _, sess := range expired {
-			h.cfg.Logger.Info("closing session", "session", sess.ID())
-			sess.Close()
+			wg.Go(func() {
+				h.cfg.Logger.Info("closing session", "session", sess.ID())
+				sess.Close()
+			})
 		}
+		wg.Wait()
 	}
 }

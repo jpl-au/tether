@@ -15,6 +15,7 @@
 package sse
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -101,12 +102,20 @@ type transport struct {
 // buffering delay.
 func (t *transport) SendUpdate(update poly.Update) error {
 	msg := poly.EncodeUpdate(update)
-	data, err := json.Marshal(msg)
-	if err != nil {
+
+	// Avoid json.Marshal's default HTML escaping (< to \u003c) which
+	// inflates the size of DOM patches sent over the wire.
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(msg); err != nil {
 		return err
 	}
+
 	t.wmu.Lock()
-	_, err = fmt.Fprintf(t.w, "data: %s\n\n", data)
+	// Encode appends a newline, so we only need the SSE prefix and
+	// one trailing newline for the double-newline message delimiter.
+	_, err := fmt.Fprintf(t.w, "data: %s\n", buf.Bytes())
 	if err != nil {
 		t.wmu.Unlock()
 		return err

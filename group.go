@@ -73,12 +73,10 @@ func (g *Group[S]) Broadcast(fn func(S) S) {
 	g.mu.Unlock()
 
 	var wg sync.WaitGroup
-	wg.Add(len(targets))
 	for _, s := range targets {
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			s.Update(fn)
-		}()
+		})
 	}
 	wg.Wait()
 }
