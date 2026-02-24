@@ -60,10 +60,19 @@ func (g *Group[S]) Len() int {
 }
 
 // Broadcast applies fn to every session in the group via
-// [Session.Update]. Each session is updated concurrently so a slow
-// render in one session does not block delivery to the rest. Broadcast
-// returns after all updates have completed. Safe to call from any
-// goroutine.
+// [Session.Update]. Each session is updated in its own goroutine so
+// a slow render in one session does not block delivery to the rest.
+//
+// Broadcast does not wait for the updates to complete. This is
+// necessary because Broadcast is typically called from inside a
+// [HandleFunc] (e.g. chat messages, collaborative edits), where the
+// calling session's mutex is held. If Broadcast blocked, the update
+// goroutine for the calling session would deadlock trying to acquire
+// the same mutex. The goroutines are bounded by the number of sessions
+// in the group and each completes after a single render-diff-send
+// cycle, so they do not accumulate.
+//
+// Safe to call from any goroutine.
 func (g *Group[S]) Broadcast(fn func(S) S) {
 	g.mu.Lock()
 	targets := make([]*Session[S], 0, len(g.sessions))
@@ -72,11 +81,7 @@ func (g *Group[S]) Broadcast(fn func(S) S) {
 	}
 	g.mu.Unlock()
 
-	var wg sync.WaitGroup
 	for _, s := range targets {
-		wg.Go(func() {
-			s.Update(fn)
-		})
+		go s.Update(fn)
 	}
-	wg.Wait()
 }
