@@ -147,31 +147,36 @@ window.Poly.hooks = window.Poly.hooks || {};
 
     restorePending(msg.event_id);
 
-    // Apply content patches first, then structural morphs.
-    if (msg.patches) {
-      for (var i = 0; i < msg.patches.length; i++) {
-        applyPatch(msg.patches[i]);
+    // Batch all DOM mutations into a single animation frame so the
+    // browser coalesces reflows and repaints. Without this, each
+    // patch and morph triggers a separate layout pass.
+    requestAnimationFrame(function () {
+      // Apply content patches first, then structural morphs.
+      if (msg.patches) {
+        for (var i = 0; i < msg.patches.length; i++) {
+          applyPatch(msg.patches[i]);
+        }
       }
-    }
-    if (msg.morphs) {
-      for (var i = 0; i < msg.morphs.length; i++) {
-        applyMorph(msg.morphs[i]);
+      if (msg.morphs) {
+        for (var i = 0; i < msg.morphs.length; i++) {
+          applyMorph(msg.morphs[i]);
+        }
       }
-    }
-    if (msg.url) {
-      if (msg.replace) {
-        history.replaceState({}, "", msg.url);
-      } else {
-        history.pushState({}, "", msg.url);
+      if (msg.url) {
+        if (msg.replace) {
+          history.replaceState({}, "", msg.url);
+        } else {
+          history.pushState({}, "", msg.url);
+        }
       }
-    }
-    if (msg.title) {
-      document.title = msg.title;
-    }
+      if (msg.title) {
+        document.title = msg.title;
+      }
 
-    // Set focus on the designated element after all DOM updates.
-    var focusEl = root.querySelector("[data-poly-focus]");
-    if (focusEl) focusEl.focus();
+      // Set focus on the designated element after all DOM updates.
+      var focusEl = root.querySelector("[data-poly-focus]");
+      if (focusEl) focusEl.focus();
+    });
   }
 
   // --- JS hooks ---
