@@ -18,14 +18,15 @@ type pendingSession[S any] struct {
 	createdAt time.Time
 }
 
-// pendingTimeout is the maximum time a pending session waits for a
-// WebSocket connection before being discarded.
+// pendingTimeout bounds how long we keep pre-warmed sessions. If the
+// browser doesn't open a transport connection within this window, the
+// session is discarded to prevent memory leaks from abandoned page loads.
 const pendingTimeout = 30 * time.Second
 
-// Handler is the core HTTP handler. It maintains three pools of sessions:
-// pending (pre-warmed, waiting for WebSocket), active (connected and
-// processing events), and disconnected (waiting for client to reconnect).
-// Use Shutdown for graceful termination.
+// Handler manages the lifecycle of poly sessions. Sessions move through
+// three pools — pending, active, and disconnected — so the server can
+// pre-warm state on the initial GET and preserve it across brief network
+// interruptions. Use Shutdown for graceful termination.
 type Handler[S any] struct {
 	cfg          Config[S]
 	mu           sync.Mutex
@@ -35,9 +36,9 @@ type Handler[S any] struct {
 	done         chan struct{}
 }
 
-// serveInitialPage renders the full HTML, pre-warms a session, and
-// injects the client runtime. The session ID is embedded in the root
-// element so the client can attach to it on WebSocket connect.
+// serveInitialPage handles the initial GET request. It pre-warms the
+// session with the diff state and embeds the session ID in the root
+// element so the client can reclaim it when the transport connects.
 func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 	h.cfg.Logger.Info("serving initial page")
 
@@ -80,11 +81,10 @@ func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 }
 
 // serveSession upgrades the connection and runs the session event loop.
-// The upgrade function creates the transport — it may be the primary
-// WebSocket upgrade or the SSE fallback. It checks three pools in order:
-//  1. Disconnected sessions (reconnecting client)
-//  2. Pending sessions (initial page load)
-//  3. Fresh session (fallback)
+// It checks pools in priority order — disconnected first (so a
+// reconnecting client recovers its state), then pending (the normal
+// path after a page load), and finally creates a fresh session as a
+// fallback for direct transport connections without a prior GET.
 func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrade func(http.ResponseWriter, *http.Request) (Transport, error)) {
 	transport, err := upgrade(w, r)
 	if err != nil {
@@ -164,8 +164,9 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 	sess.run()
 }
 
-// reattach connects a new transport to a disconnected session and
-// sends a full re-render so the client is in sync.
+// reattach reconnects a disconnected session with a new transport.
+// A full re-render is sent because the client's DOM may have diverged
+// while disconnected.
 func (h *Handler[S]) reattach(sess *Session[S], transport Transport) {
 	sess.mu.Lock()
 	sess.transport = transport
@@ -188,9 +189,10 @@ func (h *Handler[S]) reattach(sess *Session[S], transport Transport) {
 	sess.run()
 }
 
-// wireDisconnect sets the onDisconnect callback for a session. On
-// disconnect, the session is moved to the disconnected pool (if
-// reconnection is enabled) or removed entirely.
+// wireDisconnect installs the callback that moves a session into the
+// disconnected pool (when reconnection is enabled) or removes it
+// entirely. Must be called each time a transport is attached because
+// the callback captures the handler's pool references.
 func (h *Handler[S]) wireDisconnect(sess *Session[S]) {
 	sess.onDisconnect = func() {
 		h.mu.Lock()
@@ -210,8 +212,8 @@ func (h *Handler[S]) wireDisconnect(sess *Session[S]) {
 	}
 }
 
-// shutdown closes all active sessions and stops the background reaper.
-// It blocks until all sessions are closed or ctx is cancelled.
+// Shutdown closes all active sessions and stops the background reaper.
+// It blocks until every session has exited or ctx is cancelled.
 func (h *Handler[S]) Shutdown(ctx context.Context) error {
 	close(h.done)
 
@@ -238,8 +240,8 @@ func (h *Handler[S]) Shutdown(ctx context.Context) error {
 	}
 }
 
-// reap periodically removes expired pending and disconnected sessions,
-// and closes idle or long-lived active sessions.
+// reap runs in a background goroutine, enforcing the lifecycle limits
+// set in Config. It exits when the done channel is closed by Shutdown.
 func (h *Handler[S]) reap() {
 	ticker := time.NewTicker(15 * time.Second)
 	defer ticker.Stop()
@@ -254,14 +256,12 @@ func (h *Handler[S]) reap() {
 		now := time.Now()
 		h.mu.Lock()
 
-		// Remove pending sessions that were never claimed.
 		for id, ps := range h.pending {
 			if now.Sub(ps.createdAt) > pendingTimeout {
 				delete(h.pending, id)
 			}
 		}
 
-		// Remove disconnected sessions past the reconnect window.
 		if h.cfg.ReconnectTimeout > 0 {
 			for id, sess := range h.disconnected {
 				sess.mu.Lock()
@@ -273,7 +273,6 @@ func (h *Handler[S]) reap() {
 			}
 		}
 
-		// Collect active sessions that should be closed.
 		var expired []*Session[S]
 		for id, sess := range h.active {
 			sess.mu.Lock()

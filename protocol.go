@@ -2,10 +2,12 @@ package poly
 
 import jit "github.com/jpl-au/fluent-jit"
 
-// Update is the server-side representation of changes to send to the client.
-// It contains content patches (targeted key updates) and/or morphs
-// (structural DOM changes applied via idiomorph). URL fields allow
-// the server to push browser URL changes alongside DOM updates.
+// Update is the server-side representation of changes to send to the
+// client. A single Update can carry any combination of content patches
+// (targeted key replacements), structural morphs (DOM mutations applied
+// via idiomorph), URL changes (pushState/replaceState), and title
+// changes. Combining them in one message lets the client apply
+// everything atomically in a single pass.
 type Update struct {
 	Patches []jit.Patch
 	Morphs  []Morph
@@ -15,17 +17,24 @@ type Update struct {
 	EventID string // echoed from the triggering Event for correlation
 }
 
-// Morph represents a structural change to a keyed container or the root.
-// An empty Key targets the root element.
+// Morph represents a structural change that cannot be expressed as a
+// simple content patch. The HTML replaces the content of the element
+// identified by Key (a Dynamic key attribute), or the entire root
+// element when Key is empty. The client applies morphs via idiomorph,
+// which preserves focus, scroll position, and form state.
 type Morph struct {
 	Key  string
 	HTML []byte
 }
 
-// UpdateMessage is the JSON envelope sent over the wire.
+// UpdateMessage is the JSON envelope sent over the wire. It mirrors
+// [Update] but uses string HTML (not []byte) and omits empty fields
+// to keep the payload small. Transport implementations convert an
+// Update to an UpdateMessage via [EncodeUpdate] before marshalling.
+//
 // Patches and morphs are sent together so the client can apply them
-// in a single pass — content updates first, then structural changes.
-// URL fields allow the server to push browser URL changes.
+// in a single pass — content patches first (cheap innerHTML swaps),
+// then structural morphs (idiomorph reconciliation).
 type UpdateMessage struct {
 	Type    string       `json:"type"`
 	Patches []PatchEntry `json:"patches,omitempty"`
@@ -36,22 +45,24 @@ type UpdateMessage struct {
 	EventID string       `json:"event_id,omitempty"`
 }
 
-// PatchEntry is a single key+html pair within an update message.
+// PatchEntry is a single key+html pair within an [UpdateMessage]. The
+// Key identifies a Dynamic-keyed element in the DOM; the HTML replaces
+// its innerHTML.
 type PatchEntry struct {
 	Key  string `json:"key"`
 	HTML string `json:"html"`
 }
 
-// MorphEntry is a single key+html pair for a structural morph.
-// An empty key targets the root element.
+// MorphEntry is a single key+html pair for a structural morph within
+// an [UpdateMessage]. An empty Key targets the root element.
 type MorphEntry struct {
 	Key  string `json:"key"`
 	HTML string `json:"html"`
 }
 
-// EncodeUpdate builds an UpdateMessage from an Update.
-// Transport implementations use this to create the wire format
-// before marshalling to JSON.
+// EncodeUpdate converts an [Update] (server-side, []byte HTML) into an
+// [UpdateMessage] (wire format, string HTML). Transport implementations
+// call this before marshalling to JSON.
 func EncodeUpdate(update Update) UpdateMessage {
 	msg := UpdateMessage{Type: "update"}
 

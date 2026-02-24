@@ -1,6 +1,11 @@
-// Package ws provides a WebSocket transport for fluent-poly.
+// Package ws provides a WebSocket transport for fluent-poly. WebSocket
+// gives full-duplex communication over a single TCP connection, so both
+// server updates and client events travel on the same channel with
+// minimal overhead. This is the default and preferred transport.
 //
-// Pass ws.Upgrade() as the Upgrade field in poly.Config.
+// Pass ws.Upgrade() as the Upgrade field in [poly.Config]. In
+// development, calling Upgrade() with no arguments accepts all origins.
+// In production, pass explicit origin patterns to restrict connections.
 package ws
 
 import (
@@ -13,9 +18,15 @@ import (
 	poly "github.com/jpl-au/fluent-poly"
 )
 
-// Upgrade returns an upgrade function for use in poly.Config. When called
-// with no arguments, all origins are accepted (suitable for development).
-// Pass origin patterns to restrict connections in production.
+// Upgrade returns an upgrade function for use in [poly.Config].Upgrade.
+// The returned function is called by the poly handler when it receives
+// a WebSocket upgrade request. It negotiates the WebSocket handshake
+// and returns a Transport that the session uses for its entire lifetime.
+//
+// When called with no arguments, all origins are accepted (suitable for
+// development). Pass origin patterns to restrict connections in
+// production — the patterns are matched by the underlying websocket
+// library (github.com/coder/websocket).
 //
 //	Upgrade: ws.Upgrade(),                          // development
 //	Upgrade: ws.Upgrade("https://example.com"),     // production
@@ -36,13 +47,17 @@ func Upgrade(origins ...string) func(http.ResponseWriter, *http.Request) (poly.T
 	}
 }
 
-// transport implements poly.Transport over a single WebSocket connection.
+// transport implements [poly.Transport] over a single WebSocket
+// connection. The connection is owned by the session event loop for
+// reads; writes are serialised by the underlying websocket library.
 type transport struct {
 	conn *websocket.Conn
 	ctx  context.Context
 }
 
-// SendUpdate encodes the update as JSON and writes it as a text message.
+// SendUpdate encodes the update as JSON and writes it as a WebSocket
+// text message. The coder/websocket library serialises concurrent
+// writes, so this is safe to call from [Session.Update] goroutines.
 func (t *transport) SendUpdate(update poly.Update) error {
 	msg := poly.EncodeUpdate(update)
 	data, err := json.Marshal(msg)
@@ -53,8 +68,10 @@ func (t *transport) SendUpdate(update poly.Update) error {
 }
 
 // ReceiveEvent blocks until the client sends a JSON event message.
-// Normal and going-away WebSocket closes are mapped to io.EOF so the
-// session event loop treats them as clean disconnects.
+// Normal closure (1000) and going-away (1001) status codes are mapped
+// to io.EOF so the session event loop treats them as clean disconnects
+// rather than errors. All other WebSocket errors propagate as-is and
+// will terminate the session.
 func (t *transport) ReceiveEvent() (poly.Event, error) {
 	_, data, err := t.conn.Read(t.ctx)
 	if err != nil {

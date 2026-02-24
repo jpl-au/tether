@@ -24,7 +24,9 @@ type Group[S any] struct {
 	sessions map[string]*Session[S]
 }
 
-// NewGroup creates an empty group.
+// NewGroup creates an empty group ready to accept sessions.
+// Typically called once at program startup and shared across the
+// OnConnect/OnDisconnect callbacks and any code that broadcasts.
 func NewGroup[S any]() *Group[S] {
 	return &Group[S]{
 		sessions: make(map[string]*Session[S]),
@@ -47,16 +49,20 @@ func (g *Group[S]) Remove(s *Session[S]) {
 	g.mu.Unlock()
 }
 
-// Len returns the number of sessions in the group.
+// Len returns the number of sessions currently in the group. Useful
+// for displaying an "N users online" indicator via [Session.Update].
 func (g *Group[S]) Len() int {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	return len(g.sessions)
 }
 
-// Broadcast applies fn to every session in the group. Each session's
-// Update method is called individually, so the function receives that
-// session's current state. Safe to call from any goroutine.
+// Broadcast applies fn to every session in the group via
+// [Session.Update]. Each session receives its own current state, so
+// the function can produce session-specific output (e.g. highlighting
+// a user's own messages differently). The group lock is released before
+// calling Update to avoid holding two locks simultaneously. Safe to
+// call from any goroutine.
 func (g *Group[S]) Broadcast(fn func(S) S) {
 	g.mu.Lock()
 	// Snapshot the session pointers so we don't hold the group lock

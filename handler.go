@@ -1,24 +1,37 @@
-// Package poly is a reactive server-driven UI layer for Go. It connects
-// Fluent node trees to the browser via a persistent transport (typically
-// WebSocket), sending only the parts that changed as targeted patches.
-// The client morphs the DOM in place using idiomorph, preserving input
-// focus, scroll position, and form state.
+// Package poly is a reactive server-driven UI layer for Go. The server
+// holds all application state and renders HTML; the browser is a thin
+// display layer that forwards DOM events and morphs the page in place.
+// This keeps business logic on the server while delivering the
+// responsiveness of a single-page app.
+//
+// The lifecycle of a page visit is:
+//
+//  1. The browser GETs the page. The handler renders the initial HTML
+//     from [Config].InitialState and [Config].Render, pre-warms a
+//     session with the diff state, and embeds the session ID in the
+//     root element.
+//  2. The client JS opens a persistent transport (WebSocket or SSE)
+//     and reclaims the pre-warmed session. Pre-warming avoids a second
+//     render on connect and ensures the diff baseline matches the HTML
+//     the browser already has.
+//  3. When the user interacts with the page, the client sends an
+//     [Event]. The server calls [Config].Handle to produce new state,
+//     diffs the old and new render trees, and sends only the changed
+//     fragments back as targeted patches or structural morphs.
+//  4. The client applies patches by swapping innerHTML on keyed
+//     elements, or applies morphs via idiomorph when the tree structure
+//     changes. Idiomorph preserves input focus, scroll position, and
+//     form state during morphs.
 //
 // The central type is [Config], which wires together state, rendering,
-// and event handling for a single page. Pass it to [New] to get an
-// [http.Handler] that manages the full session lifecycle: initial HTML
-// render, transport upgrade, event loop, diffing, reconnection, and
-// idle/lifetime reaping.
+// and event handling. Pass it to [New] to get an [http.Handler] that
+// manages the full session lifecycle.
 //
-// Updates flow through a unified protocol. Each message is a single
-// "update" type containing either content patches (targeted key updates)
-// or structural morphs (DOM changes applied via idiomorph). The
-// [Transport] interface abstracts the wire — see the ws sub-package for
-// the WebSocket implementation.
-//
-// Event binding helpers ([Click], [Submit], [Input], [Change], [KeyDown],
-// [Focus], [Blur]) attach data-poly-* attributes to Fluent elements so
-// the client JS knows which DOM events to forward.
+// Event binding helpers ([Click], [Submit], [Input], [Change],
+// [KeyDown], [Focus], [Blur]) attach data-poly-* attributes to Fluent
+// elements so the client JS knows which DOM events to forward. See
+// bind.go for the full set of helpers including client-side directives,
+// loading states, and JS hooks.
 package poly
 
 import (
@@ -33,7 +46,13 @@ import (
 	"github.com/jpl-au/fluent/node"
 )
 
-// TransportMode controls which transports the handler accepts.
+// TransportMode selects the wire protocol between server and browser.
+// WebSocket gives bidirectional communication over a single connection.
+// SSE+POST splits the channel: server→client updates flow over a
+// long-lived EventSource stream, and client→server events arrive as
+// individual HTTP POSTs. SSE+POST works through HTTP/2 reverse proxies
+// and load balancers that may not support WebSocket, at the cost of
+// slightly higher latency on client events.
 type TransportMode int
 
 const (
@@ -41,18 +60,29 @@ const (
 	// default when Mode is not set. The Fallback field is ignored.
 	WebSocketOnly TransportMode = iota
 
-	// SSEOnly accepts only SSE+POST connections. The Upgrade field is
+	// SSEOnly accepts only SSE+POST connections. Use this when the
+	// deployment environment does not support WebSocket (e.g. certain
+	// PaaS providers or corporate proxies). The Upgrade field is
 	// ignored; Fallback must be set.
 	SSEOnly
 
-	// WebSocketWithFallback tries WebSocket first. If the client cannot
-	// establish a WebSocket connection, it falls back to SSE+POST
-	// automatically. Both Upgrade and Fallback must be set.
+	// WebSocketWithFallback tries WebSocket first. If the client
+	// cannot establish a WebSocket connection (e.g. the proxy strips
+	// the Upgrade header), it falls back to SSE+POST automatically.
+	// Both Upgrade and Fallback must be set.
 	WebSocketWithFallback
 )
 
-// Config configures a poly handler. The type parameter S is the session
-// state — it can be any type (struct, int, string, etc.).
+// Config wires together all the pieces of a poly page: how to create
+// initial state, how to render it, and how to handle events. The type
+// parameter S is the session state — typically a struct, but it can be
+// any type. Each connected browser tab gets its own independent copy
+// of S, so state is never shared across sessions unless you explicitly
+// coordinate via [Group] or external storage.
+//
+// At minimum, set InitialState, Render, Handle, and either Upgrade or
+// Fallback (depending on Mode). Everything else is optional and has
+// sensible defaults.
 type Config[S any] struct {
 	// Upgrade converts an HTTP request into a Transport connection.
 	// Use ws.Upgrade for WebSocket connections. Required unless Mode
@@ -84,14 +114,23 @@ type Config[S any] struct {
 	// navigation events fall through to Handle.
 	HandleParams func(state S, params Params) S
 
-	// OnConnect is called when a session is established. Optional.
+	// OnConnect is called after a new session is created and its
+	// transport is ready. Use this to add the session to a [Group]
+	// for broadcasting, start background goroutines that push updates
+	// via [Session.Update], or log the connection. Optional.
 	OnConnect func(session *Session[S])
 
-	// OnDisconnect is called when a session ends. Optional.
+	// OnDisconnect is called after a session's transport closes (either
+	// because the client disconnected or the session was reaped). Use
+	// this to remove the session from a [Group] and clean up any
+	// resources started in OnConnect. Optional.
 	OnDisconnect func(session *Session[S])
 
-	// Equal compares two states. If provided and returns true, the diff
-	// is skipped entirely for that event. Optional.
+	// Equal compares two states. When provided and the old and new state
+	// are equal, the render and diff are skipped entirely — no work is
+	// done and nothing is sent to the client. This is an optimisation
+	// for handlers where many events leave state unchanged (e.g.
+	// keystrokes that don't affect the model). Optional.
 	Equal func(a, b S) bool
 
 	// Logger is used for session errors. Defaults to slog.Default().
@@ -123,10 +162,15 @@ type Config[S any] struct {
 	Layout func(content node.Node) node.Node
 }
 
-// defaultReconnectTimeout is used when ReconnectTimeout is zero.
+// defaultReconnectTimeout gives the client enough time to recover from
+// brief network interruptions without keeping abandoned sessions alive.
 const defaultReconnectTimeout = 30 * time.Second
 
-// New creates a Handler that manages poly sessions.
+// New creates a [Handler] from the given configuration and starts a
+// background reaper goroutine that enforces IdleTimeout, MaxLifetime,
+// and ReconnectTimeout. The reaper runs for the lifetime of the handler;
+// call [Handler.Shutdown] to stop it and close all active sessions
+// before the process exits.
 func New[S any](cfg Config[S]) *Handler[S] {
 	if cfg.Logger == nil {
 		cfg.Logger = slog.Default()
@@ -149,10 +193,12 @@ func New[S any](cfg Config[S]) *Handler[S] {
 	return h
 }
 
-// ServeHTTP routes requests by type. The routing depends on the configured
-// TransportMode: WebSocketOnly accepts only WebSocket upgrades, SSEOnly
-// accepts only SSE streams and POST events, and WebSocketWithFallback
-// tries WebSocket first with SSE as a backup.
+// ServeHTTP implements http.Handler. A single endpoint serves all three
+// request types: the initial HTML page (GET without upgrade headers),
+// the transport connection (WebSocket upgrade or SSE stream), and POST
+// events (SSE mode only). The Mode field in Config determines which
+// transport paths are active. Requests that don't match any transport
+// path fall through to the initial page render.
 func (h *Handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch h.cfg.Mode {
 	case SSEOnly:
@@ -189,10 +235,10 @@ func (h *Handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.serveInitialPage(w, r)
 }
 
-// handlePostEvent routes an incoming POST event to an active session's
-// transport. The transport must implement EventPusher (e.g. the SSE
-// transport). WebSocket transports do not — they receive events on
-// the WebSocket connection directly.
+// handlePostEvent receives a client event via HTTP POST. This is the
+// client→server path for SSE mode, where the EventSource connection
+// is unidirectional. WebSocket transports receive events on the
+// socket itself and do not use this path.
 func (h *Handler[S]) handlePostEvent(w http.ResponseWriter, r *http.Request) {
 	// Reject cross-origin POSTs to prevent CSRF. The session ID is a
 	// 128-bit bearer token which is hard to guess, but Origin checking
@@ -245,8 +291,8 @@ func (h *Handler[S]) handlePostEvent(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// ServeClient returns an http.Handler that serves the embedded client JS files.
-// Mount this at /_poly/ to serve fluent-poly.js and idiomorph.
+// ServeClient serves the embedded client runtime. Mount at /_poly/ so the
+// HTML page can load fluent-poly.js and idiomorph.
 func ServeClient() http.Handler {
 	return http.FileServer(http.FS(clientFiles()))
 }

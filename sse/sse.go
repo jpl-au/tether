@@ -1,12 +1,17 @@
-// Package sse provides an SSE+POST transport for fluent-poly.
+// Package sse provides an SSE+POST transport for fluent-poly. Use it
+// when the deployment environment does not support WebSocket (e.g.
+// certain PaaS providers, corporate proxies, or HTTP/2-only setups).
 //
-// Server-to-client updates are sent as Server-Sent Events over a
-// long-lived HTTP GET. Client-to-server events arrive as HTTP POST
-// requests and are routed to the transport's event channel by the
-// poly handler via the EventPusher interface.
+// The transport splits the connection into two channels:
+//   - Server→client: updates flow as Server-Sent Events over a
+//     long-lived HTTP GET (EventSource on the client side).
+//   - Client→server: events arrive as individual HTTP POST requests
+//     and are routed to the transport's internal channel via the
+//     [poly.EventPusher] interface.
 //
-// Pass sse.Upgrade() as the Fallback field in poly.Config and set Mode
-// to SSEOnly or WebSocketWithFallback.
+// Wire up by passing sse.Upgrade() as the Fallback (or Upgrade) field
+// in [poly.Config] and setting Mode to [poly.SSEOnly] or
+// [poly.WebSocketWithFallback].
 package sse
 
 import (
@@ -19,11 +24,13 @@ import (
 	poly "github.com/jpl-au/fluent-poly"
 )
 
-// Upgrade returns an upgrade function for use in poly.Config.Fallback.
-// When the handler receives a GET with Accept: text/event-stream, it
-// calls this function to establish the SSE stream. Client events arrive
-// separately via HTTP POST and are pushed through the EventPusher
-// interface.
+// Upgrade returns an upgrade function for use in [poly.Config].Fallback
+// (or Upgrade when Mode is SSEOnly). When the poly handler receives a
+// GET with Accept: text/event-stream, it calls this function to
+// establish the SSE stream. The stream stays open for the lifetime of
+// the session; server updates are written as SSE "data" lines. Client
+// events arrive separately via HTTP POST — the poly handler routes
+// them through the [poly.EventPusher] interface on this transport.
 func Upgrade() func(http.ResponseWriter, *http.Request) (poly.Transport, error) {
 	return func(w http.ResponseWriter, r *http.Request) (poly.Transport, error) {
 		flusher, ok := w.(http.Flusher)
@@ -55,8 +62,10 @@ func Upgrade() func(http.ResponseWriter, *http.Request) (poly.Transport, error) 
 	}
 }
 
-// transport implements poly.Transport over SSE (server→client) and a
-// channel fed by HTTP POST (client→server).
+// transport implements [poly.Transport] using SSE for the server→client
+// direction and a buffered channel for the client→server direction.
+// The channel is fed by PushEvent, which the poly handler calls when
+// an HTTP POST arrives for this session.
 type transport struct {
 	w       http.ResponseWriter
 	flusher http.Flusher
@@ -65,7 +74,10 @@ type transport struct {
 	once    sync.Once
 }
 
-// SendUpdate encodes the update as JSON and writes it as an SSE data line.
+// SendUpdate encodes the update as JSON and writes it as an SSE "data"
+// line followed by a double newline (the SSE message delimiter). The
+// write is immediately flushed so the client receives it without
+// buffering delay.
 func (t *transport) SendUpdate(update poly.Update) error {
 	msg := poly.EncodeUpdate(update)
 	data, err := json.Marshal(msg)
@@ -91,10 +103,14 @@ func (t *transport) ReceiveEvent() (poly.Event, error) {
 	}
 }
 
-// PushEvent implements poly.EventPusher. The handler calls this when
-// a POST request arrives for this session's event channel. Returns
-// ErrEventBufferFull if the session is not consuming events fast
-// enough, so the HTTP handler can respond with 429 instead of blocking.
+// PushEvent implements [poly.EventPusher]. The poly handler calls this
+// when an HTTP POST arrives carrying a client event for this session.
+//
+// The send is non-blocking by design. If the session's event loop is
+// not consuming events fast enough and the internal buffer (capacity 16)
+// is full, PushEvent returns [poly.ErrEventBufferFull] immediately so
+// the HTTP handler can respond with 429 rather than stalling the
+// request goroutine.
 func (t *transport) PushEvent(ev poly.Event) error {
 	select {
 	case <-t.done:

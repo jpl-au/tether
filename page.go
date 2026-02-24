@@ -8,10 +8,11 @@ import (
 	"github.com/jpl-au/fluent/node"
 )
 
-// polyBody is a node.Node that renders the poly root div (with the
-// pre-rendered session content inside) and the client script tags.
-// It exists so the Layout function receives a composable node rather
-// than raw bytes.
+// polyBody implements node.Node for the poly root div and client
+// scripts. It exists so the Layout function in Config can receive a
+// composable node and wrap it in a full HTML document (head, body, etc.)
+// rather than dealing with raw bytes. When Layout is nil, polyBody
+// renders directly into the response as a bare fragment.
 type polyBody struct {
 	html      []byte
 	endpoint  string
@@ -50,8 +51,10 @@ func (p *polyBody) RenderBuilder(buf *bytes.Buffer) {
 
 func (p *polyBody) Nodes() []node.Node { return nil }
 
-// newID generates a cryptographically random session identifier
-// using base-32 encoding (alphanumeric, no padding).
+// newID generates a cryptographically random session identifier using
+// Go's crypto/rand.Text (base-32, no padding). The session ID doubles
+// as a bearer token — knowing it is sufficient to send events to the
+// session — so it must be unguessable.
 func newID() string {
 	return rand.Text()
 }
