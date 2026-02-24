@@ -18,10 +18,8 @@ type pendingSession[S any] struct {
 	createdAt time.Time
 }
 
-// pendingTimeout bounds how long we keep pre-warmed sessions. If the
-// browser doesn't open a transport connection within this window, the
-// session is discarded to prevent memory leaks from abandoned page loads.
-const pendingTimeout = 30 * time.Second
+// defaultPendingTimeout is used when PendingTimeout is zero.
+const defaultPendingTimeout = 30 * time.Second
 
 // Handler manages the lifecycle of poly sessions. Sessions move through
 // three pools — pending, active, and disconnected — so the server can
@@ -257,7 +255,7 @@ func (h *Handler[S]) reap() {
 		h.mu.Lock()
 
 		for id, ps := range h.pending {
-			if now.Sub(ps.createdAt) > pendingTimeout {
+			if now.Sub(ps.createdAt) > h.cfg.PendingTimeout {
 				delete(h.pending, id)
 			}
 		}

@@ -166,6 +166,19 @@ type Config[S any] struct {
 	// explicit list in production.
 	AllowedOrigins []string
 
+	// MaxEventBytes limits the size of a POST event body. Events carry
+	// a type, action, and a map of string values (typically form fields).
+	// Zero defaults to 64 KB. Increase this if your forms contain large
+	// text fields (e.g. a rich-text editor).
+	MaxEventBytes int64
+
+	// PendingTimeout is how long a pre-warmed session waits for the
+	// browser to open a transport connection. If the browser never
+	// connects (e.g. the user closes the tab before the JS loads),
+	// the session is discarded after this duration. Zero defaults to
+	// 30 seconds.
+	PendingTimeout time.Duration
+
 	// Layout wraps the poly content in a full HTML document. The argument
 	// is a node that renders the poly root div and client scripts. Return
 	// a complete document tree (e.g. html.New(head.New(...), body.New(content))).
@@ -179,11 +192,8 @@ type Config[S any] struct {
 // brief network interruptions without keeping abandoned sessions alive.
 const defaultReconnectTimeout = 30 * time.Second
 
-// maxEventBytes caps the POST body size for client events. Events carry
-// a type, action, and a map of string values (typically form fields), so
-// 64 KB is generous. This prevents a malicious client from exhausting
-// server memory with an oversized payload.
-const maxEventBytes = 64 << 10 // 64 KB
+// defaultMaxEventBytes is used when MaxEventBytes is zero.
+const defaultMaxEventBytes = 64 << 10 // 64 KB
 
 // New creates a [Handler] from the given configuration and starts a
 // background reaper goroutine that enforces IdleTimeout, MaxLifetime,
@@ -196,6 +206,12 @@ func New[S any](cfg Config[S]) *Handler[S] {
 	}
 	if cfg.ReconnectTimeout == 0 {
 		cfg.ReconnectTimeout = defaultReconnectTimeout
+	}
+	if cfg.MaxEventBytes == 0 {
+		cfg.MaxEventBytes = defaultMaxEventBytes
+	}
+	if cfg.PendingTimeout == 0 {
+		cfg.PendingTimeout = defaultPendingTimeout
 	}
 	h := &Handler[S]{
 		cfg:          cfg,
@@ -329,7 +345,7 @@ func (h *Handler[S]) handlePostEvent(w http.ResponseWriter, r *http.Request) {
 
 	// Cap the request body to prevent a malicious client from sending
 	// a multi-gigabyte payload and exhausting server memory.
-	r.Body = http.MaxBytesReader(w, r.Body, maxEventBytes)
+	r.Body = http.MaxBytesReader(w, r.Body, h.cfg.MaxEventBytes)
 
 	var ev Event
 	if err := json.NewDecoder(r.Body).Decode(&ev); err != nil {
