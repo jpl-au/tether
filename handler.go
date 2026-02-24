@@ -179,6 +179,18 @@ type Config[S any] struct {
 	// 30 seconds.
 	PendingTimeout time.Duration
 
+	// OnStructuralChange is called whenever the diff engine detects that
+	// the render tree's structure has changed (Dynamic keys added,
+	// removed, or reordered). Structural changes force a full root morph
+	// instead of targeted patches, which is heavier for the client.
+	//
+	// Use this callback to track these occurrences in production via
+	// telemetry or metrics. The change parameter describes exactly what
+	// shifted so you can pinpoint which state transitions need keyed
+	// containers. The callback runs under the session lock, so keep it
+	// fast — offload any expensive work to a goroutine. Optional.
+	OnStructuralChange func(session *Session[S], change StructuralChange)
+
 	// Layout wraps the poly content in a full HTML document. The argument
 	// is a node that renders the poly root div and client scripts. Return
 	// a complete document tree (e.g. html.New(head.New(...), body.New(content))).

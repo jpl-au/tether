@@ -12,6 +12,18 @@ import (
 	"github.com/jpl-au/fluent/node"
 )
 
+// StructuralChange describes a diff result where the render tree's
+// Dynamic key set changed — keys were added, removed, or reordered.
+// This forces a full root morph instead of targeted patches. The
+// fields mirror [jit.StructuralChange] so callers don't need to import
+// the diff engine package.
+type StructuralChange struct {
+	Added     []string // keys present in the new tree but not the old
+	Removed   []string // keys present in the old tree but not the new
+	Reordered bool     // same keys, different order
+	Bytes     int      // size of the re-rendered HTML sent as a root morph
+}
+
 // RenderFunc builds a Fluent node tree from the current state. It is
 // called on initial page render, after each client event, and after
 // each call to [Session.Update]. The function must be pure — given the
@@ -50,8 +62,9 @@ type Session[S any] struct {
 	mu             sync.Mutex
 
 	// Optional callbacks from Config
-	onDisconnect func()
-	equal        func(a, b S) bool
+	onDisconnect       func()
+	equal              func(a, b S) bool
+	onStructuralChange func(*Session[S], StructuralChange)
 }
 
 // ID returns the unique session identifier. This is a cryptographically
@@ -254,6 +267,16 @@ func (s *Session[S]) applyState(newState S, eventID string) {
 			"bytes", len(html),
 			"tip", "wrap conditional elements in a keyed container to scope this morph",
 		)
+
+		if s.onStructuralChange != nil {
+			s.onStructuralChange(s, StructuralChange{
+				Added:     change.Added,
+				Removed:   change.Removed,
+				Reordered: change.Reordered,
+				Bytes:     len(html),
+			})
+		}
+
 		update := Update{
 			Morphs:  []Morph{{Key: "", HTML: html}},
 			EventID: eventID,

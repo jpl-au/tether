@@ -168,6 +168,9 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 	if h.cfg.Equal != nil {
 		sess.equal = h.cfg.Equal
 	}
+	if h.cfg.OnStructuralChange != nil {
+		sess.onStructuralChange = h.cfg.OnStructuralChange
+	}
 
 	h.mu.Lock()
 	h.active[id] = sess
