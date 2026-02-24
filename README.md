@@ -2,7 +2,7 @@
 
 Reactive server-driven UI for [Fluent](https://github.com/jpl-au/fluent). Write Go, get live updates.
 
-fluent-poly connects Fluent's node trees to the browser via WebSocket. When state changes, only the parts that actually changed are sent as targeted patches. The client morphs the DOM in place, preserving input focus, scroll position, and form state.
+fluent-poly connects Fluent's node trees to the browser via WebSocket (with SSE fallback). When state changes, only the parts that actually changed are sent as targeted patches. The client morphs the DOM in place, preserving input focus, scroll position, and form state.
 
 ## How it works
 
@@ -84,7 +84,196 @@ These return the same element type, so chaining continues:
 poly.Click(button.Text("+"), "increment").Style("cursor: pointer").Class("btn")
 ```
 
-### Performance note
+Keydown events include modifier keys (`ctrl`, `shift`, `alt`, `meta`) in `Event.Data` when held.
+
+### Timing control
+
+Input events are debounced at 300ms by default. Override with `poly.Debounce`:
+
+```go
+poly.Debounce(poly.Input(input.Text("q", ""), "search"), 150)
+```
+
+Throttle any event type with `poly.Throttle`:
+
+```go
+poly.Throttle(poly.Click(button.Text("Fire"), "fire"), 1000)
+```
+
+### Loading states
+
+Disable an element while its event is in flight to prevent double-clicks and give visual feedback:
+
+```go
+poly.Disable(poly.Click(button.Text("Save"), "save"), "Saving...")
+```
+
+The element is re-enabled when the next server update arrives. If the text argument is non-empty, the element's text content is temporarily replaced.
+
+### Confirmation dialogs
+
+Show `window.confirm` before sending an event:
+
+```go
+poly.Confirm(poly.Click(button.Text("Delete"), "delete"), "Are you sure?")
+```
+
+### Focus management
+
+Direct focus to a specific element after a server update:
+
+```go
+poly.AutoFocus(input.Text("name", ""))
+```
+
+The JS runtime calls `focus()` on the first `[data-poly-focus]` element after applying patches and morphs.
+
+## Server-initiated updates
+
+Push state changes from outside the event loop (timers, database changes, broadcasts):
+
+```go
+session.Update(func(s State) State {
+    s.Message = "New data available"
+    return s
+})
+```
+
+Update the page title:
+
+```go
+session.SetTitle("New Page — My App")
+```
+
+## URL routing
+
+Bidirectional sync between Go state and the browser URL:
+
+```go
+poly.New(poly.Config[State]{
+    HandleParams: func(state State, params poly.Params) State {
+        state.Page = params.Path
+        return state
+    },
+    // ...
+})
+
+// Mark an anchor for client-side navigation
+poly.Link(a.Link("/profile", "Profile"))
+```
+
+Server-initiated URL changes:
+
+```go
+session.Navigate("/success")          // pushState (adds history entry)
+session.ReplaceURL("/current?saved=1") // replaceState (no history entry)
+```
+
+## Client-side directives
+
+Toggle CSS classes or attributes without a server round-trip:
+
+```go
+// Toggle a CSS class on the element itself
+poly.ToggleClass(button.Text("Menu"), "is-open")
+
+// Toggle a CSS class on a different element
+poly.ToggleClass(poly.ToggleTarget(button.Text("Menu"), "#nav"), "is-open")
+
+// Toggle visibility via the hidden attribute
+poly.ToggleAttr(poly.ToggleTarget(button.Text("Show Help"), "#help"), "hidden")
+```
+
+Client-managed state survives server morphs automatically.
+
+## Form validation
+
+Validation is handled server-side in the `Handle` function. The key patterns:
+
+- Wrap form + error in a `Dynamic` key so the server controls field values
+- Use `poly.Preserve` to prevent JS form reset after submit
+- Use `poly.Input` with a validation action for live feedback
+- Keep error spans always in the tree (empty when no error) to avoid structural changes
+
+```go
+div.New(
+    poly.Preserve(form.New(
+        poly.Input(input.Text("text", s.TodoText), "validate-todo"),
+        button.Submit("Add"),
+    ).SetData("poly-submit", "add")),
+    span.Text(s.TodoError).Style("color: #c33"),
+).Dynamic("todo-form")
+```
+
+## Transitions
+
+CSS transitions coordinated with the morph lifecycle:
+
+```go
+poly.Transition(div.New(children...), "fade")
+```
+
+```css
+.item { opacity: 1; transition: opacity 0.3s; }
+.poly-fade-enter { opacity: 0; }
+.poly-fade-leave { opacity: 0; }
+```
+
+Enter: `poly-{name}-enter` is added before insertion and removed next frame. Leave: `poly-{name}-leave` is added and the node waits for `transitionend` before removal (5s fallback).
+
+## JS hooks
+
+Integrate third-party JavaScript libraries (charts, maps, rich text editors) via lifecycle hooks:
+
+```go
+poly.Hook(div.New(), "chart")
+```
+
+```js
+Poly.hooks.chart = {
+    mounted: function(el) { /* initialise chart library */ },
+    updated: function(el) { /* refresh with new data */ },
+    destroyed: function(el) { /* teardown */ }
+};
+```
+
+The JS runtime calls `mounted` when the element is added to the DOM, `updated` when it is morphed in place, and `destroyed` when it is about to be removed.
+
+## Broadcasting
+
+Push updates to multiple sessions at once:
+
+```go
+group := poly.NewGroup[State]()
+
+poly.New(poly.Config[State]{
+    OnConnect:    func(s *poly.Session[State]) { group.Add(s) },
+    OnDisconnect: func(s *poly.Session[State]) { group.Remove(s) },
+    // ...
+})
+
+// Send a message to every connected client
+group.Broadcast(func(s State) State {
+    s.Notification = "System update complete"
+    return s
+})
+```
+
+## SSE transport
+
+Fallback for environments where WebSocket is unreliable:
+
+```go
+poly.New(poly.Config[State]{
+    Upgrade:  ws.Upgrade(),
+    Fallback: sse.Upgrade(),
+    // ...
+})
+```
+
+The client tries WebSocket first and falls back to SSE+POST automatically. Same wire format, same API.
+
+## Performance note
 
 The generic helpers add measurable overhead compared to calling `SetData` directly (~47% slower with 2 extra allocations per element). For performance-sensitive render paths, use `SetData`:
 

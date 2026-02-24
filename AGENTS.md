@@ -21,10 +21,25 @@ Local development uses `replace` directives in `go.mod` pointing to sibling dire
 ## Package layout
 
 ```
-poly/           Root — Transport, Session, Config, Event, protocol, bind helpers
+poly/           Root — Transport, Session, Config, Event, Group, protocol, bind helpers
 poly/ws/        WebSocket transport (only package importing coder/websocket)
 poly/sse/       SSE+POST transport (no external dependencies)
 poly/client/    Embedded JS files (fluent-poly.js, idiomorph.min.js)
+```
+
+Source files in the root package, split by concern:
+
+```
+handler.go      Public API — Config, New(), ServeHTTP, ServeClient
+pool.go         Internal session lifecycle — pools, reap, reattach
+page.go         Initial page rendering — polyBody, newID
+session.go      Single session — event loop, Update, Navigate, SetTitle
+group.go        Broadcasting — Group type for multi-session updates
+protocol.go     Wire format types and encoding
+transport.go    Transport and EventPusher interfaces
+event.go        Event and Params types
+bind.go         Generic event binding helpers
+embed.go        Client JS embedding
 ```
 
 Transport implementations live in sub-packages. The `Config.Upgrade` field accepts any function that returns a `Transport`, keeping the root package transport-agnostic. `Config.Fallback` provides a secondary transport (typically SSE) used when the primary is unavailable.
@@ -33,12 +48,16 @@ Transport implementations live in sub-packages. The `Config.Upgrade` field accep
 
 1. Client JS sends a DOM event as JSON: `{"type":"click","action":"increment","data":{}}`
 2. `Transport.ReceiveEvent()` deserialises it to an `Event`
-3. `Session.handleEvent()` calls the user's `Handle` function with the current state
+3. `Session.safeHandleEvent()` calls the user's `Handle` function with the current state (wrapped in panic recovery)
 4. The returned state is rendered to a new node tree and diffed against the previous render
 5. `Transport.SendUpdate()` sends a unified update message containing either:
    - **Patches** — targeted content updates for keyed elements that changed
    - **Morphs** — structural DOM changes (e.g. root morph when keys are added/removed/reordered)
 6. Client JS applies patches first (targeted `Idiomorph.morph` on keyed elements), then morphs (root or scoped `Idiomorph.morph`)
+
+### Panic recovery
+
+If `Handle` or `Render` panics during event processing, `safeHandleEvent` recovers the panic, logs it with the session ID and action, and drops the event. The session continues processing subsequent events. `Session.Update` has the same recovery — a panicking callback does not crash the caller's goroutine.
 
 ### Wire format
 
@@ -47,9 +66,10 @@ All updates use a single `"update"` message type:
 ```json
 {"type":"update","patches":[{"key":"count","html":"<span>43</span>"}]}
 {"type":"update","morphs":[{"key":"","html":"<div>...</div>"}]}
+{"type":"update","title":"New Page"}
 ```
 
-An empty `key` in morphs targets the root element. A non-empty key targets a specific keyed container (for scoped morphs).
+An empty `key` in morphs targets the root element. A non-empty key targets a specific keyed container (for scoped morphs). The `title` field updates `document.title`. The `url` and `replace` fields control browser URL changes.
 
 ### Structural change diagnostics
 
@@ -74,6 +94,63 @@ button.Text("+").SetData("poly-click", "increment")
 ```
 
 The generic helpers (`Click`, `Submit`, `Input`, `Change`, `KeyDown`, `Focus`, `Blur`) are defined in `bind.go`. They use a structural type constraint so they work with any Fluent element without coupling the two packages.
+
+### Keydown modifiers
+
+Keydown events include modifier key state in `Event.Data`: `ctrl`, `shift`, `alt`, `meta` are set to `"true"` when held. This enables keyboard shortcut handling:
+
+```go
+func handle(s state, ev poly.Event) state {
+    if ev.Action == "shortcut" && ev.Data["ctrl"] == "true" && ev.Data["key"] == "s" {
+        // Ctrl+S pressed
+    }
+    return s
+}
+```
+
+### Timing control
+
+Input events are debounced at 300ms by default. Override per element:
+
+```go
+poly.Debounce(poly.Input(input.Text("q", ""), "search"), 150) // 150ms
+```
+
+Throttle any event type:
+
+```go
+poly.Throttle(poly.Click(button.Text("Fire"), "fire"), 1000) // max once per second
+```
+
+### Loading states
+
+Elements with `data-poly-disable` are disabled while an event is in flight and restored when the next server update arrives:
+
+```go
+poly.Disable(poly.Click(button.Text("Save"), "save"), "Saving...")
+```
+
+If the text argument is non-empty, the element's text content is temporarily replaced. The JS runtime tracks pending elements in an array and restores them at the top of `applyMessage`, before patches/morphs are applied.
+
+### Confirmation dialogs
+
+Elements with `data-poly-confirm` show `window.confirm` before the event is sent:
+
+```go
+poly.Confirm(poly.Click(button.Text("Delete"), "delete"), "Are you sure?")
+```
+
+If the user cancels, the event is dropped entirely.
+
+### Focus management
+
+Elements with `data-poly-focus` receive focus after patches and morphs are applied:
+
+```go
+poly.AutoFocus(input.Text("name", ""))
+```
+
+The JS runtime calls `focus()` on the first `[data-poly-focus]` element at the end of `applyMessage`. Only one element should have this attribute at a time.
 
 ### URL routing
 
@@ -100,17 +177,15 @@ a.Link("/profile", "Profile").SetData("poly-link", "")
 
 If `HandleParams` is nil, navigation events fall through to `Handle` as `Event{Type: "navigate", Data: {"path": "...", "search": "..."}}`.
 
-**Server-initiated URL updates:**
+**Server-initiated URL and title updates:**
 
 ```go
-// Push a new URL (adds history entry)
-session.Navigate("/success")
-
-// Replace current URL (no history entry)
-session.ReplaceURL("/current?saved=true")
+session.Navigate("/success")               // pushState (adds history entry)
+session.ReplaceURL("/current?saved=true")   // replaceState (no history entry)
+session.SetTitle("Settings — My App")       // updates document.title
 ```
 
-URL updates can accompany DOM patches/morphs in the same message, or be sent standalone.
+URL and title updates can accompany DOM patches/morphs in the same message, or be sent standalone.
 
 **Wire format — navigate event from client:**
 
@@ -118,10 +193,10 @@ URL updates can accompany DOM patches/morphs in the same message, or be sent sta
 {"type":"navigate","action":"","data":{"path":"/profile","search":"tab=settings"}}
 ```
 
-**Wire format — URL command from server:**
+**Wire format — URL/title command from server:**
 
 ```json
-{"type":"update","url":"/profile","replace":false}
+{"type":"update","url":"/profile","replace":false,"title":"Profile"}
 ```
 
 ### Client-side directives
@@ -203,6 +278,29 @@ func handle(s state, ev poly.Event) state {
 
 - **Keep error spans always in the tree** (empty text when no error) to avoid structural changes that trigger root morphs. Toggling between "error present" and "no error" should be a content patch, not a structural one.
 
+## JS hooks
+
+Elements with `data-poly-hook` receive JavaScript lifecycle callbacks, enabling integration with third-party libraries (charts, maps, rich text editors):
+
+```go
+poly.Hook(div.New(), "chart")
+```
+
+```js
+Poly.hooks.chart = {
+    mounted: function(el) { /* initialise — el is in the DOM */ },
+    updated: function(el) { /* re-render — el was morphed */ },
+    destroyed: function(el) { /* teardown — el is about to be removed */ }
+};
+```
+
+The global `Poly.hooks` object is defined before the IIFE in `fluent-poly.js`. The `callHook` function checks for the `data-poly-hook` attribute and calls the appropriate lifecycle method. All three callbacks are optional.
+
+**Lifecycle timing:**
+- `mounted` fires in `afterNodeAdded` — the element is in the DOM
+- `updated` fires in `afterNodeMorphed` — the element was morphed in place
+- `destroyed` fires in `beforeNodeRemoved` — the element is still in the DOM but about to be removed. For elements with transitions, destroyed fires before the leave transition starts.
+
 ## Transitions
 
 Elements can opt into CSS transitions during morph-driven add/remove by setting `data-poly-transition` (or using the `poly.Transition` helper):
@@ -228,9 +326,30 @@ The JS runtime applies CSS classes following a naming convention — the develop
 
 **Leave cancellation:** If a morph arrives that includes an element currently playing a leave transition, the leave is cancelled and the element is morphed normally. This handles rapid state changes (e.g. user toggles something twice quickly).
 
+## Broadcasting
+
+`Group[S]` tracks a set of sessions for multi-client updates:
+
+```go
+group := poly.NewGroup[State]()
+
+poly.New(poly.Config[State]{
+    OnConnect:    func(s *poly.Session[State]) { group.Add(s) },
+    OnDisconnect: func(s *poly.Session[State]) { group.Remove(s) },
+    // ...
+})
+
+group.Broadcast(func(s State) State {
+    s.Notification = "System update"
+    return s
+})
+```
+
+`Broadcast` snapshots the session pointers before calling `Update` on each, so the group lock is not held while acquiring session locks. `Add`, `Remove`, `Broadcast`, and `Len` are all safe to call from any goroutine.
+
 ## SSE transport
 
-An alternative to WebSocket for environments where proxies strip upgrade headers or WebSocket connections are unreliable. Server→client updates are sent as Server-Sent Events; client→server events are sent as HTTP POST.
+An alternative to WebSocket for environments where proxies strip upgrade headers or WebSocket connections are unreliable. Server-to-client updates are sent as Server-Sent Events; client-to-server events are sent as HTTP POST.
 
 ```go
 // WebSocket primary, SSE fallback
@@ -254,6 +373,30 @@ The `EventPusher` interface (in `transport.go`) is implemented by transports tha
 
 **Wire format:** Identical JSON to WebSocket. Server updates are SSE `data:` lines. Client events are POST bodies. The same `Update` and `Event` types are used regardless of transport.
 
+## Complete helper reference
+
+| Helper | Data attribute | Purpose |
+|--------|---------------|---------|
+| `Click` | `poly-click` | Server event on click |
+| `Submit` | `poly-submit` | Server event on form submit |
+| `Input` | `poly-input` | Server event on input (debounced) |
+| `Change` | `poly-change` | Server event on value commit |
+| `KeyDown` | `poly-keydown` | Server event on keydown (with modifiers) |
+| `Focus` | `poly-focus` | Server event on focus |
+| `Blur` | `poly-blur` | Server event on blur |
+| `Link` | `poly-link` | Client-side navigation |
+| `ToggleClass` | `poly-toggle-class` | Client-side CSS class toggle |
+| `ToggleTarget` | `poly-toggle-target` | Direct toggle at different element |
+| `ToggleAttr` | `poly-toggle-attr` | Client-side boolean attribute toggle |
+| `Debounce` | `poly-debounce` | Override input debounce delay (ms) |
+| `Throttle` | `poly-throttle` | Minimum interval between events (ms) |
+| `Disable` | `poly-disable` | Disable element while event in flight |
+| `Confirm` | `poly-confirm` | Show confirmation before sending event |
+| `Preserve` | `poly-preserve` | Prevent form reset after submit |
+| `AutoFocus` | `poly-focus` | Focus element after server update |
+| `Hook` | `poly-hook` | JS lifecycle callbacks |
+| `Transition` | `poly-transition` | CSS enter/leave transitions |
+
 ## Code style
 
 - Comments explain why, not what
@@ -267,17 +410,46 @@ The `EventPusher` interface (in `transport.go`) is implemented by transports tha
 
 ## Testing
 
-Tests live alongside the code they test (`session_test.go`, `protocol_test.go`, `bind_test.go`). The `bind_test.go` tests use `package poly_test` (black-box) because they verify the public API with real Fluent elements.
+Tests are split by concern into separate files:
 
-`session_test.go` uses a `mockTransport` that replays queued events and records sent `Update` values. Helper functions `patchUpdates()` and `morphUpdates()` filter recorded updates by type for assertions. Use this pattern for any new session behaviour tests.
+```
+mock_test.go        Shared test infrastructure (mockTransport, counterState, helpers)
+session_test.go     Core event loop (patch, morph, equality, multiple events, disconnect)
+navigate_test.go    URL navigation
+recover_test.go     Panic recovery
+title_test.go       Page title updates
+group_test.go       Broadcasting
+bind_test.go        Event binding helpers (package poly_test, black-box)
+protocol_test.go    Wire format encoding
+bench_test.go       Performance benchmarks
+sse/sse_test.go     SSE transport
+```
+
+`mock_test.go` defines `mockTransport` (replays queued events, records sent `Update` values) and `newTestSession` (creates a session with a seeded differ). Helper functions `patchUpdates()` and `morphUpdates()` filter recorded updates by type. Use these for any new session behaviour tests.
+
+`bind_test.go` uses `package poly_test` (black-box) because it verifies the public API with real Fluent elements. All other test files use `package poly` (white-box).
 
 ## Client JS
 
 `client/fluent-poly.js` is plain JS with no build step or bundler. It uses `Idiomorph.morph()` from the bundled `idiomorph.min.js` (0BSD licence). Both are embedded via `go:embed` in `embed.go` and served by `ServeClient()`.
 
-Supported event bindings (data attributes): `data-poly-click`, `data-poly-input`, `data-poly-submit`, `data-poly-change`, `data-poly-keydown`, `data-poly-focus`, `data-poly-blur`, `data-poly-link`.
+The JS exposes one global: `window.Poly` with a `hooks` property for JS interop.
 
-Input events are debounced at 300ms by default, configurable per element via `data-poly-debounce="500"`. Throttling is available via `data-poly-throttle="1000"`.
+Supported data attributes:
+
+**Server events:** `data-poly-click`, `data-poly-input`, `data-poly-submit`, `data-poly-change`, `data-poly-keydown`, `data-poly-focus`, `data-poly-blur`
+
+**Navigation:** `data-poly-link`
+
+**Client-side toggles:** `data-poly-toggle-class`, `data-poly-toggle-target`, `data-poly-toggle-attr`
+
+**Timing:** `data-poly-debounce`, `data-poly-throttle`
+
+**UX:** `data-poly-disable`, `data-poly-confirm`, `data-poly-focus` (auto-focus), `data-poly-preserve`
+
+**Lifecycle:** `data-poly-hook`, `data-poly-transition`
+
+**Internal (managed by JS):** `data-poly-client-classes`, `data-poly-client-attrs`
 
 ## Dependencies
 
