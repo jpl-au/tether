@@ -482,3 +482,16 @@ Supported data attributes:
 
 - `ws.Upgrade()` sets `InsecureSkipVerify: true` for development. Pass origin patterns for production: `ws.Upgrade("https://example.com")`.
 - Event data comes from the client — always validate in the `Handle` function.
+- **Session IDs** are 128-bit cryptographically random strings (`crypto/rand.Text`). They appear in query parameters for both WebSocket upgrades and SSE POSTs — treat them as bearer tokens.
+- **Referrer-Policy:** The initial page response sets `Referrer-Policy: same-origin` to prevent session ID leakage via the Referer header on external links.
+- **Origin checking:** SSE POST requests are checked against the `Origin` header when present. Cross-origin POSTs are rejected with 403. This mitigates CSRF even if a session ID is leaked. Same-origin requests that omit the Origin header are allowed through.
+- **Session ID in logs:** Session IDs appear in server access logs as query parameters. If log exposure is a concern, consider stripping query strings from access logs or using a reverse proxy that redacts them.
+
+## Known limitations
+
+These are architectural trade-offs, not bugs. They are documented here so future contributors understand the decisions.
+
+- **Session lock granularity:** The session mutex is held during the entire render/diff/send cycle. This is necessary for correctness (state, differ, and transport are coupled), but it means `Render` functions should be computationally cheap. A slow `Render` will block concurrent `Session.Update` calls.
+- **WebSocket backpressure:** `SendUpdate` writes synchronously. If the client is slow to read, the write will block, stalling the session event loop. This is inherent to the synchronous transport interface. For most applications the browser reads faster than the server writes, so this is not a practical concern.
+- **Loading state restoration:** `restorePending()` restores all disabled elements when any server update arrives. If two events are in flight simultaneously (A and B), the response for A will re-enable the element disabled by B. A full fix requires event correlation IDs (protocol change). In practice this is rare because events are debounced/throttled and server responses are fast.
+- **Client state vs server state:** Client-side toggles (`ToggleClass`, `ToggleAttr`) modify the DOM without the server knowing. When a server morph arrives, the `beforeNodeMorphed` hook preserves client state. However, if the server explicitly sets the same class or attribute, the client value takes precedence. This is intentional for ephemeral UI state (menus, modals) but can be surprising if misused.
