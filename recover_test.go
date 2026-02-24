@@ -1,0 +1,61 @@
+package poly
+
+import (
+	"log/slog"
+	"testing"
+)
+
+func TestSessionHandlePanicDoesNotKillSession(t *testing.T) {
+	mt := &mockTransport{
+		events: []Event{
+			{Type: "click", Action: "crash"},
+			{Type: "click", Action: "increment"},
+		},
+	}
+
+	handle := func(s counterState, ev Event) counterState {
+		if ev.Action == "crash" {
+			panic("boom")
+		}
+		s.Count++
+		return s
+	}
+
+	sess := newTestSession(counterState{Count: 0}, mt)
+	sess.handle = handle
+	sess.logger = slog.Default()
+
+	// Should not panic — the session recovers and processes the second event.
+	sess.run()
+
+	if sess.state.Count != 1 {
+		t.Errorf("expected Count 1 after recovery, got %d", sess.state.Count)
+	}
+
+	mt.mu.Lock()
+	defer mt.mu.Unlock()
+
+	// Only the second event (increment) should produce a patch.
+	if len(patchUpdates(mt.updates)) != 1 {
+		t.Errorf("expected 1 patch update after panic recovery, got %d", len(patchUpdates(mt.updates)))
+	}
+}
+
+func TestSessionUpdatePanicDoesNotCrashCaller(t *testing.T) {
+	mt := &mockTransport{
+		events: []Event{},
+	}
+
+	sess := newTestSession(counterState{Count: 0}, mt)
+	sess.logger = slog.Default()
+
+	// Should not panic — the recovery in Update catches it.
+	sess.Update(func(s counterState) counterState {
+		panic("boom in update")
+	})
+
+	// State should be unchanged after a panicking Update.
+	if sess.state.Count != 0 {
+		t.Errorf("expected Count 0 after panicking Update, got %d", sess.state.Count)
+	}
+}

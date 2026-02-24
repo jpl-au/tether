@@ -75,7 +75,7 @@ func (s *Session[S]) run() {
 
 		s.mu.Lock()
 		s.lastActivity = time.Now()
-		s.handleEvent(ev)
+		s.safeHandleEvent(ev)
 		s.mu.Unlock()
 	}
 }
@@ -90,12 +90,38 @@ func (s *Session[S]) Close() {
 // Update applies a state change from outside the event loop and pushes
 // the resulting diff to the client. Safe to call from any goroutine.
 // Use this for server-initiated updates like timers, database changes,
-// or broadcasts from other sessions.
+// or broadcasts from other sessions. Panics in fn or the render pass
+// are recovered and logged rather than crashing the caller.
 func (s *Session[S]) Update(fn func(S) S) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	defer func() {
+		if r := recover(); r != nil {
+			s.logger.Error("panic in Update callback",
+				"session", s.id,
+				"panic", r,
+			)
+		}
+	}()
 
 	s.applyState(fn(s.state))
+}
+
+// safeHandleEvent wraps handleEvent with panic recovery so that a
+// bug in Handle or Render does not kill the session. The panic is
+// logged and the event is dropped — the session continues processing
+// subsequent events.
+func (s *Session[S]) safeHandleEvent(ev Event) {
+	defer func() {
+		if r := recover(); r != nil {
+			s.logger.Error("panic in event handler",
+				"session", s.id,
+				"action", ev.Action,
+				"panic", r,
+			)
+		}
+	}()
+	s.handleEvent(ev)
 }
 
 // handleEvent processes a single event. Caller must hold s.mu.
