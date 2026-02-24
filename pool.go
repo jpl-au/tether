@@ -22,10 +22,11 @@ type pendingSession[S any] struct {
 // WebSocket connection before being discarded.
 const pendingTimeout = 30 * time.Second
 
-// handler is the core HTTP handler. It maintains three pools of sessions:
+// Handler is the core HTTP handler. It maintains three pools of sessions:
 // pending (pre-warmed, waiting for WebSocket), active (connected and
 // processing events), and disconnected (waiting for client to reconnect).
-type handler[S any] struct {
+// Use Shutdown for graceful termination.
+type Handler[S any] struct {
 	cfg          Config[S]
 	mu           sync.Mutex
 	pending      map[string]*pendingSession[S]
@@ -37,7 +38,7 @@ type handler[S any] struct {
 // serveInitialPage renders the full HTML, pre-warms a session, and
 // injects the client runtime. The session ID is embedded in the root
 // element so the client can attach to it on WebSocket connect.
-func (h *handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
+func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 	h.cfg.Logger.Info("serving initial page")
 
 	h.mu.Lock()
@@ -84,7 +85,7 @@ func (h *handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 //  1. Disconnected sessions (reconnecting client)
 //  2. Pending sessions (initial page load)
 //  3. Fresh session (fallback)
-func (h *handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrade func(http.ResponseWriter, *http.Request) (Transport, error)) {
+func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrade func(http.ResponseWriter, *http.Request) (Transport, error)) {
 	transport, err := upgrade(w, r)
 	if err != nil {
 		http.Error(w, "connection upgrade failed", http.StatusInternalServerError)
@@ -165,7 +166,7 @@ func (h *handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 
 // reattach connects a new transport to a disconnected session and
 // sends a full re-render so the client is in sync.
-func (h *handler[S]) reattach(sess *Session[S], transport Transport) {
+func (h *Handler[S]) reattach(sess *Session[S], transport Transport) {
 	sess.mu.Lock()
 	sess.transport = transport
 	sess.lastActivity = time.Now()
@@ -190,7 +191,7 @@ func (h *handler[S]) reattach(sess *Session[S], transport Transport) {
 // wireDisconnect sets the onDisconnect callback for a session. On
 // disconnect, the session is moved to the disconnected pool (if
 // reconnection is enabled) or removed entirely.
-func (h *handler[S]) wireDisconnect(sess *Session[S]) {
+func (h *Handler[S]) wireDisconnect(sess *Session[S]) {
 	sess.onDisconnect = func() {
 		h.mu.Lock()
 		delete(h.active, sess.id)
@@ -211,7 +212,7 @@ func (h *handler[S]) wireDisconnect(sess *Session[S]) {
 
 // shutdown closes all active sessions and stops the background reaper.
 // It blocks until all sessions are closed or ctx is cancelled.
-func (h *handler[S]) shutdown(ctx context.Context) error {
+func (h *Handler[S]) Shutdown(ctx context.Context) error {
 	close(h.done)
 
 	h.mu.Lock()
@@ -239,7 +240,7 @@ func (h *handler[S]) shutdown(ctx context.Context) error {
 
 // reap periodically removes expired pending and disconnected sessions,
 // and closes idle or long-lived active sessions.
-func (h *handler[S]) reap() {
+func (h *Handler[S]) reap() {
 	ticker := time.NewTicker(15 * time.Second)
 	defer ticker.Stop()
 

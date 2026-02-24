@@ -22,7 +22,6 @@
 package poly
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -127,27 +126,7 @@ type Config[S any] struct {
 // defaultReconnectTimeout is used when ReconnectTimeout is zero.
 const defaultReconnectTimeout = 30 * time.Second
 
-// Handler manages poly sessions. It implements http.Handler for routing
-// requests and provides Shutdown for graceful termination.
-type Handler[S any] struct {
-	h *handler[S]
-}
-
-// ServeHTTP implements http.Handler.
-func (h *Handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	h.h.ServeHTTP(w, r)
-}
-
-// Shutdown closes all active sessions and stops the background reaper.
-// It blocks until all sessions are closed or the context is cancelled.
-func (h *Handler[S]) Shutdown(ctx context.Context) error {
-	return h.h.shutdown(ctx)
-}
-
 // New creates a Handler that manages poly sessions.
-//
-// GET requests receive the initial HTML page with the client JS injected.
-// Requests with an Upgrade header start a session event loop.
 func New[S any](cfg Config[S]) *Handler[S] {
 	if cfg.Logger == nil {
 		cfg.Logger = slog.Default()
@@ -155,7 +134,7 @@ func New[S any](cfg Config[S]) *Handler[S] {
 	if cfg.ReconnectTimeout == 0 {
 		cfg.ReconnectTimeout = defaultReconnectTimeout
 	}
-	h := &handler[S]{
+	h := &Handler[S]{
 		cfg:          cfg,
 		pending:      make(map[string]*pendingSession[S]),
 		active:       make(map[string]*Session[S]),
@@ -167,14 +146,14 @@ func New[S any](cfg Config[S]) *Handler[S] {
 	// sessions. It also enforces idle and lifetime limits when set.
 	go h.reap()
 
-	return &Handler[S]{h: h}
+	return h
 }
 
 // ServeHTTP routes requests by type. The routing depends on the configured
 // TransportMode: WebSocketOnly accepts only WebSocket upgrades, SSEOnly
 // accepts only SSE streams and POST events, and WebSocketWithFallback
 // tries WebSocket first with SSE as a backup.
-func (h *handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *Handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch h.cfg.Mode {
 	case SSEOnly:
 		if strings.Contains(r.Header.Get("Accept"), "text/event-stream") {
@@ -214,7 +193,7 @@ func (h *handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // transport. The transport must implement EventPusher (e.g. the SSE
 // transport). WebSocket transports do not — they receive events on
 // the WebSocket connection directly.
-func (h *handler[S]) handlePostEvent(w http.ResponseWriter, r *http.Request) {
+func (h *Handler[S]) handlePostEvent(w http.ResponseWriter, r *http.Request) {
 	// Reject cross-origin POSTs to prevent CSRF. The session ID is a
 	// 128-bit bearer token which is hard to guess, but Origin checking
 	// adds defence in depth against ID leakage.

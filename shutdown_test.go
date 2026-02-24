@@ -10,7 +10,7 @@ func TestShutdownClosesActiveSessions(t *testing.T) {
 	mt := &mockTransport{events: []Event{}}
 	sess := newTestSession(counterState{Count: 0}, mt)
 
-	h := &handler[counterState]{
+	h := &Handler[counterState]{
 		cfg:          Config[counterState]{},
 		pending:      make(map[string]*pendingSession[counterState]),
 		active:       map[string]*Session[counterState]{"test": sess},
@@ -21,7 +21,7 @@ func TestShutdownClosesActiveSessions(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	if err := h.shutdown(ctx); err != nil {
+	if err := h.Shutdown(ctx); err != nil {
 		t.Fatalf("shutdown error: %v", err)
 	}
 
@@ -35,7 +35,7 @@ func TestShutdownClosesActiveSessions(t *testing.T) {
 }
 
 func TestShutdownStopsReaper(t *testing.T) {
-	h := &handler[counterState]{
+	h := &Handler[counterState]{
 		cfg:          Config[counterState]{},
 		pending:      make(map[string]*pendingSession[counterState]),
 		active:       make(map[string]*Session[counterState]),
