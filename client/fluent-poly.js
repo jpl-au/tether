@@ -31,7 +31,8 @@ window.Poly.hooks = window.Poly.hooks || {};
   var maxRetryDelay = 30000;
   var debounceTimers = {};
   var leavingNodes = new Set();
-  var pendingElements = [];
+  var pendingElements = {};
+  var eventCounter = 0;
   var transportMode = "ws"; // "ws", "sse", or "auto" — set from data-poly-transport
   var connectionMode = "ws";
   var eventSource = null;
@@ -144,8 +145,7 @@ window.Poly.hooks = window.Poly.hooks || {};
   function applyMessage(msg) {
     if (msg.type !== "update") return;
 
-    // Restore elements disabled while waiting for this response.
-    restorePending();
+    restorePending(msg.event_id);
 
     // Apply content patches first, then structural morphs.
     if (msg.patches) {
@@ -196,25 +196,25 @@ window.Poly.hooks = window.Poly.hooks || {};
   // text content during the wait. All pending elements are restored
   // when the next server update arrives.
 
-  function disablePending(el) {
+  function disablePending(el, eventID) {
     if (!el || !el.hasAttribute("data-poly-disable")) return;
     var text = el.getAttribute("data-poly-disable");
-    pendingElements.push({
+    pendingElements[eventID] = {
       el: el,
       text: text ? el.textContent : null,
       disabled: el.hasAttribute("disabled")
-    });
+    };
     el.setAttribute("disabled", "");
     if (text) el.textContent = text;
   }
 
-  function restorePending() {
-    for (var i = 0; i < pendingElements.length; i++) {
-      var entry = pendingElements[i];
-      if (!entry.disabled) entry.el.removeAttribute("disabled");
-      if (entry.text !== null) entry.el.textContent = entry.text;
-    }
-    pendingElements = [];
+  function restorePending(eventID) {
+    if (!eventID) return;
+    var entry = pendingElements[eventID];
+    if (!entry) return;
+    if (!entry.disabled) entry.el.removeAttribute("disabled");
+    if (entry.text !== null) entry.el.textContent = entry.text;
+    delete pendingElements[eventID];
   }
 
   // --- Client state preservation ---
@@ -477,8 +477,8 @@ window.Poly.hooks = window.Poly.hooks || {};
         }, throttle);
       }
 
-      sendEvent(domEvent, action, data);
-      disablePending(target);
+      var eid = sendEvent(domEvent, action, data);
+      disablePending(target, eid);
 
       // Clear form fields after submit unless the form opts out via
       // data-poly-preserve (used when the server controls field values
@@ -490,7 +490,8 @@ window.Poly.hooks = window.Poly.hooks || {};
   }
 
   function sendEvent(type, action, data) {
-    var payload = JSON.stringify({type: type, action: action, data: data});
+    var id = String(++eventCounter);
+    var payload = JSON.stringify({type: type, action: action, data: data, event_id: id});
 
     if (connectionMode === "sse") {
       var url = location.protocol + "//" + location.host + endpoint;
@@ -502,11 +503,12 @@ window.Poly.hooks = window.Poly.hooks || {};
         },
         body: payload
       });
-      return;
+      return id;
     }
 
-    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return id;
     ws.send(payload);
+    return id;
   }
 
   // --- Client-side toggles ---

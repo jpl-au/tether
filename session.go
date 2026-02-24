@@ -107,7 +107,7 @@ func (s *Session[S]) Update(fn func(S) S) {
 	// Server-initiated updates count as activity so that sessions
 	// receiving only server pushes are not reaped as idle.
 	s.lastActivity = time.Now()
-	s.applyState(fn(s.state))
+	s.applyState(fn(s.state), "")
 }
 
 // safeHandleEvent wraps handleEvent with panic recovery so that a
@@ -134,10 +134,10 @@ func (s *Session[S]) handleEvent(ev Event) {
 		if search := ev.Data["search"]; search != "" {
 			params.Query, _ = url.ParseQuery(search)
 		}
-		s.applyState(s.handleParams(s.state, params))
+		s.applyState(s.handleParams(s.state, params), ev.EventID)
 		return
 	}
-	s.applyState(s.handle(s.state, ev))
+	s.applyState(s.handle(s.state, ev), ev.EventID)
 }
 
 // Navigate pushes a URL change to the client. The browser calls
@@ -177,8 +177,10 @@ func (s *Session[S]) sendURL(rawURL string, replace bool) {
 }
 
 // applyState sets the new state, diffs the rendered tree, and sends
-// an update to the client. Caller must hold s.mu.
-func (s *Session[S]) applyState(newState S) {
+// an update to the client. eventID is echoed back so the client can
+// correlate responses with the events that triggered them (used for
+// loading state restoration). Caller must hold s.mu.
+func (s *Session[S]) applyState(newState S, eventID string) {
 	if s.equal != nil && s.equal(s.state, newState) {
 		return
 	}
@@ -188,9 +190,6 @@ func (s *Session[S]) applyState(newState S) {
 
 	patches, change := s.differ.Diff(tree)
 	if change != nil {
-		// Keys were added, removed, or reordered — morph the root.
-		// The client uses idiomorph to morph the entire root, preserving
-		// focus, scroll position, and form state.
 		html := s.differ.Render(tree)
 		s.logger.Warn("structural change, sending root morph",
 			"session", s.id,
@@ -199,7 +198,8 @@ func (s *Session[S]) applyState(newState S) {
 			"tip", "wrap conditional elements in a keyed container to scope this morph",
 		)
 		update := Update{
-			Morphs: []Morph{{Key: "", HTML: html}},
+			Morphs:  []Morph{{Key: "", HTML: html}},
+			EventID: eventID,
 		}
 		if err := s.transport.SendUpdate(update); err != nil {
 			s.logger.Error("send update error", "session", s.id, "err", err)
@@ -208,7 +208,7 @@ func (s *Session[S]) applyState(newState S) {
 	}
 
 	if len(patches) > 0 {
-		update := Update{Patches: patches}
+		update := Update{Patches: patches, EventID: eventID}
 		if err := s.transport.SendUpdate(update); err != nil {
 			s.logger.Error("send update error", "session", s.id, "err", err)
 		}

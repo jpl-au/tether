@@ -12,6 +12,7 @@ type Update struct {
 	URL     string // if non-empty, push/replace browser URL
 	Replace bool   // true for replaceState, false for pushState
 	Title   string // if non-empty, set document.title
+	EventID string // echoed from the triggering Event for correlation
 }
 
 // Morph represents a structural change to a keyed container or the root.
@@ -32,6 +33,7 @@ type UpdateMessage struct {
 	URL     string       `json:"url,omitempty"`
 	Replace bool         `json:"replace,omitempty"`
 	Title   string       `json:"title,omitempty"`
+	EventID string       `json:"event_id,omitempty"`
 }
 
 // PatchEntry is a single key+html pair within an update message.
@@ -76,6 +78,7 @@ func EncodeUpdate(update Update) UpdateMessage {
 	msg.URL = update.URL
 	msg.Replace = update.Replace
 	msg.Title = update.Title
+	msg.EventID = update.EventID
 
 	return msg
 }
