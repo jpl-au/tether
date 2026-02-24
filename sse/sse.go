@@ -24,6 +24,10 @@ import (
 	poly "github.com/jpl-au/fluent-poly"
 )
 
+// defaultBufferSize is the event channel capacity when no explicit
+// size is passed to Upgrade.
+const defaultBufferSize = 16
+
 // Upgrade returns an upgrade function for use in [poly.Config].Fallback
 // (or Upgrade when Mode is SSEOnly). When the poly handler receives a
 // GET with Accept: text/event-stream, it calls this function to
@@ -31,7 +35,19 @@ import (
 // the session; server updates are written as SSE "data" lines. Client
 // events arrive separately via HTTP POST — the poly handler routes
 // them through the [poly.EventPusher] interface on this transport.
-func Upgrade() func(http.ResponseWriter, *http.Request) (poly.Transport, error) {
+//
+// An optional bufferSize parameter sets the capacity of the internal
+// event channel. When the channel is full, PushEvent returns
+// [poly.ErrEventBufferFull] so the HTTP handler can respond with 429
+// rather than blocking. The default is 16, which is sufficient for
+// typical form-driven UIs. Increase it for high-frequency event
+// streams such as mouse tracking or real-time collaboration.
+func Upgrade(bufferSize ...int) func(http.ResponseWriter, *http.Request) (poly.Transport, error) {
+	size := defaultBufferSize
+	if len(bufferSize) > 0 && bufferSize[0] > 0 {
+		size = bufferSize[0]
+	}
+
 	return func(w http.ResponseWriter, r *http.Request) (poly.Transport, error) {
 		flusher, ok := w.(http.Flusher)
 		if !ok {
@@ -47,7 +63,7 @@ func Upgrade() func(http.ResponseWriter, *http.Request) (poly.Transport, error) 
 		t := &transport{
 			w:       w,
 			flusher: flusher,
-			events:  make(chan poly.Event, 16),
+			events:  make(chan poly.Event, size),
 			done:    make(chan struct{}),
 		}
 
@@ -114,10 +130,11 @@ func (t *transport) ReceiveEvent() (poly.Event, error) {
 // when an HTTP POST arrives carrying a client event for this session.
 //
 // The send is non-blocking by design. If the session's event loop is
-// not consuming events fast enough and the internal buffer (capacity 16)
-// is full, PushEvent returns [poly.ErrEventBufferFull] immediately so
-// the HTTP handler can respond with 429 rather than stalling the
-// request goroutine.
+// not consuming events fast enough and the internal buffer is full,
+// PushEvent returns [poly.ErrEventBufferFull] immediately so the HTTP
+// handler can respond with 429 rather than stalling the request
+// goroutine. The buffer capacity is set via the bufferSize parameter
+// to [Upgrade] (default 16).
 func (t *transport) PushEvent(ev poly.Event) error {
 	select {
 	case <-t.done:
