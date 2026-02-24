@@ -113,6 +113,24 @@ func TestPreserveRendersDataAttribute(t *testing.T) {
 	}
 }
 
+func TestDisableRendersDataAttribute(t *testing.T) {
+	el := poly.Disable(poly.Click(button.Text("Save"), "save"), "Saving...")
+	html := string(el.Render())
+
+	if !strings.Contains(html, `data-poly-disable="Saving..."`) {
+		t.Errorf("expected data-poly-disable attribute in HTML:\n%s", html)
+	}
+}
+
+func TestDisableEmptyTextRendersDataAttribute(t *testing.T) {
+	el := poly.Disable(poly.Click(button.Text("Go"), "go"), "")
+	html := string(el.Render())
+
+	if !strings.Contains(html, `data-poly-disable=""`) {
+		t.Errorf("expected data-poly-disable attribute in HTML:\n%s", html)
+	}
+}
+
 func TestConfirmRendersDataAttribute(t *testing.T) {
 	el := poly.Confirm(poly.Click(button.Text("Delete"), "delete"), "Are you sure?")
 	html := string(el.Render())

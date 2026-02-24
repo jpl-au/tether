@@ -112,6 +112,17 @@ func Throttle[E settable[E]](el E, ms int) E {
 	return el.SetData("poly-throttle", strconv.Itoa(ms))
 }
 
+// --- Loading states ---
+
+// Disable marks an element for automatic disabling while an event is
+// in flight. The JS runtime sets the disabled attribute when the event
+// is sent and clears it when the next server update arrives. If text
+// is non-empty, the element's text content is temporarily replaced
+// (e.g. "Saving..." while a form submits).
+func Disable[E settable[E]](el E, text string) E {
+	return el.SetData("poly-disable", text)
+}
+
 // --- Confirmation ---
 
 // Confirm attaches a confirmation prompt to an event-bound element.

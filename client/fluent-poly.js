@@ -20,6 +20,7 @@
   var maxRetryDelay = 30000;
   var debounceTimers = {};
   var leavingNodes = new Set();
+  var pendingElements = [];
   var connectionMode = "ws";
   var eventSource = null;
   var sseAvailable = false;
@@ -131,6 +132,9 @@
   function applyMessage(msg) {
     if (msg.type !== "update") return;
 
+    // Restore elements disabled while waiting for this response.
+    restorePending();
+
     // Apply content patches first, then structural morphs.
     if (msg.patches) {
       for (var i = 0; i < msg.patches.length; i++) {
@@ -152,6 +156,34 @@
     if (msg.title) {
       document.title = msg.title;
     }
+  }
+
+  // --- Loading / pending states ---
+  //
+  // Elements with data-poly-disable are disabled while an event is in
+  // flight. The attribute value, if non-empty, replaces the element's
+  // text content during the wait. All pending elements are restored
+  // when the next server update arrives.
+
+  function disablePending(el) {
+    if (!el || !el.hasAttribute("data-poly-disable")) return;
+    var text = el.getAttribute("data-poly-disable");
+    pendingElements.push({
+      el: el,
+      text: text ? el.textContent : null,
+      disabled: el.hasAttribute("disabled")
+    });
+    el.setAttribute("disabled", "");
+    if (text) el.textContent = text;
+  }
+
+  function restorePending() {
+    for (var i = 0; i < pendingElements.length; i++) {
+      var entry = pendingElements[i];
+      if (!entry.disabled) entry.el.removeAttribute("disabled");
+      if (entry.text !== null) entry.el.textContent = entry.text;
+    }
+    pendingElements = [];
   }
 
   // --- Client state preservation ---
@@ -408,6 +440,7 @@
       }
 
       sendEvent(domEvent, action, data);
+      disablePending(target);
 
       // Clear form fields after submit unless the form opts out via
       // data-poly-preserve (used when the server controls field values
