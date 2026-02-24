@@ -233,6 +233,10 @@ func (h *Handler[S]) Shutdown(ctx context.Context) error {
 	for _, sess := range h.active {
 		sessions = append(sessions, sess)
 	}
+	// The reaper is stopped (done is closed), so nothing else will
+	// clean up these maps. Clear them to release memory.
+	clear(h.pending)
+	clear(h.disconnected)
 	h.mu.Unlock()
 
 	done := make(chan struct{})
