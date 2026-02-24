@@ -159,7 +159,7 @@ If the user cancels, the event is dropped entirely.
 
 ### Focus management
 
-Elements with `data-poly-focus` receive focus after patches and morphs are applied:
+Elements with `data-poly-autofocus` receive focus after patches and morphs are applied:
 
 ```go
 poly.AutoFocus(input.Text("name", ""))
@@ -360,7 +360,7 @@ group.Broadcast(func(s State) State {
 })
 ```
 
-`Broadcast` updates all sessions concurrently and returns after all updates have completed. `Add`, `Remove`, `Broadcast`, and `Len` are all safe to call from any goroutine.
+`Broadcast` updates all sessions concurrently and is fire-and-forget — it returns immediately after spawning the update goroutines. Each goroutine completes after a single render-diff-send cycle. `Add`, `Remove`, `Broadcast`, and `Len` are all safe to call from any goroutine.
 
 ## Transport mode
 
@@ -440,7 +440,7 @@ When SSE is active, client events are sent as HTTP POST requests to the same end
 | `Disable` | `poly-disable` | Disable element while event in flight |
 | `Confirm` | `poly-confirm` | Show confirmation before sending event |
 | `Preserve` | `poly-preserve` | Prevent form reset after submit |
-| `AutoFocus` | `poly-focus` | Focus element after server update |
+| `AutoFocus` | `poly-autofocus` | Focus element after server update |
 | `Hook` | `poly-hook` | JS lifecycle callbacks |
 | `Transition` | `poly-transition` | CSS enter/leave transitions |
 
@@ -465,7 +465,11 @@ session_test.go     Core event loop (patch, morph, equality, multiple events, di
 navigate_test.go    URL navigation
 recover_test.go     Panic recovery
 title_test.go       Page title updates
-group_test.go       Broadcasting
+group_test.go       Broadcasting (uses testing/synctest for fire-and-forget verification)
+activity_test.go    Server-initiated update refreshes lastActivity
+reap_test.go        Reaper lifecycle tests (uses testing/synctest fake clock)
+shutdown_test.go    Graceful shutdown and reaper termination (uses testing/synctest)
+origin_test.go      Origin checking and CSRF protection
 bind_test.go        Event binding helpers (package poly_test, black-box)
 protocol_test.go    Wire format encoding
 bench_test.go       Performance benchmarks
@@ -492,7 +496,7 @@ Supported data attributes:
 
 **Timing:** `data-poly-debounce`, `data-poly-throttle`
 
-**UX:** `data-poly-disable`, `data-poly-confirm`, `data-poly-focus` (auto-focus), `data-poly-preserve`
+**UX:** `data-poly-disable`, `data-poly-confirm`, `data-poly-autofocus`, `data-poly-preserve`
 
 **Lifecycle:** `data-poly-hook`, `data-poly-transition`
 

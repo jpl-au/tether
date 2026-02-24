@@ -137,7 +137,7 @@ Direct focus to a specific element after a server update:
 poly.AutoFocus(input.Text("name", ""))
 ```
 
-The JS runtime calls `focus()` on the first `[data-poly-focus]` element after applying patches and morphs.
+The JS runtime calls `focus()` on the first `[data-poly-autofocus]` element after applying patches and morphs.
 
 ## Server-initiated updates
 
@@ -270,7 +270,7 @@ group.Broadcast(func(s State) State {
 })
 ```
 
-Sessions are updated concurrently so a slow render in one session does not block delivery to the rest. `Broadcast` returns after all updates have completed.
+Sessions are updated concurrently so a slow render in one session does not block delivery to the rest. `Broadcast` is fire-and-forget — it returns immediately after spawning the update goroutines. Each goroutine completes after a single render-diff-send cycle.
 
 ## Transport mode
 
