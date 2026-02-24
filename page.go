@@ -3,7 +3,6 @@ package poly
 import (
 	"bytes"
 	"crypto/rand"
-	"encoding/hex"
 	"io"
 
 	"github.com/jpl-au/fluent/node"
@@ -51,10 +50,8 @@ func (p *polyBody) RenderBuilder(buf *bytes.Buffer) {
 
 func (p *polyBody) Nodes() []node.Node { return nil }
 
-// newID generates a cryptographically random 32-character hex string
-// for use as a session identifier.
+// newID generates a cryptographically random session identifier
+// using base-32 encoding (alphanumeric, no padding).
 func newID() string {
-	b := make([]byte, 16)
-	rand.Read(b)
-	return hex.EncodeToString(b)
+	return rand.Text()
 }
