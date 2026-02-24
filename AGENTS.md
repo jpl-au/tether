@@ -48,16 +48,16 @@ Transport implementations live in sub-packages. The `Config.Upgrade` field accep
 
 1. Client JS sends a DOM event as JSON: `{"type":"click","action":"increment","data":{}}`
 2. `Transport.ReceiveEvent()` deserialises it to an `Event`
-3. `Session.safeHandleEvent()` calls the user's `Handle` function with the current state (wrapped in panic recovery)
+3. The session calls the user's `Handle` function with the current state
 4. The returned state is rendered to a new node tree and diffed against the previous render
 5. `Transport.SendUpdate()` sends a unified update message containing either:
    - **Patches** — targeted content updates for keyed elements that changed
    - **Morphs** — structural DOM changes (e.g. root morph when keys are added/removed/reordered)
-6. Client JS applies patches first (targeted `Idiomorph.morph` on keyed elements), then morphs (root or scoped `Idiomorph.morph`). All DOM writes are batched inside a single `requestAnimationFrame` callback so the browser coalesces reflows into one paint pass
+6. Client JS applies patches first, then morphs
 
 ### Panic recovery
 
-If `Handle` or `Render` panics during event processing, `safeHandleEvent` recovers the panic, logs it with the session ID and action, and drops the event. The session continues processing subsequent events. `Session.Update` has the same recovery — a panicking callback does not crash the caller's goroutine.
+If `Handle` or `Render` panics during event processing, the panic is recovered, logged with the session ID and action, and the event is dropped. The session continues processing subsequent events. `Session.Update` has the same recovery — a panicking callback does not crash the caller's goroutine.
 
 ### Wire format
 
@@ -79,7 +79,7 @@ When a structural change is detected (keys added, removed, or reordered), the se
 WARN structural change, sending root morph session=abc change="key 'help' added" bytes=15234 tip="wrap conditional elements in a keyed container to scope this morph"
 ```
 
-The `change` field comes from `jit.StructuralChange.String()`, which reports exactly which keys were added, removed, or if they were reordered. The `tip` guides the developer toward wrapping conditional elements in a stable keyed container to avoid full-page morphs.
+The `change` field reports exactly which keys were added, removed, or if they were reordered. The `tip` guides the developer toward wrapping conditional elements in a stable keyed container to avoid full-page morphs.
 
 For production telemetry, use the `OnStructuralChange` callback on `Config`:
 
@@ -108,7 +108,7 @@ poly.Click(button.Text("+"), "increment")
 button.Text("+").SetData("poly-click", "increment")
 ```
 
-The generic helpers (`Click`, `Submit`, `Input`, `Change`, `KeyDown`, `Focus`, `Blur`) are defined in `bind.go`. They use a structural type constraint so they work with any Fluent element without coupling the two packages.
+The generic helpers (`Click`, `Submit`, `Input`, `Change`, `KeyDown`, `Focus`, `Blur`) are defined in `bind.go`. They work with any Fluent element type.
 
 ### Keydown modifiers
 
@@ -145,7 +145,7 @@ Elements with `data-poly-disable` are disabled while an event is in flight and r
 poly.Disable(poly.Click(button.Text("Save"), "save"), "Saving...")
 ```
 
-If the text argument is non-empty, the element's text content is temporarily replaced. The JS runtime tracks pending elements in an array and restores them at the top of `applyMessage`, before patches/morphs are applied.
+If the text argument is non-empty, the element's text content is temporarily replaced.
 
 ### Confirmation dialogs
 
@@ -165,7 +165,7 @@ Elements with `data-poly-focus` receive focus after patches and morphs are appli
 poly.AutoFocus(input.Text("name", ""))
 ```
 
-The JS runtime calls `focus()` on the first `[data-poly-focus]` element at the end of `applyMessage`. Only one element should have this attribute at a time.
+Focus is applied after patches and morphs. Only one element should have this attribute at a time.
 
 ### URL routing
 
@@ -231,11 +231,11 @@ poly.ToggleAttr(poly.ToggleTarget(button.Text("Show Help"), "#help"), "hidden")
 
 Helpers: `ToggleClass`, `ToggleTarget`, `ToggleAttr`. Data attributes: `data-poly-toggle-class`, `data-poly-toggle-target`, `data-poly-toggle-attr`.
 
-Client-managed state survives server morphs via an Idiomorph `beforeNodeMorphed` hook. The JS runtime tracks which classes and attributes are client-managed using `data-poly-client-classes` and `data-poly-client-attrs` on the target element. If the element is removed entirely (not morphed), the client state is lost — this is by design.
+Client-managed state survives server morphs automatically. If the element is removed entirely (not morphed), the client state is lost — this is by design.
 
-**Performance:** The generic helpers are ~47% slower than raw `SetData` and add 2 extra allocations per element. Rendered output is identical once built — the overhead is purely in element creation, caused by Go's shape-based generic dispatch preventing full inlining. For performance-sensitive code, prefer `SetData` directly. Run `go test -bench=BenchmarkBind -benchmem` to compare.
+**Performance:** The generic helpers are ~47% slower than raw `SetData` and add 2 extra allocations per element. For performance-sensitive code, prefer `SetData` directly. Run `go test -bench=BenchmarkBind -benchmem` to compare.
 
-**PGO:** [Profile-Guided Optimization](https://go.dev/doc/pgo) improves speed ~5-10% for both generic and direct paths but cannot eliminate the allocation gap — that's structural to Go's shape-based generics. Applications consuming fluent-poly should collect a CPU profile from production and place it as `default.pgo` in their main package. Do not commit a `default.pgo` into this library — PGO profiles are application-specific.
+**PGO:** Applications consuming fluent-poly benefit from [Profile-Guided Optimization](https://go.dev/doc/pgo). Collect a CPU profile from production and place it as `default.pgo` in the main package. Do not commit a `default.pgo` into this library — PGO profiles are application-specific.
 
 ## Form validation
 
@@ -309,7 +309,7 @@ Poly.hooks.chart = {
 };
 ```
 
-The global `Poly.hooks` object is defined before the IIFE in `fluent-poly.js`. The `callHook` function checks for the `data-poly-hook` attribute and calls the appropriate lifecycle method. All three callbacks are optional.
+All three callbacks are optional.
 
 **Lifecycle timing:**
 - `mounted` fires in `afterNodeAdded` — the element is in the DOM
@@ -360,7 +360,7 @@ group.Broadcast(func(s State) State {
 })
 ```
 
-`Broadcast` snapshots the session pointers, releases the group lock, then updates all sessions concurrently via goroutines. This prevents a slow render in one session from blocking delivery to the rest. `Broadcast` returns after all updates have completed. `Add`, `Remove`, `Broadcast`, and `Len` are all safe to call from any goroutine.
+`Broadcast` updates all sessions concurrently and returns after all updates have completed. `Add`, `Remove`, `Broadcast`, and `Len` are all safe to call from any goroutine.
 
 ## Transport mode
 
@@ -410,15 +410,15 @@ The initial HTML includes a `data-poly-transport` attribute on the root element 
 - **`sse`** — connects via SSE+POST only; never attempts WebSocket.
 - **`auto`** — tries WebSocket first. If the first attempt fails, switches to SSE+POST permanently for that page load.
 
-When SSE is active, events are sent via `fetch(url, {method: "POST"})` to the same endpoint with `?session=ID`. The `EventPusher` interface (in `transport.go`) is implemented by transports that receive events externally rather than through the transport connection itself. The SSE transport implements it; the WebSocket transport does not.
+When SSE is active, client events are sent as HTTP POST requests to the same endpoint.
 
-**SSE buffer size:** `sse.Upgrade()` accepts an optional buffer size parameter (default 16). When the internal event channel is full, `PushEvent` returns `ErrEventBufferFull` and the HTTP handler responds with 429. Increase the buffer for high-frequency event streams: `sse.Upgrade(64)`.
+**SSE buffer size:** `sse.Upgrade()` accepts an optional buffer size parameter (default 16). If the buffer is full, the HTTP handler responds with 429. Increase the buffer for high-frequency event streams: `sse.Upgrade(64)`.
 
-**SSE heartbeat:** The SSE transport sends keep-alive comments (`: heartbeat\n\n`) at `HeartbeatInterval` (default 20s) to prevent intermediate proxies (AWS ALB, Nginx, Cloudflare) from closing idle connections. SSE comments are silently discarded by the EventSource client. Set `HeartbeatInterval` to `-1` to disable. WebSocket transports have their own ping/pong frames and do not use this.
+**SSE heartbeat:** Set `HeartbeatInterval` (default 20s) to send keep-alive comments that prevent proxies from closing idle SSE connections. Set to `-1` to disable. WebSocket transports have their own ping/pong and do not need this.
 
-**SSE reconnection:** `EventSource` has built-in reconnection. When the SSE connection drops, the session moves to the disconnected pool. On reconnect, the existing `reattach` flow sends a full re-render morph — no `Last-Event-ID` replay is needed.
+**SSE reconnection:** Reconnection is automatic. When an SSE connection drops, the session is preserved. On reconnect, a full re-render is sent to bring the client up to date.
 
-**Wire format:** Identical JSON regardless of transport. Server updates are WebSocket messages or SSE `data:` lines. Client events are WebSocket frames or POST bodies. The same `Update` and `Event` types are used.
+**Wire format:** Identical JSON regardless of transport.
 
 ## Complete helper reference
 
@@ -504,7 +504,7 @@ Supported data attributes:
 
 ## Dependencies
 
-- `github.com/coder/websocket` — WebSocket library, used only in `ws/` sub-package. Chosen for: idiomatic Go API, context-aware, zero transitive dependencies.
+- `github.com/coder/websocket` — WebSocket library, used only in `ws/` sub-package.
 - `github.com/jpl-au/fluent` — HTML node tree library
 - `github.com/jpl-au/fluent-jit` — diff engine for dynamic nodes
 
@@ -518,11 +518,7 @@ Supported data attributes:
 
 ## Known limitations
 
-These are architectural trade-offs, not bugs. They are documented here so future contributors understand the decisions.
-
-- **MaxSessions counts pending + active only.** Disconnected sessions (waiting for client reconnect) are excluded from the limit because they hold no transport resources. This prevents a network blip from blocking new connections while clients wait to reconnect.
-- **Reaper lock strategy:** The reaper (`reapPending`, `reapDisconnected`, `reapActive`) uses a snapshot-check-delete pattern. Each function snapshots session pointers under `Handler.mu`, releases the lock, checks timestamps under individual `Session.mu` locks, then re-acquires `Handler.mu` only to delete expired entries. This avoids holding the handler lock during N session lock cycles. Expired entries are re-verified before deletion in case a reconnect occurred between snapshot and delete.
-- **Session lock granularity:** The session mutex is held during the entire render/diff/send cycle. This is necessary for correctness (state, differ, and transport are coupled), but it means `Render` functions should be computationally cheap. A slow `Render` will block concurrent `Session.Update` calls.
-- **WebSocket backpressure:** `SendUpdate` writes synchronously. If the client is slow to read, the write will block, stalling the session event loop. This is inherent to the synchronous transport interface. For most applications the browser reads faster than the server writes, so this is not a practical concern.
-- **Loading state restoration:** `restorePending()` restores all disabled elements when any server update arrives. If two events are in flight simultaneously (A and B), the response for A will re-enable the element disabled by B. A full fix requires event correlation IDs (protocol change). In practice this is rare because events are debounced/throttled and server responses are fast.
-- **Client state vs server state:** Client-side toggles (`ToggleClass`, `ToggleAttr`) modify the DOM without the server knowing. When a server morph arrives, the `beforeNodeMorphed` hook preserves client state. However, if the server explicitly sets the same class or attribute, the client value takes precedence. This is intentional for ephemeral UI state (menus, modals) but can be surprising if misused.
+- **MaxSessions counts pending + active only.** Disconnected sessions are excluded from the limit, so a network blip does not block new connections while clients reconnect.
+- **Keep `Render` functions fast.** A slow `Render` will block concurrent `Session.Update` calls on the same session.
+- **Loading state restoration:** All disabled elements are re-enabled when any server update arrives. If two events are in flight simultaneously, the response for one will re-enable the element disabled by the other. In practice this is rare because events are debounced/throttled.
+- **Client state vs server state:** Client-side toggles (`ToggleClass`, `ToggleAttr`) modify the DOM without the server knowing. Client-managed state survives server morphs, but if the server explicitly sets the same class or attribute, the client value takes precedence.

@@ -312,17 +312,17 @@ SSE connections send keep-alive comments at `HeartbeatInterval` (default 20s) to
 
 ## Performance note
 
-The generic helpers add measurable overhead compared to calling `SetData` directly (~47% slower with 2 extra allocations per element). For performance-sensitive render paths, use `SetData`:
+The generic helpers are ~47% slower than calling `SetData` directly. For performance-sensitive render paths, use `SetData`:
 
 ```go
 button.Text("+").SetData("poly-click", "increment")
 ```
 
-In practice the absolute difference is ~250ns per element — negligible next to a WebSocket round-trip — but worth knowing if you're rendering thousands of event-bound elements per frame.
+In practice the difference is ~250ns per element — negligible unless you're rendering thousands of event-bound elements per frame.
 
 ## Profile-Guided Optimization (PGO)
 
-Applications using fluent-poly benefit from [Profile-Guided Optimization](https://go.dev/doc/pgo) (Go 1.21+). PGO uses a CPU profile from your running application to make more aggressive inlining decisions at compile time. Expect **10-20% speed improvements** across the entire rendering and event-handling pipeline with no code changes.
+Applications using fluent-poly benefit from [Profile-Guided Optimization](https://go.dev/doc/pgo) (Go 1.21+). Expect **10-20% speed improvements** with no code changes.
 
 1. Collect a CPU profile under realistic load:
    ```bash
@@ -331,7 +331,7 @@ Applications using fluent-poly benefit from [Profile-Guided Optimization](https:
 2. Place `default.pgo` in your main package directory
 3. `go build` — PGO is applied automatically
 
-Both generic helpers and direct `SetData` paths benefit equally from PGO (~5-10% each). PGO cannot eliminate the allocation difference between them — that's structural to Go's shape-based generic dispatch. Allocations are unaffected; PGO improves speed only.
+Both generic helpers and direct `SetData` paths benefit from PGO.
 
 ## Third-party libraries
 
