@@ -1,6 +1,7 @@
 package poly
 
 import (
+	"context"
 	"net/http"
 	"sync"
 	"time"
@@ -30,6 +31,7 @@ type handler[S any] struct {
 	pending      map[string]*pendingSession[S]
 	active       map[string]*Session[S]
 	disconnected map[string]*Session[S]
+	done         chan struct{}
 }
 
 // serveInitialPage renders the full HTML, pre-warms a session, and
@@ -207,13 +209,47 @@ func (h *handler[S]) wireDisconnect(sess *Session[S]) {
 	}
 }
 
+// shutdown closes all active sessions and stops the background reaper.
+// It blocks until all sessions are closed or ctx is cancelled.
+func (h *handler[S]) shutdown(ctx context.Context) error {
+	close(h.done)
+
+	h.mu.Lock()
+	sessions := make([]*Session[S], 0, len(h.active))
+	for _, sess := range h.active {
+		sessions = append(sessions, sess)
+	}
+	h.mu.Unlock()
+
+	done := make(chan struct{})
+	go func() {
+		for _, sess := range sessions {
+			sess.Close()
+		}
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
 // reap periodically removes expired pending and disconnected sessions,
 // and closes idle or long-lived active sessions.
 func (h *handler[S]) reap() {
 	ticker := time.NewTicker(15 * time.Second)
 	defer ticker.Stop()
 
-	for range ticker.C {
+	for {
+		select {
+		case <-h.done:
+			return
+		case <-ticker.C:
+		}
+
 		now := time.Now()
 		h.mu.Lock()
 

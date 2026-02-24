@@ -22,6 +22,7 @@
 package poly
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -126,11 +127,28 @@ type Config[S any] struct {
 // defaultReconnectTimeout is used when ReconnectTimeout is zero.
 const defaultReconnectTimeout = 30 * time.Second
 
-// New creates an http.Handler that manages poly sessions.
+// Handler manages poly sessions. It implements http.Handler for routing
+// requests and provides Shutdown for graceful termination.
+type Handler[S any] struct {
+	h *handler[S]
+}
+
+// ServeHTTP implements http.Handler.
+func (h *Handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	h.h.ServeHTTP(w, r)
+}
+
+// Shutdown closes all active sessions and stops the background reaper.
+// It blocks until all sessions are closed or the context is cancelled.
+func (h *Handler[S]) Shutdown(ctx context.Context) error {
+	return h.h.shutdown(ctx)
+}
+
+// New creates a Handler that manages poly sessions.
 //
 // GET requests receive the initial HTML page with the client JS injected.
 // Requests with an Upgrade header start a session event loop.
-func New[S any](cfg Config[S]) http.Handler {
+func New[S any](cfg Config[S]) *Handler[S] {
 	if cfg.Logger == nil {
 		cfg.Logger = slog.Default()
 	}
@@ -142,13 +160,14 @@ func New[S any](cfg Config[S]) http.Handler {
 		pending:      make(map[string]*pendingSession[S]),
 		active:       make(map[string]*Session[S]),
 		disconnected: make(map[string]*Session[S]),
+		done:         make(chan struct{}),
 	}
 
 	// The reaper always runs to clean up pending and disconnected
 	// sessions. It also enforces idle and lifetime limits when set.
 	go h.reap()
 
-	return h
+	return &Handler[S]{h: h}
 }
 
 // ServeHTTP routes requests by type. The routing depends on the configured
