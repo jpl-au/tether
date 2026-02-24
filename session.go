@@ -104,6 +104,9 @@ func (s *Session[S]) Update(fn func(S) S) {
 		}
 	}()
 
+	// Server-initiated updates count as activity so that sessions
+	// receiving only server pushes are not reaped as idle.
+	s.lastActivity = time.Now()
 	s.applyState(fn(s.state))
 }
 
