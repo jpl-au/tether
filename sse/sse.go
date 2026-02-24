@@ -72,6 +72,10 @@ type transport struct {
 	events  chan poly.Event
 	done    chan struct{}
 	once    sync.Once
+	// wmu serialises writes to w. Today all SendUpdate calls are
+	// serialised by the session mutex, but this guard protects against
+	// future callers that might not hold that lock.
+	wmu sync.Mutex
 }
 
 // SendUpdate encodes the update as JSON and writes it as an SSE "data"
@@ -84,11 +88,14 @@ func (t *transport) SendUpdate(update poly.Update) error {
 	if err != nil {
 		return err
 	}
+	t.wmu.Lock()
 	_, err = fmt.Fprintf(t.w, "data: %s\n\n", data)
 	if err != nil {
+		t.wmu.Unlock()
 		return err
 	}
 	t.flusher.Flush()
+	t.wmu.Unlock()
 	return nil
 }
 
