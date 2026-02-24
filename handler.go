@@ -222,7 +222,12 @@ type Config[S any] struct {
 	// telemetry or metrics. The change parameter describes exactly what
 	// shifted so you can pinpoint which state transitions need keyed
 	// containers. The callback runs under the session lock, so keep it
-	// fast — offload any expensive work to a goroutine. Optional.
+	// fast — offload any expensive work to a goroutine. Do not call
+	// Session methods (Update, State, Navigate, ReplaceURL, SetTitle,
+	// Close) from within this callback — the session mutex is already
+	// held and these methods acquire it, causing a deadlock. Use
+	// session.ID() for identification; it does not take the lock.
+	// Optional.
 	OnStructuralChange func(session *Session[S], change StructuralChange)
 
 	// Layout wraps the poly content in a full HTML document. The argument

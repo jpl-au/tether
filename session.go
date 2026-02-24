@@ -140,6 +140,10 @@ func (s *Session[S]) Close() {
 // or in the subsequent render pass are recovered and logged rather than
 // crashing the calling goroutine.
 //
+// Do not call Session methods (Update, State, Navigate, ReplaceURL,
+// SetTitle, Close) from within fn — the session mutex is already held
+// and these methods acquire it, causing a deadlock.
+//
 // Safe to call from any goroutine.
 func (s *Session[S]) Update(fn func(S) S) {
 	s.mu.Lock()

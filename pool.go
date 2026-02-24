@@ -105,6 +105,16 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		return
 	}
 
+	// Close the transport if we exit before handing it to a session
+	// event loop (e.g. a panic in InitialState or Render). Once
+	// sess.run() starts, the event loop owns the transport lifecycle.
+	running := false
+	defer func() {
+		if !running {
+			transport.Close()
+		}
+	}()
+
 	// Start keep-alive writes for transports that need them (SSE).
 	// WebSocket has its own ping/pong and does not implement this.
 	if hb, ok := transport.(Heartbeater); ok && h.cfg.HeartbeatInterval > 0 {
@@ -120,6 +130,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		h.active[id] = sess
 		h.mu.Unlock()
 
+		running = true
 		h.reattach(sess, transport)
 		return
 	}
@@ -147,7 +158,6 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 			full := len(h.pending)+len(h.active) >= h.cfg.MaxSessions
 			h.mu.Unlock()
 			if full {
-				transport.Close()
 				return
 			}
 		}
@@ -197,6 +207,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		h.cfg.OnConnect(sess)
 	}
 
+	running = true
 	sess.run()
 }
 
@@ -237,13 +248,21 @@ func (h *Handler[S]) reattach(sess *Session[S], transport Transport) {
 // the callback captures the handler's pool references.
 func (h *Handler[S]) wireDisconnect(sess *Session[S]) {
 	sess.onDisconnect = func() {
-		h.mu.Lock()
-		delete(h.active, sess.id)
-
+		// Write disconnectedAt under sess.mu before acquiring h.mu
+		// to avoid nesting sess.mu inside h.mu. The reaper also
+		// reads disconnectedAt under sess.mu (after releasing h.mu),
+		// so this keeps the lock ordering consistent and prevents
+		// a latent deadlock if any future code path acquires the
+		// locks in the opposite order.
 		if h.cfg.ReconnectTimeout > 0 {
 			sess.mu.Lock()
 			sess.disconnectedAt = time.Now()
 			sess.mu.Unlock()
+		}
+
+		h.mu.Lock()
+		delete(h.active, sess.id)
+		if h.cfg.ReconnectTimeout > 0 {
 			h.disconnected[sess.id] = sess
 		}
 		h.mu.Unlock()
