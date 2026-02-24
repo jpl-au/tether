@@ -113,6 +113,24 @@ func TestPreserveRendersDataAttribute(t *testing.T) {
 	}
 }
 
+func TestDebounceRendersDataAttribute(t *testing.T) {
+	el := poly.Debounce(poly.Input(input.Text("q", ""), "search"), 500)
+	html := string(el.Render())
+
+	if !strings.Contains(html, `data-poly-debounce="500"`) {
+		t.Errorf("expected data-poly-debounce attribute in HTML:\n%s", html)
+	}
+}
+
+func TestThrottleRendersDataAttribute(t *testing.T) {
+	el := poly.Throttle(poly.Click(button.Text("Go"), "fire"), 1000)
+	html := string(el.Render())
+
+	if !strings.Contains(html, `data-poly-throttle="1000"`) {
+		t.Errorf("expected data-poly-throttle attribute in HTML:\n%s", html)
+	}
+}
+
 func TestClickChains(t *testing.T) {
 	// Verify the return type preserves chainability
 	el := poly.Click(button.Text("+"), "increment").

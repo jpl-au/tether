@@ -1,5 +1,7 @@
 package poly
 
+import "strconv"
+
 // Event binding helpers. Each function wraps SetData with the correct
 // data-poly-* attribute so callers don't need to remember the convention
 // strings. The underlying SetData call is unchanged — these are purely
@@ -94,6 +96,20 @@ func ToggleTarget[E settable[E]](el E, selector string) E {
 // "aria-expanded") without a server round-trip.
 func ToggleAttr[E settable[E]](el E, attr string) E {
 	return el.SetData("poly-toggle-attr", attr)
+}
+
+// --- Timing ---
+
+// Debounce overrides the default 300ms debounce delay on input events.
+// Only meaningful on elements that also have a poly-input binding.
+func Debounce[E settable[E]](el E, ms int) E {
+	return el.SetData("poly-debounce", strconv.Itoa(ms))
+}
+
+// Throttle sets a minimum interval between repeated events. The JS
+// runtime drops events that arrive within the throttle window.
+func Throttle[E settable[E]](el E, ms int) E {
+	return el.SetData("poly-throttle", strconv.Itoa(ms))
 }
 
 // --- Form helpers ---
