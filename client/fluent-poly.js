@@ -494,10 +494,12 @@ window.Poly.hooks = window.Poly.hooks || {};
 
     if (connectionMode === "sse") {
       var url = location.protocol + "//" + location.host + endpoint;
-      if (sessionID) url += "?session=" + sessionID;
       fetch(url, {
         method: "POST",
-        headers: {"Content-Type": "application/json"},
+        headers: {
+          "Content-Type": "application/json",
+          "X-Poly-Session": sessionID
+        },
         body: payload
       });
       return;

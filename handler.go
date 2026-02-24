@@ -207,7 +207,9 @@ func (h *handler[S]) handlePostEvent(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	id := r.URL.Query().Get("session")
+	// The session ID is sent as a header rather than a query parameter
+	// to keep it out of server access logs and browser history.
+	id := r.Header.Get("X-Poly-Session")
 	if id == "" {
 		http.Error(w, "missing session", http.StatusBadRequest)
 		return
