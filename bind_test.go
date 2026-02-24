@@ -113,6 +113,15 @@ func TestPreserveRendersDataAttribute(t *testing.T) {
 	}
 }
 
+func TestAutoFocusRendersDataAttribute(t *testing.T) {
+	el := poly.AutoFocus(input.Text("name", ""))
+	html := string(el.Render())
+
+	if !strings.Contains(html, `data-poly-focus=""`) {
+		t.Errorf("expected data-poly-focus attribute in HTML:\n%s", html)
+	}
+}
+
 func TestHookRendersDataAttribute(t *testing.T) {
 	el := poly.Hook(button.Text("Chart"), "chart")
 	html := string(el.Render())

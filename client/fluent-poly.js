@@ -167,6 +167,10 @@ window.Poly.hooks = window.Poly.hooks || {};
     if (msg.title) {
       document.title = msg.title;
     }
+
+    // Set focus on the designated element after all DOM updates.
+    var focusEl = root.querySelector("[data-poly-focus]");
+    if (focusEl) focusEl.focus();
   }
 
   // --- JS hooks ---

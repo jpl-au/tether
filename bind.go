@@ -142,6 +142,16 @@ func Preserve[E settable[E]](el E) E {
 	return el.SetData("poly-preserve", "")
 }
 
+// --- Focus ---
+
+// AutoFocus marks an element to receive focus after the next server
+// update. The JS runtime calls focus() on the first element with
+// data-poly-focus after applying patches and morphs. Only one element
+// should have this attribute at a time.
+func AutoFocus[E settable[E]](el E) E {
+	return el.SetData("poly-focus", "")
+}
+
 // --- JS hooks ---
 
 // Hook annotates an element with a named JS hook. The developer
