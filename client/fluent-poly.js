@@ -473,7 +473,7 @@ window.Poly.hooks = window.Poly.hooks || {};
         var throttleKey = "throttle:" + dataAttr + ":" + action;
         if (debounceTimers[throttleKey]) return;
         debounceTimers[throttleKey] = setTimeout(function () {
-          debounceTimers[throttleKey] = null;
+          delete debounceTimers[throttleKey];
         }, throttle);
       }
 
