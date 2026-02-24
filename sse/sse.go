@@ -92,10 +92,10 @@ func (t *transport) ReceiveEvent() (poly.Event, error) {
 }
 
 // PushEvent implements poly.EventPusher. The handler calls this when
-// a POST request arrives for this session's event channel.
+// a POST request arrives for this session's event channel. Returns
+// ErrEventBufferFull if the session is not consuming events fast
+// enough, so the HTTP handler can respond with 429 instead of blocking.
 func (t *transport) PushEvent(ev poly.Event) error {
-	// Check for closure first so a closed transport always rejects
-	// new events, even when the buffered channel has space.
 	select {
 	case <-t.done:
 		return io.EOF
@@ -106,6 +106,8 @@ func (t *transport) PushEvent(ev poly.Event) error {
 		return nil
 	case <-t.done:
 		return io.EOF
+	default:
+		return poly.ErrEventBufferFull
 	}
 }
 

@@ -1,5 +1,12 @@
 package poly
 
+import "errors"
+
+// ErrEventBufferFull is returned by EventPusher.PushEvent when the
+// internal event buffer is at capacity. The caller should respond
+// with HTTP 429 rather than blocking.
+var ErrEventBufferFull = errors.New("event buffer full")
+
 // Transport abstracts the connection between server and client.
 // See the ws sub-package for the WebSocket implementation.
 type Transport interface {

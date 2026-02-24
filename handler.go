@@ -23,6 +23,7 @@ package poly
 
 import (
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -221,6 +222,10 @@ func (h *handler[S]) handlePostEvent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := pusher.PushEvent(ev); err != nil {
+		if errors.Is(err, ErrEventBufferFull) {
+			http.Error(w, "event buffer full", http.StatusTooManyRequests)
+			return
+		}
 		http.Error(w, "session closed", http.StatusGone)
 		return
 	}

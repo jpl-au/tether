@@ -2,6 +2,7 @@ package sse
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -92,7 +93,7 @@ func TestReceiveEventReturnsEOFOnClose(t *testing.T) {
 	tr.Close()
 
 	_, err := tr.ReceiveEvent()
-	if err != io.EOF {
+	if !errors.Is(err, io.EOF) {
 		t.Errorf("expected io.EOF, got %v", err)
 	}
 }
@@ -102,8 +103,25 @@ func TestPushEventReturnsEOFWhenClosed(t *testing.T) {
 	tr.Close()
 
 	err := tr.PushEvent(poly.Event{Type: "click", Action: "test"})
-	if err != io.EOF {
+	if !errors.Is(err, io.EOF) {
 		t.Errorf("expected io.EOF, got %v", err)
+	}
+}
+
+func TestPushEventReturnsBufferFullWhenFull(t *testing.T) {
+	tr, _ := newTestTransport()
+
+	// Fill the buffer (capacity 16).
+	for i := 0; i < 16; i++ {
+		if err := tr.PushEvent(poly.Event{Action: "fill"}); err != nil {
+			t.Fatalf("PushEvent %d: unexpected error: %v", i, err)
+		}
+	}
+
+	// The 17th push should return ErrEventBufferFull, not block.
+	err := tr.PushEvent(poly.Event{Action: "overflow"})
+	if !errors.Is(err, poly.ErrEventBufferFull) {
+		t.Errorf("expected ErrEventBufferFull, got %v", err)
 	}
 }
 
