@@ -31,7 +31,7 @@ Source files in the root package, split by concern:
 
 ```
 handler.go      Public API — Config, New(), ServeHTTP, ServeClient
-pool.go         Internal session lifecycle — pools, reap, reattach
+pool.go         Internal session lifecycle — pools, reap (split by pool), reattach
 page.go         Initial page rendering — polyBody, newID
 session.go      Single session — event loop, Update, Navigate, SetTitle
 group.go        Broadcasting — Group type for multi-session updates
@@ -496,6 +496,8 @@ Supported data attributes:
 
 **Configuration (set by server, read by JS):** `data-poly-retry-delay`, `data-poly-max-retry-delay`, `data-poly-debounce-default`, `data-poly-transition-timeout`
 
+**Developer warnings:** The client logs `console.warn` if a patch or morph contains multiple root elements. Only the first element is used — wrap siblings in a container to avoid silent data loss.
+
 **Internal (managed by JS):** `data-poly-client-classes`, `data-poly-client-attrs`
 
 ## Dependencies
@@ -517,6 +519,7 @@ Supported data attributes:
 These are architectural trade-offs, not bugs. They are documented here so future contributors understand the decisions.
 
 - **MaxSessions counts pending + active only.** Disconnected sessions (waiting for client reconnect) are excluded from the limit because they hold no transport resources. This prevents a network blip from blocking new connections while clients wait to reconnect.
+- **Reaper lock strategy:** The reaper (`reapPending`, `reapDisconnected`, `reapActive`) uses a snapshot-check-delete pattern. Each function snapshots session pointers under `Handler.mu`, releases the lock, checks timestamps under individual `Session.mu` locks, then re-acquires `Handler.mu` only to delete expired entries. This avoids holding the handler lock during N session lock cycles. Expired entries are re-verified before deletion in case a reconnect occurred between snapshot and delete.
 - **Session lock granularity:** The session mutex is held during the entire render/diff/send cycle. This is necessary for correctness (state, differ, and transport are coupled), but it means `Render` functions should be computationally cheap. A slow `Render` will block concurrent `Session.Update` calls.
 - **WebSocket backpressure:** `SendUpdate` writes synchronously. If the client is slow to read, the write will block, stalling the session event loop. This is inherent to the synchronous transport interface. For most applications the browser reads faster than the server writes, so this is not a practical concern.
 - **Loading state restoration:** `restorePending()` restores all disabled elements when any server update arrives. If two events are in flight simultaneously (A and B), the response for A will re-enable the element disabled by B. A full fix requires event correlation IDs (protocol change). In practice this is rare because events are debounced/throttled and server responses are fast.
