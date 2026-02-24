@@ -106,7 +106,12 @@ func (s *Session[S]) run() {
 // will exit and the onDisconnect callback will fire. Safe to call from
 // any goroutine; safe to call more than once.
 func (s *Session[S]) Close() {
-	s.transport.Close()
+	// Read transport under the lock because reattach writes it
+	// concurrently when a disconnected session reconnects.
+	s.mu.Lock()
+	t := s.transport
+	s.mu.Unlock()
+	t.Close()
 }
 
 // Update applies a state change from outside the normal event loop and
