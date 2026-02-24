@@ -480,11 +480,10 @@ Supported data attributes:
 
 ## Security
 
-- `ws.Upgrade()` sets `InsecureSkipVerify: true` for development. Pass origin patterns for production: `ws.Upgrade("https://example.com")`.
+- **Origin checking:** `Config.AllowedOrigins` provides a single configuration point for origin enforcement across all transport types (WebSocket upgrades, SSE streams, and POST events). When set, the `Origin` header must match one of the listed values exactly. When empty, the handler falls back to same-host checking (the Origin host must match the request Host header) as basic CSRF protection. `ws.Upgrade()` skips the websocket library's own origin check because the poly handler enforces it first.
 - Event data comes from the client — always validate in the `Handle` function.
-- **Session IDs** are 128-bit cryptographically random strings (`crypto/rand.Text`). They appear in query parameters for both WebSocket upgrades and SSE POSTs — treat them as bearer tokens.
+- **Session IDs** are cryptographically random strings (`crypto/rand.Text`). They appear in query parameters for WebSocket upgrades and SSE streams, and in the `X-Poly-Session` header for POST events. Treat them as bearer tokens.
 - **Referrer-Policy:** The initial page response sets `Referrer-Policy: same-origin` to prevent session ID leakage via the Referer header on external links.
-- **Origin checking:** SSE POST requests are checked against the `Origin` header when present. Cross-origin POSTs are rejected with 403. This mitigates CSRF even if a session ID is leaked. Same-origin requests that omit the Origin header are allowed through.
 - **Session ID in logs:** Session IDs appear in server access logs as query parameters. If log exposure is a concern, consider stripping query strings from access logs or using a reverse proxy that redacts them.
 
 ## Known limitations

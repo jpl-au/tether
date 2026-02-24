@@ -153,6 +153,19 @@ type Config[S any] struct {
 	// disable reconnection (sessions are destroyed on disconnect).
 	ReconnectTimeout time.Duration
 
+	// AllowedOrigins restricts WebSocket upgrades, SSE streams, and POST
+	// events to requests whose Origin header matches one of these values.
+	// This provides consistent CSRF protection across all transport types
+	// from a single configuration point.
+	//
+	// Example: []string{"https://example.com", "https://staging.example.com"}
+	//
+	// When empty, the handler falls back to same-host checking (the
+	// Origin header's host must match the request's Host header). This
+	// is suitable for development but should be replaced with an
+	// explicit list in production.
+	AllowedOrigins []string
+
 	// Layout wraps the poly content in a full HTML document. The argument
 	// is a node that renders the poly root div and client scripts. Return
 	// a complete document tree (e.g. html.New(head.New(...), body.New(content))).
@@ -203,6 +216,10 @@ func (h *Handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch h.cfg.Mode {
 	case SSEOnly:
 		if strings.Contains(r.Header.Get("Accept"), "text/event-stream") {
+			if !h.originAllowed(r) {
+				http.Error(w, "origin not allowed", http.StatusForbidden)
+				return
+			}
 			h.serveSession(w, r, h.cfg.Fallback)
 			return
 		}
@@ -213,10 +230,18 @@ func (h *Handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	case WebSocketWithFallback:
 		if r.Header.Get("Upgrade") == "websocket" {
+			if !h.originAllowed(r) {
+				http.Error(w, "origin not allowed", http.StatusForbidden)
+				return
+			}
 			h.serveSession(w, r, h.cfg.Upgrade)
 			return
 		}
 		if strings.Contains(r.Header.Get("Accept"), "text/event-stream") {
+			if !h.originAllowed(r) {
+				http.Error(w, "origin not allowed", http.StatusForbidden)
+				return
+			}
 			h.serveSession(w, r, h.cfg.Fallback)
 			return
 		}
@@ -227,6 +252,10 @@ func (h *Handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	default: // WebSocketOnly
 		if r.Header.Get("Upgrade") == "websocket" {
+			if !h.originAllowed(r) {
+				http.Error(w, "origin not allowed", http.StatusForbidden)
+				return
+			}
 			h.serveSession(w, r, h.cfg.Upgrade)
 			return
 		}
@@ -235,20 +264,39 @@ func (h *Handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.serveInitialPage(w, r)
 }
 
+// originAllowed checks the request's Origin header against
+// Config.AllowedOrigins. When AllowedOrigins is configured, the Origin
+// must match one of the listed values exactly. When AllowedOrigins is
+// empty, it falls back to same-host checking as basic CSRF protection.
+// Requests without an Origin header (e.g. same-origin navigations or
+// non-browser clients) are always allowed.
+func (h *Handler[S]) originAllowed(r *http.Request) bool {
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		return true
+	}
+	if len(h.cfg.AllowedOrigins) > 0 {
+		for _, allowed := range h.cfg.AllowedOrigins {
+			if origin == allowed {
+				return true
+			}
+		}
+		return false
+	}
+	// No AllowedOrigins configured — fall back to same-host check
+	// as basic CSRF protection.
+	u, err := url.Parse(origin)
+	return err == nil && u.Host == r.Host
+}
+
 // handlePostEvent receives a client event via HTTP POST. This is the
 // client→server path for SSE mode, where the EventSource connection
 // is unidirectional. WebSocket transports receive events on the
 // socket itself and do not use this path.
 func (h *Handler[S]) handlePostEvent(w http.ResponseWriter, r *http.Request) {
-	// Reject cross-origin POSTs to prevent CSRF. The session ID is a
-	// 128-bit bearer token which is hard to guess, but Origin checking
-	// adds defence in depth against ID leakage.
-	if origin := r.Header.Get("Origin"); origin != "" {
-		u, err := url.Parse(origin)
-		if err != nil || u.Host != r.Host {
-			http.Error(w, "origin not allowed", http.StatusForbidden)
-			return
-		}
+	if !h.originAllowed(r) {
+		http.Error(w, "origin not allowed", http.StatusForbidden)
+		return
 	}
 
 	// The session ID is sent as a header rather than a query parameter

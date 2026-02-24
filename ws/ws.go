@@ -3,9 +3,9 @@
 // server updates and client events travel on the same channel with
 // minimal overhead. This is the default and preferred transport.
 //
-// Pass ws.Upgrade() as the Upgrade field in [poly.Config]. In
-// development, calling Upgrade() with no arguments accepts all origins.
-// In production, pass explicit origin patterns to restrict connections.
+// Pass ws.Upgrade() as the Upgrade field in [poly.Config]. Origin
+// checking is handled by the poly handler via [poly.Config].AllowedOrigins
+// rather than by the websocket library directly.
 package ws
 
 import (
@@ -23,21 +23,14 @@ import (
 // a WebSocket upgrade request. It negotiates the WebSocket handshake
 // and returns a Transport that the session uses for its entire lifetime.
 //
-// When called with no arguments, all origins are accepted (suitable for
-// development). Pass origin patterns to restrict connections in
-// production — the patterns are matched by the underlying websocket
-// library (github.com/coder/websocket).
-//
-//	Upgrade: ws.Upgrade(),                          // development
-//	Upgrade: ws.Upgrade("https://example.com"),     // production
-func Upgrade(origins ...string) func(http.ResponseWriter, *http.Request) (poly.Transport, error) {
+// Origin checking is handled by the poly handler via
+// [poly.Config].AllowedOrigins, so Upgrade skips the websocket
+// library's own origin verification to avoid double-checking.
+func Upgrade() func(http.ResponseWriter, *http.Request) (poly.Transport, error) {
 	return func(w http.ResponseWriter, r *http.Request) (poly.Transport, error) {
-		opts := &websocket.AcceptOptions{}
-		if len(origins) == 0 {
-			opts.InsecureSkipVerify = true
-		} else {
-			opts.OriginPatterns = origins
-		}
+		// Origin checking is done by the poly handler before this
+		// function is called, so skip the websocket library's check.
+		opts := &websocket.AcceptOptions{InsecureSkipVerify: true}
 
 		conn, err := websocket.Accept(w, r, opts)
 		if err != nil {
