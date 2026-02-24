@@ -149,6 +149,9 @@
         history.pushState({}, "", msg.url);
       }
     }
+    if (msg.title) {
+      document.title = msg.title;
+    }
   }
 
   // --- Client state preservation ---

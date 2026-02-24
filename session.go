@@ -155,6 +155,17 @@ func (s *Session[S]) ReplaceURL(rawURL string) {
 	s.sendURL(rawURL, true)
 }
 
+// SetTitle updates the browser's document title. Safe to call from
+// any goroutine. Can be combined with Navigate or sent standalone.
+func (s *Session[S]) SetTitle(title string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	update := Update{Title: title}
+	if err := s.transport.SendUpdate(update); err != nil {
+		s.logger.Error("send title error", "session", s.id, "err", err)
+	}
+}
+
 func (s *Session[S]) sendURL(rawURL string, replace bool) {
 	update := Update{URL: rawURL, Replace: replace}
 	if err := s.transport.SendUpdate(update); err != nil {
