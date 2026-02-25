@@ -7,6 +7,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"io/fs"
+	"net/http"
+	"net/url"
+	"sync"
 )
 
 // clientFS embeds the client-side JS runtime and the idiomorph library.
@@ -58,4 +61,48 @@ func buildWorkerJS(precache []string) []byte {
 	}
 
 	return body
+}
+
+// ServeClient serves the embedded client runtime. Mount at /_poly/ so the
+// HTML page can load fluent-poly.js and idiomorph. The handler adds a
+// Service-Worker-Allowed header when serving poly-worker.js so the service
+// worker can control the entire origin despite being served from /_poly/.
+//
+// The service worker's CACHE_VERSION is set to a content hash of the
+// embedded files so cache invalidation happens automatically when the
+// library is rebuilt with new client code.
+//
+// The optional precache parameter lists additional app-specific asset URLs
+// (e.g. "/styles.css", "/logo.svg") that the service worker should cache
+// on install alongside the poly runtime files.
+func ServeClient(precache ...string) http.Handler {
+	fileServer := http.FileServer(http.FS(clientFiles()))
+
+	var workerOnce sync.Once
+	var workerBody []byte
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// The service worker needs the content-hash cache version
+		// injected and the scope header set, so it is served directly
+		// rather than through the static file server.
+		if r.URL.Path == "/poly-worker.js" || r.URL.Path == "poly-worker.js" {
+			// Defence-in-depth: reject cross-origin requests for the
+			// worker script. The browser already prevents cross-origin
+			// registration, but this guards against misconfigured proxies.
+			if origin := r.Header.Get("Origin"); origin != "" {
+				if u, err := url.Parse(origin); err != nil || stripPort(u.Host) != stripPort(r.Host) {
+					http.Error(w, "Forbidden", http.StatusForbidden)
+					return
+				}
+			}
+			workerOnce.Do(func() {
+				workerBody = buildWorkerJS(precache)
+			})
+			w.Header().Set("Service-Worker-Allowed", "/")
+			w.Header().Set("Content-Type", "application/javascript")
+			w.Write(workerBody)
+			return
+		}
+		fileServer.ServeHTTP(w, r)
+	})
 }
