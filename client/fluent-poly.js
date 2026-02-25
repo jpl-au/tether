@@ -493,15 +493,22 @@ window.Poly.hooks = window.Poly.hooks || {};
   // when the next server update arrives.
 
   function disablePending(el, eventID) {
-    if (!el || !el.hasAttribute("data-poly-disable")) return;
-    var text = el.getAttribute("data-poly-disable");
-    pendingElements[eventID] = {
-      el: el,
-      text: text ? el.textContent : null,
-      disabled: el.hasAttribute("disabled")
-    };
-    el.setAttribute("disabled", "");
-    if (text) el.textContent = text;
+    var entry = { el: el, disabled: el.hasAttribute("disabled") };
+
+    if (el.hasAttribute("data-poly-disable")) {
+      entry.text = el.textContent;
+      var newText = el.getAttribute("data-poly-disable");
+      el.setAttribute("disabled", "");
+      if (newText) el.textContent = newText;
+    }
+
+    var indicatorSelector = el.getAttribute("data-poly-indicator");
+    if (indicatorSelector) {
+      entry.indicator = document.querySelector(indicatorSelector);
+      if (entry.indicator) entry.indicator.classList.add("poly-pending");
+    }
+
+    pendingElements[eventID] = entry;
   }
 
   function restorePending(eventID) {
@@ -509,7 +516,8 @@ window.Poly.hooks = window.Poly.hooks || {};
     var entry = pendingElements[eventID];
     if (!entry) return;
     if (!entry.disabled) entry.el.removeAttribute("disabled");
-    if (entry.text !== null) entry.el.textContent = entry.text;
+    if (entry.text !== undefined) entry.el.textContent = entry.text;
+    if (entry.indicator) entry.indicator.classList.remove("poly-pending");
     delete pendingElements[eventID];
   }
 
