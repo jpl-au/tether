@@ -789,6 +789,10 @@ window.Poly.hooks = window.Poly.hooks || {};
           data.checked = target.checked ? "true" : "false";
         }
       } else if (domEvent === "keydown") {
+        // If data-poly-key is set, only send the event if it matches.
+        var filter = target.getAttribute("data-poly-key");
+        if (filter && filter !== e.key) return;
+
         data.key = e.key || "";
         if (e.ctrlKey) data.ctrl = "true";
         if (e.shiftKey) data.shift = "true";
