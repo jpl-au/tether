@@ -96,14 +96,28 @@ self.addEventListener("push", function (e) {
     badge: data.badge || "",
     tag: data.tag || undefined,
     renotify: !!data.renotify,
-    data: { url: data.url || "/" }
+    silent: !!data.silent,
+    actions: data.actions || [],
+    data: { url: data.url || "/", actions: data.actions || [] }
   };
   e.waitUntil(self.registration.showNotification(title, opts));
 });
 
 self.addEventListener("notificationclick", function (e) {
   e.notification.close();
-  var url = (e.notification.data && e.notification.data.url) || "/";
+  var ndata = e.notification.data || {};
+  var url = ndata.url || "/";
+
+  // When the user clicks an action button, find its URL.
+  if (e.action && ndata.actions) {
+    for (var i = 0; i < ndata.actions.length; i++) {
+      if (ndata.actions[i].action === e.action && ndata.actions[i].url) {
+        url = ndata.actions[i].url;
+        break;
+      }
+    }
+  }
+
   e.waitUntil(
     self.clients.matchAll({ type: "window" }).then(function (list) {
       // Focus an existing tab if one is open at the target URL.

@@ -228,6 +228,104 @@ func TestSendServerError(t *testing.T) {
 	}
 }
 
+func TestNotificationSilentField(t *testing.T) {
+	n := Notification{Title: "Quiet", Silent: true}
+	data, err := json.Marshal(n)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var m map[string]any
+	json.Unmarshal(data, &m)
+	if m["silent"] != true {
+		t.Errorf("silent = %v, want true", m["silent"])
+	}
+}
+
+func TestNotificationSilentOmitted(t *testing.T) {
+	n := Notification{Title: "Loud"}
+	data, _ := json.Marshal(n)
+	var m map[string]any
+	json.Unmarshal(data, &m)
+	if _, ok := m["silent"]; ok {
+		t.Error("silent should be omitted when false")
+	}
+}
+
+func TestNotificationActions(t *testing.T) {
+	n := Notification{
+		Title: "Message",
+		URL:   "/inbox",
+		Actions: []NotificationAction{
+			{Action: "reply", Title: "Reply", URL: "/inbox?reply=1"},
+			{Action: "dismiss", Title: "Dismiss"},
+		},
+	}
+	data, err := json.Marshal(n)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var m map[string]any
+	json.Unmarshal(data, &m)
+
+	actions, ok := m["actions"].([]any)
+	if !ok {
+		t.Fatalf("actions not an array: %T", m["actions"])
+	}
+	if len(actions) != 2 {
+		t.Fatalf("len(actions) = %d, want 2", len(actions))
+	}
+
+	first := actions[0].(map[string]any)
+	if first["action"] != "reply" {
+		t.Errorf("first action = %v, want %q", first["action"], "reply")
+	}
+	if first["url"] != "/inbox?reply=1" {
+		t.Errorf("first url = %v, want %q", first["url"], "/inbox?reply=1")
+	}
+
+	second := actions[1].(map[string]any)
+	if _, ok := second["url"]; ok {
+		t.Error("second action should omit empty url")
+	}
+}
+
+func TestNotificationActionsOmitted(t *testing.T) {
+	n := Notification{Title: "Simple"}
+	data, _ := json.Marshal(n)
+	var m map[string]any
+	json.Unmarshal(data, &m)
+	if _, ok := m["actions"]; ok {
+		t.Error("actions should be omitted when nil")
+	}
+}
+
+func TestSendWithActions(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+	}))
+	defer srv.Close()
+
+	sub := newTestSubscription(t, srv.URL)
+	pub, priv, _ := GenerateVAPIDKeys()
+
+	err := Send(sub, Notification{
+		Title:  "Chat",
+		Body:   "New message",
+		Silent: true,
+		Actions: []NotificationAction{
+			{Action: "reply", Title: "Reply", URL: "/chat?reply=1"},
+		},
+	}, Options{
+		VAPIDPublicKey:  pub,
+		VAPIDPrivateKey: priv,
+		Subject:         "mailto:test@example.com",
+		HTTPClient:      srv.Client(),
+	})
+	if err != nil {
+		t.Fatalf("Send: %v", err)
+	}
+}
+
 // --- Test helpers ---
 
 // newTestSubscription creates a Subscription with a real P-256 key pair

@@ -35,13 +35,26 @@ import (
 // The fields map to the Notification API options that the service
 // worker passes to showNotification().
 type Notification struct {
-	Title    string `json:"title"`
-	Body     string `json:"body,omitempty"`
-	Icon     string `json:"icon,omitempty"`
-	Badge    string `json:"badge,omitempty"`
-	URL      string `json:"url,omitempty"`
-	Tag      string `json:"tag,omitempty"`      // Groups related notifications; replaces previous with same tag.
-	Renotify bool   `json:"renotify,omitempty"` // Re-alert (vibration/sound) when replacing a tagged notification.
+	Title    string               `json:"title"`
+	Body     string               `json:"body,omitempty"`
+	Icon     string               `json:"icon,omitempty"`
+	Badge    string               `json:"badge,omitempty"`
+	URL      string               `json:"url,omitempty"`
+	Tag      string               `json:"tag,omitempty"`      // Groups related notifications; replaces previous with same tag.
+	Renotify bool                 `json:"renotify,omitempty"` // Re-alert (vibration/sound) when replacing a tagged notification.
+	Silent   bool                 `json:"silent,omitempty"`   // Suppress vibration and sound.
+	Actions  []NotificationAction `json:"actions,omitempty"`  // Up to two action buttons shown on the notification.
+}
+
+// NotificationAction is a button displayed on a push notification.
+// Browsers typically show at most two actions. Each action can navigate
+// to its own URL when clicked; if URL is empty, the notification's
+// top-level URL is used.
+type NotificationAction struct {
+	Action string `json:"action"`         // Identifier sent in the notificationclick event.
+	Title  string `json:"title"`          // Button label.
+	Icon   string `json:"icon,omitempty"` // Optional button icon URL.
+	URL    string `json:"url,omitempty"`  // URL to open when this action is clicked.
 }
 
 // Options configures VAPID authentication for push requests. The same

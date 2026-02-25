@@ -574,7 +574,14 @@ type PushSubscriptionKeys struct {
 **Sending notifications:** Use the `push` subpackage:
 
 ```go
-push.Send(sub, push.Notification{Title: "Hello", Tag: "chat"}, push.Options{
+push.Send(sub, push.Notification{
+    Title:  "Hello",
+    Tag:    "chat",
+    Silent: true,
+    Actions: []push.NotificationAction{
+        {Action: "reply", Title: "Reply", URL: "/chat?reply=1"},
+    },
+}, push.Options{
     VAPIDPublicKey:  pub,
     VAPIDPrivateKey: priv,
     Subject:         "mailto:admin@example.com",

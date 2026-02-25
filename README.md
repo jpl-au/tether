@@ -357,9 +357,14 @@ poly.New(poly.Config[State]{
 
 // Send a notification from anywhere.
 push.Send(sub, push.Notification{
-    Title: "New message",
-    Body:  "You have a new reply.",
-    Tag:   "chat",     // groups related notifications
+    Title:  "New message",
+    Body:   "You have a new reply.",
+    Tag:    "chat",     // groups related notifications
+    Silent: true,       // suppress vibration and sound
+    Actions: []push.NotificationAction{
+        {Action: "reply", Title: "Reply", URL: "/chat?reply=1"},
+        {Action: "dismiss", Title: "Dismiss"},
+    },
 }, push.Options{
     VAPIDPublicKey:  pub,
     VAPIDPrivateKey: priv,
