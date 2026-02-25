@@ -286,12 +286,18 @@ func (h *Handler[S]) wireDisconnect(sess *Session[S]) {
 	sess.onDisconnect = func() {
 		h.mu.Lock()
 		delete(h.active, sess.id)
-		if h.cfg.ReconnectTimeout > 0 {
+		destroy := h.cfg.ReconnectTimeout <= 0
+		if !destroy {
 			h.disconnected[sess.id] = sess
-		} else {
-			h.destroySession(sess)
 		}
 		h.mu.Unlock()
+
+		// destroySession calls g.Remove which may fire OnLeave
+		// callbacks — run it outside h.mu to avoid deadlock if
+		// the callback accesses the Handler (e.g. Health).
+		if destroy {
+			h.destroySession(sess)
+		}
 
 		if h.cfg.OnDisconnect != nil {
 			h.cfg.OnDisconnect(sess)
