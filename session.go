@@ -88,10 +88,9 @@ type Session[S any] struct {
 	// Push subscription — accessed only from within the loop.
 	pushSub *PushSubscription
 
-	// Extension point: called at the end of exec() after the client
-	// update is sent. Task 2 (EDD) will use this to publish domain
-	// events. Nil until the event bus is wired in.
-	afterExec func(trigger Event)
+	// Buffered domain event publications, flushed after the client
+	// update is sent. Populated by Bus.Emit via the emitter interface.
+	emitted []func()
 
 	// Installed by the Handler. Called when the transport reader
 	// goroutine exits. Handles pool transitions
@@ -167,6 +166,34 @@ func (s *Session[S]) Context() context.Context {
 // when the session is gone.
 func (s *Session[S]) Go(fn func(ctx context.Context)) {
 	go fn(s.Context())
+}
+
+// addEmission buffers a domain event publication. Only called when
+// isHandling() is true — the loop goroutine is the only writer.
+func (s *Session[S]) addEmission(fn func()) {
+	s.emitted = append(s.emitted, fn)
+}
+
+// isHandling reports whether the session is inside exec() or an
+// Update command. Used by Bus.Emit for the dual-path decision.
+func (s *Session[S]) isHandling() bool {
+	return s.handling
+}
+
+// sessionID returns the session's unique identifier. Used by
+// Bus.Emit to record the sender for subscriber filtering.
+func (s *Session[S]) sessionID() string {
+	return s.id
+}
+
+// flushEmissions publishes all buffered domain events and clears
+// the buffer. Called at the end of exec() and Update after the
+// client update is sent.
+func (s *Session[S]) flushEmissions() {
+	for _, fn := range s.emitted {
+		fn()
+	}
+	s.emitted = s.emitted[:0]
 }
 
 // enqueue pushes a command to the session's loop without blocking the

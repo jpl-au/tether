@@ -49,6 +49,7 @@ func (s *Session[S]) Update(fn func(S) S) {
 		defer func() {
 			if r := recover(); r != nil {
 				s.logger.Error("panic in Update", "panic", r)
+				s.emitted = s.emitted[:0]
 			}
 			s.handling = false
 			s.fx = nil
@@ -63,6 +64,7 @@ func (s *Session[S]) Update(fn func(S) S) {
 		tree := s.render(s.state)
 		patches, change := s.differ.Diff(tree)
 		s.sendDiff("", patches, change, tree)
+		s.flushEmissions()
 	})
 }
 

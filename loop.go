@@ -77,6 +77,9 @@ func (s *Session[S]) exec(ev Event) {
 				"action", ev.Action,
 				"panic", r,
 			)
+			// Discard buffered emissions — the handler's state
+			// change is incomplete so its events are invalid.
+			s.emitted = s.emitted[:0]
 		}
 		s.handling = false
 		s.fx = nil
@@ -101,6 +104,7 @@ func (s *Session[S]) exec(ev Event) {
 			s.fx.merge(&u)
 			s.send(u)
 		}
+		s.flushEmissions()
 		return
 	}
 	s.state = newState
@@ -112,10 +116,8 @@ func (s *Session[S]) exec(ev Event) {
 	// Phase 4: Build and send update.
 	s.sendDiff(ev.EventID, patches, change, tree)
 
-	// Phase 5: Extension point — domain event emission (task 2).
-	if s.afterExec != nil {
-		s.afterExec(ev)
-	}
+	// Phase 5: Publish buffered domain events.
+	s.flushEmissions()
 }
 
 // onTransportClose handles transport disconnection. The transport is
