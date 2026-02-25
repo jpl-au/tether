@@ -666,6 +666,11 @@ window.Poly.hooks = window.Poly.hooks || {};
     var el = document.querySelector('[data-poly-key="' + patch.key + '"]');
     if (!el) return;
 
+    if (devMode) {
+      console.log("fluent-poly: patch", patch.key);
+      flashElement(el);
+    }
+
     var template = document.createElement("template");
     template.innerHTML = patch.html;
     if (template.content.childElementCount > 1) {
@@ -678,6 +683,10 @@ window.Poly.hooks = window.Poly.hooks || {};
   }
 
   function applyMorph(morph) {
+    if (devMode) {
+      console.log("fluent-poly: morph", morph.key || "root");
+    }
+
     var template = document.createElement("template");
     template.innerHTML = morph.html;
     if (template.content.childElementCount > 1) {
@@ -690,12 +699,34 @@ window.Poly.hooks = window.Poly.hooks || {};
       // Empty key targets the root element. Use innerHTML mode so
       // idiomorph morphs root's children without replacing root itself
       // (which carries data-poly-root, data-poly-session, etc.).
-      if (root) Idiomorph.morph(root, newEl, {morphStyle: "innerHTML", callbacks: morphCallbacks});
+      if (root) {
+        if (devMode) flashElement(root);
+        Idiomorph.morph(root, newEl, {morphStyle: "innerHTML", callbacks: morphCallbacks});
+      }
     } else {
       // Scoped morph targets a keyed container.
       var el = document.querySelector('[data-poly-key="' + morph.key + '"]');
-      if (el) Idiomorph.morph(el, newEl, {callbacks: morphCallbacks});
+      if (el) {
+        if (devMode) flashElement(el);
+        Idiomorph.morph(el, newEl, {callbacks: morphCallbacks});
+      }
     }
+  }
+
+  function flashElement(el) {
+    var oldTransition = el.style.transition;
+    var oldOutline = el.style.outline;
+    el.style.transition = "none";
+    el.style.outline = "2px solid rgba(59, 130, 246, 0.5)"; // Blue-500
+    el.style.outlineOffset = "-2px";
+    requestAnimationFrame(function () {
+      el.style.transition = "outline 0.5s ease-out";
+      el.style.outline = "2px solid transparent";
+      setTimeout(function () {
+        el.style.transition = oldTransition;
+        el.style.outline = oldOutline;
+      }, 500);
+    });
   }
 
   // --- Event delegation ---
@@ -844,6 +875,9 @@ window.Poly.hooks = window.Poly.hooks || {};
   }
 
   function sendEvent(type, action, data) {
+    if (devMode) {
+      console.log("fluent-poly: event", {type: type, action: action, data: data});
+    }
     var id = String(++eventCounter);
     var payload = JSON.stringify({type: type, action: action, data: data, event_id: id});
 
