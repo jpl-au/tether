@@ -1,13 +1,14 @@
 package poly
 
 // effects accumulates side effects during an exec cycle. Session
-// methods (Toast, Navigate, etc.) populate these fields when called
-// inside Handle. After Handle returns, the effects are flushed into
-// the same Update message as the state diff so the client receives
-// everything atomically in one frame.
+// methods (Toast, Navigate, Signal, etc.) populate these fields when
+// called inside Handle. After Handle returns, the effects are flushed
+// into the same Update message as the state diff so the client
+// receives everything atomically in one frame.
 type effects struct {
 	announce string
 	flash    map[string]string
+	signals  map[string]any
 	toast    string
 	title    string
 	url      string
@@ -16,7 +17,7 @@ type effects struct {
 
 // any reports whether any side effects have been buffered.
 func (fx *effects) any() bool {
-	return fx.announce != "" || fx.flash != nil ||
+	return fx.announce != "" || fx.flash != nil || fx.signals != nil ||
 		fx.toast != "" || fx.title != "" || fx.url != ""
 }
 
@@ -27,6 +28,9 @@ func (fx *effects) merge(u *Update) {
 	}
 	if fx.flash != nil {
 		u.Flash = fx.flash
+	}
+	if fx.signals != nil {
+		u.Signals = fx.signals
 	}
 	if fx.toast != "" {
 		u.Toast = fx.toast

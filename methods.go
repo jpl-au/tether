@@ -162,6 +162,31 @@ func (s *Session[S]) Flash(selector, text string) {
 	})
 }
 
+// Signal pushes a reactive value to the client. Elements bound to the
+// signal name via [BindText], [BindShow], [BindClass], or [BindAttr]
+// update instantly — no render cycle, no diff, no HTML. Inside Handle
+// the signal is buffered and sent atomically with the state diff.
+// Outside Handle it is sent immediately.
+//
+// Signals are ideal for high-frequency updates (counters, status
+// indicators, progress bars) where the full render/diff pipeline
+// is unnecessary overhead.
+//
+//	s.Signal("count", 42)
+//	s.Signal("status", "online")
+func (s *Session[S]) Signal(key string, value any) {
+	if s.handling {
+		if s.fx.signals == nil {
+			s.fx.signals = make(map[string]any)
+		}
+		s.fx.signals[key] = value
+		return
+	}
+	s.enqueue(func() {
+		s.send(Update{Signals: map[string]any{key: value}})
+	})
+}
+
 // Push sends a Web Push notification to the browser. Only works when
 // the session has an active push subscription. Returns an error if no
 // subscription exists. Safe to call from any goroutine.

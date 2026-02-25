@@ -24,6 +24,7 @@
 // the console and silent errors remain silent.
 window.Poly = window.Poly || {};
 window.Poly.hooks = window.Poly.hooks || {};
+window.Poly.signals = window.Poly.signals || {};
 
 (function () {
   "use strict";
@@ -472,6 +473,9 @@ window.Poly.hooks = window.Poly.hooks || {};
       if (msg.toast) {
         toast(msg.toast);
       }
+      if (msg.signals) {
+        applySignals(msg.signals);
+      }
 
       // Set focus on the designated element after all DOM updates.
       // Uses data-poly-autofocus (not data-poly-focus, which is the
@@ -718,6 +722,7 @@ window.Poly.hooks = window.Poly.hooks || {};
     afterNodeAdded: function (newNode) {
       if (newNode.nodeType !== 1) return;
       callHookDeep(newNode, "mounted");
+      reapplySignals(newNode);
       var name = newNode.getAttribute("data-poly-transition");
       if (!name) return;
       // Force reflow so the browser registers the enter class,
@@ -746,6 +751,7 @@ window.Poly.hooks = window.Poly.hooks || {};
     afterNodeMorphed: function (oldNode) {
       if (oldNode.nodeType !== 1) return;
       callHook(oldNode, "updated");
+      reapplySignals(oldNode);
     },
 
     beforeNodeRemoved: function (oldNode) {
@@ -854,6 +860,125 @@ window.Poly.hooks = window.Poly.hooks || {};
         el.style.outline = oldOutline;
       }, 500);
     });
+  }
+
+  // --- Signals ---
+  //
+  // Signals are reactive key/value pairs pushed by the server. Elements
+  // bind to signals via data-poly-bind-* attributes. When a signal
+  // changes, all bound elements update instantly — no render, no diff.
+  // Signal values are stored in Poly.signals so JS hooks can read them.
+
+  function applySignals(updates) {
+    for (var key in updates) {
+      window.Poly.signals[key] = updates[key];
+      updateSignalBindings(key, updates[key]);
+    }
+  }
+
+  function updateSignalBindings(key, value) {
+    if (!root) return;
+
+    // Text bindings: data-poly-bind-text="signalName"
+    var els = root.querySelectorAll('[data-poly-bind-text="' + key + '"]');
+    for (var i = 0; i < els.length; i++) {
+      els[i].textContent = value == null ? "" : String(value);
+    }
+
+    // Show bindings: data-poly-bind-show="signalName"
+    els = root.querySelectorAll('[data-poly-bind-show="' + key + '"]');
+    for (var i = 0; i < els.length; i++) {
+      els[i].style.display = isTruthy(value) ? "" : "none";
+    }
+
+    // Hide bindings: data-poly-bind-hide="signalName"
+    els = root.querySelectorAll('[data-poly-bind-hide="' + key + '"]');
+    for (var i = 0; i < els.length; i++) {
+      els[i].style.display = isTruthy(value) ? "none" : "";
+    }
+
+    // Class bindings: data-poly-bind-class="className signalName"
+    els = root.querySelectorAll("[data-poly-bind-class]");
+    for (var i = 0; i < els.length; i++) {
+      var parts = els[i].getAttribute("data-poly-bind-class").split(/\s+/);
+      if (parts.length === 2 && parts[1] === key) {
+        els[i].classList.toggle(parts[0], isTruthy(value));
+      }
+    }
+
+    // Attr bindings: data-poly-bind-attr="attrName signalName"
+    els = root.querySelectorAll("[data-poly-bind-attr]");
+    for (var i = 0; i < els.length; i++) {
+      var parts = els[i].getAttribute("data-poly-bind-attr").split(/\s+/);
+      if (parts.length === 2 && parts[1] === key) {
+        if (value === null || value === undefined || value === false) {
+          els[i].removeAttribute(parts[0]);
+        } else {
+          els[i].setAttribute(parts[0], String(value));
+        }
+      }
+    }
+  }
+
+  // isTruthy mirrors JavaScript's truthiness but treats null, undefined,
+  // false, 0, and empty string as falsy. Used for show/hide/class bindings.
+  function isTruthy(val) {
+    return val !== null && val !== undefined && val !== false && val !== 0 && val !== "";
+  }
+
+  // reapplySignals restores signal-bound values on an element and its
+  // descendants after a morph replaces server-rendered content. Called
+  // from the idiomorph afterNodeAdded and afterNodeMorphed callbacks.
+  function reapplySignals(el) {
+    applySignalsToElement(el);
+    var bound = el.querySelectorAll(
+      "[data-poly-bind-text],[data-poly-bind-show],[data-poly-bind-hide]," +
+      "[data-poly-bind-class],[data-poly-bind-attr]"
+    );
+    for (var i = 0; i < bound.length; i++) {
+      applySignalsToElement(bound[i]);
+    }
+  }
+
+  function applySignalsToElement(el) {
+    if (el.nodeType !== 1) return;
+    var signals = window.Poly.signals;
+
+    var textSignal = el.getAttribute("data-poly-bind-text");
+    if (textSignal && signals.hasOwnProperty(textSignal)) {
+      el.textContent = signals[textSignal] == null ? "" : String(signals[textSignal]);
+    }
+
+    var showSignal = el.getAttribute("data-poly-bind-show");
+    if (showSignal && signals.hasOwnProperty(showSignal)) {
+      el.style.display = isTruthy(signals[showSignal]) ? "" : "none";
+    }
+
+    var hideSignal = el.getAttribute("data-poly-bind-hide");
+    if (hideSignal && signals.hasOwnProperty(hideSignal)) {
+      el.style.display = isTruthy(signals[hideSignal]) ? "none" : "";
+    }
+
+    var classBinding = el.getAttribute("data-poly-bind-class");
+    if (classBinding) {
+      var parts = classBinding.split(/\s+/);
+      if (parts.length === 2 && signals.hasOwnProperty(parts[1])) {
+        el.classList.toggle(parts[0], isTruthy(signals[parts[1]]));
+      }
+    }
+
+    var attrBinding = el.getAttribute("data-poly-bind-attr");
+    if (attrBinding) {
+      var parts = attrBinding.split(/\s+/);
+      if (parts.length === 2 && signals.hasOwnProperty(parts[1])) {
+        var val = signals[parts[1]];
+        if (val === null || val === undefined || val === false) {
+          el.removeAttribute(parts[0]);
+        } else {
+          el.setAttribute(parts[0], String(val));
+        }
+      }
+    }
   }
 
   // --- Event delegation ---

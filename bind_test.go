@@ -234,6 +234,51 @@ func TestFocusTrapRendersDataAttribute(t *testing.T) {
 	}
 }
 
+func TestBindTextRendersDataAttribute(t *testing.T) {
+	el := poly.BindText(button.Text("0"), "count")
+	html := string(el.Render())
+
+	if !strings.Contains(html, `data-poly-bind-text="count"`) {
+		t.Errorf("expected data-poly-bind-text attribute in HTML:\n%s", html)
+	}
+}
+
+func TestBindShowRendersDataAttribute(t *testing.T) {
+	el := poly.BindShow(button.Text("Panel"), "isOpen")
+	html := string(el.Render())
+
+	if !strings.Contains(html, `data-poly-bind-show="isOpen"`) {
+		t.Errorf("expected data-poly-bind-show attribute in HTML:\n%s", html)
+	}
+}
+
+func TestBindHideRendersDataAttribute(t *testing.T) {
+	el := poly.BindHide(button.Text("Spinner"), "isLoaded")
+	html := string(el.Render())
+
+	if !strings.Contains(html, `data-poly-bind-hide="isLoaded"`) {
+		t.Errorf("expected data-poly-bind-hide attribute in HTML:\n%s", html)
+	}
+}
+
+func TestBindClassRendersDataAttribute(t *testing.T) {
+	el := poly.BindClass(button.Text("Tab"), "active", "isSelected")
+	html := string(el.Render())
+
+	if !strings.Contains(html, `data-poly-bind-class="active isSelected"`) {
+		t.Errorf("expected data-poly-bind-class attribute in HTML:\n%s", html)
+	}
+}
+
+func TestBindAttrRendersDataAttribute(t *testing.T) {
+	el := poly.BindAttr(button.Text("Save"), "disabled", "isSaving")
+	html := string(el.Render())
+
+	if !strings.Contains(html, `data-poly-bind-attr="disabled isSaving"`) {
+		t.Errorf("expected data-poly-bind-attr attribute in HTML:\n%s", html)
+	}
+}
+
 func TestClickChains(t *testing.T) {
 	// Verify the return type preserves chainability
 	el := poly.Click(button.Text("+"), "increment").

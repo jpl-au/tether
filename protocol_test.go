@@ -144,6 +144,74 @@ func TestEncodeUpdateWithURLReplace(t *testing.T) {
 	}
 }
 
+func TestEncodeUpdateWithSignals(t *testing.T) {
+	update := Update{
+		Signals: map[string]any{
+			"count":  42,
+			"status": "online",
+		},
+	}
+
+	msg := EncodeUpdate(update)
+
+	if msg.Type != "update" {
+		t.Errorf("type should be %q, got %q", "update", msg.Type)
+	}
+	if msg.Signals == nil {
+		t.Fatal("signals should not be nil")
+	}
+	if msg.Signals["count"] != 42 {
+		t.Errorf("signals[count] should be 42, got %v", msg.Signals["count"])
+	}
+	if msg.Signals["status"] != "online" {
+		t.Errorf("signals[status] should be %q, got %v", "online", msg.Signals["status"])
+	}
+
+	data, err := json.Marshal(msg)
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+
+	var decoded map[string]any
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	signals, ok := decoded["signals"].(map[string]any)
+	if !ok {
+		t.Fatal("decoded signals should be a map")
+	}
+	// JSON numbers decode as float64.
+	if signals["count"] != float64(42) {
+		t.Errorf("decoded signals[count] = %v, want 42", signals["count"])
+	}
+	if signals["status"] != "online" {
+		t.Errorf("decoded signals[status] = %v, want online", signals["status"])
+	}
+}
+
+func TestEncodeUpdateOmitsEmptySignals(t *testing.T) {
+	update := Update{
+		Toast: "hello",
+	}
+
+	msg := EncodeUpdate(update)
+
+	data, err := json.Marshal(msg)
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+
+	var decoded map[string]any
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	if _, ok := decoded["signals"]; ok {
+		t.Error("signals key should be omitted when empty")
+	}
+}
+
 func TestEventUnmarshal(t *testing.T) {
 	raw := `{"type":"click","action":"increment","data":{"value":"42"}}`
 

@@ -117,6 +117,7 @@ type PreSession interface {
 	SetTitle(title string)
 	Announce(text string)
 	Flash(selector, text string)
+	Signal(key string, value any)
 }
 
 // captureSession implements PreSession by buffering side effects.
@@ -139,6 +140,13 @@ func (c *captureSession) Flash(selector, text string) {
 		c.fx.flash = make(map[string]string)
 	}
 	c.fx.flash[selector] = text
+}
+
+func (c *captureSession) Signal(key string, value any) {
+	if c.fx.signals == nil {
+		c.fx.signals = make(map[string]any)
+	}
+	c.fx.signals[key] = value
 }
 
 // ID returns the unique session identifier. This is a cryptographically

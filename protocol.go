@@ -15,6 +15,7 @@ type Update struct {
 	Replace  bool              // true for replaceState, false for pushState
 	Title    string            // if non-empty, set document.title
 	Flash    map[string]string // key: CSS selector, value: plain text to display
+	Signals  map[string]any    // key: signal name, value: pushed to bound elements
 	Announce string            // if non-empty, inject into an aria-live region
 	Toast    string            // if non-empty, show a global notification
 	EventID  string            // echoed from the triggering Event for correlation
@@ -46,6 +47,7 @@ type UpdateMessage struct {
 	Replace  bool              `json:"replace,omitempty"`
 	Title    string            `json:"title,omitempty"`
 	Flash    map[string]string `json:"flash,omitempty"`
+	Signals  map[string]any    `json:"signals,omitempty"`
 	Announce string            `json:"announce,omitempty"`
 	Toast    string            `json:"toast,omitempty"`
 	EventID  string            `json:"event_id,omitempty"`
@@ -96,6 +98,7 @@ func EncodeUpdate(update Update) UpdateMessage {
 	msg.Replace = update.Replace
 	msg.Title = update.Title
 	msg.Flash = update.Flash
+	msg.Signals = update.Signals
 	msg.Announce = update.Announce
 	msg.Toast = update.Toast
 	msg.EventID = update.EventID
