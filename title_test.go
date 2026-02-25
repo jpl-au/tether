@@ -20,11 +20,12 @@ func TestSessionSetTitleSendsUpdate(t *testing.T) {
 		mt.mu.Lock()
 		defer mt.mu.Unlock()
 
-		if len(mt.updates) != 1 {
-			t.Fatalf("expected 1 update, got %d", len(mt.updates))
+		if len(mt.sent) != 1 {
+			t.Fatalf("expected 1 update, got %d", len(mt.sent))
 		}
-		if mt.updates[0].Title != "New Page" {
-			t.Errorf("expected title %q, got %q", "New Page", mt.updates[0].Title)
+		msg := decodeMessage(mt.sent[0])
+		if msg.Title != "New Page" {
+			t.Errorf("expected title %q, got %q", "New Page", msg.Title)
 		}
 	})
 }

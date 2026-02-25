@@ -68,7 +68,7 @@ func TestSessionNavigateEvent(t *testing.T) {
 		mt.mu.Lock()
 		defer mt.mu.Unlock()
 
-		if len(mt.updates) == 0 {
+		if len(mt.sent) == 0 {
 			t.Fatal("expected at least one update after navigation")
 		}
 	})
@@ -169,13 +169,14 @@ func TestSessionNavigateSendsURL(t *testing.T) {
 		mt.mu.Lock()
 		defer mt.mu.Unlock()
 
-		if len(mt.updates) != 1 {
-			t.Fatalf("expected 1 update, got %d", len(mt.updates))
+		if len(mt.sent) != 1 {
+			t.Fatalf("expected 1 update, got %d", len(mt.sent))
 		}
-		if mt.updates[0].URL != "/new-page" {
-			t.Errorf("expected URL %q, got %q", "/new-page", mt.updates[0].URL)
+		msg := decodeMessage(mt.sent[0])
+		if msg.URL != "/new-page" {
+			t.Errorf("expected URL %q, got %q", "/new-page", msg.URL)
 		}
-		if mt.updates[0].Replace {
+		if msg.Replace {
 			t.Error("Navigate should use pushState (Replace=false)")
 		}
 	})
@@ -196,13 +197,14 @@ func TestSessionReplaceURLSendsReplace(t *testing.T) {
 		mt.mu.Lock()
 		defer mt.mu.Unlock()
 
-		if len(mt.updates) != 1 {
-			t.Fatalf("expected 1 update, got %d", len(mt.updates))
+		if len(mt.sent) != 1 {
+			t.Fatalf("expected 1 update, got %d", len(mt.sent))
 		}
-		if mt.updates[0].URL != "/current" {
-			t.Errorf("expected URL %q, got %q", "/current", mt.updates[0].URL)
+		msg := decodeMessage(mt.sent[0])
+		if msg.URL != "/current" {
+			t.Errorf("expected URL %q, got %q", "/current", msg.URL)
 		}
-		if !mt.updates[0].Replace {
+		if !msg.Replace {
 			t.Error("ReplaceURL should use replaceState (Replace=true)")
 		}
 	})

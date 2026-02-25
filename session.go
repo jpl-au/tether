@@ -3,6 +3,7 @@ package poly
 import (
 	"context"
 	"log/slog"
+	"maps"
 	"sync/atomic"
 	"time"
 
@@ -118,6 +119,7 @@ type PreSession interface {
 	Announce(text string)
 	Flash(selector, text string)
 	Signal(key string, value any)
+	Signals(signals map[string]any)
 }
 
 // captureSession implements PreSession by buffering side effects.
@@ -147,6 +149,13 @@ func (c *captureSession) Signal(key string, value any) {
 		c.fx.signals = make(map[string]any)
 	}
 	c.fx.signals[key] = value
+}
+
+func (c *captureSession) Signals(signals map[string]any) {
+	if c.fx.signals == nil {
+		c.fx.signals = make(map[string]any, len(signals))
+	}
+	maps.Copy(c.fx.signals, signals)
 }
 
 // ID returns the unique session identifier. This is a cryptographically

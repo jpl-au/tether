@@ -20,15 +20,15 @@ func TestSessionFlashSendsUpdate(t *testing.T) {
 		mt.mu.Lock()
 		defer mt.mu.Unlock()
 
-		if len(mt.updates) != 1 {
-			t.Fatalf("expected 1 update, got %d", len(mt.updates))
+		if len(mt.sent) != 1 {
+			t.Fatalf("expected 1 update, got %d", len(mt.sent))
 		}
-		flash := mt.updates[0].Flash
-		if flash == nil {
+		msg := decodeMessage(mt.sent[0])
+		if msg.Flash == nil {
 			t.Fatal("expected Flash map, got nil")
 		}
-		if flash["#notice"] != "Settings saved" {
-			t.Errorf("Flash[#notice] = %q, want %q", flash["#notice"], "Settings saved")
+		if msg.Flash["#notice"] != "Settings saved" {
+			t.Errorf("Flash[#notice] = %q, want %q", msg.Flash["#notice"], "Settings saved")
 		}
 	})
 }

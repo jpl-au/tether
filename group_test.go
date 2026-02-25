@@ -75,14 +75,14 @@ func TestGroupBroadcastUpdatesAllSessions(t *testing.T) {
 
 		// Both transports should have received an update.
 		mt1.mu.Lock()
-		if len(mt1.updates) != 1 {
-			t.Errorf("expected 1 update on mt1, got %d", len(mt1.updates))
+		if len(mt1.sent) != 1 {
+			t.Errorf("expected 1 update on mt1, got %d", len(mt1.sent))
 		}
 		mt1.mu.Unlock()
 
 		mt2.mu.Lock()
-		if len(mt2.updates) != 1 {
-			t.Errorf("expected 1 update on mt2, got %d", len(mt2.updates))
+		if len(mt2.sent) != 1 {
+			t.Errorf("expected 1 update on mt2, got %d", len(mt2.sent))
 		}
 		mt2.mu.Unlock()
 	})

@@ -9,7 +9,6 @@
 package ws
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"io"
@@ -49,23 +48,10 @@ type transport struct {
 	ctx  context.Context
 }
 
-// SendUpdate encodes the update as JSON and writes it as a WebSocket
-// text message. The coder/websocket library serialises concurrent
-// writes, so this is safe to call from [Session.Update] goroutines.
-func (t *transport) SendUpdate(update poly.Update) error {
-	msg := poly.EncodeUpdate(update)
-
-	// Avoid json.Marshal's default HTML escaping (< to \u003c) which
-	// inflates the size of DOM patches sent over the wire.
-	var buf bytes.Buffer
-	enc := json.NewEncoder(&buf)
-	enc.SetEscapeHTML(false)
-	if err := enc.Encode(msg); err != nil {
-		return err
-	}
-
-	// Encode appends a trailing newline; strip it so we send clean JSON.
-	data := bytes.TrimRight(buf.Bytes(), "\n")
+// Send writes pre-encoded JSON bytes as a WebSocket text message. The
+// coder/websocket library serialises concurrent writes, so this is
+// safe to call from [Session.Update] goroutines.
+func (t *transport) Send(data []byte) error {
 	return t.conn.Write(t.ctx, websocket.MessageText, data)
 }
 

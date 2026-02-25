@@ -21,8 +21,8 @@ func (fx *effects) any() bool {
 		fx.toast != "" || fx.title != "" || fx.url != ""
 }
 
-// merge copies buffered effects into an Update message.
-func (fx *effects) merge(u *Update) {
+// merge copies buffered effects into an update message.
+func (fx *effects) merge(u *update) {
 	if fx.announce != "" {
 		u.Announce = fx.announce
 	}

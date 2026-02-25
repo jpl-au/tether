@@ -2,6 +2,7 @@ package poly
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"log/slog"
 	"sync"
@@ -12,41 +13,58 @@ import (
 	"github.com/jpl-au/fluent/node"
 )
 
-// patchUpdates returns all updates that contained patches (no morphs).
-func patchUpdates(updates []Update) []Update {
-	var result []Update
-	for _, u := range updates {
-		if len(u.Patches) > 0 && len(u.Morphs) == 0 {
-			result = append(result, u)
+// patchMessages returns all decoded messages that contained patches (no morphs).
+func patchMessages(sent [][]byte) []updateMessage {
+	var result []updateMessage
+	for _, data := range sent {
+		var msg updateMessage
+		if err := json.Unmarshal(data, &msg); err != nil {
+			continue
+		}
+		if len(msg.Patches) > 0 && len(msg.Morphs) == 0 {
+			result = append(result, msg)
 		}
 	}
 	return result
 }
 
-// morphUpdates returns all updates that contained morphs.
-func morphUpdates(updates []Update) []Update {
-	var result []Update
-	for _, u := range updates {
-		if len(u.Morphs) > 0 {
-			result = append(result, u)
+// morphMessages returns all decoded messages that contained morphs.
+func morphMessages(sent [][]byte) []updateMessage {
+	var result []updateMessage
+	for _, data := range sent {
+		var msg updateMessage
+		if err := json.Unmarshal(data, &msg); err != nil {
+			continue
+		}
+		if len(msg.Morphs) > 0 {
+			result = append(result, msg)
 		}
 	}
 	return result
 }
 
-// mockTransport records sent updates and replays queued events,
+// decodeMessage unmarshals a single raw JSON message.
+func decodeMessage(data []byte) updateMessage {
+	var msg updateMessage
+	json.Unmarshal(data, &msg)
+	return msg
+}
+
+// mockTransport records sent bytes and replays queued events,
 // allowing session event loop tests without a real connection.
 type mockTransport struct {
-	mu      sync.Mutex
-	events  []Event
-	updates []Update
-	closed  bool
+	mu     sync.Mutex
+	events []Event
+	sent   [][]byte
+	closed bool
 }
 
-func (m *mockTransport) SendUpdate(update Update) error {
+func (m *mockTransport) Send(data []byte) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.updates = append(m.updates, update)
+	cp := make([]byte, len(data))
+	copy(cp, data)
+	m.sent = append(m.sent, cp)
 	return nil
 }
 

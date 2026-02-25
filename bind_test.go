@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	poly "github.com/jpl-au/fluent-poly"
+	"github.com/jpl-au/fluent-poly/bind"
 	"github.com/jpl-au/fluent/html5/a"
 	"github.com/jpl-au/fluent/html5/button"
 	"github.com/jpl-au/fluent/html5/dropdown"
@@ -13,7 +13,7 @@ import (
 )
 
 func TestClickRendersDataAttribute(t *testing.T) {
-	el := poly.Click(button.Text("+"), "increment")
+	el := bind.Click(button.Text("+"), "increment")
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-poly-click="increment"`) {
@@ -22,7 +22,7 @@ func TestClickRendersDataAttribute(t *testing.T) {
 }
 
 func TestSubmitRendersDataAttribute(t *testing.T) {
-	el := poly.Submit(form.New(), "save")
+	el := bind.Submit(form.New(), "save")
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-poly-submit="save"`) {
@@ -31,7 +31,7 @@ func TestSubmitRendersDataAttribute(t *testing.T) {
 }
 
 func TestInputRendersDataAttribute(t *testing.T) {
-	el := poly.Input(input.Text("name", ""), "update")
+	el := bind.Input(input.Text("name", ""), "update")
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-poly-input="update"`) {
@@ -40,7 +40,7 @@ func TestInputRendersDataAttribute(t *testing.T) {
 }
 
 func TestLinkRendersDataAttribute(t *testing.T) {
-	el := poly.Link(a.Link("/profile", "Profile"))
+	el := bind.Link(a.Link("/profile", "Profile"))
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-poly-link=""`) {
@@ -52,7 +52,7 @@ func TestLinkRendersDataAttribute(t *testing.T) {
 }
 
 func TestToggleClassRendersDataAttribute(t *testing.T) {
-	el := poly.ToggleClass(button.Text("Menu"), "is-open")
+	el := bind.ToggleClass(button.Text("Menu"), "is-open")
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-poly-toggle-class="is-open"`) {
@@ -61,7 +61,7 @@ func TestToggleClassRendersDataAttribute(t *testing.T) {
 }
 
 func TestToggleTargetRendersDataAttribute(t *testing.T) {
-	el := poly.ToggleTarget(button.Text("Menu"), "#nav")
+	el := bind.ToggleTarget(button.Text("Menu"), "#nav")
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-poly-toggle-target="#nav"`) {
@@ -70,7 +70,7 @@ func TestToggleTargetRendersDataAttribute(t *testing.T) {
 }
 
 func TestToggleAttrRendersDataAttribute(t *testing.T) {
-	el := poly.ToggleAttr(button.Text("Toggle"), "hidden")
+	el := bind.ToggleAttr(button.Text("Toggle"), "hidden")
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-poly-toggle-attr="hidden"`) {
@@ -79,8 +79,8 @@ func TestToggleAttrRendersDataAttribute(t *testing.T) {
 }
 
 func TestToggleClassWithTargetChains(t *testing.T) {
-	el := poly.ToggleClass(
-		poly.ToggleTarget(button.Text("Menu"), "#nav"),
+	el := bind.ToggleClass(
+		bind.ToggleTarget(button.Text("Menu"), "#nav"),
 		"is-open",
 	).Style("cursor: pointer")
 	html := string(el.Render())
@@ -97,7 +97,7 @@ func TestToggleClassWithTargetChains(t *testing.T) {
 }
 
 func TestTransitionRendersDataAttribute(t *testing.T) {
-	el := poly.Transition(button.Text("Item"), "fade")
+	el := bind.Transition(button.Text("Item"), "fade")
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-poly-transition="fade"`) {
@@ -106,7 +106,7 @@ func TestTransitionRendersDataAttribute(t *testing.T) {
 }
 
 func TestPreserveRendersDataAttribute(t *testing.T) {
-	el := poly.Preserve(form.New())
+	el := bind.Preserve(form.New())
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-poly-preserve=""`) {
@@ -115,7 +115,7 @@ func TestPreserveRendersDataAttribute(t *testing.T) {
 }
 
 func TestAutoFocusRendersDataAttribute(t *testing.T) {
-	el := poly.AutoFocus(input.Text("name", ""))
+	el := bind.AutoFocus(input.Text("name", ""))
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-poly-autofocus=""`) {
@@ -124,7 +124,7 @@ func TestAutoFocusRendersDataAttribute(t *testing.T) {
 }
 
 func TestHookRendersDataAttribute(t *testing.T) {
-	el := poly.Hook(button.Text("Chart"), "chart")
+	el := bind.Hook(button.Text("Chart"), "chart")
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-poly-hook="chart"`) {
@@ -133,7 +133,7 @@ func TestHookRendersDataAttribute(t *testing.T) {
 }
 
 func TestDisableRendersDataAttribute(t *testing.T) {
-	el := poly.Disable(poly.Click(button.Text("Save"), "save"), "Saving...")
+	el := bind.Disable(bind.Click(button.Text("Save"), "save"), "Saving...")
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-poly-disable="Saving..."`) {
@@ -142,7 +142,7 @@ func TestDisableRendersDataAttribute(t *testing.T) {
 }
 
 func TestDisableEmptyTextRendersDataAttribute(t *testing.T) {
-	el := poly.Disable(poly.Click(button.Text("Go"), "go"), "")
+	el := bind.Disable(bind.Click(button.Text("Go"), "go"), "")
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-poly-disable=""`) {
@@ -151,7 +151,7 @@ func TestDisableEmptyTextRendersDataAttribute(t *testing.T) {
 }
 
 func TestConfirmRendersDataAttribute(t *testing.T) {
-	el := poly.Confirm(poly.Click(button.Text("Delete"), "delete"), "Are you sure?")
+	el := bind.Confirm(bind.Click(button.Text("Delete"), "delete"), "Are you sure?")
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-poly-confirm="Are you sure?"`) {
@@ -160,7 +160,7 @@ func TestConfirmRendersDataAttribute(t *testing.T) {
 }
 
 func TestDebounceRendersDataAttribute(t *testing.T) {
-	el := poly.Debounce(poly.Input(input.Text("q", ""), "search"), 500)
+	el := bind.Debounce(bind.Input(input.Text("q", ""), "search"), 500)
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-poly-debounce="500"`) {
@@ -169,7 +169,7 @@ func TestDebounceRendersDataAttribute(t *testing.T) {
 }
 
 func TestThrottleRendersDataAttribute(t *testing.T) {
-	el := poly.Throttle(poly.Click(button.Text("Go"), "fire"), 1000)
+	el := bind.Throttle(bind.Click(button.Text("Go"), "fire"), 1000)
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-poly-throttle="1000"`) {
@@ -178,7 +178,7 @@ func TestThrottleRendersDataAttribute(t *testing.T) {
 }
 
 func TestChangeRendersDataAttribute(t *testing.T) {
-	el := poly.Change(dropdown.New(), "filter")
+	el := bind.Change(dropdown.New(), "filter")
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-poly-change="filter"`) {
@@ -187,7 +187,7 @@ func TestChangeRendersDataAttribute(t *testing.T) {
 }
 
 func TestKeyDownRendersDataAttribute(t *testing.T) {
-	el := poly.KeyDown(input.Text("cmd", ""), "exec")
+	el := bind.KeyDown(input.Text("cmd", ""), "exec")
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-poly-keydown="exec"`) {
@@ -196,7 +196,7 @@ func TestKeyDownRendersDataAttribute(t *testing.T) {
 }
 
 func TestFocusRendersDataAttribute(t *testing.T) {
-	el := poly.Focus(input.Text("name", ""), "focus-name")
+	el := bind.Focus(input.Text("name", ""), "focus-name")
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-poly-focus="focus-name"`) {
@@ -205,7 +205,7 @@ func TestFocusRendersDataAttribute(t *testing.T) {
 }
 
 func TestBlurRendersDataAttribute(t *testing.T) {
-	el := poly.Blur(input.Text("name", ""), "blur-name")
+	el := bind.Blur(input.Text("name", ""), "blur-name")
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-poly-blur="blur-name"`) {
@@ -214,7 +214,7 @@ func TestBlurRendersDataAttribute(t *testing.T) {
 }
 
 func TestFilterKeyRendersDataAttribute(t *testing.T) {
-	el := poly.FilterKey(poly.KeyDown(input.Text("cmd", ""), "exec"), "Enter")
+	el := bind.FilterKey(bind.KeyDown(input.Text("cmd", ""), "exec"), "Enter")
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-poly-key="Enter"`) {
@@ -226,7 +226,7 @@ func TestFilterKeyRendersDataAttribute(t *testing.T) {
 }
 
 func TestFocusTrapRendersDataAttribute(t *testing.T) {
-	el := poly.FocusTrap(button.Text("Dialog"))
+	el := bind.FocusTrap(button.Text("Dialog"))
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-poly-focus-trap=""`) {
@@ -235,7 +235,7 @@ func TestFocusTrapRendersDataAttribute(t *testing.T) {
 }
 
 func TestBindTextRendersDataAttribute(t *testing.T) {
-	el := poly.BindText(button.Text("0"), "count")
+	el := bind.BindText(button.Text("0"), "count")
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-poly-bind-text="count"`) {
@@ -244,7 +244,7 @@ func TestBindTextRendersDataAttribute(t *testing.T) {
 }
 
 func TestBindShowRendersDataAttribute(t *testing.T) {
-	el := poly.BindShow(button.Text("Panel"), "isOpen")
+	el := bind.BindShow(button.Text("Panel"), "isOpen")
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-poly-bind-show="isOpen"`) {
@@ -253,7 +253,7 @@ func TestBindShowRendersDataAttribute(t *testing.T) {
 }
 
 func TestBindHideRendersDataAttribute(t *testing.T) {
-	el := poly.BindHide(button.Text("Spinner"), "isLoaded")
+	el := bind.BindHide(button.Text("Spinner"), "isLoaded")
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-poly-bind-hide="isLoaded"`) {
@@ -262,7 +262,7 @@ func TestBindHideRendersDataAttribute(t *testing.T) {
 }
 
 func TestBindClassRendersDataAttribute(t *testing.T) {
-	el := poly.BindClass(button.Text("Tab"), "active", "isSelected")
+	el := bind.BindClass(button.Text("Tab"), "active", "isSelected")
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-poly-bind-class="active isSelected"`) {
@@ -271,7 +271,7 @@ func TestBindClassRendersDataAttribute(t *testing.T) {
 }
 
 func TestBindAttrRendersDataAttribute(t *testing.T) {
-	el := poly.BindAttr(button.Text("Save"), "disabled", "isSaving")
+	el := bind.BindAttr(button.Text("Save"), "disabled", "isSaving")
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-poly-bind-attr="disabled isSaving"`) {
@@ -281,7 +281,7 @@ func TestBindAttrRendersDataAttribute(t *testing.T) {
 
 func TestClickChains(t *testing.T) {
 	// Verify the return type preserves chainability
-	el := poly.Click(button.Text("+"), "increment").
+	el := bind.Click(button.Text("+"), "increment").
 		Style("cursor: pointer").
 		Class("btn")
 	html := string(el.Render())

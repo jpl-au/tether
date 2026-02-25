@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/coder/websocket"
-	jit "github.com/jpl-au/fluent-jit"
 	poly "github.com/jpl-au/fluent-poly"
 )
 
@@ -50,54 +49,51 @@ func dial(t *testing.T) (*transport, *websocket.Conn) {
 	return tp, client
 }
 
-func TestSendUpdateDeliversJSON(t *testing.T) {
+func TestSendDeliversJSON(t *testing.T) {
 	tp, client := dial(t)
 
-	update := poly.Update{
-		Patches: []jit.Patch{{Key: "count", HTML: []byte("<span>1</span>")}},
-		Title:   "hello",
-	}
-	if err := tp.SendUpdate(update); err != nil {
-		t.Fatalf("SendUpdate: %v", err)
+	data := []byte(`{"type":"update","patches":[{"key":"count","html":"<span>1</span>"}],"title":"hello"}`)
+	if err := tp.Send(data); err != nil {
+		t.Fatalf("Send: %v", err)
 	}
 
-	_, data, err := client.Read(context.Background())
+	_, received, err := client.Read(context.Background())
 	if err != nil {
 		t.Fatalf("client read: %v", err)
 	}
 
-	var msg poly.UpdateMessage
-	if err := json.Unmarshal(data, &msg); err != nil {
+	if string(received) != string(data) {
+		t.Errorf("received %q, want %q", received, data)
+	}
+
+	var decoded map[string]any
+	if err := json.Unmarshal(received, &decoded); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
-	if msg.Type != "update" {
-		t.Errorf("expected type \"update\", got %q", msg.Type)
+	if decoded["type"] != "update" {
+		t.Errorf("expected type \"update\", got %v", decoded["type"])
 	}
-	if len(msg.Patches) != 1 || msg.Patches[0].Key != "count" {
-		t.Errorf("unexpected patches: %+v", msg.Patches)
-	}
-	if msg.Title != "hello" {
-		t.Errorf("expected title \"hello\", got %q", msg.Title)
+	if decoded["title"] != "hello" {
+		t.Errorf("expected title \"hello\", got %v", decoded["title"])
 	}
 }
 
-func TestSendUpdateNoHTMLEscaping(t *testing.T) {
+func TestSendPreservesAngleBrackets(t *testing.T) {
 	tp, client := dial(t)
 
-	// Angle brackets should not be escaped to \u003c / \u003e.
-	update := poly.Update{
-		Patches: []jit.Patch{{Key: "x", HTML: []byte("<b>hi</b>")}},
-	}
-	if err := tp.SendUpdate(update); err != nil {
-		t.Fatalf("SendUpdate: %v", err)
+	// Angle brackets should pass through unchanged — the session
+	// encodes with SetEscapeHTML(false) before calling Send.
+	data := []byte(`{"type":"update","patches":[{"key":"x","html":"<b>hi</b>"}]}`)
+	if err := tp.Send(data); err != nil {
+		t.Fatalf("Send: %v", err)
 	}
 
-	_, data, err := client.Read(context.Background())
+	_, received, err := client.Read(context.Background())
 	if err != nil {
 		t.Fatalf("client read: %v", err)
 	}
 
-	raw := string(data)
+	raw := string(received)
 	if strings.Contains(raw, `\u003c`) || strings.Contains(raw, `\u003e`) {
 		t.Errorf("HTML was escaped: %s", raw)
 	}

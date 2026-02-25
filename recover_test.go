@@ -40,8 +40,8 @@ func TestSessionHandlePanicDoesNotKillSession(t *testing.T) {
 		defer mt.mu.Unlock()
 
 		// Only the second event (increment) should produce a patch.
-		if len(patchUpdates(mt.updates)) != 1 {
-			t.Errorf("expected 1 patch update after panic recovery, got %d", len(patchUpdates(mt.updates)))
+		if len(patchMessages(mt.sent)) != 1 {
+			t.Errorf("expected 1 patch update after panic recovery, got %d", len(patchMessages(mt.sent)))
 		}
 	})
 }

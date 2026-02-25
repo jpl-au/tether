@@ -15,8 +15,6 @@
 package sse
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -94,32 +92,22 @@ type transport struct {
 	events  chan poly.Event
 	done    chan struct{}
 	once    sync.Once
-	// wmu serialises writes to w. Today all SendUpdate calls are
-	// serialised by the session mutex, but this guard protects against
-	// future callers that might not hold that lock.
+	// wmu serialises writes to w. Today all Send calls are serialised
+	// by the session loop, but this guard protects against future
+	// callers that might not hold that lock.
 	wmu sync.Mutex
 }
 
-// SendUpdate encodes the update as JSON and writes it as an SSE "data"
-// line followed by a double newline (the SSE message delimiter). The
-// write is immediately flushed so the client receives it without
-// buffering delay.
-func (t *transport) SendUpdate(update poly.Update) error {
-	msg := poly.EncodeUpdate(update)
-
-	// Avoid json.Marshal's default HTML escaping (< to \u003c) which
-	// inflates the size of DOM patches sent over the wire.
-	var buf bytes.Buffer
-	enc := json.NewEncoder(&buf)
-	enc.SetEscapeHTML(false)
-	if err := enc.Encode(msg); err != nil {
-		return err
-	}
-
+// Send writes pre-encoded JSON bytes as an SSE "data" line followed
+// by a double newline (the SSE message delimiter). The write is
+// immediately flushed so the client receives it without buffering
+// delay.
+func (t *transport) Send(data []byte) error {
 	t.wmu.Lock()
-	// Encode appends a newline, so we only need the SSE prefix and
-	// one trailing newline for the double-newline message delimiter.
-	_, err := fmt.Fprintf(t.w, "data: %s\n", buf.Bytes())
+	// Write "data: <json>\n\n" — the SSE message delimiter is two
+	// newlines. The JSON from marshalUpdate has no trailing newline,
+	// so we add both here.
+	_, err := fmt.Fprintf(t.w, "data: %s\n\n", data)
 	if err != nil {
 		t.wmu.Unlock()
 		return err

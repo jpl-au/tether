@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	jit "github.com/jpl-au/fluent-jit"
 	poly "github.com/jpl-au/fluent-poly"
 )
 
@@ -42,15 +41,12 @@ func newTestTransport() (*transport, *mockWriter) {
 	return t, w
 }
 
-func TestSendUpdateWritesSSEFormat(t *testing.T) {
+func TestSendWritesSSEFormat(t *testing.T) {
 	tr, w := newTestTransport()
 
-	update := poly.Update{
-		Patches: []jit.Patch{{Key: "count", HTML: []byte("<span>1</span>")}},
-	}
-
-	if err := tr.SendUpdate(update); err != nil {
-		t.Fatalf("SendUpdate error: %v", err)
+	data := []byte(`{"type":"update","patches":[{"key":"count","html":"<span>1</span>"}]}`)
+	if err := tr.Send(data); err != nil {
+		t.Fatalf("Send error: %v", err)
 	}
 
 	output := w.buf.String()
@@ -67,7 +63,7 @@ func TestSendUpdateWritesSSEFormat(t *testing.T) {
 		t.Errorf("expected patch key in output:\n%s", output)
 	}
 	if w.flushed < 1 {
-		t.Error("expected Flush to be called after SendUpdate")
+		t.Error("expected Flush to be called after Send")
 	}
 }
 

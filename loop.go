@@ -100,7 +100,7 @@ func (s *Session[S]) exec(ev Event) {
 	// Phase 2: State check — skip render if unchanged.
 	if s.equal != nil && s.equal(s.state, newState) {
 		if s.fx.any() || ev.EventID != "" {
-			u := Update{EventID: ev.EventID}
+			u := update{EventID: ev.EventID}
 			s.fx.merge(&u)
 			s.send(u)
 		}
@@ -170,8 +170,8 @@ func (s *Session[S]) sendDiff(eventID string, patches []jit.Patch, change *jit.S
 			})
 		}
 
-		u := Update{
-			Morphs:  []Morph{{Key: "", HTML: html}},
+		u := update{
+			Morphs:  []morph{{Key: "", HTML: html}},
 			EventID: eventID,
 		}
 		if s.fx != nil {
@@ -182,7 +182,7 @@ func (s *Session[S]) sendDiff(eventID string, patches []jit.Patch, change *jit.S
 	}
 
 	if len(patches) > 0 || (s.fx != nil && s.fx.any()) {
-		u := Update{Patches: patches, EventID: eventID}
+		u := update{Patches: patches, EventID: eventID}
 		if s.fx != nil {
 			s.fx.merge(&u)
 		}
@@ -193,14 +193,14 @@ func (s *Session[S]) sendDiff(eventID string, patches []jit.Patch, change *jit.S
 	// No patches and no structural change. Still echo the eventID
 	// so the client can restore any loading state.
 	if eventID != "" {
-		s.send(Update{EventID: eventID})
+		s.send(update{EventID: eventID})
 	}
 }
 
-// send writes an update to the transport, logging errors. URL and
-// title are captured before the nil-transport guard so reattach can
-// replay them after a disconnect.
-func (s *Session[S]) send(u Update) {
+// send encodes an update as JSON and writes the bytes to the
+// transport. URL and title are captured before the nil-transport
+// guard so reattach can replay them after a disconnect.
+func (s *Session[S]) send(u update) {
 	if u.URL != "" {
 		s.lastURL = u.URL
 	}
@@ -210,7 +210,12 @@ func (s *Session[S]) send(u Update) {
 	if s.transport == nil {
 		return
 	}
-	if err := s.transport.SendUpdate(u); err != nil {
+	data, err := marshalUpdate(u)
+	if err != nil {
+		s.logger.Error("encode update error", "err", err)
+		return
+	}
+	if err := s.transport.Send(data); err != nil {
 		s.logger.Error("send update error", "err", err)
 	}
 }

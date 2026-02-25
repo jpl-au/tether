@@ -15,19 +15,21 @@ var ErrEventBufferFull = errors.New("event buffer full")
 
 // Transport abstracts the persistent connection between server and
 // client. The session event loop calls ReceiveEvent in a tight loop
-// and calls SendUpdate after each state change. Implementations must
-// be safe for concurrent use: SendUpdate may be called from any
-// goroutine (via [Session.Update]), while ReceiveEvent is only called
-// from the event loop goroutine.
+// and calls Send after each state change. Implementations must be
+// safe for concurrent use: Send may be called from any goroutine
+// (via [Session.Update]), while ReceiveEvent is only called from the
+// event loop goroutine.
+//
+// Send receives pre-encoded JSON bytes — the session handles all
+// encoding so transports only deal with raw bytes.
 //
 // See the ws sub-package for WebSocket and the sse sub-package for
 // Server-Sent Events.
 type Transport interface {
-	// SendUpdate pushes a state update to the client. The update may
-	// contain content patches (targeted key replacements), structural
-	// morphs (full or scoped DOM mutations), URL changes, title
-	// changes, or any combination.
-	SendUpdate(update Update) error
+	// Send writes pre-encoded JSON bytes to the client. The session
+	// encodes updates before calling Send, so implementations only
+	// need to frame and transmit the data.
+	Send(data []byte) error
 
 	// ReceiveEvent blocks until the next client event arrives. Returns
 	// io.EOF when the connection is closed cleanly. Any other error is

@@ -20,15 +20,15 @@ func TestSignalOutsideHandle(t *testing.T) {
 		mt.mu.Lock()
 		defer mt.mu.Unlock()
 
-		if len(mt.updates) == 0 {
+		if len(mt.sent) == 0 {
 			t.Fatal("expected an update with signals")
 		}
-		u := mt.updates[len(mt.updates)-1]
-		if u.Signals == nil {
+		msg := decodeMessage(mt.sent[len(mt.sent)-1])
+		if msg.Signals == nil {
 			t.Fatal("update.Signals is nil")
 		}
-		if u.Signals["count"] != 42 {
-			t.Errorf("Signals[count] = %v, want 42", u.Signals["count"])
+		if msg.Signals["count"] != float64(42) {
+			t.Errorf("Signals[count] = %v, want 42", msg.Signals["count"])
 		}
 	})
 }
@@ -59,8 +59,9 @@ func TestSignalInsideHandle(t *testing.T) {
 
 		// The signal should be merged into the same update as the state diff.
 		var found bool
-		for _, u := range mt.updates {
-			if u.Signals != nil && u.Signals["status"] == "active" {
+		for _, data := range mt.sent {
+			msg := decodeMessage(data)
+			if msg.Signals != nil && msg.Signals["status"] == "active" {
 				found = true
 				break
 			}
@@ -97,12 +98,13 @@ func TestSignalMultipleKeys(t *testing.T) {
 		defer mt.mu.Unlock()
 
 		var found bool
-		for _, u := range mt.updates {
-			if u.Signals == nil {
+		for _, data := range mt.sent {
+			msg := decodeMessage(data)
+			if msg.Signals == nil {
 				continue
 			}
-			// Last write wins.
-			if u.Signals["count"] == 2 && u.Signals["status"] == "online" {
+			// Last write wins. JSON numbers decode as float64.
+			if msg.Signals["count"] == float64(2) && msg.Signals["status"] == "online" {
 				found = true
 				break
 			}
@@ -157,8 +159,9 @@ func TestSignalWithoutStateChange(t *testing.T) {
 		defer mt.mu.Unlock()
 
 		var found bool
-		for _, u := range mt.updates {
-			if u.Signals != nil && u.Signals["ping"] == "pong" {
+		for _, data := range mt.sent {
+			msg := decodeMessage(data)
+			if msg.Signals != nil && msg.Signals["ping"] == "pong" {
 				found = true
 				break
 			}
@@ -177,11 +180,11 @@ func TestSignalMergedIntoEffects(t *testing.T) {
 		t.Error("effects.any() should be true when signals are set")
 	}
 
-	u := &Update{}
+	u := &update{}
 	fx.merge(u)
 
 	if u.Signals == nil {
-		t.Fatal("Update.Signals is nil after merge")
+		t.Fatal("update.Signals is nil after merge")
 	}
 	if u.Signals["count"] != 5 {
 		t.Errorf("Signals[count] = %v, want 5", u.Signals["count"])

@@ -8,14 +8,14 @@ import (
 )
 
 func TestEncodeUpdateWithPatches(t *testing.T) {
-	update := Update{
+	update := update{
 		Patches: []jit.Patch{
 			{Key: "count", HTML: []byte(`<span data-poly-key="count">42</span>`)},
 			{Key: "name", HTML: []byte(`<span data-poly-key="name">Alice</span>`)},
 		},
 	}
 
-	msg := EncodeUpdate(update)
+	msg := encodeUpdate(update)
 
 	if msg.Type != "update" {
 		t.Errorf("type should be %q, got %q", "update", msg.Type)
@@ -50,11 +50,11 @@ func TestEncodeUpdateWithPatches(t *testing.T) {
 
 func TestEncodeUpdateWithMorphs(t *testing.T) {
 	html := []byte(`<div data-poly-root><span>hello</span></div>`)
-	update := Update{
-		Morphs: []Morph{{Key: "", HTML: html}},
+	update := update{
+		Morphs: []morph{{Key: "", HTML: html}},
 	}
 
-	msg := EncodeUpdate(update)
+	msg := encodeUpdate(update)
 
 	if msg.Type != "update" {
 		t.Errorf("type should be %q, got %q", "update", msg.Type)
@@ -87,12 +87,12 @@ func TestEncodeUpdateWithMorphs(t *testing.T) {
 }
 
 func TestEncodeUpdateWithURL(t *testing.T) {
-	update := Update{
+	update := update{
 		URL:     "/profile",
 		Replace: false,
 	}
 
-	msg := EncodeUpdate(update)
+	msg := encodeUpdate(update)
 
 	if msg.URL != "/profile" {
 		t.Errorf("URL should be %q, got %q", "/profile", msg.URL)
@@ -116,12 +116,12 @@ func TestEncodeUpdateWithURL(t *testing.T) {
 }
 
 func TestEncodeUpdateWithURLReplace(t *testing.T) {
-	update := Update{
+	update := update{
 		URL:     "/current",
 		Replace: true,
 	}
 
-	msg := EncodeUpdate(update)
+	msg := encodeUpdate(update)
 
 	if msg.URL != "/current" {
 		t.Errorf("URL should be %q, got %q", "/current", msg.URL)
@@ -145,14 +145,14 @@ func TestEncodeUpdateWithURLReplace(t *testing.T) {
 }
 
 func TestEncodeUpdateWithSignals(t *testing.T) {
-	update := Update{
+	update := update{
 		Signals: map[string]any{
 			"count":  42,
 			"status": "online",
 		},
 	}
 
-	msg := EncodeUpdate(update)
+	msg := encodeUpdate(update)
 
 	if msg.Type != "update" {
 		t.Errorf("type should be %q, got %q", "update", msg.Type)
@@ -191,11 +191,11 @@ func TestEncodeUpdateWithSignals(t *testing.T) {
 }
 
 func TestEncodeUpdateOmitsEmptySignals(t *testing.T) {
-	update := Update{
+	update := update{
 		Toast: "hello",
 	}
 
-	msg := EncodeUpdate(update)
+	msg := encodeUpdate(update)
 
 	data, err := json.Marshal(msg)
 	if err != nil {

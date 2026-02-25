@@ -2,13 +2,13 @@ package poly
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"sync"
 	"testing"
 
 	jit "github.com/jpl-au/fluent-jit"
+	"github.com/jpl-au/fluent-poly/bind"
 	"github.com/jpl-au/fluent/html5/button"
 	"github.com/jpl-au/fluent/html5/div"
 	"github.com/jpl-au/fluent/html5/span"
@@ -22,7 +22,7 @@ import (
 // BenchmarkBindClick measures Click (generic wrapper) + Render.
 func BenchmarkBindClick(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		el := Click(button.Text("+"), "increment")
+		el := bind.Click(button.Text("+"), "increment")
 		_ = el.Render()
 	}
 }
@@ -38,7 +38,7 @@ func BenchmarkSetDataDirect(b *testing.B) {
 // BenchmarkBindClickRenderOnly isolates the render cost by pre-building
 // the element, so only the Render() call is measured.
 func BenchmarkBindClickRenderOnly(b *testing.B) {
-	el := Click(button.Text("+"), "increment")
+	el := bind.Click(button.Text("+"), "increment")
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = el.Render()
@@ -79,24 +79,22 @@ func benchEncodeUpdatePatches(b *testing.B, n int) {
 			HTML: fmt.Appendf(nil, `<span data-poly-key="%s">value %d</span>`, key, i),
 		}
 	}
-	update := Update{Patches: patches}
+	u := update{Patches: patches}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		msg := EncodeUpdate(update)
-		data, _ := json.Marshal(msg)
+		data, _ := marshalUpdate(u)
 		_ = data
 	}
 }
 
 func BenchmarkEncodeUpdateMorph(b *testing.B) {
 	html := []byte(`<div data-poly-root><span data-poly-key="count">42</span><span data-poly-key="name">Alice</span></div>`)
-	update := Update{
-		Morphs: []Morph{{Key: "", HTML: html}},
+	u := update{
+		Morphs: []morph{{Key: "", HTML: html}},
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		msg := EncodeUpdate(update)
-		data, _ := json.Marshal(msg)
+		data, _ := marshalUpdate(u)
 		_ = data
 	}
 }
@@ -128,7 +126,7 @@ type discardTransport struct {
 	events []Event
 }
 
-func (d *discardTransport) SendUpdate(_ Update) error { return nil }
+func (d *discardTransport) Send(_ []byte) error { return nil }
 func (d *discardTransport) ReceiveEvent() (Event, error) {
 	d.mu.Lock()
 	if len(d.events) == 0 {

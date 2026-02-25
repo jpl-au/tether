@@ -29,15 +29,15 @@ func TestSessionSendsPatchOnChange(t *testing.T) {
 		mt.mu.Lock()
 		defer mt.mu.Unlock()
 
-		pUpdates := patchUpdates(mt.updates)
-		if len(pUpdates) != 1 {
-			t.Fatalf("expected 1 patch update, got %d", len(pUpdates))
+		pMsgs := patchMessages(mt.sent)
+		if len(pMsgs) != 1 {
+			t.Fatalf("expected 1 patch update, got %d", len(pMsgs))
 		}
-		if len(pUpdates[0].Patches) != 1 {
-			t.Fatalf("expected 1 patch in first update, got %d", len(pUpdates[0].Patches))
+		if len(pMsgs[0].Patches) != 1 {
+			t.Fatalf("expected 1 patch in first update, got %d", len(pMsgs[0].Patches))
 		}
-		if pUpdates[0].Patches[0].Key != "count" {
-			t.Errorf("patch key should be %q, got %q", "count", pUpdates[0].Patches[0].Key)
+		if pMsgs[0].Patches[0].Key != "count" {
+			t.Errorf("patch key should be %q, got %q", "count", pMsgs[0].Patches[0].Key)
 		}
 		if !mt.closed {
 			t.Error("transport should be closed after event loop exits")
@@ -62,8 +62,8 @@ func TestSessionNoPatchWhenUnchanged(t *testing.T) {
 		mt.mu.Lock()
 		defer mt.mu.Unlock()
 
-		if len(patchUpdates(mt.updates)) != 0 {
-			t.Errorf("expected no patch updates when state unchanged, got %d", len(patchUpdates(mt.updates)))
+		if len(patchMessages(mt.sent)) != 0 {
+			t.Errorf("expected no patch updates when state unchanged, got %d", len(patchMessages(mt.sent)))
 		}
 	})
 }
@@ -89,8 +89,8 @@ func TestSessionEqualSkipsDiff(t *testing.T) {
 		mt.mu.Lock()
 		defer mt.mu.Unlock()
 
-		if len(mt.updates) != 0 {
-			t.Errorf("expected no updates when Equal returns true, got %d", len(mt.updates))
+		if len(mt.sent) != 0 {
+			t.Errorf("expected no updates when Equal returns true, got %d", len(mt.sent))
 		}
 	})
 }
@@ -114,9 +114,9 @@ func TestSessionMultipleEvents(t *testing.T) {
 		mt.mu.Lock()
 		defer mt.mu.Unlock()
 
-		pUpdates := patchUpdates(mt.updates)
-		if len(pUpdates) != 3 {
-			t.Fatalf("expected 3 patch updates, got %d", len(pUpdates))
+		pMsgs := patchMessages(mt.sent)
+		if len(pMsgs) != 3 {
+			t.Fatalf("expected 3 patch updates, got %d", len(pMsgs))
 		}
 
 		// Read state through the command channel.
@@ -186,12 +186,12 @@ func TestSessionStructuralChange(t *testing.T) {
 		mt.mu.Lock()
 		defer mt.mu.Unlock()
 
-		mUpdates := morphUpdates(mt.updates)
-		if len(mUpdates) != 1 {
-			t.Fatalf("expected 1 morph update for structural change, got %d", len(mUpdates))
+		mMsgs := morphMessages(mt.sent)
+		if len(mMsgs) != 1 {
+			t.Fatalf("expected 1 morph update for structural change, got %d", len(mMsgs))
 		}
-		if len(patchUpdates(mt.updates)) != 0 {
-			t.Errorf("expected no patch updates for structural change, got %d", len(patchUpdates(mt.updates)))
+		if len(patchMessages(mt.sent)) != 0 {
+			t.Errorf("expected no patch updates for structural change, got %d", len(patchMessages(mt.sent)))
 		}
 	})
 }

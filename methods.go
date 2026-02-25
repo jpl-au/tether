@@ -2,6 +2,7 @@ package poly
 
 import (
 	"errors"
+	"maps"
 	"time"
 
 	"github.com/jpl-au/fluent-poly/push"
@@ -89,7 +90,7 @@ func (s *Session[S]) Toast(text string) {
 		return
 	}
 	s.enqueue(func() {
-		s.send(Update{Toast: text})
+		s.send(update{Toast: text})
 	})
 }
 
@@ -102,7 +103,7 @@ func (s *Session[S]) Navigate(rawURL string) {
 		return
 	}
 	s.enqueue(func() {
-		s.send(Update{URL: rawURL})
+		s.send(update{URL: rawURL})
 	})
 }
 
@@ -116,7 +117,7 @@ func (s *Session[S]) ReplaceURL(rawURL string) {
 		return
 	}
 	s.enqueue(func() {
-		s.send(Update{URL: rawURL, Replace: true})
+		s.send(update{URL: rawURL, Replace: true})
 	})
 }
 
@@ -128,7 +129,7 @@ func (s *Session[S]) SetTitle(title string) {
 		return
 	}
 	s.enqueue(func() {
-		s.send(Update{Title: title})
+		s.send(update{Title: title})
 	})
 }
 
@@ -141,7 +142,7 @@ func (s *Session[S]) Announce(text string) {
 		return
 	}
 	s.enqueue(func() {
-		s.send(Update{Announce: text})
+		s.send(update{Announce: text})
 	})
 }
 
@@ -158,7 +159,7 @@ func (s *Session[S]) Flash(selector, text string) {
 		return
 	}
 	s.enqueue(func() {
-		s.send(Update{Flash: map[string]string{selector: text}})
+		s.send(update{Flash: map[string]string{selector: text}})
 	})
 }
 
@@ -183,7 +184,27 @@ func (s *Session[S]) Signal(key string, value any) {
 		return
 	}
 	s.enqueue(func() {
-		s.send(Update{Signals: map[string]any{key: value}})
+		s.send(update{Signals: map[string]any{key: value}})
+	})
+}
+
+// Signals pushes multiple reactive values to the client in a single
+// update. This is a batch variant of [Signal] — use it when setting
+// several signals at once to avoid sending one message per key.
+// Inside Handle all keys are merged into the buffered effects.
+// Outside Handle a single update is sent with all keys.
+//
+//	s.Signals(map[string]any{"count": 42, "status": "online"})
+func (s *Session[S]) Signals(signals map[string]any) {
+	if s.handling {
+		if s.fx.signals == nil {
+			s.fx.signals = make(map[string]any, len(signals))
+		}
+		maps.Copy(s.fx.signals, signals)
+		return
+	}
+	s.enqueue(func() {
+		s.send(update{Signals: signals})
 	})
 }
 

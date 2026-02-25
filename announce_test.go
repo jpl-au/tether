@@ -20,18 +20,19 @@ func TestSessionAnnounceSendsUpdate(t *testing.T) {
 		mt.mu.Lock()
 		defer mt.mu.Unlock()
 
-		if len(mt.updates) != 1 {
-			t.Fatalf("expected 1 update, got %d", len(mt.updates))
+		if len(mt.sent) != 1 {
+			t.Fatalf("expected 1 update, got %d", len(mt.sent))
 		}
-		if mt.updates[0].Announce != "Item added" {
-			t.Errorf("expected announce 'Item added', got %q", mt.updates[0].Announce)
+		msg := decodeMessage(mt.sent[0])
+		if msg.Announce != "Item added" {
+			t.Errorf("expected announce 'Item added', got %q", msg.Announce)
 		}
 	})
 }
 
 func TestEncodeUpdateIncludesAnnounce(t *testing.T) {
-	update := Update{Announce: "Screen reader text"}
-	msg := EncodeUpdate(update)
+	u := update{Announce: "Screen reader text"}
+	msg := encodeUpdate(u)
 
 	if msg.Announce != "Screen reader text" {
 		t.Errorf("expected announce in encoded message, got %q", msg.Announce)
