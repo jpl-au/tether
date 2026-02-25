@@ -77,9 +77,7 @@ func (h *Handler[S]) reapDisconnected(now time.Time) {
 		h.mu.Unlock()
 
 		for _, sess := range expired {
-			if sess.cancel != nil {
-				sess.cancel()
-			}
+			h.destroySession(sess)
 		}
 	}
 }
@@ -127,13 +125,12 @@ func (h *Handler[S]) reapActive(now time.Time) {
 		}
 		h.mu.Unlock()
 
-		var wg sync.WaitGroup
 		for _, sess := range expired {
-			wg.Go(func() {
-				h.cfg.Logger.Info("closing session", "session", sess.ID())
-				sess.Close()
-			})
+			go func(s *Session[S]) {
+				h.cfg.Logger.Info("closing session", "session", s.ID())
+				s.Close()
+				h.destroySession(s)
+			}(sess)
 		}
-		wg.Wait()
 	}
 }

@@ -355,3 +355,15 @@ func (h *Handler[S]) handlePushSubscribe(w http.ResponseWriter, r *http.Request)
 	go h.cfg.Push.OnSubscribe(sess, sub)
 	w.WriteHeader(http.StatusNoContent)
 }
+
+// destroySession performs permanent cleanup for a session that is no
+// longer reachable (reaped, shutdown, or disconnected with timeout -1).
+func (h *Handler[S]) destroySession(s *Session[S]) {
+	if s.cancel != nil {
+		s.cancel()
+	}
+
+	for _, g := range h.cfg.Groups {
+		g.Remove(s)
+	}
+}

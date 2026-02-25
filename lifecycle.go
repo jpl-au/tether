@@ -212,6 +212,10 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		h.cfg.OnConnect(sess)
 	}
 
+	for _, g := range h.cfg.Groups {
+		g.Add(sess)
+	}
+
 	running = true
 	sess.run()
 }
@@ -269,6 +273,8 @@ func (h *Handler[S]) wireDisconnect(sess *Session[S]) {
 		delete(h.active, sess.id)
 		if h.cfg.ReconnectTimeout > 0 {
 			h.disconnected[sess.id] = sess
+		} else {
+			h.destroySession(sess)
 		}
 		h.mu.Unlock()
 

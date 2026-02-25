@@ -227,6 +227,12 @@ type Config[S any] struct {
 	// connecting, and the subscription is delivered via OnSubscribe.
 	// Use the push subpackage to send notifications. Optional.
 	Push *PushConfig[S]
+
+	// Groups are collections that the session will automatically join
+	// when its transport is ready and leave when the session is
+	// permanently destroyed. Using Groups on Config avoids repetitive
+	// Add/Remove boilerplate in OnConnect/OnDisconnect. Optional.
+	Groups []*Group[S]
 }
 
 // PushConfig enables Web Push notifications for the page. When set on
