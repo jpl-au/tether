@@ -114,11 +114,11 @@ func benchRender(s benchState) node.Node {
 	)
 }
 
-func benchHandle(s benchState, ev Event) benchState {
+func benchHandle(s benchState, ev Event) HandleResult[benchState] {
 	if ev.Action == "increment" {
 		s.Count++
 	}
-	return s
+	return Result(s)
 }
 
 // discardTransport satisfies Transport but discards all output.

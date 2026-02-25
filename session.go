@@ -31,12 +31,75 @@ type StructuralChange struct {
 // engine compares consecutive renders to compute patches.
 type RenderFunc[S any] func(state S) node.Node
 
-// HandleFunc processes a client event and returns updated state. The
-// function should treat the input state as immutable — return a new
+// HandleFunc processes a client event and returns a [HandleResult]
+// containing the new state and optional side effects (announce, flash,
+// title, URL changes). Side effects are merged into the same update
+// message as the state diff, so the client receives everything
+// atomically in a single frame.
+//
+// The function should treat the input state as immutable — return a new
 // value with the desired changes. Returning the original state
 // unchanged is valid and will produce no diff (especially when an
 // Equal function is configured).
-type HandleFunc[S any] func(state S, event Event) S
+//
+// Use [Result] to create a HandleResult from a bare state value when
+// no side effects are needed.
+type HandleFunc[S any] func(state S, event Event) HandleResult[S]
+
+// HandleResult wraps the new state with optional side effects that
+// the session applies in the same update message as the state diff.
+// Use [Result] to create one from a bare state, and the With* methods
+// to attach side effects.
+type HandleResult[S any] struct {
+	State    S
+	Announce string            // text for aria-live region
+	Flash    map[string]string // CSS selector → text, cleared after 5s
+	Title    string            // set document.title
+	URL      string            // push/replace browser URL
+	Replace  bool              // true for replaceState, false for pushState
+}
+
+// Result creates a [HandleResult] from a bare state value. This is the
+// common case when no side effects are needed.
+func Result[S any](state S) HandleResult[S] {
+	return HandleResult[S]{State: state}
+}
+
+// WithAnnounce attaches a screen reader announcement to the result.
+func (r HandleResult[S]) WithAnnounce(text string) HandleResult[S] {
+	r.Announce = text
+	return r
+}
+
+// WithFlash attaches a flash notification to the result. The selector
+// identifies the target element; the text is displayed for 5 seconds.
+func (r HandleResult[S]) WithFlash(selector, text string) HandleResult[S] {
+	if r.Flash == nil {
+		r.Flash = make(map[string]string)
+	}
+	r.Flash[selector] = text
+	return r
+}
+
+// WithTitle sets the browser's document title.
+func (r HandleResult[S]) WithTitle(title string) HandleResult[S] {
+	r.Title = title
+	return r
+}
+
+// WithNavigate pushes a URL change with a history entry.
+func (r HandleResult[S]) WithNavigate(rawURL string) HandleResult[S] {
+	r.URL = rawURL
+	r.Replace = false
+	return r
+}
+
+// WithReplaceURL updates the browser URL without a history entry.
+func (r HandleResult[S]) WithReplaceURL(rawURL string) HandleResult[S] {
+	r.URL = rawURL
+	r.Replace = true
+	return r
+}
 
 // Session represents a single connected client. Each browser tab gets
 // its own Session with independent state and a dedicated diff engine.
@@ -160,7 +223,7 @@ func (s *Session[S]) Update(fn func(S) S) {
 	// Server-initiated updates count as activity so that sessions
 	// receiving only server pushes are not reaped as idle.
 	s.lastActivity = time.Now()
-	s.applyState(fn(s.state), "")
+	s.applyState(fn(s.state), "", nil)
 }
 
 // safeHandleEvent wraps handleEvent with panic recovery so that a
@@ -183,8 +246,8 @@ func (s *Session[S]) safeHandleEvent(ev Event) {
 // handleEvent processes a single event. Navigate events are routed to
 // handleParams (when configured) so URL changes can update state without
 // going through the general Handle function. All other events go through
-// Handle. The eventID from the client is threaded through to applyState
-// so the response can be correlated with the triggering event.
+// Handle. Side effects from the HandleResult (announce, flash, title,
+// URL) are merged into the update that applyState builds from the diff.
 //
 // Caller must hold s.mu.
 func (s *Session[S]) handleEvent(ev Event) {
@@ -193,10 +256,11 @@ func (s *Session[S]) handleEvent(ev Event) {
 		if search := ev.Data["search"]; search != "" {
 			params.Query, _ = url.ParseQuery(search)
 		}
-		s.applyState(s.handleParams(s.state, params), ev.EventID)
+		s.applyState(s.handleParams(s.state, params), ev.EventID, nil)
 		return
 	}
-	s.applyState(s.handle(s.state, ev), ev.EventID)
+	result := s.handle(s.state, ev)
+	s.applyState(result.State, ev.EventID, &result)
 }
 
 // Navigate pushes a URL change to the client. The browser calls
@@ -273,13 +337,19 @@ func (s *Session[S]) sendURL(rawURL string, replace bool) {
 // to restore loading states (e.g. re-enabling a button) on the specific
 // element that initiated the action.
 //
+// When effects is non-nil, its fields (Announce, Flash, Title, URL) are
+// merged into the update so side effects from Handle travel in the same
+// message as the diff.
+//
 // Caller must hold s.mu.
-func (s *Session[S]) applyState(newState S, eventID string) {
+func (s *Session[S]) applyState(newState S, eventID string, effects *HandleResult[S]) {
 	if s.equal != nil && s.equal(s.state, newState) {
-		// Still echo the eventID so the client can restore any loading
-		// state (e.g. a disabled button) even when nothing changed.
-		if eventID != "" {
-			if err := s.transport.SendUpdate(Update{EventID: eventID}); err != nil {
+		// Still send side effects and echo the eventID even when the
+		// state is unchanged.
+		if hasEffects(effects) || eventID != "" {
+			update := Update{EventID: eventID}
+			mergeEffects(&update, effects)
+			if err := s.transport.SendUpdate(update); err != nil {
 				s.logger.Error("send update error", "session", s.id, "err", err)
 			}
 		}
@@ -312,14 +382,16 @@ func (s *Session[S]) applyState(newState S, eventID string) {
 			Morphs:  []Morph{{Key: "", HTML: html}},
 			EventID: eventID,
 		}
+		mergeEffects(&update, effects)
 		if err := s.transport.SendUpdate(update); err != nil {
 			s.logger.Error("send update error", "session", s.id, "err", err)
 		}
 		return
 	}
 
-	if len(patches) > 0 {
+	if len(patches) > 0 || hasEffects(effects) {
 		update := Update{Patches: patches, EventID: eventID}
+		mergeEffects(&update, effects)
 		if err := s.transport.SendUpdate(update); err != nil {
 			s.logger.Error("send update error", "session", s.id, "err", err)
 		}
@@ -333,5 +405,37 @@ func (s *Session[S]) applyState(newState S, eventID string) {
 		if err := s.transport.SendUpdate(Update{EventID: eventID}); err != nil {
 			s.logger.Error("send update error", "session", s.id, "err", err)
 		}
+	}
+}
+
+// hasEffects reports whether a HandleResult carries any side effects
+// (announce, flash, title, or URL changes).
+func hasEffects[S any](effects *HandleResult[S]) bool {
+	if effects == nil {
+		return false
+	}
+	return effects.Announce != "" || effects.Flash != nil ||
+		effects.Title != "" || effects.URL != ""
+}
+
+// mergeEffects copies side effect fields from a HandleResult into an
+// Update. Called by applyState to combine diff output with Handle's
+// side effects into a single wire message.
+func mergeEffects[S any](update *Update, effects *HandleResult[S]) {
+	if effects == nil {
+		return
+	}
+	if effects.Announce != "" {
+		update.Announce = effects.Announce
+	}
+	if effects.Flash != nil {
+		update.Flash = effects.Flash
+	}
+	if effects.Title != "" {
+		update.Title = effects.Title
+	}
+	if effects.URL != "" {
+		update.URL = effects.URL
+		update.Replace = effects.Replace
 	}
 }

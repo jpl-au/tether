@@ -4,7 +4,7 @@
 
 1. Define your state type
 2. Write a render function that builds a Fluent node tree, marking dynamic elements with `.Dynamic("key")`
-3. Write an event handler that takes state + event and returns new state
+3. Write an event handler that takes state + event and returns a `HandleResult` (state + optional side effects)
 4. Mount it as an `http.Handler`
 
 ```go
@@ -24,11 +24,11 @@ mux.Handle("/counter", poly.New(poly.Config[CounterState]{
             poly.Click(button.Text("+1"), "increment"),
         )
     },
-    Handle: func(state CounterState, event poly.Event) CounterState {
+    Handle: func(state CounterState, event poly.Event) poly.HandleResult[CounterState] {
         if event.Action == "increment" {
             state.Count++
         }
-        return state
+        return poly.Result(state)
     },
 }))
 

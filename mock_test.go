@@ -77,14 +77,14 @@ func renderCounter(state counterState) node.Node {
 	)
 }
 
-func handleCounter(state counterState, ev Event) counterState {
+func handleCounter(state counterState, ev Event) HandleResult[counterState] {
 	switch ev.Action {
 	case "increment":
 		state.Count++
 	case "decrement":
 		state.Count--
 	}
-	return state
+	return Result(state)
 }
 
 // newTestSession creates a session with a seeded differ, ready for

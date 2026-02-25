@@ -50,8 +50,8 @@ Transport implementations live in sub-packages. The `Config.Upgrade` field accep
 
 1. Client JS sends a DOM event as JSON: `{"type":"click","action":"increment","data":{}}`
 2. `Transport.ReceiveEvent()` deserialises it to an `Event`
-3. The session calls the user's `Handle` function with the current state
-4. The returned state is rendered to a new node tree and diffed against the previous render
+3. The session calls the user's `Handle` function with the current state; Handle returns a `HandleResult` containing the new state and optional side effects (announce, flash, title, URL)
+4. The returned state is rendered to a new node tree and diffed against the previous render; side effects from the `HandleResult` are merged into the update
 5. `Transport.SendUpdate()` sends a unified update message containing either:
    - **Patches** — targeted content updates for keyed elements that changed
    - **Morphs** — structural DOM changes (e.g. root morph when keys are added/removed/reordered)
@@ -252,18 +252,19 @@ type state struct {
 }
 
 // Handle validates on submit and clears errors on success.
-func handle(s state, ev poly.Event) state {
+func handle(s state, ev poly.Event) poly.HandleResult[state] {
     switch {
     case ev.Action == "add":
         text := strings.TrimSpace(ev.Data["text"])
         if text == "" {
             s.TodoError = "Please enter a todo."
             s.TodoText = ev.Data["text"]
-            return s
+            return poly.Result(s)
         }
         s.TodoError = ""
         s.TodoText = ""
         // ... add the item
+        return poly.Result(s).WithAnnounce("Todo added")
 
     case ev.Action == "validate-todo":
         // Live validation on input — clears error once corrected
@@ -275,7 +276,7 @@ func handle(s state, ev poly.Event) state {
         }
         s.TodoText = text
     }
-    return s
+    return poly.Result(s)
 }
 ```
 

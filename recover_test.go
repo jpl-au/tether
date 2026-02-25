@@ -15,12 +15,12 @@ func TestSessionHandlePanicDoesNotKillSession(t *testing.T) {
 		},
 	}
 
-	handle := func(s counterState, ev Event) counterState {
+	handle := func(s counterState, ev Event) HandleResult[counterState] {
 		if ev.Action == "crash" {
 			panic("boom")
 		}
 		s.Count++
-		return s
+		return Result(s)
 	}
 
 	sess := newTestSession(counterState{Count: 0}, mt)
