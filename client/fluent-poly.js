@@ -41,6 +41,7 @@ window.Poly.hooks = window.Poly.hooks || {};
   var eventSource = null;
   var wsOpened = false;
   var sseOpened = false;
+  var devMode = false;
 
   // --- Initialisation ---
 
@@ -56,14 +57,21 @@ window.Poly.hooks = window.Poly.hooks || {};
     maxRetryDelay = parseInt(root.getAttribute("data-poly-max-retry-delay")) || 30000;
     defaultDebounce = parseInt(root.getAttribute("data-poly-debounce-default")) || 300;
     transitionTimeout = parseInt(root.getAttribute("data-poly-transition-timeout")) || 5000;
+    devMode = root.hasAttribute("data-poly-dev");
     connectionMode = (transportMode === "sse") ? "sse" : "ws";
     connect();
     bindEvents();
 
-    // Register service worker when enabled by the server. The worker
-    // provides asset caching, offline page shells, push notification
-    // handling, and background sync for SSE event resilience.
-    if (root.hasAttribute("data-poly-worker") && "serviceWorker" in navigator) {
+    // Dev mode: unregister any existing service worker so cached assets
+    // are never served stale during development.
+    if (devMode && "serviceWorker" in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function (regs) {
+        for (var i = 0; i < regs.length; i++) regs[i].unregister();
+      });
+    } else if (root.hasAttribute("data-poly-worker") && "serviceWorker" in navigator) {
+      // Register service worker when enabled by the server. The worker
+      // provides asset caching, offline page shells, push notification
+      // handling, and background sync for SSE event resilience.
       navigator.serviceWorker.register("/_poly/poly-worker.js", { scope: "/" })
         .then(function (reg) {
           var pushKey = root.getAttribute("data-poly-push-key");
@@ -128,6 +136,10 @@ window.Poly.hooks = window.Poly.hooks || {};
     ws.onclose = function () {
       if (root) root.classList.add("poly-disconnected");
       showReconnectBar();
+      if (devMode) {
+        setTimeout(function () { location.reload(); }, retryDelay);
+        return;
+      }
       // If the WebSocket never connected and the server allows SSE
       // fallback (transportMode "auto"), switch to SSE+POST permanently.
       if (!wsOpened && transportMode === "auto") {
@@ -178,6 +190,11 @@ window.Poly.hooks = window.Poly.hooks || {};
     eventSource.onerror = function () {
       if (root) root.classList.add("poly-disconnected");
       showReconnectBar();
+      if (devMode) {
+        eventSource.close();
+        setTimeout(function () { location.reload(); }, retryDelay);
+        return;
+      }
       // EventSource reconnects automatically — no manual retry needed.
     };
   }
@@ -226,6 +243,7 @@ window.Poly.hooks = window.Poly.hooks || {};
 
   function showReconnectBar() {
     if (!reconnectBar) reconnectBar = createReconnectBar();
+    reconnectBar.textContent = devMode ? "Reloading\u2026" : "Reconnecting\u2026";
     // Force reflow before changing the transform so the browser
     // registers the initial off-screen position.
     reconnectBar.offsetHeight;

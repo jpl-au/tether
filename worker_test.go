@@ -337,6 +337,124 @@ func TestHandlePushSubscribeUnknownSession(t *testing.T) {
 	}
 }
 
+func TestPolyBodyDevModeAttribute(t *testing.T) {
+	t.Run("devMode true emits data-poly-dev", func(t *testing.T) {
+		body := &polyBody{
+			html:     []byte("<p>hello</p>"),
+			endpoint: "/app",
+			session:  "abc",
+			devMode:  true,
+		}
+		var buf bytes.Buffer
+		body.RenderBuilder(&buf)
+		html := buf.String()
+
+		if !strings.Contains(html, "data-poly-dev") {
+			t.Error("expected data-poly-dev attribute when devMode is true")
+		}
+	})
+
+	t.Run("devMode false omits data-poly-dev", func(t *testing.T) {
+		body := &polyBody{
+			html:     []byte("<p>hello</p>"),
+			endpoint: "/app",
+			session:  "abc",
+			devMode:  false,
+		}
+		var buf bytes.Buffer
+		body.RenderBuilder(&buf)
+		html := buf.String()
+
+		if strings.Contains(html, "data-poly-dev") {
+			t.Error("data-poly-dev should not appear when devMode is false")
+		}
+	})
+}
+
+func TestDevModeEnvVar(t *testing.T) {
+	t.Setenv("POLY_DEV", "1")
+
+	handler := New(Config[counterState]{
+		Upgrade:      stubUpgrade,
+		InitialState: func(r *http.Request) counterState { return counterState{} },
+		Render:       renderCounter,
+		Handle:       handleCounter,
+	})
+
+	if !handler.cfg.DevMode {
+		t.Error("expected DevMode to be true when POLY_DEV is set")
+	}
+}
+
+func TestDevModeBoolOverridesEnv(t *testing.T) {
+	t.Setenv("POLY_DEV", "")
+
+	handler := New(Config[counterState]{
+		Upgrade:      stubUpgrade,
+		InitialState: func(r *http.Request) counterState { return counterState{} },
+		Render:       renderCounter,
+		Handle:       handleCounter,
+		DevMode:      true,
+	})
+
+	if !handler.cfg.DevMode {
+		t.Error("expected DevMode to remain true even without POLY_DEV")
+	}
+}
+
+func TestDevModeCacheControl(t *testing.T) {
+	handler := New(Config[counterState]{
+		Upgrade:      stubUpgrade,
+		InitialState: func(r *http.Request) counterState { return counterState{} },
+		Render:       renderCounter,
+		Handle:       handleCounter,
+		DevMode:      true,
+	})
+
+	req := httptest.NewRequest("GET", "/app", nil)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	if w.Header().Get("Cache-Control") != "no-store" {
+		t.Errorf("Cache-Control = %q, want %q", w.Header().Get("Cache-Control"), "no-store")
+	}
+}
+
+func TestDevModeNoCacheControlInProduction(t *testing.T) {
+	handler := New(Config[counterState]{
+		Upgrade:      stubUpgrade,
+		InitialState: func(r *http.Request) counterState { return counterState{} },
+		Render:       renderCounter,
+		Handle:       handleCounter,
+	})
+
+	req := httptest.NewRequest("GET", "/app", nil)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	if w.Header().Get("Cache-Control") != "" {
+		t.Errorf("Cache-Control = %q, want empty when DevMode is false", w.Header().Get("Cache-Control"))
+	}
+}
+
+func TestDevModeInitialPageHasAttribute(t *testing.T) {
+	handler := New(Config[counterState]{
+		Upgrade:      stubUpgrade,
+		InitialState: func(r *http.Request) counterState { return counterState{} },
+		Render:       renderCounter,
+		Handle:       handleCounter,
+		DevMode:      true,
+	})
+
+	req := httptest.NewRequest("GET", "/app", nil)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	if !strings.Contains(w.Body.String(), "data-poly-dev") {
+		t.Error("expected data-poly-dev attribute in initial page HTML")
+	}
+}
+
 // stubUpgrade is a no-op upgrade function for tests that don't need
 // a real transport connection.
 func stubUpgrade(w http.ResponseWriter, r *http.Request) (Transport, error) {

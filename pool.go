@@ -95,11 +95,15 @@ func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 		transitionTimeout: h.cfg.TransitionTimeout,
 		worker:            h.cfg.Worker,
 		pushKey:           pushKey,
+		devMode:           h.cfg.DevMode,
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	// Prevent session ID leakage via Referer header on external links.
 	w.Header().Set("Referrer-Policy", "same-origin")
+	if h.cfg.DevMode {
+		w.Header().Set("Cache-Control", "no-store")
+	}
 	if h.cfg.Layout != nil {
 		h.cfg.Layout(content).Render(w)
 	} else {

@@ -27,6 +27,7 @@ type polyBody struct {
 	transitionTimeout time.Duration
 	worker            bool
 	pushKey           string
+	devMode           bool
 }
 
 func (p *polyBody) Render(w ...io.Writer) []byte {
@@ -71,6 +72,9 @@ func (p *polyBody) RenderBuilder(buf *bytes.Buffer) {
 		buf.WriteString(` data-poly-push-key="`)
 		buf.WriteString(html.EscapeString(p.pushKey))
 		buf.WriteString(`"`)
+	}
+	if p.devMode {
+		buf.WriteString(` data-poly-dev`)
 	}
 	buf.WriteString(`>`)
 	buf.Write(p.html)

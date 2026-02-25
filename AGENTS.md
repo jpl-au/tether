@@ -504,13 +504,25 @@ Supported data attributes:
 
 **Lifecycle:** `data-poly-hook`, `data-poly-transition`
 
-**Configuration (set by server, read by JS):** `data-poly-retry-delay`, `data-poly-max-retry-delay`, `data-poly-debounce-default`, `data-poly-transition-timeout`
+**Configuration (set by server, read by JS):** `data-poly-retry-delay`, `data-poly-max-retry-delay`, `data-poly-debounce-default`, `data-poly-transition-timeout`, `data-poly-dev`
 
 **Developer warnings:** The client logs `console.warn` if a patch or morph contains multiple root elements. Only the first element is used — wrap siblings in a container to avoid silent data loss.
 
 **Service worker:** `data-poly-worker` (boolean — registers the service worker), `data-poly-push-key` (VAPID public key for push subscription)
 
+**Dev mode:** `data-poly-dev` (boolean — disables service worker, reloads on disconnect)
+
 **Internal (managed by JS):** `data-poly-client-classes`, `data-poly-client-attrs`
+
+## Dev mode
+
+`Config.DevMode` (or `POLY_DEV` env var) optimises the development experience:
+
+- **No service worker** — the client unregisters any existing worker and skips registration, ensuring fresh assets on every reload.
+- **Page reload on disconnect** — instead of reconnecting with exponential backoff, the page does `location.reload()` after a brief delay. When the Go server restarts, the browser reloads with fresh state automatically.
+- **Cache-Control: no-store** — prevents the browser from serving a cached initial page with a stale session ID.
+
+The `DevMode` bool takes precedence over the environment variable. When `DevMode` is false (the default), `os.Getenv("POLY_DEV")` is checked as a fallback. The reconnect bar shows "Reloading…" instead of "Reconnecting…" in dev mode.
 
 ## Service worker
 

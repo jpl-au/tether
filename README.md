@@ -377,6 +377,31 @@ In SSE mode, events that fail to send (due to network interruptions) are automat
 
 When the service worker is active and the browser supports Background Sync (Chromium), queued events are replayed even if the tab was closed. On other browsers, replay occurs when the tab reopens and the SSE connection restores.
 
+## Dev mode
+
+During development, enable dev mode for fast iteration:
+
+```go
+poly.New(poly.Config[State]{
+    DevMode: true,
+    // ...
+})
+```
+
+Or set the `POLY_DEV` environment variable without changing code:
+
+```bash
+POLY_DEV=1 go run .
+```
+
+Dev mode does three things:
+
+1. **No service worker** — unregisters any existing worker and skips registration, so you always get fresh assets
+2. **Page reload on disconnect** — when the server restarts, the page reloads automatically instead of attempting to reconnect to a stale session
+3. **No caching** — sets `Cache-Control: no-store` on the initial page response
+
+The `DevMode` bool takes precedence. When it's false (the default), the `POLY_DEV` environment variable is checked as a fallback.
+
 ## Performance note
 
 The generic helpers are ~47% slower than calling `SetData` directly. For performance-sensitive render paths, use `SetData`:

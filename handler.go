@@ -41,6 +41,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -245,6 +246,13 @@ type Config[S any] struct {
 	// "/". Implicitly true when Push is configured. Default false.
 	Worker bool
 
+	// DevMode disables service worker registration and reloads the page
+	// on disconnect instead of reconnecting. This ensures fresh assets
+	// and state during development. Also sets Cache-Control: no-store
+	// on the initial page response. Enable via this field or set the
+	// POLY_DEV environment variable to any non-empty value.
+	DevMode bool
+
 	// Push enables Web Push notification support. When set, Worker is
 	// implicitly true. Clients subscribe to push notifications after
 	// connecting, and the subscription is delivered via OnSubscribe.
@@ -328,6 +336,9 @@ func New[S any](cfg Config[S]) *Handler[S] {
 
 	if cfg.Push != nil {
 		cfg.Worker = true
+	}
+	if !cfg.DevMode && os.Getenv("POLY_DEV") != "" {
+		cfg.DevMode = true
 	}
 
 	if cfg.Logger == nil {
