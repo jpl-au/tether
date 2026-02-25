@@ -123,18 +123,3 @@ func (s *Session[S]) Context() context.Context {
 func (s *Session[S]) Go(fn func(ctx context.Context)) {
 	go fn(s.Context())
 }
-
-// enqueue pushes a command to the session's loop. To prevent
-// cross-session deadlocks (e.g. during a Broadcast storm), it uses a
-// non-blocking send with a goroutine fallback when the command buffer
-// is full. This effectively creates an unbounded mailbox using
-// goroutines as the "overflow" buffer.
-func (s *Session[S]) enqueue(fn func()) {
-	select {
-	case s.cmds <- fn:
-	default:
-		// Buffer full. Spawn a goroutine to ensure delivery without
-		// deadlocking the caller (who might be another Session).
-		go func() { s.cmds <- fn }()
-	}
-}
