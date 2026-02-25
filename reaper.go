@@ -75,6 +75,12 @@ func (h *Handler[S]) reapDisconnected(now time.Time) {
 			}
 		}
 		h.mu.Unlock()
+
+		for _, sess := range expired {
+			if sess.cancel != nil {
+				sess.cancel()
+			}
+		}
 	}
 }
 

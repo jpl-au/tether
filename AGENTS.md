@@ -393,6 +393,40 @@ Handle: func(sess *poly.Session[State], s State, ev poly.Event) poly.HandleResul
 - `OnLeave` fires only for sessions that were in the group (absent `Remove` is a no-op).
 - `Members()` returns a snapshot of `[]*Session[S]` — use `sess.State()` to read each session's data (e.g. usernames for an online list).
 
+## Session context and background goroutines
+
+Each session carries a `context.Context` that is cancelled when the session is permanently destroyed (reaped from the disconnected pool, or shutdown). The context survives temporary disconnects and reconnects.
+
+```go
+OnConnect: func(s *poly.Session[State]) {
+    // Launch a ticker bound to the session's lifetime.
+    s.Go(func(ctx context.Context) {
+        ticker := time.NewTicker(time.Second)
+        defer ticker.Stop()
+        for {
+            select {
+            case <-ctx.Done():
+                return
+            case <-ticker.C:
+                s.Update(func(st State) poly.HandleResult[State] {
+                    st.Uptime++
+                    return poly.Result(st)
+                })
+            }
+        }
+    })
+},
+```
+
+`Session.Go(fn)` launches a goroutine with the session's context. When the session is reaped or the handler shuts down, the context is cancelled and the goroutine exits cleanly. No global maps, no done channels, no OnDisconnect cleanup.
+
+`Session.Context()` returns the context directly for use cases where Go() is not needed (e.g. passing to database queries or HTTP clients).
+
+**Cancellation points:**
+- `reapDisconnected` — reconnect window expired, session removed
+- `wireDisconnect` when `ReconnectTimeout <= 0` — reconnection disabled, session gone on first disconnect
+- `Shutdown` — all sessions destroyed
+
 ## Transport mode
 
 The `Mode` field on `Config` controls which transports the handler accepts. It is an enum (`TransportMode`) with three values:
@@ -497,6 +531,7 @@ navigate_test.go    URL navigation
 recover_test.go     Panic recovery
 title_test.go       Page title updates
 group_test.go       Broadcasting (uses testing/synctest for fire-and-forget verification)
+context_test.go     Session context and Go lifecycle
 activity_test.go    Server-initiated update refreshes lastActivity
 reap_test.go        Reaper lifecycle tests (uses testing/synctest fake clock)
 shutdown_test.go    Graceful shutdown and reaper termination (uses testing/synctest)

@@ -1,6 +1,7 @@
 package poly
 
 import (
+	"context"
 	"net/http"
 	"time"
 
@@ -178,6 +179,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 	}
 
 	now := time.Now()
+	ctx, cancel := context.WithCancel(context.Background())
 	sess := &Session[S]{
 		id:           id,
 		state:        state,
@@ -189,6 +191,8 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		logger:       h.cfg.Logger,
 		createdAt:    now,
 		lastActivity: now,
+		ctx:          ctx,
+		cancel:       cancel,
 	}
 
 	if h.cfg.Equal != nil {
@@ -270,6 +274,13 @@ func (h *Handler[S]) wireDisconnect(sess *Session[S]) {
 
 		if h.cfg.OnDisconnect != nil {
 			h.cfg.OnDisconnect(sess)
+		}
+
+		// When reconnection is disabled, the session will never be
+		// reclaimed — cancel its context so lifecycle-bound goroutines
+		// started with Go() can clean up.
+		if h.cfg.ReconnectTimeout <= 0 && sess.cancel != nil {
+			sess.cancel()
 		}
 	}
 }

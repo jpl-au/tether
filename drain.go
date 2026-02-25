@@ -46,6 +46,13 @@ func (h *Handler[S]) Shutdown(ctx context.Context) error {
 	for _, sess := range h.active {
 		sessions = append(sessions, sess)
 	}
+	// Cancel disconnected session contexts before clearing — these
+	// sessions will never be reclaimed.
+	for _, sess := range h.disconnected {
+		if sess.cancel != nil {
+			sess.cancel()
+		}
+	}
 	// The reaper is stopped (done is closed), so nothing else will
 	// clean up these maps. Clear them to release memory.
 	clear(h.pending)
@@ -55,6 +62,9 @@ func (h *Handler[S]) Shutdown(ctx context.Context) error {
 	var wg sync.WaitGroup
 	for _, sess := range sessions {
 		wg.Go(func() {
+			if sess.cancel != nil {
+				sess.cancel()
+			}
 			sess.Close()
 		})
 	}

@@ -1,6 +1,7 @@
 package poly
 
 import (
+	"context"
 	"errors"
 	"io"
 	"log/slog"
@@ -52,6 +53,8 @@ type Session[S any] struct {
 	createdAt      time.Time
 	lastActivity   time.Time
 	disconnectedAt time.Time
+	ctx            context.Context
+	cancel         context.CancelFunc
 	mu             sync.Mutex
 
 	// Optional callbacks from Config
@@ -65,6 +68,26 @@ type Session[S any] struct {
 // for logging, metrics, or as a key in external storage.
 func (s *Session[S]) ID() string {
 	return s.id
+}
+
+// Context returns a context that is cancelled when the session is
+// permanently destroyed (reaped or shutdown). The context survives
+// temporary disconnects and reconnects — use it for background
+// goroutines that should keep running while the client is away.
+func (s *Session[S]) Context() context.Context {
+	if s.ctx != nil {
+		return s.ctx
+	}
+	return context.Background()
+}
+
+// Go launches a goroutine bound to the session's lifetime. The
+// context passed to fn is cancelled when the session is permanently
+// destroyed (reaped or shutdown). Use this in OnConnect for background
+// work like tickers, watchers, or change listeners that should stop
+// when the session is gone.
+func (s *Session[S]) Go(fn func(ctx context.Context)) {
+	go fn(s.Context())
 }
 
 // State returns the current session state. The value is read under the

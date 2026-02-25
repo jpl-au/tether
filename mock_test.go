@@ -1,6 +1,7 @@
 package poly
 
 import (
+	"context"
 	"io"
 	"sync"
 
@@ -91,6 +92,7 @@ func handleCounter(_ *Session[counterState], state counterState, ev Event) Handl
 // testing. Caller provides the transport with queued events.
 func newTestSession(state counterState, mt *mockTransport) *Session[counterState] {
 	differ := jit.NewDiffer()
+	ctx, cancel := context.WithCancel(context.Background())
 	sess := &Session[counterState]{
 		id:        "test",
 		state:     state,
@@ -98,6 +100,8 @@ func newTestSession(state counterState, mt *mockTransport) *Session[counterState
 		handle:    handleCounter,
 		differ:    differ,
 		transport: mt,
+		ctx:       ctx,
+		cancel:    cancel,
 	}
 	tree := sess.render(sess.state)
 	differ.Render(tree)

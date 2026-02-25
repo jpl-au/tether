@@ -48,6 +48,34 @@ session.Update(func(s State) poly.HandleResult[State] {
 })
 ```
 
+## Background goroutines
+
+Use `Session.Go` to launch background work tied to a session's lifetime. The context is cancelled when the session is permanently destroyed (reaped or shutdown), but survives temporary disconnects:
+
+```go
+OnConnect: func(s *poly.Session[State]) {
+    s.Go(func(ctx context.Context) {
+        ticker := time.NewTicker(time.Second)
+        defer ticker.Stop()
+        for {
+            select {
+            case <-ctx.Done():
+                return
+            case <-ticker.C:
+                s.Update(func(st State) poly.HandleResult[State] {
+                    st.Uptime++
+                    return poly.Result(st)
+                })
+            }
+        }
+    })
+},
+```
+
+No global maps, no done channels, no OnDisconnect cleanup needed.
+
+`Session.Context()` returns the context directly for passing to database queries, HTTP clients, or other context-aware APIs.
+
 ## Session methods
 
 These methods are safe to call from any goroutine — use them from `OnConnect`, timers, broadcast callbacks, or background workers:
