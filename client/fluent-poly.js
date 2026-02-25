@@ -17,6 +17,11 @@
 //     updated: function(el) { /* refresh chart */ },
 //     destroyed: function(el) { /* teardown */ }
 //   };
+// Poly.onError is an optional callback for client-side error reporting.
+// When set, it receives an object with {type, message} for every error
+// or warning the runtime encounters. Types: "parse", "fetch", "worker",
+// "push", "indexeddb", "render". If not set, warnings are logged to
+// the console and silent errors remain silent.
 window.Poly = window.Poly || {};
 window.Poly.hooks = window.Poly.hooks || {};
 
@@ -43,6 +48,16 @@ window.Poly.hooks = window.Poly.hooks || {};
   var sseOpened = false;
   var devMode = false;
   var pendingCount = 0;
+
+  // Report an error or warning to the Poly.onError callback if set.
+  // Falls back to console.warn for non-silent errors.
+  function reportError(type, message, silent) {
+    if (typeof window.Poly.onError === "function") {
+      window.Poly.onError({ type: type, message: message });
+    } else if (!silent) {
+      console.warn("fluent-poly: " + message);
+    }
+  }
 
   // --- Initialisation ---
 
@@ -81,7 +96,7 @@ window.Poly.hooks = window.Poly.hooks || {};
           }
         })
         .catch(function (err) {
-          console.warn("fluent-poly: service worker registration failed:", err);
+          reportError("worker", "service worker registration failed: " + err);
         });
     }
   });
@@ -128,7 +143,8 @@ window.Poly.hooks = window.Poly.hooks || {};
       var msg;
       try {
         msg = JSON.parse(e.data);
-      } catch (_) {
+      } catch (err) {
+        reportError("parse", "failed to parse WebSocket message: " + err, true);
         return;
       }
       applyMessage(msg);
@@ -182,7 +198,8 @@ window.Poly.hooks = window.Poly.hooks || {};
       var msg;
       try {
         msg = JSON.parse(e.data);
-      } catch (_) {
+      } catch (err) {
+        reportError("parse", "failed to parse SSE message: " + err, true);
         return;
       }
       applyMessage(msg);
@@ -278,7 +295,7 @@ window.Poly.hooks = window.Poly.hooks || {};
         sendPushSubscription(sub);
       });
     }).catch(function (err) {
-      console.warn("fluent-poly: push subscription failed:", err);
+      reportError("push", "push subscription failed: " + err);
     });
   }
 
@@ -293,7 +310,7 @@ window.Poly.hooks = window.Poly.hooks || {};
       },
       body: JSON.stringify(sub.toJSON())
     }).catch(function (err) {
-      console.warn("fluent-poly: push subscription POST failed:", err);
+      reportError("push", "push subscription POST failed: " + err);
     });
   }
 
@@ -348,9 +365,8 @@ window.Poly.hooks = window.Poly.hooks || {};
           reg.sync.register("poly-event-sync");
         });
       }
-    }).catch(function () {
-      // IndexedDB unavailable — event is lost. The user will need
-      // to repeat the action after reconnect.
+    }).catch(function (err) {
+      reportError("indexeddb", "failed to queue event: " + err, true);
     });
   }
 
@@ -382,8 +398,8 @@ window.Poly.hooks = window.Poly.hooks || {};
           replayAndDeleteEvent(db, keys[i], events[i].payload, url);
         }
       };
-    }).catch(function () {
-      // IndexedDB unavailable — nothing to replay.
+    }).catch(function (err) {
+      reportError("indexeddb", "failed to replay queued events: " + err, true);
     });
   }
 
@@ -400,8 +416,8 @@ window.Poly.hooks = window.Poly.hooks || {};
         var tx = db.transaction(EVENT_STORE, "readwrite");
         tx.objectStore(EVENT_STORE).delete(key);
       }
-    }).catch(function () {
-      // Still failing — leave in IndexedDB for the next attempt.
+    }).catch(function (err) {
+      reportError("fetch", "event replay failed: " + err, true);
     });
   }
 
@@ -674,7 +690,7 @@ window.Poly.hooks = window.Poly.hooks || {};
     var template = document.createElement("template");
     template.innerHTML = patch.html;
     if (template.content.childElementCount > 1) {
-      console.warn("fluent-poly: patch for key '" + patch.key + "' contains multiple root elements. Only the first will be used. Wrap them in a single container.");
+      reportError("render", "patch for key '" + patch.key + "' contains multiple root elements; only the first will be used");
     }
     var newEl = template.content.firstElementChild;
     if (!newEl) return;
@@ -690,7 +706,7 @@ window.Poly.hooks = window.Poly.hooks || {};
     var template = document.createElement("template");
     template.innerHTML = morph.html;
     if (template.content.childElementCount > 1) {
-      console.warn("fluent-poly: morph for key '" + morph.key + "' contains multiple root elements. Only the first will be used. Wrap them in a single container.");
+      reportError("render", "morph for key '" + morph.key + "' contains multiple root elements; only the first will be used");
     }
     var newEl = template.content.firstElementChild;
     if (!newEl) return;
@@ -897,7 +913,8 @@ window.Poly.hooks = window.Poly.hooks || {};
         // Restore loading state on non-2xx responses so the button
         // does not stay permanently disabled.
         if (!resp.ok) restorePending(id);
-      }).catch(function () {
+      }).catch(function (err) {
+        reportError("fetch", "event POST failed: " + err, true);
         restorePending(id);
         queueFailedEvent(payload);
       });

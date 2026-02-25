@@ -424,6 +424,23 @@ Dev mode does three things:
 
 The `DevMode` bool takes precedence. When it's false (the default), the `POLY_DEV` environment variable is checked as a fallback.
 
+## Error reporting
+
+Track client-side errors without browser dev tools:
+
+```js
+Poly.onError = function(err) {
+    // err.type: "parse", "fetch", "worker", "push", "indexeddb", "render"
+    // err.message: human-readable description
+    fetch("/errors", {
+        method: "POST",
+        body: JSON.stringify(err)
+    });
+};
+```
+
+When set, `Poly.onError` is called for every error and warning the JS runtime encounters. When not set, warnings are logged to `console.warn` and silent errors (parse failures, IndexedDB issues) remain silent.
+
 ## Performance note
 
 The generic helpers are ~47% slower than calling `SetData` directly. For performance-sensitive render paths, use `SetData`:

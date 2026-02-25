@@ -488,7 +488,7 @@ push/push_test.go   VAPID key generation, JWT signing, Send end-to-end
 
 `client/fluent-poly.js` is plain JS with no build step or bundler. It uses `Idiomorph.morph()` from the bundled `idiomorph.min.js` (0BSD licence). Both are embedded via `go:embed` in `embed.go` and served by `ServeClient()`.
 
-The JS exposes one global: `window.Poly` with a `hooks` property for JS interop.
+The JS exposes one global: `window.Poly` with a `hooks` property for JS interop and an optional `onError` callback for error reporting.
 
 Supported data attributes:
 
@@ -506,7 +506,7 @@ Supported data attributes:
 
 **Configuration (set by server, read by JS):** `data-poly-retry-delay`, `data-poly-max-retry-delay`, `data-poly-debounce-default`, `data-poly-transition-timeout`, `data-poly-dev`
 
-**Developer warnings:** The client logs `console.warn` if a patch or morph contains multiple root elements. Only the first element is used — wrap siblings in a container to avoid silent data loss.
+**Developer warnings:** The client reports an error (via `Poly.onError` if set, otherwise `console.warn`) if a patch or morph contains multiple root elements. Only the first element is used — wrap siblings in a container to avoid silent data loss.
 
 **Service worker:** `data-poly-worker` (boolean — registers the service worker), `data-poly-push-key` (VAPID public key for push subscription)
 
@@ -527,6 +527,20 @@ Supported data attributes:
 - **Cache-Control: no-store** — prevents the browser from serving a cached initial page with a stale session ID.
 
 The `DevMode` bool takes precedence over the environment variable. When `DevMode` is false (the default), `os.Getenv("POLY_DEV")` is checked as a fallback. The reconnect bar shows "Reloading…" instead of "Reconnecting…" in dev mode.
+
+## Error reporting
+
+`Poly.onError` is an optional callback on the global `window.Poly` object. When set, it receives `{type, message}` for every error or warning in the client JS runtime.
+
+Error types:
+- `"parse"` — JSON parse failure on WebSocket or SSE message
+- `"fetch"` — Network failure for SSE POST events or event replay
+- `"worker"` — Service worker registration failure
+- `"push"` — Push subscription or subscription POST failure
+- `"indexeddb"` — IndexedDB queue or replay failure
+- `"render"` — Patch or morph contains multiple root elements
+
+When `Poly.onError` is not set, non-silent errors fall through to `console.warn` and silent errors (parse, indexeddb, fetch) are swallowed. The `reportError(type, message, silent)` helper inside the IIFE handles the routing.
 
 ## Service worker
 
