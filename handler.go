@@ -348,6 +348,10 @@ func (h *Handler[S]) handlePushSubscribe(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	sess.mu.Lock()
+	sess.pushSub = &sub
+	sess.mu.Unlock()
+
 	go h.cfg.Push.OnSubscribe(sess, sub)
 	w.WriteHeader(http.StatusNoContent)
 }

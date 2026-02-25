@@ -10,6 +10,7 @@ import (
 	"time"
 
 	jit "github.com/jpl-au/fluent-jit"
+	"github.com/jpl-au/fluent-poly/push"
 	"github.com/jpl-au/fluent/node"
 )
 
@@ -55,6 +56,7 @@ type Session[S any] struct {
 	disconnectedAt time.Time
 	ctx            context.Context
 	cancel         context.CancelFunc
+	pushSub        *PushSubscription
 	mu             sync.Mutex
 
 	// Optional callbacks from Config
@@ -276,6 +278,44 @@ func (s *Session[S]) Flash(selector, text string) {
 	if err := s.transport.SendUpdate(update); err != nil {
 		s.logger.Error("send flash error", "session", s.id, "err", err)
 	}
+}
+
+// Toast sends a global notification to the client. The JS runtime
+// displays the message in a transient overlay that clears after 5
+// seconds. Safe to call from any goroutine.
+func (s *Session[S]) Toast(text string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	update := Update{Toast: text}
+	if err := s.transport.SendUpdate(update); err != nil {
+		s.logger.Error("send toast error", "session", s.id, "err", err)
+	}
+}
+
+// Push sends a Web Push notification to the browser. Only works when the
+// session has an active push subscription (typically after the client
+// calls PushManager.subscribe()). Returns an error if no subscription
+// exists. Safe to call from any goroutine.
+func (s *Session[S]) Push(n push.Notification, opts push.Options) error {
+	s.mu.Lock()
+	sub := s.pushSub
+	s.mu.Unlock()
+
+	if sub == nil {
+		return errors.New("poly: no push subscription for session")
+	}
+
+	return push.Send(
+		push.Subscription{
+			Endpoint: sub.Endpoint,
+			Keys: push.SubscriptionKeys{
+				P256dh: sub.Keys.P256dh,
+				Auth:   sub.Keys.Auth,
+			},
+		},
+		n,
+		opts,
+	)
 }
 
 func (s *Session[S]) sendURL(rawURL string, replace bool) {
