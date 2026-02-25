@@ -68,8 +68,8 @@ func (r *Router[S]) Handle(sess *Session[S], s S, ev Event) S {
 
 // HandleParams is a helper for [Config.HandleParams] that simply
 // updates the page field in the state.
-func (r *Router[S]) HandleParams(setter func(*S, string)) func(*Session[S], S, Params) S {
-	return func(sess *Session[S], s S, p Params) S {
+func (r *Router[S]) HandleParams(setter func(*S, string)) func(PreSession, S, Params) S {
+	return func(_ PreSession, s S, p Params) S {
 		setter(&s, p.Path)
 		return s
 	}

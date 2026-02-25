@@ -45,8 +45,8 @@ func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 			Path:  r.URL.Path,
 			Query: r.URL.Query(),
 		}
-		// Pre-warm uses a nil session since no session exists yet.
-		state = h.cfg.HandleParams(nil, state, params)
+		cs := &captureSession{id: "pre-warm", fx: &effects{}}
+		state = h.cfg.HandleParams(cs, state, params)
 	}
 	tree := h.cfg.Render(state)
 
@@ -163,7 +163,8 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 				Path:  r.URL.Path,
 				Query: r.URL.Query(),
 			}
-			state = h.cfg.HandleParams(nil, state, params)
+			cs := &captureSession{id: "pre-warm", fx: &effects{}}
+			state = h.cfg.HandleParams(cs, state, params)
 		}
 		differ = jit.NewDiffer()
 

@@ -24,7 +24,7 @@ func TestSessionNavigateEvent(t *testing.T) {
 			)
 		}
 
-		handleParams := func(_ *Session[state], s state, params Params) state {
+		handleParams := func(_ PreSession, s state, params Params) state {
 			s.Page = params.Path
 			return s
 		}
@@ -80,7 +80,7 @@ func TestSessionNavigateEventWithQuery(t *testing.T) {
 			Tab  string
 		}
 
-		handleParams := func(_ *Session[state], s state, params Params) state {
+		handleParams := func(_ PreSession, s state, params Params) state {
 			s.Page = params.Path
 			if params.Query != nil {
 				s.Tab = params.Query.Get("tab")
@@ -204,4 +204,56 @@ func TestSessionReplaceURLSendsReplace(t *testing.T) {
 			t.Error("ReplaceURL should use replaceState (Replace=true)")
 		}
 	})
+}
+
+func TestCaptureSessionBuffersEffects(t *testing.T) {
+	cs := &captureSession{id: "cap-1", fx: &effects{}}
+
+	cs.SetTitle("Hello")
+	cs.Toast("saved")
+	cs.Navigate("/next")
+	cs.Flash("#msg", "done")
+	cs.Announce("submitted")
+
+	if cs.ID() != "cap-1" {
+		t.Errorf("ID() = %q, want %q", cs.ID(), "cap-1")
+	}
+	if cs.fx.title != "Hello" {
+		t.Errorf("title = %q, want %q", cs.fx.title, "Hello")
+	}
+	if cs.fx.toast != "saved" {
+		t.Errorf("toast = %q, want %q", cs.fx.toast, "saved")
+	}
+	if cs.fx.url != "/next" || cs.fx.replace {
+		t.Errorf("url = %q replace = %v, want %q false", cs.fx.url, cs.fx.replace, "/next")
+	}
+	if cs.fx.flash["#msg"] != "done" {
+		t.Errorf("flash[#msg] = %q, want %q", cs.fx.flash["#msg"], "done")
+	}
+	if cs.fx.announce != "submitted" {
+		t.Errorf("announce = %q, want %q", cs.fx.announce, "submitted")
+	}
+}
+
+func TestHandleParamsWithCaptureSession(t *testing.T) {
+	type state struct {
+		Page  string
+		Title string
+	}
+
+	handleParams := func(s PreSession, st state, params Params) state {
+		st.Page = params.Path
+		s.SetTitle("My App - " + params.Path)
+		return st
+	}
+
+	cs := &captureSession{id: "pre", fx: &effects{}}
+	result := handleParams(cs, state{}, Params{Path: "/about"})
+
+	if result.Page != "/about" {
+		t.Errorf("Page = %q, want %q", result.Page, "/about")
+	}
+	if cs.fx.title != "My App - /about" {
+		t.Errorf("captured title = %q, want %q", cs.fx.title, "My App - /about")
+	}
 }

@@ -76,10 +76,14 @@ type Config[S any] struct {
 	// HandleParams processes a URL change and returns the new state.
 	// Called on initial page load (after InitialState) and when the
 	// browser navigates via link click or back/forward. If nil,
-	// navigation events fall through to Handle. The session parameter
-	// allows calling side-effect methods (e.g. SetTitle) during
-	// navigation.
-	HandleParams func(session *Session[S], state S, params Params) S
+	// navigation events fall through to Handle.
+	//
+	// The session parameter is a [PreSession] because this function
+	// runs both during pre-warming (initial GET, before a real session
+	// exists) and during live navigation. Side-effect methods (SetTitle,
+	// Toast, etc.) are always safe to call. During pre-warming, effects
+	// are captured; during navigation, they are sent to the client.
+	HandleParams func(session PreSession, state S, params Params) S
 
 	// OnConnect is called after a new session is created and its
 	// transport is ready. Use this to add the session to a [Group]

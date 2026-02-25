@@ -47,7 +47,7 @@ type Session[S any] struct {
 
 	render       RenderFunc[S]
 	handle       HandleFunc[S]
-	handleParams func(*Session[S], S, Params) S
+	handleParams func(PreSession, S, Params) S
 	differ       *jit.Differ
 	transport    Transport
 	logger       *slog.Logger
@@ -97,6 +97,43 @@ type Session[S any] struct {
 	onStructuralChange func(*Session[S], StructuralChange)
 }
 
+// PreSession is the subset of Session methods available in
+// [Config.HandleParams]. During pre-warming (initial GET) no real
+// session exists yet, so HandleParams receives a capture
+// implementation that buffers side effects. During live navigation
+// the real [Session] satisfies the interface.
+type PreSession interface {
+	ID() string
+	Toast(text string)
+	Navigate(rawURL string)
+	ReplaceURL(rawURL string)
+	SetTitle(title string)
+	Announce(text string)
+	Flash(selector, text string)
+}
+
+// captureSession implements PreSession by buffering side effects.
+// Used during pre-warming to allow HandleParams to call SetTitle,
+// Toast, etc. without panicking on a nil session.
+type captureSession struct {
+	id string
+	fx *effects
+}
+
+func (c *captureSession) ID() string               { return c.id }
+func (c *captureSession) Toast(text string)        { c.fx.toast = text }
+func (c *captureSession) Navigate(rawURL string)   { c.fx.url = rawURL; c.fx.replace = false }
+func (c *captureSession) ReplaceURL(rawURL string) { c.fx.url = rawURL; c.fx.replace = true }
+func (c *captureSession) SetTitle(title string)    { c.fx.title = title }
+func (c *captureSession) Announce(text string)     { c.fx.announce = text }
+
+func (c *captureSession) Flash(selector, text string) {
+	if c.fx.flash == nil {
+		c.fx.flash = make(map[string]string)
+	}
+	c.fx.flash[selector] = text
+}
+
 // ID returns the unique session identifier. This is a cryptographically
 // random string generated when the session is created. It can be used
 // for logging, metrics, or as a key in external storage.
@@ -122,4 +159,26 @@ func (s *Session[S]) Context() context.Context {
 // when the session is gone.
 func (s *Session[S]) Go(fn func(ctx context.Context)) {
 	go fn(s.Context())
+}
+
+// enqueue pushes a command to the session's loop without blocking the
+// caller. Under normal load the command goes straight into the buffered
+// channel. When the buffer is full (e.g. during a Broadcast storm) a
+// short-lived goroutine delivers the command instead, preventing
+// cross-session deadlocks where two sessions broadcast to each other
+// simultaneously with full buffers.
+//
+// The goroutine is context-aware: if the session is destroyed before
+// the command can be delivered, the goroutine exits cleanly.
+func (s *Session[S]) enqueue(fn func()) {
+	select {
+	case s.cmds <- fn:
+	default:
+		go func() {
+			select {
+			case s.cmds <- fn:
+			case <-s.ctx.Done():
+			}
+		}()
+	}
 }
