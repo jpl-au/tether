@@ -2,7 +2,6 @@ package poly
 
 import (
 	"context"
-	"sync"
 	"time"
 )
 
@@ -57,17 +56,18 @@ func (h *Handler[S]) Shutdown(ctx context.Context) error {
 	clear(h.disconnected)
 	h.mu.Unlock()
 
-	var wg sync.WaitGroup
+	// Cancel all active sessions and close their transports.
 	for _, sess := range sessions {
-		wg.Go(func() {
-			sess.stop()
-			sess.Close()
-		})
+		sess.stop()
 	}
 
+	// Wait for every loop goroutine to exit (or the caller's
+	// deadline, whichever comes first).
 	done := make(chan struct{})
 	go func() {
-		wg.Wait()
+		for _, sess := range sessions {
+			<-sess.loopDone
+		}
 		close(done)
 	}()
 

@@ -20,6 +20,7 @@ import (
 // continues processing commands and shutdown signals. This keeps the
 // session alive for reconnection.
 func (s *Session[S]) run() {
+	defer close(s.loopDone)
 	defer s.cleanup()
 
 	for {

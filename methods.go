@@ -16,8 +16,14 @@ func (s *Session[S]) State() S {
 		return s.state
 	}
 	ch := make(chan S, 1)
-	s.cmds <- func() { ch <- s.state }
-	return <-ch
+	select {
+	case s.cmds <- func() { ch <- s.state }:
+		return <-ch
+	case <-s.ctx.Done():
+		// Session destroyed — return last known state rather than
+		// blocking forever on a channel nobody will drain.
+		return s.state
+	}
 }
 
 // Update applies a state change and pushes the resulting diff to the
@@ -65,9 +71,11 @@ func (s *Session[S]) Update(fn func(S) S) {
 // handles via onTransportClose. Safe to call from any goroutine;
 // safe to call more than once.
 func (s *Session[S]) Close() {
-	if s.transport != nil {
-		s.transport.Close()
-	}
+	s.enqueue(func() {
+		if s.transport != nil {
+			s.transport.Close()
+		}
+	})
 }
 
 // Toast sends a global notification to the client. Inside Handle the
@@ -164,10 +172,12 @@ func (s *Session[S]) Push(n push.Notification, opts push.Options) error {
 	}
 
 	ch := make(chan error, 1)
-	s.cmds <- func() {
-		ch <- s.sendPush(n, opts)
+	select {
+	case s.cmds <- func() { ch <- s.sendPush(n, opts) }:
+		return <-ch
+	case <-s.ctx.Done():
+		return errors.New("poly: session closed")
 	}
-	return <-ch
 }
 
 func (s *Session[S]) sendPush(n push.Notification, opts push.Options) error {

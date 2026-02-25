@@ -108,6 +108,7 @@ func newTestSession(state counterState, mt *mockTransport) *Session[counterState
 		logger:    slog.Default().WithGroup("session").With("id", "test"),
 		events:    make(chan Event),
 		cmds:      make(chan func(), cmdBufferSize),
+		loopDone:  make(chan struct{}),
 		ctx:       ctx,
 		stop:      cancel,
 	}

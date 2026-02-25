@@ -345,9 +345,13 @@ func (h *Handler[S]) handlePushSubscribe(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Send the subscription to the session loop so it's stored
-	// without racing with other loop operations.
-	sess.cmds <- func() {
-		sess.pushSub = &sub
+	// without racing with other loop operations. The select guards
+	// against hanging if the session is destroyed mid-request.
+	select {
+	case sess.cmds <- func() { sess.pushSub = &sub }:
+	case <-sess.ctx.Done():
+		http.Error(w, "session closed", http.StatusGone)
+		return
 	}
 
 	go h.cfg.Push.OnSubscribe(sess, sub)

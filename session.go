@@ -59,6 +59,8 @@ type Session[S any] struct {
 	// Session lifetime — cancelled on permanent destruction.
 	ctx  context.Context
 	stop context.CancelFunc
+	// closed by run() on exit so Shutdown can wait for the loop.
+	loopDone chan struct{}
 
 	// Timestamps. lastActivity is atomic so the idle timer reset
 	// (inside the loop) and external readers (Health) don't conflict.

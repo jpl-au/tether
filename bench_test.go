@@ -163,6 +163,7 @@ func BenchmarkEventCycle(b *testing.B) {
 		transport: dt,
 		events:    make(chan Event),
 		cmds:      make(chan func(), cmdBufferSize),
+		loopDone:  make(chan struct{}),
 		ctx:       ctx,
 		stop:      cancel,
 	}
