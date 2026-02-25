@@ -7,6 +7,7 @@ import (
 	"testing/synctest"
 
 	jit "github.com/jpl-au/fluent-jit"
+	"github.com/jpl-au/fluent-poly/event"
 	"github.com/jpl-au/fluent/html5/div"
 	"github.com/jpl-au/fluent/html5/span"
 	"github.com/jpl-au/fluent/node"
@@ -16,7 +17,7 @@ func TestSessionSendsPatchOnChange(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		mt := &mockTransport{
 			events: []Event{
-				{Type: "click", Action: "increment"},
+				{Type: event.Click, Action: "increment"},
 			},
 		}
 
@@ -49,7 +50,7 @@ func TestSessionNoPatchWhenUnchanged(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		mt := &mockTransport{
 			events: []Event{
-				{Type: "click", Action: "noop"},
+				{Type: event.Click, Action: "noop"},
 			},
 		}
 
@@ -72,7 +73,7 @@ func TestSessionEqualSkipsDiff(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		mt := &mockTransport{
 			events: []Event{
-				{Type: "click", Action: "noop"},
+				{Type: event.Click, Action: "noop"},
 			},
 		}
 
@@ -99,9 +100,9 @@ func TestSessionMultipleEvents(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		mt := &mockTransport{
 			events: []Event{
-				{Type: "click", Action: "increment"},
-				{Type: "click", Action: "increment"},
-				{Type: "click", Action: "increment"},
+				{Type: event.Click, Action: "increment"},
+				{Type: event.Click, Action: "increment"},
+				{Type: event.Click, Action: "increment"},
 			},
 		}
 
@@ -154,7 +155,7 @@ func TestSessionStructuralChange(t *testing.T) {
 
 		mt := &mockTransport{
 			events: []Event{
-				{Type: "click", Action: "toggle-help"},
+				{Type: event.Click, Action: "toggle-help"},
 			},
 		}
 

@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/jpl-au/fluent-poly/mode"
 	"github.com/jpl-au/fluent/node"
 )
 
@@ -20,7 +21,7 @@ type polyBody struct {
 	html              []byte
 	endpoint          string
 	session           string
-	transport         TransportMode
+	transport         mode.Transport
 	retryDelay        time.Duration
 	maxRetryDelay     time.Duration
 	defaultDebounce   time.Duration
@@ -47,9 +48,9 @@ func (p *polyBody) RenderBuilder(buf *bytes.Buffer) {
 	buf.WriteString(html.EscapeString(p.session))
 	buf.WriteString(`"`)
 	switch p.transport {
-	case SSEOnly:
+	case mode.SSE:
 		buf.WriteString(` data-poly-transport="sse"`)
-	case WebSocketWithFallback:
+	case mode.Auto:
 		buf.WriteString(` data-poly-transport="auto"`)
 	default:
 		buf.WriteString(` data-poly-transport="ws"`)

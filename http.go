@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/jpl-au/fluent-poly/mode"
 	"github.com/jpl-au/fluent-poly/push"
 )
 
@@ -34,7 +35,7 @@ func (h *Handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	switch h.cfg.Mode {
-	case SSEOnly:
+	case mode.SSE:
 		if strings.Contains(r.Header.Get("Accept"), "text/event-stream") {
 			if !h.originAllowed(r) {
 				http.Error(w, "origin not allowed", http.StatusForbidden)
@@ -48,7 +49,7 @@ func (h *Handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-	case WebSocketWithFallback:
+	case mode.Auto:
 		if r.Header.Get("Upgrade") == "websocket" {
 			if !h.originAllowed(r) {
 				http.Error(w, "origin not allowed", http.StatusForbidden)
@@ -70,7 +71,7 @@ func (h *Handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-	default: // WebSocketOnly
+	default: // mode.WebSocket
 		if r.Header.Get("Upgrade") == "websocket" {
 			if !h.originAllowed(r) {
 				http.Error(w, "origin not allowed", http.StatusForbidden)

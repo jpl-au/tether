@@ -5,35 +5,9 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/jpl-au/fluent-poly/mode"
 	"github.com/jpl-au/fluent-poly/push"
 	"github.com/jpl-au/fluent/node"
-)
-
-// TransportMode selects the wire protocol between server and browser.
-// WebSocket gives bidirectional communication over a single connection.
-// SSE+POST splits the channel: server→client updates flow over a
-// long-lived EventSource stream, and client→server events arrive as
-// individual HTTP POSTs. SSE+POST works through HTTP/2 reverse proxies
-// and load balancers that may not support WebSocket, at the cost of
-// slightly higher latency on client events.
-type TransportMode int
-
-const (
-	// WebSocketOnly accepts only WebSocket connections. This is the
-	// default when Mode is not set. The Fallback field is ignored.
-	WebSocketOnly TransportMode = iota
-
-	// SSEOnly accepts only SSE+POST connections. Use this when the
-	// deployment environment does not support WebSocket (e.g. certain
-	// PaaS providers or corporate proxies). The Upgrade field is
-	// ignored; Fallback must be set.
-	SSEOnly
-
-	// WebSocketWithFallback tries WebSocket first. If the client
-	// cannot establish a WebSocket connection (e.g. the proxy strips
-	// the Upgrade header), it falls back to SSE+POST automatically.
-	// Both Upgrade and Fallback must be set.
-	WebSocketWithFallback
 )
 
 // Config wires together all the pieces of a poly page: how to create
@@ -49,17 +23,17 @@ const (
 type Config[S any] struct {
 	// Upgrade converts an HTTP request into a Transport connection.
 	// Use ws.Upgrade for WebSocket connections. Required unless Mode
-	// is SSEOnly.
+	// is [mode.SSE].
 	Upgrade func(w http.ResponseWriter, r *http.Request) (Transport, error)
 
 	// Fallback converts an HTTP request into a Transport connection
-	// using SSE+POST. Required when Mode is SSEOnly or
-	// WebSocketWithFallback. Use sse.Upgrade() for SSE+POST.
+	// using SSE+POST. Required when Mode is [mode.SSE] or
+	// [mode.Auto]. Use sse.Upgrade() for SSE+POST.
 	Fallback func(w http.ResponseWriter, r *http.Request) (Transport, error)
 
 	// Mode selects which transports the handler accepts. Defaults to
-	// WebSocketOnly. See TransportMode constants.
-	Mode TransportMode
+	// [mode.WebSocket]. See [mode] package for options.
+	Mode mode.Transport
 
 	// InitialState returns the starting state for a new session.
 	// Called once per connection to create the initial state.

@@ -7,6 +7,7 @@ import (
 	"testing/synctest"
 
 	jit "github.com/jpl-au/fluent-jit"
+	"github.com/jpl-au/fluent-poly/event"
 	"github.com/jpl-au/fluent/html5/div"
 	"github.com/jpl-au/fluent/html5/span"
 	"github.com/jpl-au/fluent/node"
@@ -31,7 +32,7 @@ func TestSessionNavigateEvent(t *testing.T) {
 
 		mt := &mockTransport{
 			events: []Event{
-				{Type: "navigate", Data: map[string]string{"path": "/profile", "search": ""}},
+				{Type: event.Navigate, Data: map[string]string{"path": "/profile", "search": ""}},
 			},
 		}
 
@@ -91,7 +92,7 @@ func TestSessionNavigateEventWithQuery(t *testing.T) {
 
 		mt := &mockTransport{
 			events: []Event{
-				{Type: "navigate", Data: map[string]string{"path": "/settings", "search": "tab=security"}},
+				{Type: event.Navigate, Data: map[string]string{"path": "/settings", "search": "tab=security"}},
 			},
 		}
 
@@ -129,11 +130,11 @@ func TestSessionNavigateEventWithQuery(t *testing.T) {
 
 func TestSessionNavigateEventWithoutHandleParams(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		var receivedAction string
+		var receivedAction event.Type
 
 		mt := &mockTransport{
 			events: []Event{
-				{Type: "navigate", Data: map[string]string{"path": "/about"}},
+				{Type: event.Navigate, Data: map[string]string{"path": "/about"}},
 			},
 		}
 
@@ -148,7 +149,7 @@ func TestSessionNavigateEventWithoutHandleParams(t *testing.T) {
 		defer func() { sess.stop(); synctest.Wait() }()
 		synctest.Wait()
 
-		if receivedAction != "navigate" {
+		if receivedAction != event.Navigate {
 			t.Errorf("expected handle to receive navigate event, got %q", receivedAction)
 		}
 	})

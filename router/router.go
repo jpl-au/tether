@@ -7,9 +7,9 @@
 // page identifier from state, then register pages by path:
 //
 //	r := router.New[State](func(s State) string { return s.Page })
-//	r.Route("/", homeRender, homeHandle)
-//	r.Route("/settings", settingsRender, settingsHandle)
-//	r.NotFound(notFoundRender, nil)
+//	r.Route("/", router.Page[State]{Render: homeRender, Handle: homeHandle})
+//	r.Route("/settings", router.Page[State]{Render: settingsRender, Handle: settingsHandle})
+//	r.NotFound(router.Page[State]{Render: notFoundRender})
 //
 // Pass r.Render and r.Handle to [poly.Config]:
 //
@@ -54,14 +54,14 @@ func New[S any](selector func(S) string) *Router[S] {
 }
 
 // Route registers a page for a specific path.
-func (r *Router[S]) Route(path string, render poly.RenderFunc[S], handle poly.HandleFunc[S]) {
-	r.pages[path] = Page[S]{Render: render, Handle: handle}
+func (r *Router[S]) Route(path string, page Page[S]) {
+	r.pages[path] = page
 }
 
 // NotFound sets the page used when the selector returns an unknown
 // path.
-func (r *Router[S]) NotFound(render poly.RenderFunc[S], handle poly.HandleFunc[S]) {
-	r.notFound = Page[S]{Render: render, Handle: handle}
+func (r *Router[S]) NotFound(page Page[S]) {
+	r.notFound = page
 }
 
 // Render implements [poly.RenderFunc]. It dispatches to the active

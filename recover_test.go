@@ -5,14 +5,16 @@ import (
 	"net/http/httptest"
 	"testing"
 	"testing/synctest"
+
+	"github.com/jpl-au/fluent-poly/event"
 )
 
 func TestSessionHandlePanicDoesNotKillSession(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		mt := &mockTransport{
 			events: []Event{
-				{Type: "click", Action: "crash"},
-				{Type: "click", Action: "increment"},
+				{Type: event.Click, Action: "crash"},
+				{Type: event.Click, Action: "increment"},
 			},
 		}
 

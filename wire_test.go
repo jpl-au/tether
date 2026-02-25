@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	jit "github.com/jpl-au/fluent-jit"
+	"github.com/jpl-au/fluent-poly/event"
 )
 
 func TestEncodeUpdateWithPatches(t *testing.T) {
@@ -220,8 +221,8 @@ func TestEventUnmarshal(t *testing.T) {
 		t.Fatalf("failed to unmarshal: %v", err)
 	}
 
-	if ev.Type != "click" {
-		t.Errorf("type should be %q, got %q", "click", ev.Type)
+	if ev.Type != event.Click {
+		t.Errorf("type should be %q, got %q", event.Click, ev.Type)
 	}
 	if ev.Action != "increment" {
 		t.Errorf("action should be %q, got %q", "increment", ev.Action)

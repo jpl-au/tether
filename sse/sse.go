@@ -10,8 +10,7 @@
 //     PushEvent method.
 //
 // Wire up by passing sse.Upgrade() as the Fallback (or Upgrade) field
-// in [poly.Config] and setting Mode to [poly.SSEOnly] or
-// [poly.WebSocketWithFallback].
+// in [poly.Config] and setting Mode to [mode.SSE] or [mode.Auto].
 package sse
 
 import (
@@ -24,28 +23,36 @@ import (
 	poly "github.com/jpl-au/fluent-poly"
 )
 
-// defaultBufferSize is the event channel capacity when no explicit
-// size is passed to Upgrade.
+// defaultBufferSize is the event channel capacity when Options.BufferSize
+// is zero.
 const defaultBufferSize = 16
 
+// Options configures the SSE transport.
+type Options struct {
+	// BufferSize sets the capacity of the internal event channel. When
+	// the channel is full, PushEvent returns [poly.ErrEventBufferFull]
+	// so the HTTP handler can respond with 429 rather than blocking.
+	// Zero defaults to 16, which is sufficient for typical form-driven
+	// UIs. Increase it for high-frequency event streams such as mouse
+	// tracking or real-time collaboration.
+	BufferSize int
+}
+
 // Upgrade returns an upgrade function for use in [poly.Config].Fallback
-// (or Upgrade when Mode is SSEOnly). When the poly handler receives a
+// (or Upgrade when Mode is mode.SSE). When the poly handler receives a
 // GET with Accept: text/event-stream, it calls this function to
 // establish the SSE stream. The stream stays open for the lifetime of
 // the session; server updates are written as SSE "data" lines. Client
 // events arrive separately via HTTP POST — the poly handler routes
 // them through the PushEvent method on this transport.
-//
-// An optional bufferSize parameter sets the capacity of the internal
-// event channel. When the channel is full, PushEvent returns
-// [poly.ErrEventBufferFull] so the HTTP handler can respond with 429
-// rather than blocking. The default is 16, which is sufficient for
-// typical form-driven UIs. Increase it for high-frequency event
-// streams such as mouse tracking or real-time collaboration.
-func Upgrade(bufferSize ...int) func(http.ResponseWriter, *http.Request) (poly.Transport, error) {
-	size := defaultBufferSize
-	if len(bufferSize) > 0 && bufferSize[0] > 0 {
-		size = bufferSize[0]
+func Upgrade(opts ...Options) func(http.ResponseWriter, *http.Request) (poly.Transport, error) {
+	var o Options
+	if len(opts) > 0 {
+		o = opts[0]
+	}
+	size := o.BufferSize
+	if size <= 0 {
+		size = defaultBufferSize
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) (poly.Transport, error) {
@@ -129,14 +136,13 @@ func (t *transport) ReceiveEvent() (poly.Event, error) {
 }
 
 // PushEvent receives a client event from the poly handler via HTTP POST.
-// when an HTTP POST arrives carrying a client event for this session.
 //
 // The send is non-blocking by design. If the session's event loop is
 // not consuming events fast enough and the internal buffer is full,
 // PushEvent returns [poly.ErrEventBufferFull] immediately so the HTTP
 // handler can respond with 429 rather than stalling the request
-// goroutine. The buffer capacity is set via the bufferSize parameter
-// to [Upgrade] (default 16).
+// goroutine. The buffer capacity is set via [Options].BufferSize
+// (default 16).
 func (t *transport) PushEvent(ev poly.Event) error {
 	select {
 	case <-t.done:

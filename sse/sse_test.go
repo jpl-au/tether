@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	poly "github.com/jpl-au/fluent-poly"
+	"github.com/jpl-au/fluent-poly/event"
 )
 
 // mockWriter implements http.ResponseWriter and http.Flusher backed
@@ -70,7 +71,7 @@ func TestSendWritesSSEFormat(t *testing.T) {
 func TestReceiveEventBlocksUntilPush(t *testing.T) {
 	tr, _ := newTestTransport()
 
-	want := poly.Event{Type: "click", Action: "increment"}
+	want := poly.Event{Type: event.Click, Action: "increment"}
 	go func() {
 		tr.PushEvent(want)
 	}()
@@ -98,7 +99,7 @@ func TestPushEventReturnsEOFWhenClosed(t *testing.T) {
 	tr, _ := newTestTransport()
 	tr.Close()
 
-	err := tr.PushEvent(poly.Event{Type: "click", Action: "test"})
+	err := tr.PushEvent(poly.Event{Type: event.Click, Action: "test"})
 	if !errors.Is(err, io.EOF) {
 		t.Errorf("expected io.EOF, got %v", err)
 	}

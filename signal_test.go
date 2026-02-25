@@ -3,6 +3,8 @@ package poly
 import (
 	"testing"
 	"testing/synctest"
+
+	"github.com/jpl-au/fluent-poly/event"
 )
 
 func TestSignalOutsideHandle(t *testing.T) {
@@ -36,7 +38,7 @@ func TestSignalOutsideHandle(t *testing.T) {
 func TestSignalInsideHandle(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		mt := &mockTransport{events: []Event{
-			{Type: "click", Action: "increment"},
+			{Type: event.Click, Action: "increment"},
 		}}
 
 		handle := func(s *Session[counterState], state counterState, ev Event) counterState {
@@ -75,7 +77,7 @@ func TestSignalInsideHandle(t *testing.T) {
 func TestSignalMultipleKeys(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		mt := &mockTransport{events: []Event{
-			{Type: "click", Action: "increment"},
+			{Type: event.Click, Action: "increment"},
 		}}
 
 		handle := func(s *Session[counterState], state counterState, ev Event) counterState {
@@ -135,7 +137,7 @@ func TestSignalOnPreSession(t *testing.T) {
 func TestSignalWithoutStateChange(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		mt := &mockTransport{events: []Event{
-			{Type: "click", Action: "noop", EventID: "e1"},
+			{Type: event.Click, Action: "noop", EventID: "e1"},
 		}}
 
 		handle := func(s *Session[counterState], state counterState, ev Event) counterState {

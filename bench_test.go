@@ -9,6 +9,7 @@ import (
 
 	jit "github.com/jpl-au/fluent-jit"
 	"github.com/jpl-au/fluent-poly/bind"
+	"github.com/jpl-au/fluent-poly/event"
 	"github.com/jpl-au/fluent/html5/button"
 	"github.com/jpl-au/fluent/html5/div"
 	"github.com/jpl-au/fluent/html5/span"
@@ -145,7 +146,7 @@ func (d *discardTransport) Close() error { return nil }
 func BenchmarkEventCycle(b *testing.B) {
 	events := make([]Event, b.N)
 	for i := range events {
-		events[i] = Event{Type: "click", Action: "increment"}
+		events[i] = Event{Type: event.Click, Action: "increment"}
 	}
 
 	dt := &discardTransport{events: events}

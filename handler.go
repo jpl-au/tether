@@ -9,6 +9,7 @@ import (
 	"time"
 
 	jit "github.com/jpl-au/fluent-jit"
+	"github.com/jpl-au/fluent-poly/mode"
 )
 
 // pendingSession holds a pre-warmed session created during the initial GET
@@ -62,10 +63,10 @@ func New[S any](cfg Config[S]) *Handler[S] {
 	if cfg.Handle == nil {
 		panic("poly: Config.Handle is required")
 	}
-	if cfg.Mode != SSEOnly && cfg.Upgrade == nil {
+	if cfg.Mode != mode.SSE && cfg.Upgrade == nil {
 		panic("poly: Config.Upgrade is required for WebSocket mode")
 	}
-	if cfg.Mode != WebSocketOnly && cfg.Fallback == nil {
+	if cfg.Mode != mode.WebSocket && cfg.Fallback == nil {
 		panic("poly: Config.Fallback is required for SSE mode")
 	}
 

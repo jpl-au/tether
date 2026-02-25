@@ -3,6 +3,8 @@ package poly
 import (
 	"testing"
 	"testing/synctest"
+
+	"github.com/jpl-au/fluent-poly/event"
 )
 
 func TestOnSubscribesSessionToBus(t *testing.T) {
@@ -66,7 +68,7 @@ func TestEmitAndOnEndToEnd(t *testing.T) {
 		// Session A: the sender.
 		mtA := &mockTransport{
 			events: []Event{
-				{Type: "click", Action: "send"},
+				{Type: event.Click, Action: "send"},
 			},
 		}
 		sessA := newTestSession(counterState{Count: 0}, mtA)

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	jit "github.com/jpl-au/fluent-jit"
+	"github.com/jpl-au/fluent-poly/event"
 	"github.com/jpl-au/fluent/node"
 )
 
@@ -87,7 +88,7 @@ func (s *Session[S]) exec(ev Event) {
 
 	// Phase 1: Handle — produce new state, accumulate effects.
 	var newState S
-	if ev.Type == "navigate" && s.handleParams != nil {
+	if ev.Type == event.Navigate && s.handleParams != nil {
 		params := Params{Path: ev.Data["path"]}
 		if search := ev.Data["search"]; search != "" {
 			params.Query, _ = url.ParseQuery(search)
