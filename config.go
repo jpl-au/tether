@@ -70,11 +70,16 @@ type Config[S any] struct {
 	// Handle processes a client event and returns the new state.
 	Handle HandleFunc[S]
 
-	// HandleParams processes a URL change and returns updated state.
-	// Called on initial page load (after InitialState) and when the
-	// browser navigates via link click or back/forward. If nil,
-	// navigation events fall through to Handle.
-	HandleParams func(state S, params Params) S
+	// HandleParams processes a URL change and returns a [HandleResult]
+	// containing the new state and optional side effects. Called on
+	// initial page load (after InitialState) and when the browser
+	// navigates via link click or back/forward. If nil, navigation
+	// events fall through to Handle.
+	//
+	// Side effects returned here are merged into the same update as
+	// the state diff, so a navigation can atomically set the page
+	// title or flash a message alongside the state change.
+	HandleParams func(state S, params Params) HandleResult[S]
 
 	// OnConnect is called after a new session is created and its
 	// transport is ready. Use this to add the session to a [Group]

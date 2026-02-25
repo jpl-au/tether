@@ -33,9 +33,18 @@ When no side effects are needed, `poly.Result(s)` returns a plain state-only res
 Push state changes from outside the event loop (timers, database changes, broadcasts):
 
 ```go
-session.Update(func(s State) State {
+session.Update(func(s State) poly.HandleResult[State] {
     s.Message = "New data available"
-    return s
+    return poly.Result(s)
+})
+```
+
+`Update` returns a `HandleResult` just like `Handle`, so side effects work here too:
+
+```go
+session.Update(func(s State) poly.HandleResult[State] {
+    s.Message = "New data available"
+    return poly.Result(s).WithAnnounce("New data available")
 })
 ```
 
@@ -59,9 +68,9 @@ Bidirectional sync between Go state and the browser URL:
 
 ```go
 poly.New(poly.Config[State]{
-    HandleParams: func(state State, params poly.Params) State {
+    HandleParams: func(state State, params poly.Params) poly.HandleResult[State] {
         state.Page = params.Path
-        return state
+        return poly.Result(state).WithTitle(state.Page + " — My App")
     },
     // ...
 })

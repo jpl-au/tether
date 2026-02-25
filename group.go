@@ -17,9 +17,9 @@ import (
 //	},
 //
 //	// Later, push an update to every session in the group:
-//	group.Broadcast(func(state State) State {
+//	group.Broadcast(func(state State) poly.HandleResult[State] {
 //	    state.Message = "Hello everyone"
-//	    return state
+//	    return poly.Result(state)
 //	})
 type Group[S any] struct {
 	mu       sync.Mutex
@@ -103,6 +103,10 @@ func (g *Group[S]) Members() []*Session[S] {
 // [Session.Update]. Each session is updated in its own goroutine so
 // a slow render in one session does not block delivery to the rest.
 //
+// The function fn returns a [HandleResult] so side effects (announce,
+// flash, title, URL) can be sent atomically with the state diff. Use
+// [Result] to return a bare state when no side effects are needed.
+//
 // Broadcast does not wait for the updates to complete. This is
 // necessary because Broadcast is typically called from inside a
 // [HandleFunc] (e.g. chat messages, collaborative edits), where the
@@ -113,7 +117,7 @@ func (g *Group[S]) Members() []*Session[S] {
 // cycle, so they do not accumulate.
 //
 // Safe to call from any goroutine.
-func (g *Group[S]) Broadcast(fn func(S) S) {
+func (g *Group[S]) Broadcast(fn func(S) HandleResult[S]) {
 	g.mu.Lock()
 	targets := make([]*Session[S], 0, len(g.sessions))
 	for _, s := range g.sessions {

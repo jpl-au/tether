@@ -14,9 +14,9 @@ poly.New(poly.Config[State]{
 })
 
 // Send a message to every connected client
-group.Broadcast(func(s State) State {
+group.Broadcast(func(s State) poly.HandleResult[State] {
     s.Notification = "System update complete"
-    return s
+    return poly.Result(s).WithAnnounce("System update complete")
 })
 ```
 

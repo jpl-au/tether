@@ -43,7 +43,7 @@ func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 		state = h.cfg.HandleParams(state, Params{
 			Path:  r.URL.Path,
 			Query: r.URL.Query(),
-		})
+		}).State
 	}
 	tree := h.cfg.Render(state)
 
@@ -169,7 +169,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 			state = h.cfg.HandleParams(state, Params{
 				Path:  r.URL.Path,
 				Query: r.URL.Query(),
-			})
+			}).State
 		}
 		differ = jit.NewDiffer()
 

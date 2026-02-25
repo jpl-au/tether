@@ -175,9 +175,9 @@ Bidirectional sync between Go state and the browser URL. Anchors with `data-poly
 
 ```go
 // Config — HandleParams processes URL changes on initial load and navigation
-HandleParams: func(state State, params poly.Params) State {
+HandleParams: func(state State, params poly.Params) poly.HandleResult[State] {
     state.Page = params.Path
-    return state
+    return poly.Result(state).WithTitle(state.Page + " — My App")
 },
 
 // Mark an anchor for client-side navigation
@@ -357,9 +357,9 @@ poly.New(poly.Config[State]{
     // ...
 })
 
-group.Broadcast(func(s State) State {
+group.Broadcast(func(s State) poly.HandleResult[State] {
     s.Notification = "System update"
-    return s
+    return poly.Result(s)
 })
 ```
 

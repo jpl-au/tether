@@ -45,7 +45,7 @@ type Session[S any] struct {
 	state          S
 	render         RenderFunc[S]
 	handle         HandleFunc[S]
-	handleParams   func(S, Params) S
+	handleParams   func(S, Params) HandleResult[S]
 	differ         *jit.Differ
 	transport      Transport
 	logger         *slog.Logger
@@ -127,8 +127,13 @@ func (s *Session[S]) Close() {
 // push server-initiated updates — call it from timers, database change
 // listeners, message queue consumers, or [Group.Broadcast].
 //
-// The function fn receives the current state and returns the new state.
-// It runs under the session lock, so it is serialised with client
+// The function fn receives the current state and returns a
+// [HandleResult] containing the new state and optional side effects.
+// Side effects are merged into the same update message as the state
+// diff, so the client receives everything atomically. Use [Result] to
+// return a bare state when no side effects are needed.
+//
+// fn runs under the session lock, so it is serialised with client
 // events — there is no risk of concurrent state mutation. Panics in fn
 // or in the subsequent render pass are recovered and logged rather than
 // crashing the calling goroutine.
@@ -138,7 +143,7 @@ func (s *Session[S]) Close() {
 // and these methods acquire it, causing a deadlock.
 //
 // Safe to call from any goroutine.
-func (s *Session[S]) Update(fn func(S) S) {
+func (s *Session[S]) Update(fn func(S) HandleResult[S]) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	defer func() {
@@ -153,7 +158,8 @@ func (s *Session[S]) Update(fn func(S) S) {
 	// Server-initiated updates count as activity so that sessions
 	// receiving only server pushes are not reaped as idle.
 	s.lastActivity = time.Now()
-	s.applyState(fn(s.state), "", nil)
+	result := fn(s.state)
+	s.applyState(result.State, "", &result)
 }
 
 // safeHandleEvent wraps handleEvent with panic recovery so that a
@@ -186,7 +192,8 @@ func (s *Session[S]) handleEvent(ev Event) {
 		if search := ev.Data["search"]; search != "" {
 			params.Query, _ = url.ParseQuery(search)
 		}
-		s.applyState(s.handleParams(s.state, params), ev.EventID, nil)
+		result := s.handleParams(s.state, params)
+		s.applyState(result.State, ev.EventID, &result)
 		return
 	}
 	result := s.handle(s.state, ev)

@@ -21,9 +21,9 @@ func TestSessionNavigateEvent(t *testing.T) {
 		)
 	}
 
-	handleParams := func(s state, params Params) state {
+	handleParams := func(s state, params Params) HandleResult[state] {
 		s.Page = params.Path
-		return s
+		return Result(s)
 	}
 
 	mt := &mockTransport{
@@ -69,13 +69,13 @@ func TestSessionNavigateEventWithQuery(t *testing.T) {
 
 	var receivedQuery string
 
-	handleParams := func(s state, params Params) state {
+	handleParams := func(s state, params Params) HandleResult[state] {
 		s.Page = params.Path
 		if params.Query != nil {
 			receivedQuery = params.Query.Get("tab")
 			s.Tab = receivedQuery
 		}
-		return s
+		return Result(s)
 	}
 
 	mt := &mockTransport{

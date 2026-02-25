@@ -52,7 +52,7 @@ func TestSessionUpdatePanicDoesNotCrashCaller(t *testing.T) {
 	sess.logger = slog.Default()
 
 	// Should not panic — the recovery in Update catches it.
-	sess.Update(func(s counterState) counterState {
+	sess.Update(func(s counterState) HandleResult[counterState] {
 		panic("boom in update")
 	})
 

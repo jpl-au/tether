@@ -56,9 +56,9 @@ func TestGroupBroadcastUpdatesAllSessions(t *testing.T) {
 		g.Add(sess1)
 		g.Add(sess2)
 
-		g.Broadcast(func(s counterState) counterState {
+		g.Broadcast(func(s counterState) HandleResult[counterState] {
 			s.Count += 5
-			return s
+			return Result(s)
 		})
 
 		// Broadcast is fire-and-forget — wait for the spawned
@@ -91,8 +91,8 @@ func TestGroupBroadcastEmptyGroupIsNoop(t *testing.T) {
 	g := NewGroup[counterState]()
 
 	// Should not panic.
-	g.Broadcast(func(s counterState) counterState {
+	g.Broadcast(func(s counterState) HandleResult[counterState] {
 		s.Count++
-		return s
+		return Result(s)
 	})
 }

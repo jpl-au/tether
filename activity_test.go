@@ -15,9 +15,9 @@ func TestUpdateRefreshesLastActivity(t *testing.T) {
 	past := time.Now().Add(-10 * time.Minute)
 	sess.lastActivity = past
 
-	sess.Update(func(s counterState) counterState {
+	sess.Update(func(s counterState) HandleResult[counterState] {
 		s.Count = 42
-		return s
+		return Result(s)
 	})
 
 	sess.mu.Lock()
