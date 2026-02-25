@@ -39,6 +39,13 @@ type Handler[S any] struct {
 // session with the diff state and embeds the session ID in the root
 // element so the client can reclaim it when the transport connects.
 func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
+	defer func() {
+		if v := recover(); v != nil {
+			h.cfg.Logger.Error("panic in initial render", "panic", v)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		}
+	}()
+
 	h.cfg.Logger.Info("serving initial page")
 
 	// Disconnected sessions are excluded from the limit because they

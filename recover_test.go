@@ -2,6 +2,8 @@ package poly
 
 import (
 	"log/slog"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 )
 
@@ -57,5 +59,26 @@ func TestSessionUpdatePanicDoesNotCrashCaller(t *testing.T) {
 	// State should be unchanged after a panicking Update.
 	if sess.state.Count != 0 {
 		t.Errorf("expected Count 0 after panicking Update, got %d", sess.state.Count)
+	}
+}
+
+func TestServeInitialPagePanicDoesNotCrashProcess(t *testing.T) {
+	handler := New(Config[counterState]{
+		Upgrade: stubUpgrade,
+		InitialState: func(r *http.Request) counterState {
+			panic("boom in InitialState")
+		},
+		Render: renderCounter,
+		Handle: handleCounter,
+	})
+
+	req := httptest.NewRequest("GET", "/app", nil)
+	w := httptest.NewRecorder()
+
+	// Should not panic — the recovery in serveInitialPage catches it.
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("status = %d, want %d", w.Code, http.StatusInternalServerError)
 	}
 }
