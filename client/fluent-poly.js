@@ -42,6 +42,7 @@ window.Poly.hooks = window.Poly.hooks || {};
   var wsOpened = false;
   var sseOpened = false;
   var devMode = false;
+  var pendingCount = 0;
 
   // --- Initialisation ---
 
@@ -519,6 +520,10 @@ window.Poly.hooks = window.Poly.hooks || {};
       if (entry.indicator) entry.indicator.classList.add("poly-pending");
     }
 
+    if (++pendingCount === 1 && root) {
+      root.classList.add("poly-loading");
+    }
+
     pendingElements[eventID] = entry;
   }
 
@@ -529,6 +534,11 @@ window.Poly.hooks = window.Poly.hooks || {};
     if (!entry.disabled) entry.el.removeAttribute("disabled");
     if (entry.text !== undefined) entry.el.textContent = entry.text;
     if (entry.indicator) entry.indicator.classList.remove("poly-pending");
+
+    if (--pendingCount === 0 && root) {
+      root.classList.remove("poly-loading");
+    }
+
     delete pendingElements[eventID];
   }
 
