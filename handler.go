@@ -2,6 +2,7 @@ package poly
 
 import (
 	"log/slog"
+	"net/http"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -26,6 +27,9 @@ const defaultPendingTimeout = 30 * time.Second
 // three pools — pending, active, and disconnected — so the server can
 // pre-warm state on the initial GET and preserve it across brief network
 // interruptions. Use Shutdown for graceful termination.
+//
+// The handler also serves the embedded client runtime at /_poly/ — there
+// is no need to mount a separate file server for the JS assets.
 type Handler[S any] struct {
 	cfg          Config[S]
 	mu           sync.Mutex
@@ -35,6 +39,9 @@ type Handler[S any] struct {
 	done         chan struct{}
 	closeOnce    sync.Once
 	draining     atomic.Bool
+
+	// clientHandler serves the embedded JS runtime at /_poly/*.
+	clientHandler http.Handler
 }
 
 // New creates a [Handler] from the given configuration. Session
@@ -97,11 +104,12 @@ func New[S any](cfg Config[S]) *Handler[S] {
 		cfg.HeartbeatInterval = defaultHeartbeatInterval
 	}
 	h := &Handler[S]{
-		cfg:          cfg,
-		pending:      make(map[string]*pendingSession[S]),
-		active:       make(map[string]*Session[S]),
-		disconnected: make(map[string]*Session[S]),
-		done:         make(chan struct{}),
+		cfg:           cfg,
+		pending:       make(map[string]*pendingSession[S]),
+		active:        make(map[string]*Session[S]),
+		disconnected:  make(map[string]*Session[S]),
+		done:          make(chan struct{}),
+		clientHandler: newClientHandler(cfg.Precache),
 	}
 
 	go h.reapPending()

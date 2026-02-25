@@ -8,6 +8,7 @@ import (
 	"time"
 
 	jit "github.com/jpl-au/fluent-jit"
+	"github.com/jpl-au/fluent-poly/push"
 	"github.com/jpl-au/fluent/node"
 )
 
@@ -87,10 +88,10 @@ type Session[S any] struct {
 	lastTitle string
 
 	// Push subscription — accessed only from within the loop.
-	pushSub *PushSubscription
+	pushSub *push.Subscription
 
 	// Buffered domain event publications, flushed after the client
-	// update is sent. Populated by Bus.Emit via the emitter interface.
+	// update is sent. Populated by Bus.Emit via the Emitter interface.
 	emitted []func()
 
 	// Installed by the Handler. Called when the transport reader

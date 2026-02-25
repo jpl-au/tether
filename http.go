@@ -8,15 +8,23 @@ import (
 	"net/url"
 	"slices"
 	"strings"
+
+	"github.com/jpl-au/fluent-poly/push"
 )
 
-// ServeHTTP implements http.Handler. A single endpoint serves all three
-// request types: the initial HTML page (GET without upgrade headers),
-// the transport connection (WebSocket upgrade or SSE stream), and POST
-// events (SSE mode only). The Mode field in Config determines which
-// transport paths are active. Requests that don't match any transport
-// path fall through to the initial page render.
+// ServeHTTP implements http.Handler. A single endpoint serves the
+// initial HTML page (GET without upgrade headers), the transport
+// connection (WebSocket upgrade or SSE stream), POST events (SSE mode
+// only), and the embedded client JS runtime at /_poly/. The Mode field
+// in Config determines which transport paths are active. Requests that
+// don't match any transport path fall through to the initial page render.
 func (h *Handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Serve the embedded client runtime (JS, idiomorph, service worker).
+	if strings.HasPrefix(r.URL.Path, "/_poly/") {
+		http.StripPrefix("/_poly", h.clientHandler).ServeHTTP(w, r)
+		return
+	}
+
 	// Push subscription registrations arrive as POST with a special
 	// header, regardless of transport mode. Handle them before the
 	// mode switch to avoid being mistaken for an SSE event.
@@ -140,7 +148,7 @@ func (h *Handler[S]) handlePostEvent(w http.ResponseWriter, r *http.Request) {
 	// reader goroutine consumes — it does not touch session state.
 	// The transport pointer is only modified by the loop (reattach),
 	// and an active session always has a valid transport.
-	pusher, ok := sess.transport.(EventPusher)
+	pusher, ok := sess.transport.(eventPusher)
 	if !ok {
 		http.Error(w, "transport does not accept events", http.StatusMethodNotAllowed)
 		return
@@ -198,7 +206,7 @@ func (h *Handler[S]) handlePushSubscribe(w http.ResponseWriter, r *http.Request)
 
 	r.Body = http.MaxBytesReader(w, r.Body, h.cfg.MaxEventBytes)
 
-	var sub PushSubscription
+	var sub push.Subscription
 	if err := json.NewDecoder(r.Body).Decode(&sub); err != nil {
 		http.Error(w, "invalid subscription", http.StatusBadRequest)
 		return

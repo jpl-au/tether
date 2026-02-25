@@ -13,7 +13,7 @@ import (
 )
 
 // clientFS embeds the client-side JS runtime and the idiomorph library.
-// These files are served by ServeClient() at the /_poly/ mount point.
+// These files are served at the /_poly/ path by the Handler.
 //
 //go:embed client/fluent-poly.js client/idiomorph.min.js client/poly-worker.js
 var clientFS embed.FS
@@ -63,19 +63,13 @@ func buildWorkerJS(precache []string) []byte {
 	return body
 }
 
-// ServeClient serves the embedded client runtime. Mount at /_poly/ so the
-// HTML page can load fluent-poly.js and idiomorph. The handler adds a
-// Service-Worker-Allowed header when serving poly-worker.js so the service
-// worker can control the entire origin despite being served from /_poly/.
-//
-// The service worker's CACHE_VERSION is set to a content hash of the
-// embedded files so cache invalidation happens automatically when the
-// library is rebuilt with new client code.
-//
-// The optional precache parameter lists additional app-specific asset URLs
-// (e.g. "/styles.css", "/logo.svg") that the service worker should cache
-// on install alongside the poly runtime files.
-func ServeClient(precache ...string) http.Handler {
+// newClientHandler builds an http.Handler that serves the embedded
+// client runtime. The Handler mounts this at /_poly/ so the HTML page
+// can load fluent-poly.js and idiomorph. The service worker script
+// gets special treatment: its CACHE_VERSION is set to a content hash
+// of the embedded files, and a Service-Worker-Allowed header is added
+// so it can control the entire origin.
+func newClientHandler(precache []string) http.Handler {
 	fileServer := http.FileServer(http.FS(clientFiles()))
 
 	var workerOnce sync.Once

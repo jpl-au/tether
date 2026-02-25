@@ -7,7 +7,7 @@
 //     long-lived HTTP GET (EventSource on the client side).
 //   - Client→server: events arrive as individual HTTP POST requests
 //     and are routed to the transport's internal channel via the
-//     [poly.EventPusher] interface.
+//     PushEvent method.
 //
 // Wire up by passing sse.Upgrade() as the Fallback (or Upgrade) field
 // in [poly.Config] and setting Mode to [poly.SSEOnly] or
@@ -34,7 +34,7 @@ const defaultBufferSize = 16
 // establish the SSE stream. The stream stays open for the lifetime of
 // the session; server updates are written as SSE "data" lines. Client
 // events arrive separately via HTTP POST — the poly handler routes
-// them through the [poly.EventPusher] interface on this transport.
+// them through the PushEvent method on this transport.
 //
 // An optional bufferSize parameter sets the capacity of the internal
 // event channel. When the channel is full, PushEvent returns
@@ -128,7 +128,7 @@ func (t *transport) ReceiveEvent() (poly.Event, error) {
 	}
 }
 
-// PushEvent implements [poly.EventPusher]. The poly handler calls this
+// PushEvent receives a client event from the poly handler via HTTP POST.
 // when an HTTP POST arrives carrying a client event for this session.
 //
 // The send is non-blocking by design. If the session's event loop is

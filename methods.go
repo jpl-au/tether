@@ -232,15 +232,5 @@ func (s *Session[S]) sendPush(n push.Notification, opts push.Options) error {
 	if s.pushSub == nil {
 		return errors.New("poly: no push subscription for session")
 	}
-	return push.Send(
-		push.Subscription{
-			Endpoint: s.pushSub.Endpoint,
-			Keys: push.SubscriptionKeys{
-				P256dh: s.pushSub.Keys.P256dh,
-				Auth:   s.pushSub.Keys.Auth,
-			},
-		},
-		n,
-		opts,
-	)
+	return push.Send(*s.pushSub, n, opts)
 }

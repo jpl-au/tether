@@ -223,7 +223,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 
 	// Start keep-alive writes for transports that need them (SSE).
 	// For reconnects, reattach handles this.
-	if hb, ok := transport.(Heartbeater); ok && h.cfg.HeartbeatInterval > 0 {
+	if hb, ok := transport.(heartbeater); ok && h.cfg.HeartbeatInterval > 0 {
 		hb.StartHeartbeat(h.cfg.HeartbeatInterval)
 	}
 

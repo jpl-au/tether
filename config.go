@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/jpl-au/fluent-poly/push"
 	"github.com/jpl-au/fluent/node"
 )
 
@@ -214,6 +215,12 @@ type Config[S any] struct {
 	// POLY_DEV environment variable to any non-empty value.
 	DevMode bool
 
+	// Precache lists additional app-specific asset URLs (e.g.
+	// "/styles.css", "/logo.svg") that the service worker should cache
+	// on install alongside the poly runtime files. Only relevant when
+	// Worker is true or Push is configured. Optional.
+	Precache []string
+
 	// Push enables Web Push notification support. When set, Worker is
 	// implicitly true. Clients subscribe to push notifications after
 	// connecting, and the subscription is delivered via OnSubscribe.
@@ -241,22 +248,7 @@ type PushConfig[S any] struct {
 	// to the server. Store the subscription to send notifications later
 	// via [push.Send]. The callback runs in its own goroutine so it is
 	// safe to perform I/O (e.g. database writes). Optional.
-	OnSubscribe func(session *Session[S], sub PushSubscription)
-}
-
-// PushSubscription holds the endpoint and encryption keys the browser
-// provides after a successful pushManager.subscribe() call. Store this
-// server-side to send notifications later via the push subpackage.
-type PushSubscription struct {
-	Endpoint string               `json:"endpoint"`
-	Keys     PushSubscriptionKeys `json:"keys"`
-}
-
-// PushSubscriptionKeys holds the client-side ECDH public key and
-// authentication secret needed to encrypt push message payloads.
-type PushSubscriptionKeys struct {
-	P256dh string `json:"p256dh"`
-	Auth   string `json:"auth"`
+	OnSubscribe func(session *Session[S], sub push.Subscription)
 }
 
 // defaultReconnectTimeout gives the client enough time to recover from

@@ -76,8 +76,8 @@ type Options struct {
 }
 
 // Subscription holds the endpoint and encryption keys the browser
-// provides after a successful PushManager.subscribe() call. This type
-// mirrors [poly.PushSubscription] to avoid an import cycle.
+// provides after a successful PushManager.subscribe() call. Store this
+// server-side to send notifications later via [Send].
 type Subscription struct {
 	Endpoint string           `json:"endpoint"`
 	Keys     SubscriptionKeys `json:"keys"`

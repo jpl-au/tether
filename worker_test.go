@@ -8,13 +8,15 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/jpl-au/fluent-poly/push"
 )
 
-func TestServeClientWorkerHeader(t *testing.T) {
-	handler := ServeClient()
+func TestClientWorkerHeader(t *testing.T) {
+	handler := newTestHandler()
 
 	t.Run("poly-worker.js gets Service-Worker-Allowed header", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/poly-worker.js", nil)
+		req := httptest.NewRequest("GET", "/_poly/poly-worker.js", nil)
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, req)
 
@@ -27,7 +29,7 @@ func TestServeClientWorkerHeader(t *testing.T) {
 	})
 
 	t.Run("poly-worker.js has content-hash cache version", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/poly-worker.js", nil)
+		req := httptest.NewRequest("GET", "/_poly/poly-worker.js", nil)
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, req)
 
@@ -41,7 +43,7 @@ func TestServeClientWorkerHeader(t *testing.T) {
 	})
 
 	t.Run("fluent-poly.js does not get Service-Worker-Allowed header", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/fluent-poly.js", nil)
+		req := httptest.NewRequest("GET", "/_poly/fluent-poly.js", nil)
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, req)
 
@@ -51,10 +53,16 @@ func TestServeClientWorkerHeader(t *testing.T) {
 	})
 }
 
-func TestServeClientPrecache(t *testing.T) {
-	handler := ServeClient("/styles.css", "/logo.svg")
+func TestClientPrecache(t *testing.T) {
+	handler := New(Config[counterState]{
+		Upgrade:      stubUpgrade,
+		InitialState: func(r *http.Request) counterState { return counterState{} },
+		Render:       renderCounter,
+		Handle:       handleCounter,
+		Precache:     []string{"/styles.css", "/logo.svg"},
+	})
 
-	req := httptest.NewRequest("GET", "/poly-worker.js", nil)
+	req := httptest.NewRequest("GET", "/_poly/poly-worker.js", nil)
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 
@@ -70,10 +78,10 @@ func TestServeClientPrecache(t *testing.T) {
 	}
 }
 
-func TestServeClientNoPrecache(t *testing.T) {
-	handler := ServeClient()
+func TestClientNoPrecache(t *testing.T) {
+	handler := newTestHandler()
 
-	req := httptest.NewRequest("GET", "/poly-worker.js", nil)
+	req := httptest.NewRequest("GET", "/_poly/poly-worker.js", nil)
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 
@@ -83,11 +91,11 @@ func TestServeClientNoPrecache(t *testing.T) {
 	}
 }
 
-func TestServeClientWorkerOriginCheck(t *testing.T) {
-	handler := ServeClient()
+func TestClientWorkerOriginCheck(t *testing.T) {
+	handler := newTestHandler()
 
 	t.Run("cross-origin request is rejected", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "http://myapp.com/poly-worker.js", nil)
+		req := httptest.NewRequest("GET", "http://myapp.com/_poly/poly-worker.js", nil)
 		req.Header.Set("Origin", "https://evil.com")
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, req)
@@ -98,7 +106,7 @@ func TestServeClientWorkerOriginCheck(t *testing.T) {
 	})
 
 	t.Run("same-origin request is allowed", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "http://myapp.com/poly-worker.js", nil)
+		req := httptest.NewRequest("GET", "http://myapp.com/_poly/poly-worker.js", nil)
 		req.Header.Set("Origin", "http://myapp.com")
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, req)
@@ -109,7 +117,7 @@ func TestServeClientWorkerOriginCheck(t *testing.T) {
 	})
 
 	t.Run("no origin header is allowed", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/poly-worker.js", nil)
+		req := httptest.NewRequest("GET", "/_poly/poly-worker.js", nil)
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, req)
 
@@ -207,7 +215,7 @@ func TestPolyBodyPushKeyAttribute(t *testing.T) {
 }
 
 func TestHandlePushSubscribe(t *testing.T) {
-	var received PushSubscription
+	var received push.Subscription
 	var receivedSession string
 
 	handler := New(Config[counterState]{
@@ -217,7 +225,7 @@ func TestHandlePushSubscribe(t *testing.T) {
 		Handle:       handleCounter,
 		Push: &PushConfig[counterState]{
 			VAPIDPublicKey: "test-key",
-			OnSubscribe: func(sess *Session[counterState], sub PushSubscription) {
+			OnSubscribe: func(sess *Session[counterState], sub push.Subscription) {
 				received = sub
 				receivedSession = sess.ID()
 			},
@@ -232,9 +240,9 @@ func TestHandlePushSubscribe(t *testing.T) {
 	handler.active["test-session"] = sess
 	handler.mu.Unlock()
 
-	sub := PushSubscription{
+	sub := push.Subscription{
 		Endpoint: "https://push.example.com/v1/send/abc",
-		Keys: PushSubscriptionKeys{
+		Keys: push.SubscriptionKeys{
 			P256dh: "subscriber-public-key",
 			Auth:   "subscriber-auth-secret",
 		},
@@ -297,7 +305,7 @@ func TestHandlePushSubscribeMissingSession(t *testing.T) {
 		Handle:       handleCounter,
 		Push: &PushConfig[counterState]{
 			VAPIDPublicKey: "test-key",
-			OnSubscribe:    func(*Session[counterState], PushSubscription) {},
+			OnSubscribe:    func(*Session[counterState], push.Subscription) {},
 		},
 	})
 
@@ -321,7 +329,7 @@ func TestHandlePushSubscribeUnknownSession(t *testing.T) {
 		Handle:       handleCounter,
 		Push: &PushConfig[counterState]{
 			VAPIDPublicKey: "test-key",
-			OnSubscribe:    func(*Session[counterState], PushSubscription) {},
+			OnSubscribe:    func(*Session[counterState], push.Subscription) {},
 		},
 	})
 
@@ -453,6 +461,16 @@ func TestDevModeInitialPageHasAttribute(t *testing.T) {
 	if !strings.Contains(w.Body.String(), "data-poly-dev") {
 		t.Error("expected data-poly-dev attribute in initial page HTML")
 	}
+}
+
+// newTestHandler creates a Handler with default test configuration.
+func newTestHandler() *Handler[counterState] {
+	return New(Config[counterState]{
+		Upgrade:      stubUpgrade,
+		InitialState: func(r *http.Request) counterState { return counterState{} },
+		Render:       renderCounter,
+		Handle:       handleCounter,
+	})
 }
 
 // stubUpgrade is a no-op upgrade function for tests that don't need

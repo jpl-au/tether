@@ -5,11 +5,12 @@ import (
 	"sync"
 )
 
-// emitter is the bridge between Bus[E] and Session[S]. Bus.Emit needs
-// to access session internals (the emission buffer and the handling
-// flag) without knowing the session's state type parameter S. Session
-// implements all three methods.
-type emitter interface {
+// Emitter identifies the session that published a domain event. It is
+// the bridge between [Bus] and [Session] — Bus.Emit needs to access
+// session internals without knowing the session's state type parameter
+// S. [*Session] is the only type that implements Emitter; the methods
+// are unexported to prevent external implementations.
+type Emitter interface {
 	addEmission(fn func())
 	isHandling() bool
 	sessionID() string
@@ -49,7 +50,7 @@ func NewBus[E any]() *Bus[E] {
 // Inside Handle or Update (isHandling == true), the publication is
 // deferred until after the sender's client update is sent. Outside
 // Handle, the event is published immediately.
-func (b *Bus[E]) Emit(s emitter, event E) {
+func (b *Bus[E]) Emit(s Emitter, event E) {
 	sid := s.sessionID()
 	if !s.isHandling() {
 		b.publish(event, sid)

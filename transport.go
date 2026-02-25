@@ -5,12 +5,12 @@ import (
 	"time"
 )
 
-// ErrEventBufferFull is returned by [EventPusher].PushEvent when the
-// internal event buffer is at capacity. PushEvent is non-blocking by
-// design — if the session's event loop is not consuming events fast
-// enough, the caller receives this error immediately rather than
-// stalling the HTTP handler goroutine. The handler responds with
-// HTTP 429 so the client can retry.
+// ErrEventBufferFull is returned by a transport's PushEvent method
+// when the internal event buffer is at capacity. PushEvent is
+// non-blocking by design — if the session's event loop is not
+// consuming events fast enough, the caller receives this error
+// immediately rather than stalling the HTTP handler goroutine. The
+// handler responds with HTTP 429 so the client can retry.
 var ErrEventBufferFull = errors.New("event buffer full")
 
 // Transport abstracts the persistent connection between server and
@@ -42,22 +42,22 @@ type Transport interface {
 	Close() error
 }
 
-// EventPusher is an optional interface for transports that receive
+// eventPusher is an optional interface for transports that receive
 // client events through a separate channel rather than through the
 // transport connection itself. The SSE transport implements this
 // because EventSource is unidirectional (server→client only) — client
 // events arrive as HTTP POSTs and are routed to PushEvent by the
 // handler. WebSocket transports do not need this because events
 // arrive on the socket.
-type EventPusher interface {
+type eventPusher interface {
 	PushEvent(Event) error
 }
 
-// Heartbeater is an optional interface for transports that need
+// heartbeater is an optional interface for transports that need
 // periodic keep-alive writes to prevent intermediate proxies from
 // closing idle connections. The SSE transport implements this; the
 // WebSocket transport does not need it because the WebSocket protocol
 // has its own ping/pong frames.
-type Heartbeater interface {
+type heartbeater interface {
 	StartHeartbeat(interval time.Duration)
 }
