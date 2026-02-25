@@ -747,6 +747,7 @@ window.Poly.hooks = window.Poly.hooks || {};
     }
     root.addEventListener("click", handleToggles);
     root.addEventListener("click", handleLinks);
+    window.addEventListener("keydown", handleFocusTrap);
 
     window.addEventListener("popstate", function () {
       sendNavigate(location.pathname + location.search);
@@ -950,6 +951,31 @@ window.Poly.hooks = window.Poly.hooks || {};
       }
     }
     el.setAttribute("data-poly-client-classes", set.join(" "));
+  }
+
+  function handleFocusTrap(e) {
+    if (e.key !== "Tab") return;
+
+    var container = e.target.closest("[data-poly-focus-trap]");
+    if (!container) return;
+
+    var focusables = container.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+    if (focusables.length === 0) return;
+
+    var first = focusables[0];
+    var last = focusables[focusables.length - 1];
+
+    if (e.shiftKey) {
+      if (document.activeElement === first) {
+        last.focus();
+        e.preventDefault();
+      }
+    } else {
+      if (document.activeElement === last) {
+        first.focus();
+        e.preventDefault();
+      }
+    }
   }
 
   function trackClientAttrs(el, attrName) {

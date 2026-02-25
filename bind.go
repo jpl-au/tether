@@ -51,6 +51,12 @@ func KeyDown[E settable[E]](el E, action string) E {
 	return el.SetData("poly-keydown", action)
 }
 
+// FilterKey restricts a KeyDown event to a specific key (e.g. "Enter").
+// The event is only sent to the server if the key name matches.
+func FilterKey[E settable[E]](el E, key string) E {
+	return el.SetData("poly-key", key)
+}
+
 // Focus binds a poly-focus event.
 func Focus[E settable[E]](el E, action string) E {
 	return el.SetData("poly-focus", action)
@@ -151,6 +157,12 @@ func Preserve[E settable[E]](el E) E {
 // attribute from the Focus event binding to avoid collisions.
 func AutoFocus[E settable[E]](el E) E {
 	return el.SetData("poly-autofocus", "")
+}
+
+// FocusTrap constrains Tab key navigation to the element's descendants.
+// Useful for modals and dropdown menus.
+func FocusTrap[E settable[E]](el E) E {
+	return el.SetData("poly-focus-trap", "")
 }
 
 // --- JS hooks ---
