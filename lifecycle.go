@@ -243,7 +243,8 @@ func (h *Handler[S]) reattach(sess *Session[S], transport Transport) {
 
 	h.wireDisconnect(sess)
 
-	sess.cmds <- func() {
+	select {
+	case sess.cmds <- func() {
 		// Stop the disconnect timer — we're reconnecting.
 		if sess.disconnectTimer != nil {
 			sess.disconnectTimer.Stop()
@@ -271,6 +272,9 @@ func (h *Handler[S]) reattach(sess *Session[S], transport Transport) {
 			u.Title = sess.lastTitle
 		}
 		sess.send(u)
+	}:
+	case <-sess.ctx.Done():
+		transport.Close()
 	}
 }
 
