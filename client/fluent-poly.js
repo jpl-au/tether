@@ -870,6 +870,15 @@ window.Poly.hooks = window.Poly.hooks || {};
 
       var data = {};
 
+      // Collect custom data attributes (data-poly-data-*)
+      for (var j = 0; j < target.attributes.length; j++) {
+        var attr = target.attributes[j];
+        if (attr.name.indexOf("data-poly-data-") === 0) {
+          var key = attr.name.substring(15);
+          data[key] = attr.value;
+        }
+      }
+
       // Collect event-specific data
       if (domEvent === "input" || domEvent === "change") {
         data.value = target.value || "";

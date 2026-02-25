@@ -192,3 +192,21 @@ func Hook[E settable[E]](el E, name string) E {
 func Transition[E settable[E]](el E, name string) E {
 	return el.SetData("poly-transition", name)
 }
+
+// Data attaches an arbitrary data value to an element. When an event
+// fires from this element, the key and value are included in the
+// Event.Data map sent to the server. Use this to avoid encoding IDs
+// or other parameters into action strings.
+//
+// Usage:
+//
+//	poly.Data(poly.Click(el, "delete"), "id", "123")
+//
+// On the server:
+//
+//	if ev.Action == "delete" {
+//	    id := ev.Data["id"] // "123"
+//	}
+func Data[E settable[E]](el E, key, value string) E {
+	return el.SetData("poly-data-"+key, value)
+}
