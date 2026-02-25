@@ -254,11 +254,22 @@ func (h *Handler[S]) reattach(sess *Session[S], transport Transport) {
 		go sess.readTransport(sess.events)
 
 		// Re-render and send full state to catch the client up.
+		// Include the last URL and title so the browser's address bar
+		// and document title are synced — they live outside the DOM
+		// and would otherwise be stale after reconnection.
 		tree := sess.render(sess.state)
 		html := sess.differ.Render(tree)
-		sess.send(Update{
+		u := Update{
 			Morphs: []Morph{{Key: "", HTML: html}},
-		})
+		}
+		if sess.lastURL != "" {
+			u.URL = sess.lastURL
+			u.Replace = true // sync state, don't push a history entry
+		}
+		if sess.lastTitle != "" {
+			u.Title = sess.lastTitle
+		}
+		sess.send(u)
 	}
 }
 

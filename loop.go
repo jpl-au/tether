@@ -194,8 +194,16 @@ func (s *Session[S]) sendDiff(eventID string, patches []jit.Patch, change *jit.S
 	}
 }
 
-// send writes an update to the transport, logging errors.
+// send writes an update to the transport, logging errors. URL and
+// title are captured before the nil-transport guard so reattach can
+// replay them after a disconnect.
 func (s *Session[S]) send(u Update) {
+	if u.URL != "" {
+		s.lastURL = u.URL
+	}
+	if u.Title != "" {
+		s.lastTitle = u.Title
+	}
 	if s.transport == nil {
 		return
 	}

@@ -77,6 +77,12 @@ type Session[S any] struct {
 	disconnectTimer  *time.Timer
 	reconnectTimeout time.Duration
 
+	// Last URL and title sent to the client. Captured in send() so
+	// reattach can replay them — the browser's address bar and title
+	// are separate from the DOM and would otherwise desync.
+	lastURL   string
+	lastTitle string
+
 	// Push subscription — accessed only from within the loop.
 	pushSub *PushSubscription
 
