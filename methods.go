@@ -16,7 +16,7 @@ func (s *Session[S]) State() S {
 		return s.state
 	}
 	ch := make(chan S, 1)
-	s.cmds <- func() { ch <- s.state }
+	s.enqueue(func() { ch <- s.state })
 	return <-ch
 }
 
@@ -37,7 +37,7 @@ func (s *Session[S]) Update(fn func(S) S) {
 		s.state = fn(s.state)
 		return
 	}
-	s.cmds <- func() {
+	s.enqueue(func() {
 		s.handling = true
 		s.fx = &effects{}
 		defer func() {
@@ -57,7 +57,7 @@ func (s *Session[S]) Update(fn func(S) S) {
 		tree := s.render(s.state)
 		patches, change := s.differ.Diff(tree)
 		s.sendDiff("", patches, change, tree)
-	}
+	})
 }
 
 // Close terminates the session by closing its transport. The reader
@@ -78,9 +78,9 @@ func (s *Session[S]) Toast(text string) {
 		s.fx.toast = text
 		return
 	}
-	s.cmds <- func() {
+	s.enqueue(func() {
 		s.send(Update{Toast: text})
-	}
+	})
 }
 
 // Navigate pushes a URL change to the client (history.pushState).
@@ -91,9 +91,9 @@ func (s *Session[S]) Navigate(rawURL string) {
 		s.fx.replace = false
 		return
 	}
-	s.cmds <- func() {
+	s.enqueue(func() {
 		s.send(Update{URL: rawURL})
-	}
+	})
 }
 
 // ReplaceURL updates the browser URL without a history entry
@@ -105,9 +105,9 @@ func (s *Session[S]) ReplaceURL(rawURL string) {
 		s.fx.replace = true
 		return
 	}
-	s.cmds <- func() {
+	s.enqueue(func() {
 		s.send(Update{URL: rawURL, Replace: true})
-	}
+	})
 }
 
 // SetTitle updates the browser's document title. Inside Handle the
@@ -117,9 +117,9 @@ func (s *Session[S]) SetTitle(title string) {
 		s.fx.title = title
 		return
 	}
-	s.cmds <- func() {
+	s.enqueue(func() {
 		s.send(Update{Title: title})
-	}
+	})
 }
 
 // Announce sends text to a screen-reader-accessible live region on
@@ -130,9 +130,9 @@ func (s *Session[S]) Announce(text string) {
 		s.fx.announce = text
 		return
 	}
-	s.cmds <- func() {
+	s.enqueue(func() {
 		s.send(Update{Announce: text})
-	}
+	})
 }
 
 // Flash sends a one-time notification to the client. The selector is
@@ -147,9 +147,9 @@ func (s *Session[S]) Flash(selector, text string) {
 		s.fx.flash[selector] = text
 		return
 	}
-	s.cmds <- func() {
+	s.enqueue(func() {
 		s.send(Update{Flash: map[string]string{selector: text}})
-	}
+	})
 }
 
 // Push sends a Web Push notification to the browser. Only works when
@@ -164,9 +164,9 @@ func (s *Session[S]) Push(n push.Notification, opts push.Options) error {
 	}
 
 	ch := make(chan error, 1)
-	s.cmds <- func() {
+	s.enqueue(func() {
 		ch <- s.sendPush(n, opts)
-	}
+	})
 	return <-ch
 }
 
