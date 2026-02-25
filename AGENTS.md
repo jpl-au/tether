@@ -362,7 +362,15 @@ group.Broadcast(func(s State) State {
 })
 ```
 
-`Broadcast` updates all sessions concurrently and is fire-and-forget — it returns immediately after spawning the update goroutines. Each goroutine completes after a single render-diff-send cycle. `Add`, `Remove`, `Broadcast`, and `Len` are all safe to call from any goroutine.
+`Broadcast` updates all sessions concurrently and is fire-and-forget — it returns immediately after spawning the update goroutines. Each goroutine completes after a single render-diff-send cycle. `Add`, `Remove`, `Broadcast`, `Len`, and `Members` are all safe to call from any goroutine.
+
+### Presence
+
+`Group` has optional `OnJoin` and `OnLeave` callbacks that fire when sessions are added or removed. Both run outside the group lock so it is safe to call `Broadcast` or other Group methods from within.
+
+- `OnJoin` fires only for new sessions (duplicate `Add` is a no-op).
+- `OnLeave` fires only for sessions that were in the group (absent `Remove` is a no-op).
+- `Members()` returns a snapshot of `[]*Session[S]` — use `sess.State()` to read each session's data (e.g. usernames for an online list).
 
 ## Transport mode
 
@@ -471,11 +479,16 @@ group_test.go       Broadcasting (uses testing/synctest for fire-and-forget veri
 activity_test.go    Server-initiated update refreshes lastActivity
 reap_test.go        Reaper lifecycle tests (uses testing/synctest fake clock)
 shutdown_test.go    Graceful shutdown and reaper termination (uses testing/synctest)
+drain_test.go       Graceful drain (rejects new, allows reconnect, context cancellation)
 origin_test.go      Origin checking and CSRF protection
 worker_test.go      Service worker header, polyBody attributes, push subscribe handler
 bind_test.go        Event binding helpers (package poly_test, black-box)
 protocol_test.go    Wire format encoding
 bench_test.go       Performance benchmarks
+announce_test.go    Live region announcements (Session.Announce, wire format)
+presence_test.go    Group presence (OnJoin, OnLeave, Members)
+flash_test.go       Session.Flash one-time notifications
+health_test.go      Handler.Health session pool counts
 sse/sse_test.go     SSE transport
 push/push_test.go   VAPID key generation, JWT signing, Send end-to-end
 ```
@@ -517,6 +530,20 @@ Supported data attributes:
 ## Health check
 
 `Handler.Health()` returns a `HealthStatus` struct with `Pending`, `Active`, and `Disconnected` counts. Reads three map lengths under a single lock acquisition. The struct has `json` tags for direct serialisation. Safe to call from any goroutine.
+
+## Graceful drain
+
+`Handler.Drain(ctx)` stops accepting new sessions while letting existing ones finish naturally. New page loads receive 503. Reconnecting clients can still reattach to their disconnected sessions. The background reaper continues running so idle and lifetime limits are enforced during the drain period.
+
+The method blocks until all pools (pending, active, disconnected) are empty or `ctx` is cancelled. Internally it polls `Health()` every 500ms. After `Drain` returns, call `Shutdown` to stop the reaper.
+
+The `draining` flag is an `atomic.Bool` on `Handler`. It is checked at the top of `serveInitialPage` and in the fresh-session fallback path of `serveSession`. The disconnected-session and pending-session paths are not gated — reconnects and pending claims still work during drain.
+
+## Live region announcements
+
+`Session.Announce(text)` sends text to a screen-reader-accessible `aria-live="polite"` region on the client. The JS runtime lazily creates a visually hidden `<div role="status" aria-live="polite" aria-atomic="true">` and sets its `textContent`. The `announce` field is part of the `Update`/`UpdateMessage` wire format (`"announce"` JSON key, `omitempty`).
+
+To trigger re-announcement of identical text, the JS clears the region first then sets the text in the next animation frame.
 
 ## Dev mode
 

@@ -466,12 +466,54 @@ window.Poly.hooks = window.Poly.hooks || {};
           }
         }
       }
+      if (msg.announce) {
+        announce(msg.announce);
+      }
 
       // Set focus on the designated element after all DOM updates.
       // Uses data-poly-autofocus (not data-poly-focus, which is the
       // event binding attribute for the Focus helper).
       var focusEl = root.querySelector("[data-poly-autofocus]");
       if (focusEl) focusEl.focus();
+    });
+  }
+
+  // --- Accessibility live region ---
+  //
+  // A visually hidden aria-live region for screen reader announcements.
+  // Created lazily on first use. The server sends announce text via
+  // Session.Announce and the JS populates this element, causing
+  // assistive technology to read it aloud.
+
+  var liveRegion = null;
+
+  function ensureLiveRegion() {
+    if (liveRegion) return liveRegion;
+    liveRegion = document.createElement("div");
+    liveRegion.setAttribute("role", "status");
+    liveRegion.setAttribute("aria-live", "polite");
+    liveRegion.setAttribute("aria-atomic", "true");
+    liveRegion.style.cssText = [
+      "position:absolute",
+      "width:1px",
+      "height:1px",
+      "padding:0",
+      "margin:-1px",
+      "overflow:hidden",
+      "clip:rect(0,0,0,0)",
+      "white-space:nowrap",
+      "border:0"
+    ].join(";");
+    document.body.appendChild(liveRegion);
+    return liveRegion;
+  }
+
+  function announce(text) {
+    var region = ensureLiveRegion();
+    // Clear first so repeated identical announcements still trigger.
+    region.textContent = "";
+    requestAnimationFrame(function () {
+      region.textContent = text;
     });
   }
 

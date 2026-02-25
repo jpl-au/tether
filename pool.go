@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	jit "github.com/jpl-au/fluent-jit"
@@ -33,6 +34,7 @@ type Handler[S any] struct {
 	disconnected map[string]*Session[S]
 	done         chan struct{}
 	closeOnce    sync.Once
+	draining     atomic.Bool
 }
 
 // HealthStatus reports the number of sessions in each pool. Use
@@ -60,6 +62,11 @@ func (h *Handler[S]) Health() HealthStatus {
 // session with the diff state and embeds the session ID in the root
 // element so the client can reclaim it when the transport connects.
 func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
+	if h.draining.Load() {
+		http.Error(w, "server is shutting down", http.StatusServiceUnavailable)
+		return
+	}
+
 	defer func() {
 		if v := recover(); v != nil {
 			h.cfg.Logger.Error("panic in initial render", "panic", v)
@@ -189,9 +196,15 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 
 	if differ == nil {
 		// This path handles direct transport connections without a prior
-		// GET (e.g. bogus or missing session ID). Enforce MaxSessions
-		// here too, otherwise this path bypasses the limit. Disconnected
-		// sessions are excluded for the same reason as serveInitialPage.
+		// GET (e.g. bogus or missing session ID). Reject during drain
+		// since this would create a brand new session.
+		if h.draining.Load() {
+			return
+		}
+
+		// Enforce MaxSessions here too, otherwise this path bypasses
+		// the limit. Disconnected sessions are excluded for the same
+		// reason as serveInitialPage.
 		if h.cfg.MaxSessions > 0 {
 			h.mu.Lock()
 			full := len(h.pending)+len(h.active) >= h.cfg.MaxSessions
@@ -308,6 +321,35 @@ func (h *Handler[S]) wireDisconnect(sess *Session[S]) {
 
 		if h.cfg.OnDisconnect != nil {
 			h.cfg.OnDisconnect(sess)
+		}
+	}
+}
+
+// Drain stops accepting new sessions but lets existing ones finish
+// naturally. It blocks until all sessions have disconnected or ctx
+// is cancelled. The background reaper continues running so idle and
+// lifetime limits are still enforced during the drain period.
+// Reconnecting clients can still reattach to their existing sessions.
+//
+// After Drain returns, call [Handler.Shutdown] to stop the reaper
+// and release resources. Safe to call from any goroutine.
+func (h *Handler[S]) Drain(ctx context.Context) error {
+	h.draining.Store(true)
+
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+			h.mu.Lock()
+			empty := len(h.pending) == 0 && len(h.active) == 0 && len(h.disconnected) == 0
+			h.mu.Unlock()
+			if empty {
+				return nil
+			}
 		}
 	}
 }

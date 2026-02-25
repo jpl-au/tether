@@ -112,7 +112,7 @@ func TestPushEventReturnsBufferFullWhenFull(t *testing.T) {
 	tr, _ := newTestTransport()
 
 	// Fill the buffer (capacity 16).
-	for i := 0; i < 16; i++ {
+	for i := range 16 {
 		if err := tr.PushEvent(poly.Event{Action: "fill"}); err != nil {
 			t.Fatalf("PushEvent %d: unexpected error: %v", i, err)
 		}

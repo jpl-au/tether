@@ -157,6 +157,14 @@ Update the page title:
 session.SetTitle("New Page — My App")
 ```
 
+Announce to screen readers:
+
+```go
+session.Announce("Item added to cart")
+```
+
+The JS runtime maintains a hidden `aria-live="polite"` region. Setting its text causes assistive technology to read the announcement aloud.
+
 ## URL routing
 
 Bidirectional sync between Go state and the browser URL:
@@ -272,6 +280,25 @@ group.Broadcast(func(s State) State {
 ```
 
 Sessions are updated concurrently so a slow render in one session does not block delivery to the rest. `Broadcast` is fire-and-forget — it returns immediately after spawning the update goroutines. Each goroutine completes after a single render-diff-send cycle.
+
+### Presence
+
+Track who is online with callbacks and member listing:
+
+```go
+group := poly.NewGroup[State]()
+group.OnJoin = func(s *poly.Session[State]) {
+    log.Printf("user joined: %s", s.ID())
+}
+group.OnLeave = func(s *poly.Session[State]) {
+    log.Printf("user left: %s", s.ID())
+}
+
+// Get all connected sessions
+members := group.Members()
+```
+
+`OnJoin` fires when `Add` is called with a new session. `OnLeave` fires when `Remove` is called for a session that was in the group. Duplicate adds and absent removes are no-ops.
 
 ## Transport mode
 
@@ -398,6 +425,21 @@ mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
     json.NewEncoder(w).Encode(handler.Health())
 })
 ```
+
+## Graceful drain
+
+Stop accepting new sessions while letting existing ones finish:
+
+```go
+// On SIGINT, drain then shut down.
+ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+defer stop()
+
+handler.Drain(ctx)    // blocks until all sessions disconnect or ctx cancels
+handler.Shutdown(ctx) // stops the reaper and releases resources
+```
+
+`Drain` rejects new page loads with 503 but allows existing sessions to continue and disconnected clients to reconnect. The background reaper keeps enforcing idle and lifetime limits during the drain period.
 
 ## Dev mode
 

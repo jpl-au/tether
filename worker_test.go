@@ -254,7 +254,7 @@ func TestHandlePushSubscribe(t *testing.T) {
 	}
 
 	// OnSubscribe runs in a goroutine, give it a moment.
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		if receivedSession != "" {
 			break
 		}

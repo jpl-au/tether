@@ -75,7 +75,7 @@ func benchEncodeUpdatePatches(b *testing.B, n int) {
 		key := fmt.Sprintf("key-%d", i)
 		patches[i] = jit.Patch{
 			Key:  key,
-			HTML: []byte(fmt.Sprintf(`<span data-poly-key="%s">value %d</span>`, key, i)),
+			HTML: fmt.Appendf(nil, `<span data-poly-key="%s">value %d</span>`, key, i),
 		}
 	}
 	update := Update{Patches: patches}

@@ -24,6 +24,16 @@ import (
 type Group[S any] struct {
 	mu       sync.Mutex
 	sessions map[string]*Session[S]
+
+	// OnJoin is called after a session is added to the group.
+	// Runs outside the group lock so it is safe to call Broadcast
+	// or other Group methods from within. Optional.
+	OnJoin func(session *Session[S])
+
+	// OnLeave is called after a session is removed from the group.
+	// Runs outside the group lock so it is safe to call Broadcast
+	// or other Group methods from within. Optional.
+	OnLeave func(session *Session[S])
 }
 
 // NewGroup creates an empty group ready to accept sessions.
@@ -35,20 +45,36 @@ func NewGroup[S any]() *Group[S] {
 	}
 }
 
-// Add registers a session with the group. Safe to call from any
-// goroutine. Adding a session that is already in the group is a no-op.
+// Add registers a session with the group. If the session is new and
+// OnJoin is set, the callback fires after the session is added.
+// Safe to call from any goroutine. Adding a session that is already
+// in the group is a no-op (OnJoin does not fire).
 func (g *Group[S]) Add(s *Session[S]) {
 	g.mu.Lock()
+	_, exists := g.sessions[s.id]
 	g.sessions[s.id] = s
+	onJoin := g.OnJoin
 	g.mu.Unlock()
+
+	if !exists && onJoin != nil {
+		onJoin(s)
+	}
 }
 
-// Remove unregisters a session from the group. Safe to call from any
-// goroutine. Removing a session that is not in the group is a no-op.
+// Remove unregisters a session from the group. If the session was
+// present and OnLeave is set, the callback fires after removal.
+// Safe to call from any goroutine. Removing a session that is not
+// in the group is a no-op (OnLeave does not fire).
 func (g *Group[S]) Remove(s *Session[S]) {
 	g.mu.Lock()
+	_, exists := g.sessions[s.id]
 	delete(g.sessions, s.id)
+	onLeave := g.OnLeave
 	g.mu.Unlock()
+
+	if exists && onLeave != nil {
+		onLeave(s)
+	}
 }
 
 // Len returns the number of sessions currently in the group. Useful
@@ -57,6 +83,20 @@ func (g *Group[S]) Len() int {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	return len(g.sessions)
+}
+
+// Members returns a snapshot of the sessions currently in the group.
+// The returned slice is safe to iterate without holding the group lock.
+// Use [Session.State] to read each session's state (e.g. for building
+// a list of online usernames).
+func (g *Group[S]) Members() []*Session[S] {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	members := make([]*Session[S], 0, len(g.sessions))
+	for _, s := range g.sessions {
+		members = append(members, s)
+	}
+	return members
 }
 
 // Broadcast applies fn to every session in the group via

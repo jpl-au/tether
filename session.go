@@ -228,6 +228,19 @@ func (s *Session[S]) SetTitle(title string) {
 	}
 }
 
+// Announce sends text to a screen-reader-accessible live region on the
+// client. The JS runtime maintains a hidden aria-live="polite" element
+// and sets its text content, causing assistive technology to read the
+// announcement aloud. Safe to call from any goroutine.
+func (s *Session[S]) Announce(text string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	update := Update{Announce: text}
+	if err := s.transport.SendUpdate(update); err != nil {
+		s.logger.Error("send announce error", "session", s.id, "err", err)
+	}
+}
+
 // Flash sends a one-time notification to the client. The key is a CSS
 // selector for the target element; the value is plain text to display.
 // The client JS clears the element after 5 seconds. Safe to call from

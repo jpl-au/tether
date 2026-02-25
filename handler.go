@@ -42,6 +42,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -464,12 +465,7 @@ func (h *Handler[S]) originAllowed(r *http.Request) bool {
 		return true
 	}
 	if len(h.cfg.AllowedOrigins) > 0 {
-		for _, allowed := range h.cfg.AllowedOrigins {
-			if origin == allowed {
-				return true
-			}
-		}
-		return false
+		return slices.Contains(h.cfg.AllowedOrigins, origin)
 	}
 	// No AllowedOrigins configured — fall back to same-host check
 	// as basic CSRF protection. Compare hostnames only so that
