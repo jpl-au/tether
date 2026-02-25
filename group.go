@@ -1,11 +1,13 @@
 package poly
 
 import (
+	"iter"
 	"sync"
 )
 
 // Group tracks a set of sessions for broadcasting state updates.
-// Add sessions in OnConnect and remove them in OnDisconnect:
+// Add sessions in OnConnect and remove them in OnDisconnect, or use
+// [Config].Groups for automatic membership:
 //
 //	group := poly.NewGroup[State]()
 //
@@ -17,12 +19,12 @@ import (
 //	},
 //
 //	// Later, push an update to every session in the group:
-//	group.Broadcast(func(state State) poly.HandleResult[State] {
+//	group.Broadcast(func(target *poly.Session[State], state State) State {
 //	    state.Message = "Hello everyone"
-//	    return poly.Result(state)
+//	    return state
 //	})
 type Group[S any] struct {
-	mu       sync.Mutex
+	mu       sync.RWMutex
 	sessions map[string]*Session[S]
 
 	// OnJoin is called after a session is added to the group.
@@ -80,23 +82,42 @@ func (g *Group[S]) Remove(s *Session[S]) {
 // Len returns the number of sessions currently in the group. Useful
 // for displaying an "N users online" indicator via [Session.Update].
 func (g *Group[S]) Len() int {
-	g.mu.Lock()
-	defer g.mu.Unlock()
+	g.mu.RLock()
+	defer g.mu.RUnlock()
 	return len(g.sessions)
 }
 
-// Members returns a snapshot of the sessions currently in the group.
-// The returned slice is safe to iterate without holding the group lock.
-// Use [Session.State] to read each session's state (e.g. for building
-// a list of online usernames).
-func (g *Group[S]) Members() []*Session[S] {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	members := make([]*Session[S], 0, len(g.sessions))
-	for _, s := range g.sessions {
-		members = append(members, s)
+// All returns an iterator over sessions in the group. The read lock
+// is held during iteration — callers must not block. Use this for
+// read-only access (building user lists, counting, presence). For
+// state mutations use [Group.Broadcast] instead, which snapshots
+// targets to avoid holding the lock while sending.
+func (g *Group[S]) All() iter.Seq[*Session[S]] {
+	return func(yield func(*Session[S]) bool) {
+		g.mu.RLock()
+		defer g.mu.RUnlock()
+		for _, s := range g.sessions {
+			if !yield(s) {
+				return
+			}
+		}
 	}
-	return members
+}
+
+// Broadcast applies fn to every session in the group. The callback
+// receives the target session so side-effect methods (Toast, Navigate,
+// etc.) are called on the correct session. Each session's Update is
+// non-blocking — it queues a command on the session's channel — so
+// Broadcast does not spawn goroutines per session.
+//
+// Safe to call from any goroutine, including from within Handle.
+func (g *Group[S]) Broadcast(fn func(target *Session[S], state S) S) {
+	targets := g.snapshot()
+	for _, t := range targets {
+		t.Update(func(state S) S {
+			return fn(t, state)
+		})
+	}
 }
 
 // BroadcastOthers applies fn to every session in the group except
@@ -105,50 +126,27 @@ func (g *Group[S]) Members() []*Session[S] {
 // (via the return value) and uses BroadcastOthers to push the change
 // to everyone else, avoiding a double-apply on the sender.
 //
-// Like [Group.Broadcast], this is fire-and-forget and safe to call
-// from any goroutine.
-func (g *Group[S]) BroadcastOthers(exclude *Session[S], fn func(S) HandleResult[S]) {
-	g.mu.Lock()
-	targets := make([]*Session[S], 0, len(g.sessions))
-	for _, s := range g.sessions {
-		if s != exclude {
-			targets = append(targets, s)
+// Safe to call from any goroutine, including from within Handle.
+func (g *Group[S]) BroadcastOthers(exclude *Session[S], fn func(target *Session[S], state S) S) {
+	targets := g.snapshot()
+	for _, t := range targets {
+		if t != exclude {
+			t.Update(func(state S) S {
+				return fn(t, state)
+			})
 		}
-	}
-	g.mu.Unlock()
-
-	for _, s := range targets {
-		go s.Update(fn)
 	}
 }
 
-// Broadcast applies fn to every session in the group via
-// [Session.Update]. Each session is updated in its own goroutine so
-// a slow render in one session does not block delivery to the rest.
-//
-// The function fn returns a [HandleResult] so side effects (announce,
-// flash, title, URL) can be sent atomically with the state diff. Use
-// [Result] to return a bare state when no side effects are needed.
-//
-// Broadcast does not wait for the updates to complete. This is
-// necessary because Broadcast is typically called from inside a
-// [HandleFunc] (e.g. chat messages, collaborative edits), where the
-// calling session's mutex is held. If Broadcast blocked, the update
-// goroutine for the calling session would deadlock trying to acquire
-// the same mutex. The goroutines are bounded by the number of sessions
-// in the group and each completes after a single render-diff-send
-// cycle, so they do not accumulate.
-//
-// Safe to call from any goroutine.
-func (g *Group[S]) Broadcast(fn func(S) HandleResult[S]) {
-	g.mu.Lock()
+// snapshot returns a slice of current session pointers under a
+// read lock. Used by Broadcast to avoid holding the lock while
+// sending updates (which could block if a command buffer is full).
+func (g *Group[S]) snapshot() []*Session[S] {
+	g.mu.RLock()
 	targets := make([]*Session[S], 0, len(g.sessions))
 	for _, s := range g.sessions {
 		targets = append(targets, s)
 	}
-	g.mu.Unlock()
-
-	for _, s := range targets {
-		go s.Update(fn)
-	}
+	g.mu.RUnlock()
+	return targets
 }

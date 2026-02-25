@@ -1,30 +1,33 @@
 package poly
 
 import (
-	"log/slog"
 	"testing"
+	"testing/synctest"
 	"time"
 )
 
 func TestUpdateRefreshesLastActivity(t *testing.T) {
-	mt := &mockTransport{events: []Event{}}
-	sess := newTestSession(counterState{Count: 0}, mt)
-	sess.logger = slog.Default()
+	synctest.Test(t, func(t *testing.T) {
+		mt := &mockTransport{events: []Event{}}
+		sess := newTestSession(counterState{Count: 0}, mt)
 
-	// Set lastActivity to the past so we can detect the change.
-	past := time.Now().Add(-10 * time.Minute)
-	sess.lastActivity = past
+		// Set lastActivity to the past so we can detect the change.
+		past := time.Now().Add(-10 * time.Minute)
+		sess.lastActivity.Store(past.UnixNano())
 
-	sess.Update(func(s counterState) HandleResult[counterState] {
-		s.Count = 42
-		return Result(s)
+		go sess.readTransport(sess.events)
+		go sess.run()
+		defer func() { sess.stop(); synctest.Wait() }()
+
+		sess.Update(func(s counterState) counterState {
+			s.Count = 42
+			return s
+		})
+		synctest.Wait()
+
+		activity := sess.lastActivity.Load()
+		if activity <= past.UnixNano() {
+			t.Error("expected lastActivity to be refreshed")
+		}
 	})
-
-	sess.mu.Lock()
-	activity := sess.lastActivity
-	sess.mu.Unlock()
-
-	if !activity.After(past) {
-		t.Errorf("expected lastActivity to be refreshed, still %v", activity)
-	}
 }

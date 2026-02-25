@@ -3,6 +3,7 @@ package poly
 import (
 	"context"
 	"io"
+	"log/slog"
 	"sync"
 
 	jit "github.com/jpl-au/fluent-jit"
@@ -78,18 +79,22 @@ func renderCounter(state counterState) node.Node {
 	)
 }
 
-func handleCounter(_ *Session[counterState], state counterState, ev Event) HandleResult[counterState] {
+func handleCounter(_ *Session[counterState], state counterState, ev Event) counterState {
 	switch ev.Action {
 	case "increment":
 		state.Count++
 	case "decrement":
 		state.Count--
 	}
-	return Result(state)
+	return state
 }
 
 // newTestSession creates a session with a seeded differ, ready for
-// testing. Caller provides the transport with queued events.
+// testing. The session has channels and a logger. Caller must start
+// the transport reader and run loop:
+//
+//	go sess.readTransport(sess.events)
+//	go sess.run()
 func newTestSession(state counterState, mt *mockTransport) *Session[counterState] {
 	differ := jit.NewDiffer()
 	ctx, cancel := context.WithCancel(context.Background())
@@ -100,8 +105,11 @@ func newTestSession(state counterState, mt *mockTransport) *Session[counterState
 		handle:    handleCounter,
 		differ:    differ,
 		transport: mt,
+		logger:    slog.Default().WithGroup("session").With("id", "test"),
+		events:    make(chan Event),
+		cmds:      make(chan func(), cmdBufferSize),
 		ctx:       ctx,
-		cancel:    cancel,
+		stop:      cancel,
 	}
 	tree := sess.render(sess.state)
 	differ.Render(tree)

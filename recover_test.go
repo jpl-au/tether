@@ -1,65 +1,72 @@
 package poly
 
 import (
-	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"testing/synctest"
 )
 
 func TestSessionHandlePanicDoesNotKillSession(t *testing.T) {
-	mt := &mockTransport{
-		events: []Event{
-			{Type: "click", Action: "crash"},
-			{Type: "click", Action: "increment"},
-		},
-	}
-
-	handle := func(_ *Session[counterState], s counterState, ev Event) HandleResult[counterState] {
-		if ev.Action == "crash" {
-			panic("boom")
+	synctest.Test(t, func(t *testing.T) {
+		mt := &mockTransport{
+			events: []Event{
+				{Type: "click", Action: "crash"},
+				{Type: "click", Action: "increment"},
+			},
 		}
-		s.Count++
-		return Result(s)
-	}
 
-	sess := newTestSession(counterState{Count: 0}, mt)
-	sess.handle = handle
-	sess.logger = slog.Default()
+		handle := func(_ *Session[counterState], s counterState, ev Event) counterState {
+			if ev.Action == "crash" {
+				panic("boom")
+			}
+			s.Count++
+			return s
+		}
 
-	// Should not panic — the session recovers and processes the second event.
-	sess.run()
+		sess := newTestSession(counterState{Count: 0}, mt)
+		sess.handle = handle
 
-	if sess.state.Count != 1 {
-		t.Errorf("expected Count 1 after recovery, got %d", sess.state.Count)
-	}
+		go sess.readTransport(sess.events)
+		go sess.run()
+		defer func() { sess.stop(); synctest.Wait() }()
+		synctest.Wait()
 
-	mt.mu.Lock()
-	defer mt.mu.Unlock()
+		if s := sess.State(); s.Count != 1 {
+			t.Errorf("expected Count 1 after recovery, got %d", s.Count)
+		}
 
-	// Only the second event (increment) should produce a patch.
-	if len(patchUpdates(mt.updates)) != 1 {
-		t.Errorf("expected 1 patch update after panic recovery, got %d", len(patchUpdates(mt.updates)))
-	}
+		mt.mu.Lock()
+		defer mt.mu.Unlock()
+
+		// Only the second event (increment) should produce a patch.
+		if len(patchUpdates(mt.updates)) != 1 {
+			t.Errorf("expected 1 patch update after panic recovery, got %d", len(patchUpdates(mt.updates)))
+		}
+	})
 }
 
 func TestSessionUpdatePanicDoesNotCrashCaller(t *testing.T) {
-	mt := &mockTransport{
-		events: []Event{},
-	}
+	synctest.Test(t, func(t *testing.T) {
+		mt := &mockTransport{events: []Event{}}
+		sess := newTestSession(counterState{Count: 0}, mt)
 
-	sess := newTestSession(counterState{Count: 0}, mt)
-	sess.logger = slog.Default()
+		go sess.readTransport(sess.events)
+		go sess.run()
+		defer func() { sess.stop(); synctest.Wait() }()
 
-	// Should not panic — the recovery in Update catches it.
-	sess.Update(func(s counterState) HandleResult[counterState] {
-		panic("boom in update")
+		// Queue an update that panics. The panic is recovered inside
+		// the command loop — the caller is not affected.
+		sess.Update(func(s counterState) counterState {
+			panic("boom in update")
+		})
+		synctest.Wait()
+
+		// State should be unchanged after a panicking Update.
+		if s := sess.State(); s.Count != 0 {
+			t.Errorf("expected Count 0 after panicking Update, got %d", s.Count)
+		}
 	})
-
-	// State should be unchanged after a panicking Update.
-	if sess.state.Count != 0 {
-		t.Errorf("expected Count 0 after panicking Update, got %d", sess.state.Count)
-	}
 }
 
 func TestServeInitialPagePanicDoesNotCrashProcess(t *testing.T) {

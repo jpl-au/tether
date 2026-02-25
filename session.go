@@ -2,15 +2,11 @@ package poly
 
 import (
 	"context"
-	"errors"
-	"io"
 	"log/slog"
-	"net/url"
-	"sync"
+	"sync/atomic"
 	"time"
 
 	jit "github.com/jpl-au/fluent-jit"
-	"github.com/jpl-au/fluent-poly/push"
 	"github.com/jpl-au/fluent/node"
 )
 
@@ -33,35 +29,71 @@ type StructuralChange struct {
 // engine compares consecutive renders to compute patches.
 type RenderFunc[S any] func(state S) node.Node
 
-// Session represents a single connected client. Each browser tab gets
-// its own Session with independent state and a dedicated diff engine.
-// Sessions are never shared across connections — concurrent access to
-// the same Session is serialised by an internal mutex.
-//
-// The exported methods (Update, Navigate, ReplaceURL, SetTitle, Close)
-// are safe to call from any goroutine, making it possible to push
-// server-initiated updates from background goroutines, timers, or
-// database change listeners.
-type Session[S any] struct {
-	id             string
-	state          S
-	render         RenderFunc[S]
-	handle         HandleFunc[S]
-	handleParams   func(S, Params) HandleResult[S]
-	differ         *jit.Differ
-	transport      Transport
-	logger         *slog.Logger
-	createdAt      time.Time
-	lastActivity   time.Time
-	disconnectedAt time.Time
-	ctx            context.Context
-	cancel         context.CancelFunc
-	pushSub        *PushSubscription
-	mu             sync.Mutex
+// cmdBufferSize is the capacity of the command channel. When full, the
+// sender blocks — providing natural backpressure. Convention over
+// configuration: no knob.
+const cmdBufferSize = 64
 
-	// Optional callbacks from Config
-	onDisconnect       func()
-	equal              func(a, b S) bool
+// Session represents a single connected client. Each browser tab gets
+// its own Session with independent state, a dedicated diff engine, and
+// a command-loop goroutine that serialises all state mutations.
+//
+// All exported methods are safe to call from any goroutine — including
+// from within Handle. The command loop processes them in order; there
+// is no mutex and no deadlock risk.
+type Session[S any] struct {
+	id    string
+	state S
+
+	render       RenderFunc[S]
+	handle       HandleFunc[S]
+	handleParams func(*Session[S], S, Params) S
+	differ       *jit.Differ
+	transport    Transport
+	logger       *slog.Logger
+
+	// Channel pair: events from transport, commands from everything else.
+	events chan Event
+	cmds   chan func()
+
+	// Session lifetime — cancelled on permanent destruction.
+	ctx  context.Context
+	stop context.CancelFunc
+
+	// Timestamps. lastActivity is atomic so the idle timer reset
+	// (inside the loop) and external readers (Health) don't conflict.
+	lastActivity atomic.Int64 // UnixNano
+	createdAt    time.Time
+
+	// Active during exec() — enables the dual-path pattern.
+	handling bool
+	fx       *effects
+
+	// Lifecycle timers (replace centralised reaper).
+	idleTimer   *time.Timer
+	idleTimeout time.Duration
+	// disconnectTimer is started when the transport closes and
+	// stopped on reattach. If it fires, the session is destroyed.
+	disconnectTimer  *time.Timer
+	reconnectTimeout time.Duration
+
+	// Push subscription — accessed only from within the loop.
+	pushSub *PushSubscription
+
+	// Extension point: called at the end of exec() after the client
+	// update is sent. Task 2 (EDD) will use this to publish domain
+	// events. Nil until the event bus is wired in.
+	afterExec func(trigger Event)
+
+	// Installed by the Handler. Called when the transport reader
+	// goroutine exits. Handles pool transitions
+	// (active → disconnected or destroy).
+	onDisconnect func()
+
+	// Optional equality check — skip render when state unchanged.
+	equal func(a, b S) bool
+
+	// Optional telemetry hook for structural diff changes.
 	onStructuralChange func(*Session[S], StructuralChange)
 }
 
@@ -90,320 +122,4 @@ func (s *Session[S]) Context() context.Context {
 // when the session is gone.
 func (s *Session[S]) Go(fn func(ctx context.Context)) {
 	go fn(s.Context())
-}
-
-// State returns the current session state. The value is read under the
-// session lock, so it reflects the state as of the most recently
-// completed event or Update call. The returned value is a shallow copy —
-// treat it as read-only. Mutating slices, maps, or pointer fields in
-// the returned value will corrupt the session's internal state. Use
-// [Session.Update] to apply state changes safely.
-func (s *Session[S]) State() S {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.state
-}
-
-// run is the session's event loop. It blocks the calling goroutine,
-// reading events from the transport and processing them one at a time.
-// The loop exits when the transport returns io.EOF (clean disconnect)
-// or any other error (broken connection). On exit it closes the
-// transport and fires the onDisconnect callback, which moves the
-// session to the disconnected pool or removes it entirely.
-func (s *Session[S]) run() {
-	defer func() {
-		s.transport.Close()
-		if s.onDisconnect != nil {
-			s.onDisconnect()
-		}
-	}()
-
-	for {
-		ev, err := s.transport.ReceiveEvent()
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				return
-			}
-			s.logger.Error("receive error", "session", s.id, "err", err)
-			return
-		}
-
-		s.mu.Lock()
-		s.lastActivity = time.Now()
-		s.safeHandleEvent(ev)
-		s.mu.Unlock()
-	}
-}
-
-// Close terminates the session by closing its transport. The event loop
-// will exit and the onDisconnect callback will fire. Safe to call from
-// any goroutine; safe to call more than once.
-func (s *Session[S]) Close() {
-	// Read transport under the lock because reattach writes it
-	// concurrently when a disconnected session reconnects.
-	s.mu.Lock()
-	t := s.transport
-	s.mu.Unlock()
-	t.Close()
-}
-
-// Update applies a state change from outside the normal event loop and
-// pushes the resulting diff to the client. This is the primary way to
-// push server-initiated updates — call it from timers, database change
-// listeners, message queue consumers, or [Group.Broadcast].
-//
-// The function fn receives the current state and returns a
-// [HandleResult] containing the new state and optional side effects.
-// Side effects are merged into the same update message as the state
-// diff, so the client receives everything atomically. Use [Result] to
-// return a bare state when no side effects are needed.
-//
-// fn runs under the session lock, so it is serialised with client
-// events — there is no risk of concurrent state mutation. Panics in fn
-// or in the subsequent render pass are recovered and logged rather than
-// crashing the calling goroutine.
-//
-// Do not call Session methods (Update, State, Navigate, ReplaceURL,
-// SetTitle, Close) from within fn — the session mutex is already held
-// and these methods acquire it, causing a deadlock.
-//
-// Safe to call from any goroutine.
-func (s *Session[S]) Update(fn func(S) HandleResult[S]) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	defer func() {
-		if r := recover(); r != nil {
-			s.logger.Error("panic in Update callback",
-				"session", s.id,
-				"panic", r,
-			)
-		}
-	}()
-
-	// Server-initiated updates count as activity so that sessions
-	// receiving only server pushes are not reaped as idle.
-	s.lastActivity = time.Now()
-	result := fn(s.state)
-	s.applyState(result.State, "", &result)
-}
-
-// safeHandleEvent wraps handleEvent with panic recovery so that a
-// bug in Handle or Render does not kill the session. The panic is
-// logged and the event is dropped — the session continues processing
-// subsequent events.
-func (s *Session[S]) safeHandleEvent(ev Event) {
-	defer func() {
-		if r := recover(); r != nil {
-			s.logger.Error("panic in event handler",
-				"session", s.id,
-				"action", ev.Action,
-				"panic", r,
-			)
-		}
-	}()
-	s.handleEvent(ev)
-}
-
-// handleEvent processes a single event. Navigate events are routed to
-// handleParams (when configured) so URL changes can update state without
-// going through the general Handle function. All other events go through
-// Handle. Side effects from the HandleResult (announce, flash, title,
-// URL) are merged into the update that applyState builds from the diff.
-//
-// Caller must hold s.mu.
-func (s *Session[S]) handleEvent(ev Event) {
-	if ev.Type == "navigate" && s.handleParams != nil {
-		params := Params{Path: ev.Data["path"]}
-		if search := ev.Data["search"]; search != "" {
-			params.Query, _ = url.ParseQuery(search)
-		}
-		result := s.handleParams(s.state, params)
-		s.applyState(result.State, ev.EventID, &result)
-		return
-	}
-	result := s.handle(s, s.state, ev)
-	s.applyState(result.State, ev.EventID, &result)
-}
-
-// Navigate pushes a URL change to the client. The browser calls
-// history.pushState, adding a history entry. Safe to call from
-// any goroutine.
-func (s *Session[S]) Navigate(rawURL string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.sendURL(rawURL, false)
-}
-
-// ReplaceURL updates the browser URL without adding a history entry.
-// The browser calls history.replaceState. Safe to call from any
-// goroutine.
-func (s *Session[S]) ReplaceURL(rawURL string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.sendURL(rawURL, true)
-}
-
-// SetTitle updates the browser's document title. Safe to call from
-// any goroutine. Can be combined with Navigate or sent standalone.
-func (s *Session[S]) SetTitle(title string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	update := Update{Title: title}
-	if err := s.transport.SendUpdate(update); err != nil {
-		s.logger.Error("send title error", "session", s.id, "err", err)
-	}
-}
-
-// Announce sends text to a screen-reader-accessible live region on the
-// client. The JS runtime maintains a hidden aria-live="polite" element
-// and sets its text content, causing assistive technology to read the
-// announcement aloud. Safe to call from any goroutine.
-func (s *Session[S]) Announce(text string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	update := Update{Announce: text}
-	if err := s.transport.SendUpdate(update); err != nil {
-		s.logger.Error("send announce error", "session", s.id, "err", err)
-	}
-}
-
-// Flash sends a one-time notification to the client. The key is a CSS
-// selector for the target element; the value is plain text to display.
-// The client JS clears the element after 5 seconds. Safe to call from
-// any goroutine.
-func (s *Session[S]) Flash(selector, text string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	update := Update{Flash: map[string]string{selector: text}}
-	if err := s.transport.SendUpdate(update); err != nil {
-		s.logger.Error("send flash error", "session", s.id, "err", err)
-	}
-}
-
-// Toast sends a global notification to the client. The JS runtime
-// displays the message in a transient overlay that clears after 5
-// seconds. Safe to call from any goroutine.
-func (s *Session[S]) Toast(text string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	update := Update{Toast: text}
-	if err := s.transport.SendUpdate(update); err != nil {
-		s.logger.Error("send toast error", "session", s.id, "err", err)
-	}
-}
-
-// Push sends a Web Push notification to the browser. Only works when the
-// session has an active push subscription (typically after the client
-// calls PushManager.subscribe()). Returns an error if no subscription
-// exists. Safe to call from any goroutine.
-func (s *Session[S]) Push(n push.Notification, opts push.Options) error {
-	s.mu.Lock()
-	sub := s.pushSub
-	s.mu.Unlock()
-
-	if sub == nil {
-		return errors.New("poly: no push subscription for session")
-	}
-
-	return push.Send(
-		push.Subscription{
-			Endpoint: sub.Endpoint,
-			Keys: push.SubscriptionKeys{
-				P256dh: sub.Keys.P256dh,
-				Auth:   sub.Keys.Auth,
-			},
-		},
-		n,
-		opts,
-	)
-}
-
-func (s *Session[S]) sendURL(rawURL string, replace bool) {
-	update := Update{URL: rawURL, Replace: replace}
-	if err := s.transport.SendUpdate(update); err != nil {
-		s.logger.Error("send URL error", "session", s.id, "err", err)
-	}
-}
-
-// applyState is the core render-diff-send pipeline. It stores the new
-// state, renders the tree, diffs against the previous render, and sends
-// only the changed fragments to the client. When the diff engine detects
-// a structural change (nodes added or removed outside a Dynamic key), it
-// falls back to a full root morph and logs a warning to help the
-// developer scope the change with a keyed container.
-//
-// The eventID is echoed back in the update so the client JS can
-// correlate the response with the event that triggered it. This is used
-// to restore loading states (e.g. re-enabling a button) on the specific
-// element that initiated the action.
-//
-// When effects is non-nil, its fields (Announce, Flash, Title, URL) are
-// merged into the update so side effects from Handle travel in the same
-// message as the diff.
-//
-// Caller must hold s.mu.
-func (s *Session[S]) applyState(newState S, eventID string, effects *HandleResult[S]) {
-	if s.equal != nil && s.equal(s.state, newState) {
-		// Still send side effects and echo the eventID even when the
-		// state is unchanged.
-		if hasEffects(effects) || eventID != "" {
-			update := Update{EventID: eventID}
-			mergeEffects(&update, effects)
-			if err := s.transport.SendUpdate(update); err != nil {
-				s.logger.Error("send update error", "session", s.id, "err", err)
-			}
-		}
-		return
-	}
-
-	s.state = newState
-	tree := s.render(s.state)
-
-	patches, change := s.differ.Diff(tree)
-	if change != nil {
-		html := s.differ.Render(tree)
-		s.logger.Warn("structural change, sending root morph",
-			"session", s.id,
-			"change", change.String(),
-			"bytes", len(html),
-			"tip", "wrap conditional elements in a keyed container to scope this morph",
-		)
-
-		if s.onStructuralChange != nil {
-			s.onStructuralChange(s, StructuralChange{
-				Added:     change.Added,
-				Removed:   change.Removed,
-				Reordered: change.Reordered,
-				Bytes:     len(html),
-			})
-		}
-
-		update := Update{
-			Morphs:  []Morph{{Key: "", HTML: html}},
-			EventID: eventID,
-		}
-		mergeEffects(&update, effects)
-		if err := s.transport.SendUpdate(update); err != nil {
-			s.logger.Error("send update error", "session", s.id, "err", err)
-		}
-		return
-	}
-
-	if len(patches) > 0 || hasEffects(effects) {
-		update := Update{Patches: patches, EventID: eventID}
-		mergeEffects(&update, effects)
-		if err := s.transport.SendUpdate(update); err != nil {
-			s.logger.Error("send update error", "session", s.id, "err", err)
-		}
-		return
-	}
-
-	// No patches and no structural change — the rendered tree is
-	// identical. Still echo the eventID so the client can restore
-	// any loading state (e.g. a disabled button).
-	if eventID != "" {
-		if err := s.transport.SendUpdate(Update{EventID: eventID}); err != nil {
-			s.logger.Error("send update error", "session", s.id, "err", err)
-		}
-	}
 }

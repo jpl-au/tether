@@ -41,10 +41,12 @@ func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 
 	state := h.cfg.InitialState(r)
 	if h.cfg.HandleParams != nil {
-		state = h.cfg.HandleParams(state, Params{
+		params := Params{
 			Path:  r.URL.Path,
 			Query: r.URL.Query(),
-		}).State
+		}
+		// Pre-warm uses a nil session since no session exists yet.
+		state = h.cfg.HandleParams(nil, state, params)
 	}
 	tree := h.cfg.Render(state)
 
@@ -89,8 +91,8 @@ func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// serveSession upgrades the connection and runs the session event loop.
-// It checks pools in priority order — disconnected first (so a
+// serveSession upgrades the connection and starts the session command
+// loop. It checks pools in priority order — disconnected first (so a
 // reconnecting client recovers its state), then pending (the normal
 // path after a page load), and finally creates a fresh session as a
 // fallback for direct transport connections without a prior GET.
@@ -101,21 +103,14 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		return
 	}
 
-	// Close the transport if we exit before handing it to a session
-	// event loop (e.g. a panic in InitialState or Render). Once
-	// sess.run() starts, the event loop owns the transport lifecycle.
-	running := false
+	// Close the transport if we exit before handing it to a session.
+	// Once the session loop starts, it owns the transport lifecycle.
+	started := false
 	defer func() {
-		if !running {
+		if !started {
 			transport.Close()
 		}
 	}()
-
-	// Start keep-alive writes for transports that need them (SSE).
-	// WebSocket has its own ping/pong and does not implement this.
-	if hb, ok := transport.(Heartbeater); ok && h.cfg.HeartbeatInterval > 0 {
-		hb.StartHeartbeat(h.cfg.HeartbeatInterval)
-	}
 
 	id := r.URL.Query().Get("session")
 
@@ -126,7 +121,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		h.active[id] = sess
 		h.mu.Unlock()
 
-		running = true
+		started = true
 		h.reattach(sess, transport)
 		return
 	}
@@ -145,16 +140,13 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 	h.mu.Unlock()
 
 	if differ == nil {
-		// This path handles direct transport connections without a prior
-		// GET (e.g. bogus or missing session ID). Reject during drain
-		// since this would create a brand new session.
+		// Direct transport connection without a prior GET (e.g. bogus
+		// or missing session ID). Reject during drain.
 		if h.draining.Load() {
 			return
 		}
 
-		// Enforce MaxSessions here too, otherwise this path bypasses
-		// the limit. Disconnected sessions are excluded for the same
-		// reason as serveInitialPage.
+		// Enforce MaxSessions.
 		if h.cfg.MaxSessions > 0 {
 			h.mu.Lock()
 			full := len(h.pending)+len(h.active) >= h.cfg.MaxSessions
@@ -167,10 +159,11 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		id = newID()
 		state = h.cfg.InitialState(r)
 		if h.cfg.HandleParams != nil {
-			state = h.cfg.HandleParams(state, Params{
+			params := Params{
 				Path:  r.URL.Path,
 				Query: r.URL.Query(),
-			}).State
+			}
+			state = h.cfg.HandleParams(nil, state, params)
 		}
 		differ = jit.NewDiffer()
 
@@ -181,19 +174,23 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 	now := time.Now()
 	ctx, cancel := context.WithCancel(context.Background())
 	sess := &Session[S]{
-		id:           id,
-		state:        state,
-		render:       h.cfg.Render,
-		handle:       h.cfg.Handle,
-		handleParams: h.cfg.HandleParams,
-		differ:       differ,
-		transport:    transport,
-		logger:       h.cfg.Logger,
-		createdAt:    now,
-		lastActivity: now,
-		ctx:          ctx,
-		cancel:       cancel,
+		id:               id,
+		state:            state,
+		render:           h.cfg.Render,
+		handle:           h.cfg.Handle,
+		handleParams:     h.cfg.HandleParams,
+		differ:           differ,
+		transport:        transport,
+		logger:           h.cfg.Logger.WithGroup("session").With("id", id),
+		events:           make(chan Event),
+		cmds:             make(chan func(), cmdBufferSize),
+		ctx:              ctx,
+		stop:             cancel,
+		createdAt:        now,
+		idleTimeout:      h.cfg.IdleTimeout,
+		reconnectTimeout: h.cfg.ReconnectTimeout,
 	}
+	sess.lastActivity.Store(now.UnixNano())
 
 	if h.cfg.Equal != nil {
 		sess.equal = h.cfg.Equal
@@ -201,6 +198,12 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 	if h.cfg.OnStructuralChange != nil {
 		sess.onStructuralChange = h.cfg.OnStructuralChange
 	}
+	if h.cfg.MaxLifetime > 0 {
+		time.AfterFunc(h.cfg.MaxLifetime, func() {
+			sess.stop()
+		})
+	}
+	sess.startTimers()
 
 	h.mu.Lock()
 	h.active[id] = sess
@@ -216,59 +219,54 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		g.Add(sess)
 	}
 
-	running = true
-	sess.run()
-}
-
-// reattach reconnects a disconnected session with a new transport.
-// A full re-render is sent because the client's DOM may have diverged
-// while disconnected.
-func (h *Handler[S]) reattach(sess *Session[S], transport Transport) {
-	// The old transport's heartbeat goroutine stopped when it closed.
-	// Start a fresh one for the new transport.
+	// Start keep-alive writes for transports that need them (SSE).
+	// For reconnects, reattach handles this.
 	if hb, ok := transport.(Heartbeater); ok && h.cfg.HeartbeatInterval > 0 {
 		hb.StartHeartbeat(h.cfg.HeartbeatInterval)
 	}
 
-	sess.mu.Lock()
-	sess.transport = transport
-	sess.lastActivity = time.Now()
-	sess.disconnectedAt = time.Time{}
+	started = true
+	go sess.readTransport(sess.events)
+	go sess.run()
+}
 
-	// Re-render current state and send to the client so it catches up.
-	tree := sess.render(sess.state)
-	html := sess.differ.Render(tree)
-	sess.mu.Unlock()
-
-	update := Update{
-		Morphs: []Morph{{Key: "", HTML: html}},
-	}
-	if err := transport.SendUpdate(update); err != nil {
-		sess.logger.Error("reattach send error", "session", sess.id, "err", err)
+// reattach reconnects a disconnected session with a new transport.
+// A command is sent to the session's loop to swap in the new transport
+// and re-render. This avoids any locking — only the loop touches
+// session state.
+func (h *Handler[S]) reattach(sess *Session[S], transport Transport) {
+	if hb, ok := transport.(Heartbeater); ok && h.cfg.HeartbeatInterval > 0 {
+		hb.StartHeartbeat(h.cfg.HeartbeatInterval)
 	}
 
 	h.wireDisconnect(sess)
-	sess.run()
+
+	sess.cmds <- func() {
+		// Stop the disconnect timer — we're reconnecting.
+		if sess.disconnectTimer != nil {
+			sess.disconnectTimer.Stop()
+			sess.disconnectTimer = nil
+		}
+
+		sess.transport = transport
+		sess.events = make(chan Event)
+		go sess.readTransport(sess.events)
+
+		// Re-render and send full state to catch the client up.
+		tree := sess.render(sess.state)
+		html := sess.differ.Render(tree)
+		sess.send(Update{
+			Morphs: []Morph{{Key: "", HTML: html}},
+		})
+	}
 }
 
 // wireDisconnect installs the callback that moves a session into the
 // disconnected pool (when reconnection is enabled) or removes it
-// entirely. Must be called each time a transport is attached because
-// the callback captures the handler's pool references.
+// entirely. Called each time a transport is attached because the
+// callback captures the handler's pool references.
 func (h *Handler[S]) wireDisconnect(sess *Session[S]) {
 	sess.onDisconnect = func() {
-		// Write disconnectedAt under sess.mu before acquiring h.mu
-		// to avoid nesting sess.mu inside h.mu. The reaper also
-		// reads disconnectedAt under sess.mu (after releasing h.mu),
-		// so this keeps the lock ordering consistent and prevents
-		// a latent deadlock if any future code path acquires the
-		// locks in the opposite order.
-		if h.cfg.ReconnectTimeout > 0 {
-			sess.mu.Lock()
-			sess.disconnectedAt = time.Now()
-			sess.mu.Unlock()
-		}
-
 		h.mu.Lock()
 		delete(h.active, sess.id)
 		if h.cfg.ReconnectTimeout > 0 {
@@ -280,13 +278,6 @@ func (h *Handler[S]) wireDisconnect(sess *Session[S]) {
 
 		if h.cfg.OnDisconnect != nil {
 			h.cfg.OnDisconnect(sess)
-		}
-
-		// When reconnection is disabled, the session will never be
-		// reclaimed — cancel its context so lifecycle-bound goroutines
-		// started with Go() can clean up.
-		if h.cfg.ReconnectTimeout <= 0 && sess.cancel != nil {
-			sess.cancel()
 		}
 	}
 }

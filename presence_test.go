@@ -78,7 +78,7 @@ func TestGroupOnLeaveDoesNotFireForAbsent(t *testing.T) {
 	}
 }
 
-func TestGroupMembers(t *testing.T) {
+func TestGroupAll(t *testing.T) {
 	g := NewGroup[counterState]()
 
 	mt1 := &mockTransport{events: []Event{}}
@@ -91,24 +91,25 @@ func TestGroupMembers(t *testing.T) {
 	g.Add(sess1)
 	g.Add(sess2)
 
-	members := g.Members()
-	if len(members) != 2 {
-		t.Fatalf("expected 2 members, got %d", len(members))
-	}
-
 	ids := map[string]bool{}
-	for _, m := range members {
-		ids[m.ID()] = true
+	for s := range g.All() {
+		ids[s.ID()] = true
+	}
+	if len(ids) != 2 {
+		t.Fatalf("expected 2 sessions, got %d", len(ids))
 	}
 	if !ids["test"] || !ids["test-2"] {
-		t.Errorf("expected test and test-2 in members, got %v", ids)
+		t.Errorf("expected test and test-2 in All(), got %v", ids)
 	}
 }
 
-func TestGroupMembersEmpty(t *testing.T) {
+func TestGroupAllEmpty(t *testing.T) {
 	g := NewGroup[counterState]()
-	members := g.Members()
-	if len(members) != 0 {
-		t.Errorf("expected 0 members, got %d", len(members))
+	count := 0
+	for range g.All() {
+		count++
+	}
+	if count != 0 {
+		t.Errorf("expected 0 sessions, got %d", count)
 	}
 }

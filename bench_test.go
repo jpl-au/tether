@@ -1,6 +1,7 @@
 package poly
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -114,11 +115,11 @@ func benchRender(s benchState) node.Node {
 	)
 }
 
-func benchHandle(_ *Session[benchState], s benchState, ev Event) HandleResult[benchState] {
+func benchHandle(_ *Session[benchState], s benchState, ev Event) benchState {
 	if ev.Action == "increment" {
 		s.Count++
 	}
-	return Result(s)
+	return s
 }
 
 // discardTransport satisfies Transport but discards all output.
@@ -151,6 +152,7 @@ func BenchmarkEventCycle(b *testing.B) {
 
 	dt := &discardTransport{events: events}
 	differ := jit.NewDiffer()
+	ctx, cancel := context.WithCancel(context.Background())
 
 	sess := &Session[benchState]{
 		id:        "bench",
@@ -159,12 +161,17 @@ func BenchmarkEventCycle(b *testing.B) {
 		handle:    benchHandle,
 		differ:    differ,
 		transport: dt,
+		events:    make(chan Event),
+		cmds:      make(chan func(), cmdBufferSize),
+		ctx:       ctx,
+		stop:      cancel,
 	}
 
 	tree := benchRender(benchState{Count: 0})
 	differ.Render(tree)
 
 	b.ResetTimer()
+	go sess.readTransport(sess.events)
 	sess.run()
 }
 

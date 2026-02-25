@@ -1,38 +1,32 @@
 package poly
 
 import (
-	"log/slog"
 	"testing"
+	"testing/synctest"
 )
 
 func TestSessionAnnounceSendsUpdate(t *testing.T) {
-	mt := &mockTransport{events: []Event{}}
-	sess := newTestSession(counterState{Count: 0}, mt)
-	sess.logger = slog.Default()
+	synctest.Test(t, func(t *testing.T) {
+		mt := &mockTransport{events: []Event{}}
+		sess := newTestSession(counterState{Count: 0}, mt)
 
-	sess.Announce("Item added")
+		go sess.readTransport(sess.events)
+		go sess.run()
+		defer func() { sess.stop(); synctest.Wait() }()
 
-	mt.mu.Lock()
-	defer mt.mu.Unlock()
+		sess.Announce("Item added")
+		synctest.Wait()
 
-	if len(mt.updates) != 1 {
-		t.Fatalf("expected 1 update, got %d", len(mt.updates))
-	}
-	if mt.updates[0].Announce != "Item added" {
-		t.Errorf("expected announce 'Item added', got %q", mt.updates[0].Announce)
-	}
-}
+		mt.mu.Lock()
+		defer mt.mu.Unlock()
 
-func TestSessionAnnounceDoesNotAffectState(t *testing.T) {
-	mt := &mockTransport{events: []Event{}}
-	sess := newTestSession(counterState{Count: 5}, mt)
-	sess.logger = slog.Default()
-
-	sess.Announce("Hello")
-
-	if sess.state.Count != 5 {
-		t.Errorf("expected state unchanged (Count=5), got %d", sess.state.Count)
-	}
+		if len(mt.updates) != 1 {
+			t.Fatalf("expected 1 update, got %d", len(mt.updates))
+		}
+		if mt.updates[0].Announce != "Item added" {
+			t.Errorf("expected announce 'Item added', got %q", mt.updates[0].Announce)
+		}
+	})
 }
 
 func TestEncodeUpdateIncludesAnnounce(t *testing.T) {

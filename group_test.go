@@ -1,7 +1,6 @@
 package poly
 
 import (
-	"log/slog"
 	"testing"
 	"testing/synctest"
 )
@@ -46,30 +45,32 @@ func TestGroupBroadcastUpdatesAllSessions(t *testing.T) {
 
 		mt1 := &mockTransport{events: []Event{}}
 		sess1 := newTestSession(counterState{Count: 0}, mt1)
-		sess1.logger = slog.Default()
 
 		mt2 := &mockTransport{events: []Event{}}
 		sess2 := newTestSession(counterState{Count: 10}, mt2)
 		sess2.id = "test-2"
-		sess2.logger = slog.Default()
 
 		g.Add(sess1)
 		g.Add(sess2)
 
-		g.Broadcast(func(s counterState) HandleResult[counterState] {
+		go sess1.readTransport(sess1.events)
+		go sess1.run()
+		go sess2.readTransport(sess2.events)
+		go sess2.run()
+		defer func() { sess1.stop(); sess2.stop(); synctest.Wait() }()
+
+		g.Broadcast(func(target *Session[counterState], s counterState) counterState {
 			s.Count += 5
-			return Result(s)
+			return s
 		})
 
-		// Broadcast is fire-and-forget — wait for the spawned
-		// goroutines to acquire the session locks and complete.
 		synctest.Wait()
 
-		if sess1.state.Count != 5 {
-			t.Errorf("expected sess1 Count 5, got %d", sess1.state.Count)
+		if s := sess1.State(); s.Count != 5 {
+			t.Errorf("expected sess1 Count 5, got %d", s.Count)
 		}
-		if sess2.state.Count != 15 {
-			t.Errorf("expected sess2 Count 15, got %d", sess2.state.Count)
+		if s := sess2.State(); s.Count != 15 {
+			t.Errorf("expected sess2 Count 15, got %d", s.Count)
 		}
 
 		// Both transports should have received an update.
@@ -91,8 +92,8 @@ func TestGroupBroadcastEmptyGroupIsNoop(t *testing.T) {
 	g := NewGroup[counterState]()
 
 	// Should not panic.
-	g.Broadcast(func(s counterState) HandleResult[counterState] {
+	g.Broadcast(func(target *Session[counterState], s counterState) counterState {
 		s.Count++
-		return Result(s)
+		return s
 	})
 }

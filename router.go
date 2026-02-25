@@ -55,7 +55,7 @@ func (r *Router[S]) Render(s S) node.Node {
 
 // Handle implements [HandleFunc]. It dispatches to the active page's
 // Handle function.
-func (r *Router[S]) Handle(sess *Session[S], s S, ev Event) HandleResult[S] {
+func (r *Router[S]) Handle(sess *Session[S], s S, ev Event) S {
 	path := r.selector(s)
 	if p, ok := r.pages[path]; ok && p.Handle != nil {
 		return p.Handle(sess, s, ev)
@@ -63,14 +63,14 @@ func (r *Router[S]) Handle(sess *Session[S], s S, ev Event) HandleResult[S] {
 	if r.notFound.Handle != nil {
 		return r.notFound.Handle(sess, s, ev)
 	}
-	return Result(s)
+	return s
 }
 
 // HandleParams is a helper for [Config.HandleParams] that simply
 // updates the page field in the state.
-func (r *Router[S]) HandleParams(setter func(*S, string)) func(S, Params) HandleResult[S] {
-	return func(s S, p Params) HandleResult[S] {
+func (r *Router[S]) HandleParams(setter func(*S, string)) func(*Session[S], S, Params) S {
+	return func(sess *Session[S], s S, p Params) S {
 		setter(&s, p.Path)
-		return Result(s)
+		return s
 	}
 }

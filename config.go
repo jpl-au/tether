@@ -67,21 +67,19 @@ type Config[S any] struct {
 	// Render builds a node tree from the current state.
 	Render RenderFunc[S]
 
-	// Handle processes a client event and returns the new state plus
-	// optional side effects. The session parameter is provided for
-	// identification (e.g. [Group.BroadcastOthers]).
+	// Handle processes a client event and returns the new state. Side
+	// effects (toast, navigate, title, etc.) are expressed as imperative
+	// calls on the session parameter. Safe to call any Session method
+	// from within Handle — there is no deadlock risk.
 	Handle HandleFunc[S]
 
-	// HandleParams processes a URL change and returns a [HandleResult]
-	// containing the new state and optional side effects. Called on
-	// initial page load (after InitialState) and when the browser
-	// navigates via link click or back/forward. If nil, navigation
-	// events fall through to Handle.
-	//
-	// Side effects returned here are merged into the same update as
-	// the state diff, so a navigation can atomically set the page
-	// title or flash a message alongside the state change.
-	HandleParams func(state S, params Params) HandleResult[S]
+	// HandleParams processes a URL change and returns the new state.
+	// Called on initial page load (after InitialState) and when the
+	// browser navigates via link click or back/forward. If nil,
+	// navigation events fall through to Handle. The session parameter
+	// allows calling side-effect methods (e.g. SetTitle) during
+	// navigation.
+	HandleParams func(session *Session[S], state S, params Params) S
 
 	// OnConnect is called after a new session is created and its
 	// transport is ready. Use this to add the session to a [Group]
@@ -148,12 +146,6 @@ type Config[S any] struct {
 	// 30 seconds.
 	PendingTimeout time.Duration
 
-	// ReaperInterval controls how often the background goroutine
-	// checks for expired sessions (idle, lifetime, pending, and
-	// disconnected). Shorter intervals detect expiry sooner at the
-	// cost of slightly more CPU. Zero defaults to 15 seconds.
-	ReaperInterval time.Duration
-
 	// RetryDelay is the initial delay before the client JS attempts to
 	// reconnect after a WebSocket close. The delay doubles on each
 	// failed attempt up to MaxRetryDelay. Zero defaults to 1 second.
@@ -189,12 +181,8 @@ type Config[S any] struct {
 	// Use this callback to track these occurrences in production via
 	// telemetry or metrics. The change parameter describes exactly what
 	// shifted so you can pinpoint which state transitions need keyed
-	// containers. The callback runs under the session lock, so keep it
-	// fast — offload any expensive work to a goroutine. Do not call
-	// Session methods (Update, State, Navigate, ReplaceURL, SetTitle,
-	// Close) from within this callback — the session mutex is already
-	// held and these methods acquire it, causing a deadlock. Use
-	// session.ID() for identification; it does not take the lock.
+	// containers. The callback runs inside the session's command loop,
+	// so keep it fast — offload any expensive work to a goroutine.
 	// Optional.
 	OnStructuralChange func(session *Session[S], change StructuralChange)
 
@@ -273,8 +261,6 @@ const defaultReconnectTimeout = 30 * time.Second
 
 // defaultMaxEventBytes is used when MaxEventBytes is zero.
 const defaultMaxEventBytes = 64 << 10 // 64 KB
-
-const defaultReaperInterval = 15 * time.Second
 
 const defaultHeartbeatInterval = 20 * time.Second
 

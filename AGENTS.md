@@ -34,13 +34,16 @@ Source files in the root package, split by concern:
 config.go       Config, TransportMode, PushConfig, defaults
 handler.go      Package doc, Handler, New(), ServeHTTP, origin checking, POST handlers
 lifecycle.go    serveInitialPage, serveSession, reattach, wireDisconnect
-reaper.go       reap, reapPending, reapDisconnected, reapActive
+pending.go      reapPending — periodic cleanup for pre-warmed sessions
 drain.go        Drain, Shutdown
 health.go       HealthStatus, Health()
 page.go         Initial page rendering — polyBody, newID
-session.go      Single session — event loop, Update, Navigate, SetTitle
-result.go       HandleFunc, HandleResult, Result, With* methods, mergeEffects
-group.go        Broadcasting — Group, Broadcast, BroadcastOthers
+session.go      Session struct, ID(), Context(), Go(), constants
+loop.go         Command loop — run(), readTransport(), exec(), onTransportClose(), cleanup()
+methods.go      Dual-path methods — State(), Update(), Toast(), Navigate(), SetTitle(), etc.
+handle.go       HandleFunc type definition
+effects.go      Internal effects accumulator (replaces HandleResult)
+group.go        Broadcasting — Group, Broadcast, BroadcastOthers, All()
 protocol.go     Wire format types and encoding
 transport.go    Transport and EventPusher interfaces
 event.go        Event and Params types
@@ -55,8 +58,8 @@ Transport implementations live in sub-packages. The `Config.Upgrade` field accep
 
 1. Client JS sends a DOM event as JSON: `{"type":"click","action":"increment","data":{}}`
 2. `Transport.ReceiveEvent()` deserialises it to an `Event`
-3. The session calls the user's `Handle` function with the session and current state; Handle returns a `HandleResult` containing the new state and optional side effects (announce, flash, title, URL)
-4. The returned state is rendered to a new node tree and diffed against the previous render; side effects from the `HandleResult` are merged into the update
+3. The session's command loop calls the user's `Handle` function with the session and current state; Handle returns the new state directly and may call session methods (`Toast`, `Announce`, `Flash`, `Navigate`, `SetTitle`) to buffer side effects
+4. The returned state is rendered to a new node tree and diffed against the previous render; buffered effects are merged into the update
 5. `Transport.SendUpdate()` sends a unified update message containing either:
    - **Patches** — targeted content updates for keyed elements that changed
    - **Morphs** — structural DOM changes (e.g. root morph when keys are added/removed/reordered)
@@ -64,7 +67,7 @@ Transport implementations live in sub-packages. The `Config.Upgrade` field accep
 
 ### Panic recovery
 
-If `Handle` or `Render` panics during event processing, the panic is recovered, logged with the session ID and action, and the event is dropped. The session continues processing subsequent events. `Session.Update` has the same recovery — a panicking callback does not crash the caller's goroutine.
+If `Handle` or `Render` panics during event processing, the panic is recovered, logged with the session ID and action, and the event is dropped. The session's command loop continues processing subsequent events. `Session.Update` has the same recovery — a panicking callback does not crash the caller's goroutine.
 
 ### Wire format
 
@@ -101,7 +104,7 @@ poly.New(poly.Config[State]{
 })
 ```
 
-The callback runs under the session lock, so keep it fast — offload expensive work to a goroutine. The `StructuralChange` struct has `Added`, `Removed` (key slices), `Reordered` (bool), and `Bytes` (re-rendered HTML size).
+The callback runs inside the session's command loop, so keep it fast — offload expensive work to a goroutine. The `StructuralChange` struct has `Added`, `Removed` (key slices), `Reordered` (bool), and `Bytes` (re-rendered HTML size).
 
 ## Event binding
 
@@ -122,11 +125,11 @@ The generic helpers (`Click`, `Submit`, `Input`, `Change`, `KeyDown`, `Focus`, `
 Keydown events include modifier key state in `Event.Data`: `ctrl`, `shift`, `alt`, `meta` are set to `"true"` when held. This enables keyboard shortcut handling:
 
 ```go
-func handle(_ *poly.Session[state], s state, ev poly.Event) poly.HandleResult[state] {
+func handle(_ *poly.Session[state], s state, ev poly.Event) state {
     if ev.Action == "shortcut" && ev.Data["ctrl"] == "true" && ev.Data["key"] == "s" {
         // Ctrl+S pressed
     }
-    return poly.Result(s)
+    return s
 }
 ```
 
@@ -180,9 +183,10 @@ Bidirectional sync between Go state and the browser URL. Anchors with `data-poly
 
 ```go
 // Config — HandleParams processes URL changes on initial load and navigation
-HandleParams: func(state State, params poly.Params) poly.HandleResult[State] {
+HandleParams: func(sess *poly.Session[State], state State, params poly.Params) State {
     state.Page = params.Path
-    return poly.Result(state).WithTitle(state.Page + " — My App")
+    sess.SetTitle(state.Page + " — My App")
+    return state
 },
 
 // Mark an anchor for client-side navigation
@@ -257,19 +261,20 @@ type state struct {
 }
 
 // Handle validates on submit and clears errors on success.
-func handle(_ *poly.Session[state], s state, ev poly.Event) poly.HandleResult[state] {
+func handle(sess *poly.Session[state], s state, ev poly.Event) state {
     switch {
     case ev.Action == "add":
         text := strings.TrimSpace(ev.Data["text"])
         if text == "" {
             s.TodoError = "Please enter a todo."
             s.TodoText = ev.Data["text"]
-            return poly.Result(s)
+            return s
         }
         s.TodoError = ""
         s.TodoText = ""
         // ... add the item
-        return poly.Result(s).WithAnnounce("Todo added")
+        sess.Announce("Todo added")
+        return s
 
     case ev.Action == "validate-todo":
         // Live validation on input — clears error once corrected
@@ -281,7 +286,7 @@ func handle(_ *poly.Session[state], s state, ev poly.Event) poly.HandleResult[st
         }
         s.TodoText = text
     }
-    return poly.Result(s)
+    return s
 }
 ```
 
@@ -362,26 +367,26 @@ poly.New(poly.Config[State]{
     // ...
 })
 
-group.Broadcast(func(s State) poly.HandleResult[State] {
+group.Broadcast(func(target *poly.Session[State], s State) State {
     s.Notification = "System update"
-    return poly.Result(s)
+    return s
 })
 ```
 
-`Broadcast` updates all sessions concurrently and is fire-and-forget — it returns immediately after spawning the update goroutines. Each goroutine completes after a single render-diff-send cycle. `Add`, `Remove`, `Broadcast`, `BroadcastOthers`, `Len`, and `Members` are all safe to call from any goroutine.
+`Broadcast` queues a state update on each session's command channel. The callback receives the target session and its current state — return the new state. Each session processes the update in its own command loop (no goroutine-per-session). `Add`, `Remove`, `Broadcast`, `BroadcastOthers`, `Len`, and `All` are all safe to call from any goroutine.
 
 `BroadcastOthers` excludes a session from the broadcast. This is the typical pattern when broadcasting from inside Handle — the sender's state is already updated via the return value, so BroadcastOthers pushes the change to everyone else without double-applying to the sender:
 
 ```go
-Handle: func(sess *poly.Session[State], s State, ev poly.Event) poly.HandleResult[State] {
+Handle: func(sess *poly.Session[State], s State, ev poly.Event) State {
     if ev.Action == "send-message" {
         s.Messages = append(s.Messages, ev.Data["text"])
-        group.BroadcastOthers(sess, func(s State) poly.HandleResult[State] {
+        group.BroadcastOthers(sess, func(target *poly.Session[State], s State) State {
             s.Messages = append(s.Messages, ev.Data["text"])
-            return poly.Result(s)
+            return s
         })
     }
-    return poly.Result(s)
+    return s
 },
 ```
 
@@ -391,7 +396,7 @@ Handle: func(sess *poly.Session[State], s State, ev poly.Event) poly.HandleResul
 
 - `OnJoin` fires only for new sessions (duplicate `Add` is a no-op).
 - `OnLeave` fires only for sessions that were in the group (absent `Remove` is a no-op).
-- `Members()` returns a snapshot of `[]*Session[S]` — use `sess.State()` to read each session's data (e.g. usernames for an online list).
+- `All()` returns an iterator over all sessions — use `sess.State()` to read each session's data (e.g. usernames for an online list).
 
 ## Session context and background goroutines
 
@@ -408,9 +413,9 @@ OnConnect: func(s *poly.Session[State]) {
             case <-ctx.Done():
                 return
             case <-ticker.C:
-                s.Update(func(st State) poly.HandleResult[State] {
+                s.Update(func(st State) State {
                     st.Uptime++
-                    return poly.Result(st)
+                    return st
                 })
             }
         }
@@ -423,7 +428,9 @@ OnConnect: func(s *poly.Session[State]) {
 `Session.Context()` returns the context directly for use cases where Go() is not needed (e.g. passing to database queries or HTTP clients).
 
 **Cancellation points:**
-- `reapDisconnected` — reconnect window expired, session removed
+- Per-session disconnect timer — reconnect window expired
+- Per-session idle timer — no activity within `IdleTimeout`
+- Per-session max lifetime timer — session exceeded `MaxLifetime`
 - `wireDisconnect` when `ReconnectTimeout <= 0` — reconnection disabled, session gone on first disconnect
 - `Shutdown` — all sessions destroyed
 
@@ -530,11 +537,11 @@ session_test.go     Core event loop (patch, morph, equality, multiple events, di
 navigate_test.go    URL navigation
 recover_test.go     Panic recovery
 title_test.go       Page title updates
-group_test.go       Broadcasting (uses testing/synctest for fire-and-forget verification)
+group_test.go       Broadcasting (uses testing/synctest)
 context_test.go     Session context and Go lifecycle
 activity_test.go    Server-initiated update refreshes lastActivity
-reap_test.go        Reaper lifecycle tests (uses testing/synctest fake clock)
-shutdown_test.go    Graceful shutdown and reaper termination (uses testing/synctest)
+reap_test.go        Per-session timer tests: idle, max lifetime, disconnect (uses testing/synctest)
+shutdown_test.go    Graceful shutdown (uses testing/synctest)
 drain_test.go       Graceful drain (rejects new, allows reconnect, context cancellation)
 origin_test.go      Origin checking and CSRF protection
 worker_test.go      Service worker header, polyBody attributes, push subscribe handler
@@ -542,14 +549,16 @@ bind_test.go        Event binding helpers (package poly_test, black-box)
 protocol_test.go    Wire format encoding
 bench_test.go       Performance benchmarks
 announce_test.go    Live region announcements (Session.Announce, wire format)
-presence_test.go    Group presence (OnJoin, OnLeave, Members)
+presence_test.go    Group presence (OnJoin, OnLeave, All)
 flash_test.go       Session.Flash one-time notifications
 health_test.go      Handler.Health session pool counts
 sse/sse_test.go     SSE transport
 push/push_test.go   VAPID key generation, JWT signing, Send end-to-end
 ```
 
-`mock_test.go` defines `mockTransport` (replays queued events, records sent `Update` values) and `newTestSession` (creates a session with a seeded differ). Helper functions `patchUpdates()` and `morphUpdates()` filter recorded updates by type. Use these for any new session behaviour tests.
+`mock_test.go` defines `mockTransport` (replays queued events, records sent `Update` values) and `newTestSession` (creates a session with channels, a seeded differ, and a logger — ready for `go sess.readTransport(sess.events)` + `go sess.run()`). Helper functions `patchUpdates()` and `morphUpdates()` filter recorded updates by type. Use these for any new session behaviour tests.
+
+Most tests that start a session loop use `testing/synctest.Test` for deterministic timing. The standard cleanup pattern is `defer func() { sess.stop(); synctest.Wait() }()` registered immediately after `go sess.run()` — this stops the command loop before the synctest bubble exits.
 
 `bind_test.go` uses `package poly_test` (black-box) because it verifies the public API with real Fluent elements. All other test files use `package poly` (white-box).
 
@@ -589,9 +598,9 @@ Supported data attributes:
 
 ## Graceful drain
 
-`Handler.Drain(ctx)` stops accepting new sessions while letting existing ones finish naturally. New page loads receive 503. Reconnecting clients can still reattach to their disconnected sessions. The background reaper continues running so idle and lifetime limits are enforced during the drain period.
+`Handler.Drain(ctx)` stops accepting new sessions while letting existing ones finish naturally. New page loads receive 503. Reconnecting clients can still reattach to their disconnected sessions. Per-session timers continue running so idle and lifetime limits are enforced during the drain period.
 
-The method blocks until all pools (pending, active, disconnected) are empty or `ctx` is cancelled. Internally it polls `Health()` every 500ms. After `Drain` returns, call `Shutdown` to stop the reaper.
+The method blocks until all pools (pending, active, disconnected) are empty or `ctx` is cancelled. Internally it polls `Health()` every 500ms. After `Drain` returns, call `Shutdown` to cancel remaining sessions and stop the pending cleanup goroutine.
 
 The `draining` flag is an `atomic.Bool` on `Handler`. It is checked at the top of `serveInitialPage` and in the fresh-session fallback path of `serveSession`. The disconnected-session and pending-session paths are not gated — reconnects and pending claims still work during drain.
 

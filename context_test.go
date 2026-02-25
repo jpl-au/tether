@@ -3,58 +3,62 @@ package poly
 import (
 	"context"
 	"testing"
-	"time"
+	"testing/synctest"
 )
 
-func TestSessionContextCancelledAfterRun(t *testing.T) {
-	mt := &mockTransport{
-		events: []Event{},
-	}
+func TestSessionContextCancelledAfterDestroy(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		mt := &mockTransport{events: []Event{}}
 
-	sess := newTestSession(counterState{Count: 0}, mt)
+		sess := newTestSession(counterState{Count: 0}, mt)
 
-	// Context should not be cancelled before run.
-	select {
-	case <-sess.Context().Done():
-		t.Fatal("context should not be cancelled before run")
-	default:
-	}
+		// Context should not be cancelled before destruction.
+		select {
+		case <-sess.Context().Done():
+			t.Fatal("context should not be cancelled before destruction")
+		default:
+		}
 
-	sess.run()
+		go sess.readTransport(sess.events)
+		go sess.run()
+		synctest.Wait()
 
-	// Simulate permanent destruction (no reconnect).
-	sess.cancel()
+		// Simulate permanent destruction.
+		sess.stop()
+		synctest.Wait()
 
-	select {
-	case <-sess.Context().Done():
-		// expected
-	default:
-		t.Fatal("context should be cancelled after permanent destruction")
-	}
+		select {
+		case <-sess.Context().Done():
+			// expected
+		default:
+			t.Fatal("context should be cancelled after permanent destruction")
+		}
+	})
 }
 
 func TestSessionGoReceivesCancellation(t *testing.T) {
-	mt := &mockTransport{
-		events: []Event{},
-	}
+	synctest.Test(t, func(t *testing.T) {
+		mt := &mockTransport{events: []Event{}}
 
-	sess := newTestSession(counterState{Count: 0}, mt)
+		sess := newTestSession(counterState{Count: 0}, mt)
 
-	stopped := make(chan struct{})
-	sess.Go(func(ctx context.Context) {
-		<-ctx.Done()
-		close(stopped)
+		stopped := make(chan struct{})
+		sess.Go(func(ctx context.Context) {
+			<-ctx.Done()
+			close(stopped)
+		})
+
+		// Cancel the session context (simulates reaper or shutdown).
+		sess.stop()
+		synctest.Wait()
+
+		select {
+		case <-stopped:
+			// expected
+		default:
+			t.Fatal("goroutine should have stopped after context cancellation")
+		}
 	})
-
-	// Cancel the session context (simulates reaper or shutdown).
-	sess.cancel()
-
-	select {
-	case <-stopped:
-		// expected
-	case <-time.After(time.Second):
-		t.Fatal("goroutine should have stopped after context cancellation")
-	}
 }
 
 func TestSessionContextNilFallsBackToBackground(t *testing.T) {

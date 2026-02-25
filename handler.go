@@ -78,11 +78,14 @@ type Handler[S any] struct {
 	draining     atomic.Bool
 }
 
-// New creates a [Handler] from the given configuration and starts a
-// background reaper goroutine that enforces IdleTimeout, MaxLifetime,
-// and ReconnectTimeout. The reaper runs for the lifetime of the handler;
-// call [Handler.Shutdown] to stop it and close all active sessions
-// before the process exits.
+// New creates a [Handler] from the given configuration. Session
+// lifecycle is managed by per-session timers (idle, lifetime,
+// disconnect) — there is no centralised reaper goroutine. A
+// lightweight pending-cleanup goroutine removes pre-warmed sessions
+// that are never claimed.
+//
+// Call [Handler.Shutdown] to cancel all sessions before the process
+// exits.
 func New[S any](cfg Config[S]) *Handler[S] {
 	if cfg.InitialState == nil {
 		panic("poly: Config.InitialState is required")
@@ -119,9 +122,6 @@ func New[S any](cfg Config[S]) *Handler[S] {
 	if cfg.PendingTimeout == 0 {
 		cfg.PendingTimeout = defaultPendingTimeout
 	}
-	if cfg.ReaperInterval == 0 {
-		cfg.ReaperInterval = defaultReaperInterval
-	}
 	if cfg.RetryDelay == 0 {
 		cfg.RetryDelay = defaultRetryDelay
 	}
@@ -145,9 +145,7 @@ func New[S any](cfg Config[S]) *Handler[S] {
 		done:         make(chan struct{}),
 	}
 
-	// The reaper always runs to clean up pending and disconnected
-	// sessions. It also enforces idle and lifetime limits when set.
-	go h.reap()
+	go h.reapPending()
 
 	return h
 }
@@ -278,13 +276,11 @@ func (h *Handler[S]) handlePostEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Read transport under the session lock because reattach writes
-	// it concurrently when a disconnected session reconnects.
-	sess.mu.Lock()
-	t := sess.transport
-	sess.mu.Unlock()
-
-	pusher, ok := t.(EventPusher)
+	// The transport's PushEvent writes to a buffered channel that the
+	// reader goroutine consumes — it does not touch session state.
+	// The transport pointer is only modified by the loop (reattach),
+	// and an active session always has a valid transport.
+	pusher, ok := sess.transport.(EventPusher)
 	if !ok {
 		http.Error(w, "transport does not accept events", http.StatusMethodNotAllowed)
 		return
@@ -348,9 +344,11 @@ func (h *Handler[S]) handlePushSubscribe(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	sess.mu.Lock()
-	sess.pushSub = &sub
-	sess.mu.Unlock()
+	// Send the subscription to the session loop so it's stored
+	// without racing with other loop operations.
+	sess.cmds <- func() {
+		sess.pushSub = &sub
+	}
 
 	go h.cfg.Push.OnSubscribe(sess, sub)
 	w.WriteHeader(http.StatusNoContent)
@@ -358,9 +356,10 @@ func (h *Handler[S]) handlePushSubscribe(w http.ResponseWriter, r *http.Request)
 
 // destroySession performs permanent cleanup for a session that is no
 // longer reachable (reaped, shutdown, or disconnected with timeout -1).
+// Cancelling the context causes the session loop to exit.
 func (h *Handler[S]) destroySession(s *Session[S]) {
-	if s.cancel != nil {
-		s.cancel()
+	if s.stop != nil {
+		s.stop()
 	}
 
 	for _, g := range h.cfg.Groups {

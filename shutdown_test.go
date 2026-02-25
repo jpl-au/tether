@@ -8,54 +8,60 @@ import (
 )
 
 func TestShutdownClosesActiveSessions(t *testing.T) {
-	mt := &mockTransport{events: []Event{}}
-	sess := newTestSession(counterState{Count: 0}, mt)
+	synctest.Test(t, func(t *testing.T) {
+		mt := &mockTransport{events: []Event{}}
+		sess := newTestSession(counterState{Count: 0}, mt)
 
-	h := &Handler[counterState]{
-		cfg:          Config[counterState]{},
-		pending:      make(map[string]*pendingSession[counterState]),
-		active:       map[string]*Session[counterState]{"test": sess},
-		disconnected: make(map[string]*Session[counterState]),
-		done:         make(chan struct{}),
-	}
+		go sess.readTransport(sess.events)
+		go sess.run()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
+		h := &Handler[counterState]{
+			cfg:          Config[counterState]{},
+			pending:      make(map[string]*pendingSession[counterState]),
+			active:       map[string]*Session[counterState]{"test": sess},
+			disconnected: make(map[string]*Session[counterState]),
+			done:         make(chan struct{}),
+		}
 
-	if err := h.Shutdown(ctx); err != nil {
-		t.Fatalf("shutdown error: %v", err)
-	}
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
 
-	mt.mu.Lock()
-	closed := mt.closed
-	mt.mu.Unlock()
+		if err := h.Shutdown(ctx); err != nil {
+			t.Fatalf("shutdown error: %v", err)
+		}
+		synctest.Wait()
 
-	if !closed {
-		t.Error("expected transport to be closed after shutdown")
-	}
+		mt.mu.Lock()
+		closed := mt.closed
+		mt.mu.Unlock()
+
+		if !closed {
+			t.Error("expected transport to be closed after shutdown")
+		}
+	})
 }
 
-func TestShutdownStopsReaper(t *testing.T) {
+func TestShutdownStopsPendingCleanup(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		h := &Handler[counterState]{
-			cfg:          Config[counterState]{ReaperInterval: defaultReaperInterval},
+			cfg:          Config[counterState]{PendingTimeout: 30 * time.Second},
 			pending:      make(map[string]*pendingSession[counterState]),
 			active:       make(map[string]*Session[counterState]),
 			disconnected: make(map[string]*Session[counterState]),
 			done:         make(chan struct{}),
 		}
 
-		reaperDone := false
+		cleanupDone := false
 		go func() {
-			h.reap()
-			reaperDone = true
+			h.reapPending()
+			cleanupDone = true
 		}()
 
 		close(h.done)
 		synctest.Wait()
 
-		if !reaperDone {
-			t.Fatal("reaper did not exit after done channel closed")
+		if !cleanupDone {
+			t.Fatal("pending cleanup goroutine did not exit after done channel closed")
 		}
 	})
 }

@@ -8,12 +8,13 @@ import (
 
 // Drain stops accepting new sessions but lets existing ones finish
 // naturally. It blocks until all sessions have disconnected or ctx
-// is cancelled. The background reaper continues running so idle and
-// lifetime limits are still enforced during the drain period.
-// Reconnecting clients can still reattach to their existing sessions.
+// is cancelled. Per-session lifecycle timers continue enforcing idle
+// and lifetime limits during the drain period. Reconnecting clients
+// can still reattach to their existing sessions.
 //
-// After Drain returns, call [Handler.Shutdown] to stop the reaper
-// and release resources. Safe to call from any goroutine.
+// After Drain returns, call [Handler.Shutdown] to stop the pending
+// cleanup goroutine and release resources. Safe to call from any
+// goroutine.
 func (h *Handler[S]) Drain(ctx context.Context) error {
 	h.draining.Store(true)
 
@@ -35,9 +36,9 @@ func (h *Handler[S]) Drain(ctx context.Context) error {
 	}
 }
 
-// Shutdown closes all active sessions and stops the background reaper.
-// It blocks until every session has exited or ctx is cancelled. Safe
-// to call more than once.
+// Shutdown closes all active sessions and stops the pending cleanup
+// goroutine. It blocks until every session's loop has exited or ctx
+// is cancelled. Safe to call more than once.
 func (h *Handler[S]) Shutdown(ctx context.Context) error {
 	h.closeOnce.Do(func() { close(h.done) })
 
@@ -46,15 +47,12 @@ func (h *Handler[S]) Shutdown(ctx context.Context) error {
 	for _, sess := range h.active {
 		sessions = append(sessions, sess)
 	}
-	// Cancel disconnected session contexts before clearing — these
-	// sessions will never be reclaimed.
+	// Cancel disconnected session contexts — they will never be
+	// reclaimed.
 	for _, sess := range h.disconnected {
-		if sess.cancel != nil {
-			sess.cancel()
-		}
+		sess.stop()
 	}
-	// The reaper is stopped (done is closed), so nothing else will
-	// clean up these maps. Clear them to release memory.
+	// Clear pending and disconnected maps to release memory.
 	clear(h.pending)
 	clear(h.disconnected)
 	h.mu.Unlock()
@@ -62,9 +60,7 @@ func (h *Handler[S]) Shutdown(ctx context.Context) error {
 	var wg sync.WaitGroup
 	for _, sess := range sessions {
 		wg.Go(func() {
-			if sess.cancel != nil {
-				sess.cancel()
-			}
+			sess.stop()
 			sess.Close()
 		})
 	}

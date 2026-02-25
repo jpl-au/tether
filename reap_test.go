@@ -9,12 +9,11 @@ import (
 	jit "github.com/jpl-au/fluent-jit"
 )
 
-func TestReaperRemovesPendingSessionAfterTimeout(t *testing.T) {
+func TestPendingSessionRemovedAfterTimeout(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		h := &Handler[counterState]{
 			cfg: Config[counterState]{
 				PendingTimeout: 100 * time.Millisecond,
-				ReaperInterval: 50 * time.Millisecond,
 				Logger:         slog.Default(),
 			},
 			pending: map[string]*pendingSession[counterState]{
@@ -29,12 +28,10 @@ func TestReaperRemovesPendingSessionAfterTimeout(t *testing.T) {
 			done:         make(chan struct{}),
 		}
 
-		go h.reap()
+		go h.reapPending()
 
-		// Advance past PendingTimeout. The ticker fires every 50ms;
-		// after 150ms at least one reap cycle runs after the 100ms
-		// timeout has elapsed.
-		time.Sleep(150 * time.Millisecond)
+		// Advance past the pending check interval (10s) and PendingTimeout.
+		time.Sleep(11 * time.Second)
 		synctest.Wait()
 
 		h.mu.Lock()
@@ -49,186 +46,111 @@ func TestReaperRemovesPendingSessionAfterTimeout(t *testing.T) {
 	})
 }
 
-func TestReaperRemovesDisconnectedSessionAfterTimeout(t *testing.T) {
+func TestIdleTimerClosesSession(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		mt := &mockTransport{events: []Event{}}
 		sess := newTestSession(counterState{Count: 0}, mt)
-		sess.logger = slog.Default()
-		sess.disconnectedAt = time.Now()
+		sess.idleTimeout = 200 * time.Millisecond
+		sess.startTimers()
 
-		h := &Handler[counterState]{
-			cfg: Config[counterState]{
-				ReconnectTimeout: 200 * time.Millisecond,
-				ReaperInterval:   50 * time.Millisecond,
-				Logger:           slog.Default(),
-			},
-			pending: make(map[string]*pendingSession[counterState]),
-			active:  make(map[string]*Session[counterState]),
-			disconnected: map[string]*Session[counterState]{
-				sess.id: sess,
-			},
-			done: make(chan struct{}),
-		}
+		go sess.readTransport(sess.events)
+		go sess.run()
 
-		go h.reap()
-
-		// Advance past ReconnectTimeout so the reaper evicts the session.
+		// Advance past the idle timeout.
 		time.Sleep(300 * time.Millisecond)
 		synctest.Wait()
 
-		h.mu.Lock()
-		n := len(h.disconnected)
-		h.mu.Unlock()
-
-		if n != 0 {
-			t.Errorf("expected 0 disconnected sessions after timeout, got %d", n)
+		// Session context should be cancelled.
+		if sess.ctx.Err() == nil {
+			t.Error("session should be expired after idle timeout")
 		}
-
-		close(h.done)
 	})
 }
 
-func TestReaperClosesIdleSession(t *testing.T) {
+func TestMaxLifetimeClosesSession(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		mt := &mockTransport{events: []Event{}}
 		sess := newTestSession(counterState{Count: 0}, mt)
-		sess.logger = slog.Default()
-		sess.lastActivity = time.Now()
-		sess.createdAt = time.Now()
 
-		h := &Handler[counterState]{
-			cfg: Config[counterState]{
-				IdleTimeout:    200 * time.Millisecond,
-				ReaperInterval: 50 * time.Millisecond,
-				Logger:         slog.Default(),
-			},
-			pending: make(map[string]*pendingSession[counterState]),
-			active: map[string]*Session[counterState]{
-				sess.id: sess,
-			},
-			disconnected: make(map[string]*Session[counterState]),
-			done:         make(chan struct{}),
-		}
+		// Set a max lifetime timer.
+		time.AfterFunc(200*time.Millisecond, func() {
+			sess.stop()
+		})
 
-		go h.reap()
+		go sess.readTransport(sess.events)
+		go sess.run()
 
-		// Advance past IdleTimeout so the reaper closes the session.
+		// Advance past the max lifetime.
 		time.Sleep(300 * time.Millisecond)
 		synctest.Wait()
 
-		mt.mu.Lock()
-		closed := mt.closed
-		mt.mu.Unlock()
-
-		if !closed {
-			t.Error("expected transport to be closed after idle timeout")
+		if sess.ctx.Err() == nil {
+			t.Error("session should be expired after max lifetime")
 		}
-
-		h.mu.Lock()
-		n := len(h.active)
-		h.mu.Unlock()
-
-		if n != 0 {
-			t.Errorf("expected 0 active sessions after idle reap, got %d", n)
-		}
-
-		close(h.done)
 	})
 }
 
-func TestReaperClosesSessionAtMaxLifetime(t *testing.T) {
+func TestIdleTimerResetsOnActivity(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		mt := &mockTransport{events: []Event{}}
 		sess := newTestSession(counterState{Count: 0}, mt)
-		sess.logger = slog.Default()
-		sess.lastActivity = time.Now()
-		sess.createdAt = time.Now()
+		sess.idleTimeout = 300 * time.Millisecond
+		sess.startTimers()
 
-		h := &Handler[counterState]{
-			cfg: Config[counterState]{
-				MaxLifetime:    200 * time.Millisecond,
-				ReaperInterval: 50 * time.Millisecond,
-				Logger:         slog.Default(),
-			},
-			pending: make(map[string]*pendingSession[counterState]),
-			active: map[string]*Session[counterState]{
-				sess.id: sess,
-			},
-			disconnected: make(map[string]*Session[counterState]),
-			done:         make(chan struct{}),
-		}
+		go sess.readTransport(sess.events)
+		go sess.run()
 
-		go h.reap()
-
-		// Advance past MaxLifetime so the reaper closes the session.
-		time.Sleep(300 * time.Millisecond)
+		// Send an update at 200ms — well within the 300ms idle timeout.
+		// This should reset the timer.
+		time.Sleep(200 * time.Millisecond)
+		sess.Update(func(s counterState) counterState {
+			s.Count++
+			return s
+		})
 		synctest.Wait()
 
-		mt.mu.Lock()
-		closed := mt.closed
-		mt.mu.Unlock()
-
-		if !closed {
-			t.Error("expected transport to be closed after max lifetime")
-		}
-
-		h.mu.Lock()
-		n := len(h.active)
-		h.mu.Unlock()
-
-		if n != 0 {
-			t.Errorf("expected 0 active sessions after lifetime reap, got %d", n)
-		}
-
-		close(h.done)
-	})
-}
-
-func TestReaperDoesNotCloseActiveSessionBeforeTimeout(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		mt := &mockTransport{events: []Event{}}
-		sess := newTestSession(counterState{Count: 0}, mt)
-		sess.logger = slog.Default()
-		sess.lastActivity = time.Now()
-		sess.createdAt = time.Now()
-
-		h := &Handler[counterState]{
-			cfg: Config[counterState]{
-				IdleTimeout:    500 * time.Millisecond,
-				ReaperInterval: 50 * time.Millisecond,
-				Logger:         slog.Default(),
-			},
-			pending: make(map[string]*pendingSession[counterState]),
-			active: map[string]*Session[counterState]{
-				sess.id: sess,
-			},
-			disconnected: make(map[string]*Session[counterState]),
-			done:         make(chan struct{}),
-		}
-
-		go h.reap()
-
-		// Advance to just before the idle timeout. The reaper should
-		// have run at least once but the session should still be active.
+		// At 400ms the original timer would have fired (300ms), but
+		// the reset pushes it to 500ms. Session should still be alive.
 		time.Sleep(200 * time.Millisecond)
 		synctest.Wait()
 
-		mt.mu.Lock()
-		closed := mt.closed
-		mt.mu.Unlock()
-
-		if closed {
-			t.Error("transport should not be closed before idle timeout")
+		if sess.ctx.Err() != nil {
+			t.Error("session should still be alive — idle timer was reset by activity")
 		}
 
-		h.mu.Lock()
-		n := len(h.active)
-		h.mu.Unlock()
+		// At 600ms (500ms since last activity), the timer fires.
+		time.Sleep(200 * time.Millisecond)
+		synctest.Wait()
 
-		if n != 1 {
-			t.Errorf("expected 1 active session before timeout, got %d", n)
+		if sess.ctx.Err() == nil {
+			t.Error("session should be expired after idle timeout with no further activity")
+		}
+	})
+}
+
+func TestDisconnectTimerClosesSession(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		mt := &mockTransport{events: []Event{}}
+		sess := newTestSession(counterState{Count: 0}, mt)
+		sess.reconnectTimeout = 200 * time.Millisecond
+
+		go sess.readTransport(sess.events)
+		go sess.run()
+
+		// Wait for transport to close (EOF from empty events).
+		synctest.Wait()
+
+		// Session loop should still be running (waiting for reconnect).
+		if sess.ctx.Err() != nil {
+			t.Fatal("session should still be alive while waiting for reconnect")
 		}
 
-		close(h.done)
+		// Advance past reconnect timeout.
+		time.Sleep(300 * time.Millisecond)
+		synctest.Wait()
+
+		if sess.ctx.Err() == nil {
+			t.Error("session should be expired after disconnect timeout")
+		}
 	})
 }

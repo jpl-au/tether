@@ -39,7 +39,6 @@ func TestDrainAllowsReconnect(t *testing.T) {
 	// Inject a disconnected session so reconnect path is available.
 	mt := &mockTransport{events: []Event{}}
 	sess := newTestSession(counterState{Count: 42}, mt)
-	sess.disconnectedAt = time.Now()
 
 	handler.mu.Lock()
 	handler.disconnected[sess.id] = sess
@@ -60,7 +59,7 @@ func TestDrainAllowsReconnect(t *testing.T) {
 func TestDrainReturnsWhenEmpty(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		handler := &Handler[counterState]{
-			cfg:          Config[counterState]{ReaperInterval: defaultReaperInterval},
+			cfg:          Config[counterState]{},
 			pending:      make(map[string]*pendingSession[counterState]),
 			active:       make(map[string]*Session[counterState]),
 			disconnected: make(map[string]*Session[counterState]),
