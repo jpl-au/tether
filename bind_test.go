@@ -7,6 +7,7 @@ import (
 	poly "github.com/jpl-au/fluent-poly"
 	"github.com/jpl-au/fluent/html5/a"
 	"github.com/jpl-au/fluent/html5/button"
+	"github.com/jpl-au/fluent/html5/dropdown"
 	"github.com/jpl-au/fluent/html5/form"
 	"github.com/jpl-au/fluent/html5/input"
 )
@@ -173,6 +174,63 @@ func TestThrottleRendersDataAttribute(t *testing.T) {
 
 	if !strings.Contains(html, `data-poly-throttle="1000"`) {
 		t.Errorf("expected data-poly-throttle attribute in HTML:\n%s", html)
+	}
+}
+
+func TestChangeRendersDataAttribute(t *testing.T) {
+	el := poly.Change(dropdown.New(), "filter")
+	html := string(el.Render())
+
+	if !strings.Contains(html, `data-poly-change="filter"`) {
+		t.Errorf("expected data-poly-change attribute in HTML:\n%s", html)
+	}
+}
+
+func TestKeyDownRendersDataAttribute(t *testing.T) {
+	el := poly.KeyDown(input.Text("cmd", ""), "exec")
+	html := string(el.Render())
+
+	if !strings.Contains(html, `data-poly-keydown="exec"`) {
+		t.Errorf("expected data-poly-keydown attribute in HTML:\n%s", html)
+	}
+}
+
+func TestFocusRendersDataAttribute(t *testing.T) {
+	el := poly.Focus(input.Text("name", ""), "focus-name")
+	html := string(el.Render())
+
+	if !strings.Contains(html, `data-poly-focus="focus-name"`) {
+		t.Errorf("expected data-poly-focus attribute in HTML:\n%s", html)
+	}
+}
+
+func TestBlurRendersDataAttribute(t *testing.T) {
+	el := poly.Blur(input.Text("name", ""), "blur-name")
+	html := string(el.Render())
+
+	if !strings.Contains(html, `data-poly-blur="blur-name"`) {
+		t.Errorf("expected data-poly-blur attribute in HTML:\n%s", html)
+	}
+}
+
+func TestFilterKeyRendersDataAttribute(t *testing.T) {
+	el := poly.FilterKey(poly.KeyDown(input.Text("cmd", ""), "exec"), "Enter")
+	html := string(el.Render())
+
+	if !strings.Contains(html, `data-poly-key="Enter"`) {
+		t.Errorf("expected data-poly-key attribute in HTML:\n%s", html)
+	}
+	if !strings.Contains(html, `data-poly-keydown="exec"`) {
+		t.Errorf("expected data-poly-keydown attribute in HTML:\n%s", html)
+	}
+}
+
+func TestFocusTrapRendersDataAttribute(t *testing.T) {
+	el := poly.FocusTrap(button.Text("Dialog"))
+	html := string(el.Render())
+
+	if !strings.Contains(html, `data-poly-focus-trap=""`) {
+		t.Errorf("expected data-poly-focus-trap attribute in HTML:\n%s", html)
 	}
 }
 
