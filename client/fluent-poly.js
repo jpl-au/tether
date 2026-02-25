@@ -469,6 +469,9 @@ window.Poly.hooks = window.Poly.hooks || {};
       if (msg.announce) {
         announce(msg.announce);
       }
+      if (msg.toast) {
+        toast(msg.toast);
+      }
 
       // Set focus on the designated element after all DOM updates.
       // Uses data-poly-autofocus (not data-poly-focus, which is the
@@ -515,6 +518,70 @@ window.Poly.hooks = window.Poly.hooks || {};
     requestAnimationFrame(function () {
       region.textContent = text;
     });
+  }
+
+  // --- Global toasts ---
+  //
+  // Transient notifications that float over the UI. The client JS
+  // manages their lifecycle (insertion, animation, removal) so the
+  // server can push feedback without coordinating with the page layout.
+
+  var toastContainer = null;
+
+  function ensureToastContainer() {
+    if (toastContainer) return toastContainer;
+    toastContainer = document.createElement("div");
+    toastContainer.className = "poly-toast-container";
+    toastContainer.style.cssText = [
+      "position:fixed",
+      "bottom:24px",
+      "left:50%",
+      "transform:translateX(-50%)",
+      "z-index:2147483647",
+      "display:flex",
+      "flex-direction:column-reverse",
+      "gap:8px",
+      "pointer-events:none"
+    ].join(";");
+    document.body.appendChild(toastContainer);
+    return toastContainer;
+  }
+
+  function toast(text) {
+    var container = ensureToastContainer();
+    var el = document.createElement("div");
+    el.className = "poly-toast";
+    el.textContent = text;
+    el.style.cssText = [
+      "background:#333",
+      "color:#fff",
+      "padding:10px 20px",
+      "border-radius:8px",
+      "font:14px/1.4 system-ui,sans-serif",
+      "box-shadow:0 4px 12px rgba(0,0,0,.15)",
+      "opacity:0",
+      "transform:translateY(20px)",
+      "transition:opacity .3s, transform .3s",
+      "pointer-events:auto"
+    ].join(";");
+
+    container.appendChild(el);
+
+    // Animate in
+    requestAnimationFrame(function () {
+      el.offsetHeight;
+      el.style.opacity = "1";
+      el.style.transform = "translateY(0)";
+    });
+
+    // Animate out and remove
+    setTimeout(function () {
+      el.style.opacity = "0";
+      el.style.transform = "translateY(20px)";
+      el.addEventListener("transitionend", function () {
+        if (el.parentNode) el.parentNode.removeChild(el);
+      });
+    }, 5000);
   }
 
   // --- JS hooks ---
@@ -880,34 +947,41 @@ window.Poly.hooks = window.Poly.hooks || {};
       }
 
       // Collect event-specific data
-      if (domEvent === "input" || domEvent === "change") {
-        data.value = target.value || "";
-        // Checkboxes and radios always report their value attribute
-        // (default "on"), which doesn't tell the server whether the
-        // control is checked or unchecked. Send the checked state so
-        // the server can distinguish between the two.
-        if (target.type === "checkbox" || target.type === "radio") {
-          data.checked = target.checked ? "true" : "false";
-        }
-      } else if (domEvent === "keydown") {
-        // If data-poly-key is set, only send the event if it matches.
-        var filter = target.getAttribute("data-poly-key");
-        if (filter && filter !== e.key) return;
-
-        data.key = e.key || "";
-        if (e.ctrlKey) data.ctrl = "true";
-        if (e.shiftKey) data.shift = "true";
-        if (e.altKey) data.alt = "true";
-        if (e.metaKey) data.meta = "true";
-      } else if (domEvent === "submit") {
-        var formData = new FormData(target);
-        formData.forEach(function (value, key) {
-          if (data[key]) {
-            data[key] += "," + value;
-          } else {
-            data[key] = value;
+      switch (domEvent) {
+        case "input":
+        case "change":
+          data.value = target.value || "";
+          // Checkboxes and radios always report their value attribute
+          // (default "on"), which doesn't tell the server whether the
+          // control is checked or unchecked. Send the checked state so
+          // the server can distinguish between the two.
+          if (target.type === "checkbox" || target.type === "radio") {
+            data.checked = target.checked ? "true" : "false";
           }
-        });
+          break;
+
+        case "keydown":
+          // If data-poly-key is set, only send the event if it matches.
+          var filter = target.getAttribute("data-poly-key");
+          if (filter && filter !== e.key) return;
+
+          data.key = e.key || "";
+          if (e.ctrlKey) data.ctrl = "true";
+          if (e.shiftKey) data.shift = "true";
+          if (e.altKey) data.alt = "true";
+          if (e.metaKey) data.meta = "true";
+          break;
+
+        case "submit":
+          var formData = new FormData(target);
+          formData.forEach(function (value, key) {
+            if (data[key]) {
+              data[key] += "," + value;
+            } else {
+              data[key] = value;
+            }
+          });
+          break;
       }
 
       // Debounce input events

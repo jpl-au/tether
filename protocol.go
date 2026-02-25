@@ -16,6 +16,7 @@ type Update struct {
 	Title    string            // if non-empty, set document.title
 	Flash    map[string]string // key: CSS selector, value: plain text to display
 	Announce string            // if non-empty, inject into an aria-live region
+	Toast    string            // if non-empty, show a global notification
 	EventID  string            // echoed from the triggering Event for correlation
 }
 
@@ -46,6 +47,7 @@ type UpdateMessage struct {
 	Title    string            `json:"title,omitempty"`
 	Flash    map[string]string `json:"flash,omitempty"`
 	Announce string            `json:"announce,omitempty"`
+	Toast    string            `json:"toast,omitempty"`
 	EventID  string            `json:"event_id,omitempty"`
 }
 
@@ -95,6 +97,7 @@ func EncodeUpdate(update Update) UpdateMessage {
 	msg.Title = update.Title
 	msg.Flash = update.Flash
 	msg.Announce = update.Announce
+	msg.Toast = update.Toast
 	msg.EventID = update.EventID
 
 	return msg

@@ -30,6 +30,7 @@ type HandleResult[S any] struct {
 	State    S
 	Announce string            // text for aria-live region
 	Flash    map[string]string // CSS selector → text, cleared after 5s
+	Toast    string            // global notification text, cleared after 5s
 	Title    string            // set document.title
 	URL      string            // push/replace browser URL
 	Replace  bool              // true for replaceState, false for pushState
@@ -54,6 +55,13 @@ func (r HandleResult[S]) WithFlash(selector, text string) HandleResult[S] {
 		r.Flash = make(map[string]string)
 	}
 	r.Flash[selector] = text
+	return r
+}
+
+// WithToast attaches a global notification to the result. The client
+// JS handles displaying the toast in a transient overlay.
+func (r HandleResult[S]) WithToast(text string) HandleResult[S] {
+	r.Toast = text
 	return r
 }
 
@@ -84,7 +92,7 @@ func hasEffects[S any](effects *HandleResult[S]) bool {
 		return false
 	}
 	return effects.Announce != "" || effects.Flash != nil ||
-		effects.Title != "" || effects.URL != ""
+		effects.Toast != "" || effects.Title != "" || effects.URL != ""
 }
 
 // mergeEffects copies side effect fields from a HandleResult into an
@@ -99,6 +107,9 @@ func mergeEffects[S any](update *Update, effects *HandleResult[S]) {
 	}
 	if effects.Flash != nil {
 		update.Flash = effects.Flash
+	}
+	if effects.Toast != "" {
+		update.Toast = effects.Toast
 	}
 	if effects.Title != "" {
 		update.Title = effects.Title
