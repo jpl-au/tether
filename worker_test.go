@@ -83,6 +83,42 @@ func TestServeClientNoPrecache(t *testing.T) {
 	}
 }
 
+func TestServeClientWorkerOriginCheck(t *testing.T) {
+	handler := ServeClient()
+
+	t.Run("cross-origin request is rejected", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "http://myapp.com/poly-worker.js", nil)
+		req.Header.Set("Origin", "https://evil.com")
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+
+		if w.Code != http.StatusForbidden {
+			t.Errorf("status = %d, want %d", w.Code, http.StatusForbidden)
+		}
+	})
+
+	t.Run("same-origin request is allowed", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "http://myapp.com/poly-worker.js", nil)
+		req.Header.Set("Origin", "http://myapp.com")
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("status = %d, want %d", w.Code, http.StatusOK)
+		}
+	})
+
+	t.Run("no origin header is allowed", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/poly-worker.js", nil)
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("status = %d, want %d", w.Code, http.StatusOK)
+		}
+	})
+}
+
 func TestPolyBodyWorkerAttribute(t *testing.T) {
 	t.Run("worker true emits data-poly-worker", func(t *testing.T) {
 		body := &polyBody{

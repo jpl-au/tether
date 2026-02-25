@@ -603,6 +603,15 @@ func ServeClient(precache ...string) http.Handler {
 		// injected and the scope header set, so it is served directly
 		// rather than through the static file server.
 		if r.URL.Path == "/poly-worker.js" || r.URL.Path == "poly-worker.js" {
+			// Defence-in-depth: reject cross-origin requests for the
+			// worker script. The browser already prevents cross-origin
+			// registration, but this guards against misconfigured proxies.
+			if origin := r.Header.Get("Origin"); origin != "" {
+				if u, err := url.Parse(origin); err != nil || stripPort(u.Host) != stripPort(r.Host) {
+					http.Error(w, "Forbidden", http.StatusForbidden)
+					return
+				}
+			}
 			workerOnce.Do(func() {
 				workerBody = buildWorkerJS(precache)
 			})
