@@ -87,16 +87,13 @@ func (g *Group[S]) Len() int {
 	return len(g.sessions)
 }
 
-// All returns an iterator over sessions in the group. The read lock
-// is held during iteration — callers must not block. Use this for
-// read-only access (building user lists, counting, presence). For
-// state mutations use [Group.Broadcast] instead, which snapshots
-// targets to avoid holding the lock while sending.
+// All returns an iterator over sessions in the group. The sessions
+// are snapshotted under a read lock, then iterated without holding
+// the lock — so it is safe to call Add, Remove, or Broadcast from
+// within the loop body.
 func (g *Group[S]) All() iter.Seq[*Session[S]] {
 	return func(yield func(*Session[S]) bool) {
-		g.mu.RLock()
-		defer g.mu.RUnlock()
-		for _, s := range g.sessions {
+		for _, s := range g.snapshot() {
 			if !yield(s) {
 				return
 			}
