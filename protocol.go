@@ -11,10 +11,11 @@ import jit "github.com/jpl-au/fluent-jit"
 type Update struct {
 	Patches []jit.Patch
 	Morphs  []Morph
-	URL     string // if non-empty, push/replace browser URL
-	Replace bool   // true for replaceState, false for pushState
-	Title   string // if non-empty, set document.title
-	EventID string // echoed from the triggering Event for correlation
+	URL     string            // if non-empty, push/replace browser URL
+	Replace bool              // true for replaceState, false for pushState
+	Title   string            // if non-empty, set document.title
+	Flash   map[string]string // key: target element selector, value: HTML/text to display
+	EventID string            // echoed from the triggering Event for correlation
 }
 
 // Morph represents a structural change that cannot be expressed as a
@@ -36,13 +37,14 @@ type Morph struct {
 // in a single pass — content patches first (cheap innerHTML swaps),
 // then structural morphs (idiomorph reconciliation).
 type UpdateMessage struct {
-	Type    string       `json:"type"`
-	Patches []PatchEntry `json:"patches,omitempty"`
-	Morphs  []MorphEntry `json:"morphs,omitempty"`
-	URL     string       `json:"url,omitempty"`
-	Replace bool         `json:"replace,omitempty"`
-	Title   string       `json:"title,omitempty"`
-	EventID string       `json:"event_id,omitempty"`
+	Type    string            `json:"type"`
+	Patches []PatchEntry      `json:"patches,omitempty"`
+	Morphs  []MorphEntry      `json:"morphs,omitempty"`
+	URL     string            `json:"url,omitempty"`
+	Replace bool              `json:"replace,omitempty"`
+	Title   string            `json:"title,omitempty"`
+	Flash   map[string]string `json:"flash,omitempty"`
+	EventID string            `json:"event_id,omitempty"`
 }
 
 // PatchEntry is a single key+html pair within an [UpdateMessage]. The
@@ -89,6 +91,7 @@ func EncodeUpdate(update Update) UpdateMessage {
 	msg.URL = update.URL
 	msg.Replace = update.Replace
 	msg.Title = update.Title
+	msg.Flash = update.Flash
 	msg.EventID = update.EventID
 
 	return msg

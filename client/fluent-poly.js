@@ -438,6 +438,17 @@ window.Poly.hooks = window.Poly.hooks || {};
       if (msg.title) {
         document.title = msg.title;
       }
+      if (msg.flash) {
+        for (var selector in msg.flash) {
+          var el = document.querySelector(selector);
+          if (el) {
+            el.innerHTML = msg.flash[selector];
+            (function (target) {
+              setTimeout(function () { target.innerHTML = ""; }, 5000);
+            })(el);
+          }
+        }
+      }
 
       // Set focus on the designated element after all DOM updates.
       // Uses data-poly-autofocus (not data-poly-focus, which is the
