@@ -229,13 +229,13 @@ func (s *Session[S]) SetTitle(title string) {
 }
 
 // Flash sends a one-time notification to the client. The key is a CSS
-// selector for the target element; the value is the HTML/text to
-// display. The client JS clears the element after 5 seconds. Safe to
-// call from any goroutine.
-func (s *Session[S]) Flash(selector, html string) {
+// selector for the target element; the value is plain text to display.
+// The client JS clears the element after 5 seconds. Safe to call from
+// any goroutine.
+func (s *Session[S]) Flash(selector, text string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	update := Update{Flash: map[string]string{selector: html}}
+	update := Update{Flash: map[string]string{selector: text}}
 	if err := s.transport.SendUpdate(update); err != nil {
 		s.logger.Error("send flash error", "session", s.id, "err", err)
 	}

@@ -443,9 +443,9 @@ window.Poly.hooks = window.Poly.hooks || {};
         for (var selector in msg.flash) {
           var el = document.querySelector(selector);
           if (el) {
-            el.innerHTML = msg.flash[selector];
+            el.textContent = msg.flash[selector];
             (function (target) {
-              setTimeout(function () { target.innerHTML = ""; }, 5000);
+              setTimeout(function () { target.textContent = ""; }, 5000);
             })(el);
           }
         }
@@ -717,12 +717,14 @@ window.Poly.hooks = window.Poly.hooks || {};
     var oldTransition = el.style.transition;
     var oldOutline = el.style.outline;
     el.style.transition = "none";
-    el.style.outline = "2px solid rgba(59, 130, 246, 0.5)"; // Blue-500
+    el.style.outline = "2px solid rgba(59, 130, 246, 0.5)";
     el.style.outlineOffset = "-2px";
     requestAnimationFrame(function () {
+      if (!el.isConnected) return;
       el.style.transition = "outline 0.5s ease-out";
       el.style.outline = "2px solid transparent";
       setTimeout(function () {
+        if (!el.isConnected) return;
         el.style.transition = oldTransition;
         el.style.outline = oldOutline;
       }, 500);
@@ -959,7 +961,7 @@ window.Poly.hooks = window.Poly.hooks || {};
     var container = e.target.closest("[data-poly-focus-trap]");
     if (!container) return;
 
-    var focusables = container.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+    var focusables = container.querySelectorAll('button, [href], input, select, textarea, [role="button"], [role="link"], [tabindex]:not([tabindex="-1"])');
     if (focusables.length === 0) return;
 
     var first = focusables[0];

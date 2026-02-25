@@ -14,7 +14,7 @@ type Update struct {
 	URL     string            // if non-empty, push/replace browser URL
 	Replace bool              // true for replaceState, false for pushState
 	Title   string            // if non-empty, set document.title
-	Flash   map[string]string // key: target element selector, value: HTML/text to display
+	Flash   map[string]string // key: CSS selector, value: plain text to display
 	EventID string            // echoed from the triggering Event for correlation
 }
 
