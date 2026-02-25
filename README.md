@@ -382,6 +382,23 @@ In SSE mode, events that fail to send (due to network interruptions) are automat
 
 When the service worker is active and the browser supports Background Sync (Chromium), queued events are replayed even if the tab was closed. On other browsers, replay occurs when the tab reopens and the SSE connection restores.
 
+## Health check
+
+Get a snapshot of session pool counts for monitoring, load balancer health checks, or readiness probes:
+
+```go
+status := handler.Health()
+// status.Pending, status.Active, status.Disconnected
+```
+
+`HealthStatus` has JSON tags so you can serve it directly:
+
+```go
+mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+    json.NewEncoder(w).Encode(handler.Health())
+})
+```
+
 ## Dev mode
 
 During development, enable dev mode for fast iteration:

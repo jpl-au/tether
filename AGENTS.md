@@ -514,6 +514,10 @@ Supported data attributes:
 
 **Internal (managed by JS):** `data-poly-client-classes`, `data-poly-client-attrs`
 
+## Health check
+
+`Handler.Health()` returns a `HealthStatus` struct with `Pending`, `Active`, and `Disconnected` counts. Reads three map lengths under a single lock acquisition. The struct has `json` tags for direct serialisation. Safe to call from any goroutine.
+
 ## Dev mode
 
 `Config.DevMode` (or `POLY_DEV` env var) optimises the development experience:
