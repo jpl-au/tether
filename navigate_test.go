@@ -37,7 +37,7 @@ func TestSessionNavigateEvent(t *testing.T) {
 		id:           "test",
 		state:        state{Page: "/"},
 		render:       render,
-		handle:       func(s state, ev Event) HandleResult[state] { return Result(s) },
+		handle:       func(_ *Session[state], s state, ev Event) HandleResult[state] { return Result(s) },
 		handleParams: handleParams,
 		differ:       differ,
 		transport:    mt,
@@ -89,7 +89,7 @@ func TestSessionNavigateEventWithQuery(t *testing.T) {
 		id:           "test",
 		state:        state{Page: "/"},
 		render:       func(s state) node.Node { return div.New(span.Text(s.Page).Dynamic("page")) },
-		handle:       func(s state, ev Event) HandleResult[state] { return Result(s) },
+		handle:       func(_ *Session[state], s state, ev Event) HandleResult[state] { return Result(s) },
 		handleParams: handleParams,
 		differ:       differ,
 		transport:    mt,
@@ -116,7 +116,7 @@ func TestSessionNavigateEventWithoutHandleParams(t *testing.T) {
 	}
 
 	sess := newTestSession(counterState{Count: 0}, mt)
-	sess.handle = func(s counterState, ev Event) HandleResult[counterState] {
+	sess.handle = func(_ *Session[counterState], s counterState, ev Event) HandleResult[counterState] {
 		receivedAction = ev.Type
 		return Result(s)
 	}

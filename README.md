@@ -18,7 +18,7 @@ mux.Handle("/counter", poly.New(poly.Config[CounterState]{
             poly.Click(button.Text("+1"), "increment"),
         )
     },
-    Handle: func(state CounterState, event poly.Event) poly.HandleResult[CounterState] {
+    Handle: func(_ *poly.Session[CounterState], state CounterState, event poly.Event) poly.HandleResult[CounterState] {
         if event.Action == "increment" {
             state.Count++
         }

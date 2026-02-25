@@ -31,16 +31,21 @@ poly/client/    Embedded JS files (fluent-poly.js, idiomorph.min.js, poly-worker
 Source files in the root package, split by concern:
 
 ```
-handler.go      Public API — Config, New(), ServeHTTP, ServeClient
-pool.go         Internal session lifecycle — pools, reap (split by pool), reattach
+config.go       Config, TransportMode, PushConfig, defaults
+handler.go      Package doc, Handler, New(), ServeHTTP, origin checking, POST handlers
+lifecycle.go    serveInitialPage, serveSession, reattach, wireDisconnect
+reaper.go       reap, reapPending, reapDisconnected, reapActive
+drain.go        Drain, Shutdown
+health.go       HealthStatus, Health()
 page.go         Initial page rendering — polyBody, newID
 session.go      Single session — event loop, Update, Navigate, SetTitle
-group.go        Broadcasting — Group type for multi-session updates
+result.go       HandleFunc, HandleResult, Result, With* methods, mergeEffects
+group.go        Broadcasting — Group, Broadcast, BroadcastOthers
 protocol.go     Wire format types and encoding
 transport.go    Transport and EventPusher interfaces
 event.go        Event and Params types
 bind.go         Generic event binding helpers
-embed.go        Client JS embedding
+embed.go        Client JS embedding, ServeClient
 push/push.go    Web Push protocol — Send(), GenerateVAPIDKeys(), VAPID auth, aes128gcm encryption
 ```
 
@@ -50,7 +55,7 @@ Transport implementations live in sub-packages. The `Config.Upgrade` field accep
 
 1. Client JS sends a DOM event as JSON: `{"type":"click","action":"increment","data":{}}`
 2. `Transport.ReceiveEvent()` deserialises it to an `Event`
-3. The session calls the user's `Handle` function with the current state; Handle returns a `HandleResult` containing the new state and optional side effects (announce, flash, title, URL)
+3. The session calls the user's `Handle` function with the session and current state; Handle returns a `HandleResult` containing the new state and optional side effects (announce, flash, title, URL)
 4. The returned state is rendered to a new node tree and diffed against the previous render; side effects from the `HandleResult` are merged into the update
 5. `Transport.SendUpdate()` sends a unified update message containing either:
    - **Patches** — targeted content updates for keyed elements that changed
@@ -117,11 +122,11 @@ The generic helpers (`Click`, `Submit`, `Input`, `Change`, `KeyDown`, `Focus`, `
 Keydown events include modifier key state in `Event.Data`: `ctrl`, `shift`, `alt`, `meta` are set to `"true"` when held. This enables keyboard shortcut handling:
 
 ```go
-func handle(s state, ev poly.Event) state {
+func handle(_ *poly.Session[state], s state, ev poly.Event) poly.HandleResult[state] {
     if ev.Action == "shortcut" && ev.Data["ctrl"] == "true" && ev.Data["key"] == "s" {
         // Ctrl+S pressed
     }
-    return s
+    return poly.Result(s)
 }
 ```
 
@@ -252,7 +257,7 @@ type state struct {
 }
 
 // Handle validates on submit and clears errors on success.
-func handle(s state, ev poly.Event) poly.HandleResult[state] {
+func handle(_ *poly.Session[state], s state, ev poly.Event) poly.HandleResult[state] {
     switch {
     case ev.Action == "add":
         text := strings.TrimSpace(ev.Data["text"])
@@ -363,7 +368,22 @@ group.Broadcast(func(s State) poly.HandleResult[State] {
 })
 ```
 
-`Broadcast` updates all sessions concurrently and is fire-and-forget — it returns immediately after spawning the update goroutines. Each goroutine completes after a single render-diff-send cycle. `Add`, `Remove`, `Broadcast`, `Len`, and `Members` are all safe to call from any goroutine.
+`Broadcast` updates all sessions concurrently and is fire-and-forget — it returns immediately after spawning the update goroutines. Each goroutine completes after a single render-diff-send cycle. `Add`, `Remove`, `Broadcast`, `BroadcastOthers`, `Len`, and `Members` are all safe to call from any goroutine.
+
+`BroadcastOthers` excludes a session from the broadcast. This is the typical pattern when broadcasting from inside Handle — the sender's state is already updated via the return value, so BroadcastOthers pushes the change to everyone else without double-applying to the sender:
+
+```go
+Handle: func(sess *poly.Session[State], s State, ev poly.Event) poly.HandleResult[State] {
+    if ev.Action == "send-message" {
+        s.Messages = append(s.Messages, ev.Data["text"])
+        group.BroadcastOthers(sess, func(s State) poly.HandleResult[State] {
+            s.Messages = append(s.Messages, ev.Data["text"])
+            return poly.Result(s)
+        })
+    }
+    return poly.Result(s)
+},
+```
 
 ### Presence
 

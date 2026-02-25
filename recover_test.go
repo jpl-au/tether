@@ -15,7 +15,7 @@ func TestSessionHandlePanicDoesNotKillSession(t *testing.T) {
 		},
 	}
 
-	handle := func(s counterState, ev Event) HandleResult[counterState] {
+	handle := func(_ *Session[counterState], s counterState, ev Event) HandleResult[counterState] {
 		if ev.Action == "crash" {
 			panic("boom")
 		}

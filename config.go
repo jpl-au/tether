@@ -67,7 +67,9 @@ type Config[S any] struct {
 	// Render builds a node tree from the current state.
 	Render RenderFunc[S]
 
-	// Handle processes a client event and returns the new state.
+	// Handle processes a client event and returns the new state plus
+	// optional side effects. The session parameter is provided for
+	// identification (e.g. [Group.BroadcastOthers]).
 	Handle HandleFunc[S]
 
 	// HandleParams processes a URL change and returns a [HandleResult]
@@ -196,13 +198,16 @@ type Config[S any] struct {
 	// Optional.
 	OnStructuralChange func(session *Session[S], change StructuralChange)
 
-	// Layout wraps the poly content in a full HTML document. The argument
-	// is a node that renders the poly root div and client scripts. Return
-	// a complete document tree (e.g. html.New(head.New(...), body.New(content))).
+	// Layout wraps the poly content in a full HTML document. The state
+	// parameter is the session's initial state, which can be used to set
+	// the page title or other document-level elements. The content
+	// parameter is a node that renders the poly root div and client
+	// scripts. Return a complete document tree (e.g.
+	// html.New(head.New(...), body.New(content))).
 	//
 	// When nil, the handler outputs a bare HTML fragment (the poly root
 	// div and scripts only), which puts the browser in quirks mode.
-	Layout func(content node.Node) node.Node
+	Layout func(state S, content node.Node) node.Node
 
 	// Worker enables the service worker for asset caching, offline page
 	// shells, and push notification support. When true, the client JS

@@ -6,6 +6,13 @@ package poly
 // message as the state diff, so the client receives everything
 // atomically in a single frame.
 //
+// The session parameter is provided for identification (e.g.
+// [Session.ID] for [Group.BroadcastOthers]) and for passing to
+// external systems. Do not call state-mutating Session methods
+// (Update, Navigate, SetTitle, Announce, Flash, Close) from within
+// Handle — the session mutex is held and these will deadlock. Use
+// HandleResult's With* methods to return side effects instead.
+//
 // The function should treat the input state as immutable — return a new
 // value with the desired changes. Returning the original state
 // unchanged is valid and will produce no diff (especially when an
@@ -13,7 +20,7 @@ package poly
 //
 // Use [Result] to create a HandleResult from a bare state value when
 // no side effects are needed.
-type HandleFunc[S any] func(state S, event Event) HandleResult[S]
+type HandleFunc[S any] func(session *Session[S], state S, event Event) HandleResult[S]
 
 // HandleResult wraps the new state with optional side effects that
 // the session applies in the same update message as the state diff.

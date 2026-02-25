@@ -196,7 +196,7 @@ func (s *Session[S]) handleEvent(ev Event) {
 		s.applyState(result.State, ev.EventID, &result)
 		return
 	}
-	result := s.handle(s.state, ev)
+	result := s.handle(s, s.state, ev)
 	s.applyState(result.State, ev.EventID, &result)
 }
 

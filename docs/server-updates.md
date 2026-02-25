@@ -5,7 +5,7 @@
 `Handle` returns a `HandleResult` that can carry side effects alongside the new state. Side effects are merged into the same update message as the diff, so the client receives everything atomically:
 
 ```go
-Handle: func(s State, ev poly.Event) poly.HandleResult[State] {
+Handle: func(_ *poly.Session[State], s State, ev poly.Event) poly.HandleResult[State] {
     if ev.Action == "add-todo" {
         s.Todos = append(s.Todos, todo)
         return poly.Result(s).

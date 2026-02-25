@@ -82,7 +82,7 @@ func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
 	}
 	if h.cfg.Layout != nil {
-		h.cfg.Layout(content).Render(w)
+		h.cfg.Layout(state, content).Render(w)
 	} else {
 		content.Render(w)
 	}

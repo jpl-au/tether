@@ -10,7 +10,7 @@ func TestHandleResultAnnounceMergedIntoUpdate(t *testing.T) {
 	}
 
 	sess := newTestSession(counterState{Count: 0}, mt)
-	sess.handle = func(s counterState, ev Event) HandleResult[counterState] {
+	sess.handle = func(_ *Session[counterState], s counterState, ev Event) HandleResult[counterState] {
 		s.Count++
 		return Result(s).WithAnnounce("Counter incremented")
 	}
@@ -39,7 +39,7 @@ func TestHandleResultFlashMergedIntoUpdate(t *testing.T) {
 	}
 
 	sess := newTestSession(counterState{Count: 0}, mt)
-	sess.handle = func(s counterState, ev Event) HandleResult[counterState] {
+	sess.handle = func(_ *Session[counterState], s counterState, ev Event) HandleResult[counterState] {
 		s.Count++
 		return Result(s).WithFlash("#notice", "Saved!")
 	}
@@ -86,7 +86,7 @@ func TestHandleResultEffectsSentEvenWhenStateUnchanged(t *testing.T) {
 
 	sess := newTestSession(counterState{Count: 5}, mt)
 	sess.equal = func(a, b counterState) bool { return a.Count == b.Count }
-	sess.handle = func(s counterState, ev Event) HandleResult[counterState] {
+	sess.handle = func(_ *Session[counterState], s counterState, ev Event) HandleResult[counterState] {
 		return Result(s).WithAnnounce("Still here")
 	}
 

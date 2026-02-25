@@ -22,6 +22,23 @@ group.Broadcast(func(s State) poly.HandleResult[State] {
 
 Sessions are updated concurrently so a slow render in one session does not block delivery to the rest. `Broadcast` is fire-and-forget — it returns immediately after spawning the update goroutines. Each goroutine completes after a single render-diff-send cycle.
 
+## Broadcasting from Handle
+
+When broadcasting from inside `Handle`, use `BroadcastOthers` to exclude the sender. Handle already updates the sender's state via the return value — broadcasting to everyone would double-apply the change on the sender:
+
+```go
+Handle: func(sess *poly.Session[State], s State, ev poly.Event) poly.HandleResult[State] {
+    if ev.Action == "send-message" {
+        s.Messages = append(s.Messages, ev.Data["text"])
+        group.BroadcastOthers(sess, func(s State) poly.HandleResult[State] {
+            s.Messages = append(s.Messages, ev.Data["text"])
+            return poly.Result(s)
+        })
+    }
+    return poly.Result(s)
+},
+```
+
 ## Presence
 
 Track who is online with callbacks and member listing:

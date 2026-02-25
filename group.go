@@ -99,6 +99,29 @@ func (g *Group[S]) Members() []*Session[S] {
 	return members
 }
 
+// BroadcastOthers applies fn to every session in the group except
+// the excluded one. This is the typical pattern when broadcasting from
+// inside [HandleFunc]: Handle updates the sender's state directly
+// (via the return value) and uses BroadcastOthers to push the change
+// to everyone else, avoiding a double-apply on the sender.
+//
+// Like [Group.Broadcast], this is fire-and-forget and safe to call
+// from any goroutine.
+func (g *Group[S]) BroadcastOthers(exclude *Session[S], fn func(S) HandleResult[S]) {
+	g.mu.Lock()
+	targets := make([]*Session[S], 0, len(g.sessions))
+	for _, s := range g.sessions {
+		if s != exclude {
+			targets = append(targets, s)
+		}
+	}
+	g.mu.Unlock()
+
+	for _, s := range targets {
+		go s.Update(fn)
+	}
+}
+
 // Broadcast applies fn to every session in the group via
 // [Session.Update]. Each session is updated in its own goroutine so
 // a slow render in one session does not block delivery to the rest.
