@@ -9,12 +9,14 @@ import (
 )
 
 // State returns the current session state. When called from inside
-// Handle it returns directly (no channel hop). When called from
-// outside, it performs a synchronous read through the command channel
-// so the value reflects any prior queued updates.
+// Handle (or a goroutine it spawned) it returns an atomic snapshot
+// captured at the start of the exec cycle — no channel hop, no race.
+// When called from outside Handle, it performs a synchronous read
+// through the command channel so the value reflects any prior queued
+// updates.
 func (s *Session[S]) State() S {
 	if s.handling.Load() {
-		return s.state
+		return s.stateSnap.Load().(S)
 	}
 	ch := make(chan S, 1)
 	select {
@@ -46,6 +48,7 @@ func (s *Session[S]) State() S {
 // Safe to call from any goroutine, including from within Handle.
 func (s *Session[S]) Update(fn func(S) S) {
 	s.enqueue(func() {
+		s.stateSnap.Store(s.state)
 		s.handling.Store(true)
 		fx := &effects{}
 		defer func() {
@@ -175,31 +178,18 @@ func (s *Session[S]) Signals(signals map[string]any) {
 
 // Push sends a Web Push notification to the browser. Only works when
 // the session has an active push subscription and a [push.Sender] is
-// configured. Returns an error if either is missing. Safe to call
-// from any goroutine.
+// configured. Returns an error if either is missing.
+//
+// Safe to call from any goroutine — pushSender is immutable and
+// pushSub is an atomic pointer, so no command-channel round-trip is
+// needed.
 func (s *Session[S]) Push(n push.Notification) error {
-	// Push subscription is only written from within the loop, so
-	// reading it here is safe when called from within Handle.
-	// When called from outside, we read through the command channel.
-	if s.handling.Load() {
-		return s.sendPush(n)
-	}
-
-	ch := make(chan error, 1)
-	select {
-	case s.cmds <- func() { ch <- s.sendPush(n) }:
-		return <-ch
-	case <-s.ctx.Done():
-		return errors.New("poly: session closed")
-	}
-}
-
-func (s *Session[S]) sendPush(n push.Notification) error {
 	if s.pushSender == nil {
 		return errors.New("poly: push not configured")
 	}
-	if s.pushSub == nil {
+	sub := s.pushSub.Load()
+	if sub == nil {
 		return errors.New("poly: no push subscription for session")
 	}
-	return s.pushSender.Send(*s.pushSub, n)
+	return s.pushSender.Send(*sub, n)
 }

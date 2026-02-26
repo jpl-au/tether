@@ -2,7 +2,6 @@ package poly
 
 import (
 	"encoding/json"
-	"errors"
 	"net"
 	"net/http"
 	"net/url"
@@ -146,6 +145,11 @@ func stripPort(hostport string) string {
 // client→server path for SSE mode, where the EventSource connection
 // is unidirectional. WebSocket transports receive events on the
 // socket itself and do not use this path.
+//
+// The event is enqueued directly on the session's command channel
+// rather than routed through the transport. This avoids reading the
+// transport pointer from outside the loop goroutine, eliminating a
+// data race during reconnection when the transport is swapped.
 func (h *Handler[S]) handlePostEvent(w http.ResponseWriter, r *http.Request) {
 	if !h.originAllowed(r) {
 		http.Error(w, "origin not allowed", http.StatusForbidden)
@@ -168,16 +172,6 @@ func (h *Handler[S]) handlePostEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// The transport's PushEvent writes to a buffered channel that the
-	// reader goroutine consumes — it does not touch session state.
-	// The transport pointer is only modified by the loop (reattach),
-	// and an active session always has a valid transport.
-	pusher, ok := sess.transport.(eventPusher)
-	if !ok {
-		http.Error(w, "transport does not accept events", http.StatusMethodNotAllowed)
-		return
-	}
-
 	// Cap the request body to prevent a malicious client from sending
 	// a multi-gigabyte payload and exhausting server memory.
 	r.Body = http.MaxBytesReader(w, r.Body, h.cfg.MaxEventBytes)
@@ -188,16 +182,19 @@ func (h *Handler[S]) handlePostEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := pusher.PushEvent(ev); err != nil {
-		if errors.Is(err, ErrEventBufferFull) {
-			http.Error(w, "event buffer full", http.StatusTooManyRequests)
+	// Non-blocking send: if the buffer has room the event is accepted
+	// immediately. If not, check whether the session is closing (410)
+	// or simply overloaded (429).
+	select {
+	case sess.cmds <- func() { sess.exec(ev) }:
+		w.WriteHeader(http.StatusNoContent)
+	default:
+		if sess.ctx.Err() != nil {
+			http.Error(w, "session closed", http.StatusGone)
 			return
 		}
-		http.Error(w, "session closed", http.StatusGone)
-		return
+		http.Error(w, "event buffer full", http.StatusTooManyRequests)
 	}
-
-	w.WriteHeader(http.StatusNoContent)
 }
 
 // handlePushSubscribe receives a push subscription from the client JS
@@ -240,7 +237,7 @@ func (h *Handler[S]) handlePushSubscribe(w http.ResponseWriter, r *http.Request)
 	// without racing with other loop operations. The select guards
 	// against hanging if the session is destroyed mid-request.
 	select {
-	case sess.cmds <- func() { sess.pushSub = &sub }:
+	case sess.cmds <- func() { sess.pushSub.Store(&sub) }:
 	case <-sess.ctx.Done():
 		http.Error(w, "session closed", http.StatusGone)
 		return

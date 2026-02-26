@@ -74,10 +74,15 @@ type Session[S any] struct {
 	createdAt    time.Time
 
 	// handling is true while the loop goroutine is inside exec() or
-	// Update. Used only by State() and Push() to avoid deadlocking
-	// the loop with a synchronous channel read. Atomic because those
-	// methods may be called from any goroutine.
+	// Update. Used by State() to choose the fast path (return the
+	// atomic snapshot) instead of routing through the command channel,
+	// which would deadlock because the loop is busy in Handle.
 	handling atomic.Bool
+	// stateSnap holds the state value captured at the start of each
+	// exec/Update cycle. It is stored atomically before handling is
+	// set to true, so any goroutine that sees handling=true can safely
+	// read the snapshot without a data race on s.state.
+	stateSnap atomic.Value
 
 	// Lifecycle timers (replace centralised reaper).
 	idleTimer   *time.Timer
@@ -94,8 +99,10 @@ type Session[S any] struct {
 	lastTitle string
 
 	// Push — sender is set from Config, subscription arrives at runtime.
+	// pushSub is atomic so Push() can read it safely from any goroutine
+	// without routing through the command channel.
 	pushSender *push.Sender
-	pushSub    *push.Subscription
+	pushSub    atomic.Pointer[push.Subscription]
 
 	// Installed by the Handler. Called when the transport reader
 	// goroutine exits. Handles pool transitions

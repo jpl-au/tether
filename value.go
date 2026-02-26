@@ -1,6 +1,9 @@
 package poly
 
-import "sync"
+import (
+	"context"
+	"sync"
+)
 
 // Value is a thread-safe container for shared state that notifies
 // observers when it changes. Built on top of [Bus] internally — when
@@ -65,4 +68,16 @@ func (v *Value[V]) Update(fn func(V) V) {
 // Len returns the number of active observers.
 func (v *Value[V]) Len() int {
 	return v.bus.Len()
+}
+
+// observe registers a subscriber and returns the current value
+// atomically. The read lock is held during subscription so a
+// concurrent Set cannot interleave between the subscribe and the
+// read — preventing duplicate delivery of the initial value.
+func (v *Value[V]) observe(ctx context.Context, fn func(V), sessionID string) V {
+	v.mu.RLock()
+	current := v.val
+	v.bus.subscribe(ctx, fn, sessionID)
+	v.mu.RUnlock()
+	return current
 }

@@ -18,6 +18,17 @@ import (
 	poly "github.com/jpl-au/fluent-poly"
 )
 
+// Options configures the WebSocket transport.
+type Options struct {
+	// ReadLimit sets the maximum message size in bytes that the server
+	// will accept from a client. Messages exceeding this limit cause
+	// the connection to be closed with a protocol error. When zero,
+	// the library default (32 KB) is used. Set this to match
+	// [poly.Config].MaxEventBytes for consistent limits across
+	// transport modes.
+	ReadLimit int64
+}
+
 // Upgrade returns an upgrade function for use in [poly.Config].Upgrade.
 // The returned function is called by the poly handler when it receives
 // a WebSocket upgrade request. It negotiates the WebSocket handshake
@@ -26,15 +37,23 @@ import (
 // Origin checking is handled by the poly handler via
 // [poly.Config].AllowedOrigins, so Upgrade skips the websocket
 // library's own origin verification to avoid double-checking.
-func Upgrade() func(http.ResponseWriter, *http.Request) (poly.Transport, error) {
+func Upgrade(opts ...Options) func(http.ResponseWriter, *http.Request) (poly.Transport, error) {
+	var o Options
+	if len(opts) > 0 {
+		o = opts[0]
+	}
+
 	return func(w http.ResponseWriter, r *http.Request) (poly.Transport, error) {
 		// Origin checking is done by the poly handler before this
 		// function is called, so skip the websocket library's check.
-		opts := &websocket.AcceptOptions{InsecureSkipVerify: true}
+		acceptOpts := &websocket.AcceptOptions{InsecureSkipVerify: true}
 
-		conn, err := websocket.Accept(w, r, opts)
+		conn, err := websocket.Accept(w, r, acceptOpts)
 		if err != nil {
 			return nil, err
+		}
+		if o.ReadLimit > 0 {
+			conn.SetReadLimit(o.ReadLimit)
 		}
 		return &transport{conn: conn, ctx: r.Context()}, nil
 	}

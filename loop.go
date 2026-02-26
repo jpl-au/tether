@@ -1,7 +1,6 @@
 package poly
 
 import (
-	"context"
 	"errors"
 	"io"
 	"net/url"
@@ -34,11 +33,6 @@ func (s *Session[S]) run() {
 				s.events = nil
 				s.onTransportClose()
 				continue
-			}
-			now := time.Now()
-			s.lastActivity.Store(now.UnixNano())
-			if s.idleTimer != nil {
-				s.idleTimer.Reset(s.idleTimeout)
 			}
 			s.exec(ev)
 
@@ -86,8 +80,21 @@ func (s *Session[S]) readTransport(out chan<- Event) {
 }
 
 // exec is the core pipeline. Every client event passes through it:
-// handle → drain effects → state check → render → diff → send.
+// activity tracking → snapshot → handle → drain effects → state
+// check → render → diff → send.
 func (s *Session[S]) exec(ev Event) {
+	now := time.Now()
+	s.lastActivity.Store(now.UnixNano())
+	if s.idleTimer != nil {
+		s.idleTimer.Reset(s.idleTimeout)
+	}
+
+	// Snapshot the state before entering Handle so that concurrent
+	// callers of State() can read it safely via the atomic Value.
+	// The snapshot is stored before handling is set to true —
+	// sequential consistency of atomics guarantees any goroutine
+	// that observes handling=true also sees the snapshot.
+	s.stateSnap.Store(s.state)
 	s.handling.Store(true)
 	fx := &effects{}
 	defer func() {
@@ -238,23 +245,12 @@ func (s *Session[S]) send(u update) {
 }
 
 // startTimers sets up per-session lifecycle timers. Called once during
-// session creation in lifecycle.go. context.AfterFunc ensures timers
-// are stopped when the session is destroyed even if cleanup hasn't run.
+// session creation in serve.go. Timer cleanup happens in [cleanup],
+// which runs as a defer in [run] when the loop exits.
 func (s *Session[S]) startTimers() {
 	if s.idleTimeout > 0 {
 		s.idleTimer = time.AfterFunc(s.idleTimeout, func() {
 			s.stop()
 		})
 	}
-
-	// context.AfterFunc fires when the session context is cancelled,
-	// stopping any running timers to prevent callbacks on dead sessions.
-	context.AfterFunc(s.ctx, func() {
-		if s.idleTimer != nil {
-			s.idleTimer.Stop()
-		}
-		if s.disconnectTimer != nil {
-			s.disconnectTimer.Stop()
-		}
-	})
 }

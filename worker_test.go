@@ -215,8 +215,11 @@ func TestPolyBodyPushKeyAttribute(t *testing.T) {
 }
 
 func TestHandlePushSubscribe(t *testing.T) {
-	var received push.Subscription
-	var receivedSession string
+	type result struct {
+		sub     push.Subscription
+		session string
+	}
+	ch := make(chan result, 1)
 
 	handler := New(Config[counterState]{
 		Upgrade:      stubUpgrade,
@@ -226,8 +229,7 @@ func TestHandlePushSubscribe(t *testing.T) {
 		Push: &PushConfig[counterState]{
 			Sender: push.NewSender(push.Config{VAPIDPublicKey: "test-key"}),
 			OnSubscribe: func(sess *Session[counterState], sub push.Subscription) {
-				received = sub
-				receivedSession = sess.ID()
+				ch <- result{sub: sub, session: sess.ID()}
 			},
 		},
 	})
@@ -261,19 +263,20 @@ func TestHandlePushSubscribe(t *testing.T) {
 		t.Fatalf("status = %d, want %d", w.Code, http.StatusNoContent)
 	}
 
-	// OnSubscribe runs in a goroutine, give it a moment.
-	for range 100 {
-		if receivedSession != "" {
-			break
+	// OnSubscribe runs in a goroutine — wait for it via channel.
+	select {
+	case got := <-ch:
+		if got.sub.Endpoint != sub.Endpoint {
+			t.Errorf("endpoint = %q, want %q", got.sub.Endpoint, sub.Endpoint)
 		}
-		time.Sleep(time.Millisecond)
-	}
-
-	if received.Endpoint != sub.Endpoint {
-		t.Errorf("endpoint = %q, want %q", received.Endpoint, sub.Endpoint)
-	}
-	if received.Keys.P256dh != sub.Keys.P256dh {
-		t.Errorf("p256dh = %q, want %q", received.Keys.P256dh, sub.Keys.P256dh)
+		if got.sub.Keys.P256dh != sub.Keys.P256dh {
+			t.Errorf("p256dh = %q, want %q", got.sub.Keys.P256dh, sub.Keys.P256dh)
+		}
+		if got.session != "test-session" {
+			t.Errorf("session = %q, want %q", got.session, "test-session")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("OnSubscribe was not called within 1 second")
 	}
 }
 
