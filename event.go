@@ -2,6 +2,7 @@ package poly
 
 import (
 	"net/url"
+	"strconv"
 
 	"github.com/jpl-au/fluent-poly/event"
 )
@@ -36,6 +37,39 @@ type Event struct {
 // automatically for input and change events.
 func (e Event) Value() string {
 	return e.Data["value"]
+}
+
+// Key returns the key name from a keydown event. This is a convenience
+// for ev.Data["key"], which the client JS populates automatically for
+// keydown events (e.g. "Enter", "Escape", "ArrowUp").
+func (e Event) Key() string {
+	return e.Data["key"]
+}
+
+// Get returns the value for a data key and reports whether it was present.
+func (e Event) Get(key string) (string, bool) {
+	v, ok := e.Data[key]
+	return v, ok
+}
+
+// Int returns the data value for key parsed as an integer. If the key
+// is missing or the value is not a valid integer, it returns 0 and an
+// error.
+func (e Event) Int(key string) (int, error) {
+	return strconv.Atoi(e.Data[key])
+}
+
+// Float64 returns the data value for key parsed as a float. If the key
+// is missing or the value is not a valid number, it returns 0 and an
+// error.
+func (e Event) Float64(key string) (float64, error) {
+	return strconv.ParseFloat(e.Data[key], 64)
+}
+
+// Bool returns true when the data value for key is the string "true".
+// All other values — including missing keys — return false.
+func (e Event) Bool(key string) bool {
+	return e.Data[key] == "true"
 }
 
 // Params carries URL information from a navigation event. The handler
