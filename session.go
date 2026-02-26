@@ -56,6 +56,11 @@ type Session[S any] struct {
 	// Channel pair: events from transport, commands from everything else.
 	events chan Event
 	cmds   chan func()
+	// fxCh receives effect closures (Toast, Signal, etc.) from any
+	// goroutine. The loop drains it after Handle/Update returns so
+	// effects are sent atomically with the diff. Outside of Handle,
+	// the loop picks them up and sends them as standalone updates.
+	fxCh chan func(*effects)
 
 	// Session lifetime — cancelled on permanent destruction.
 	ctx  context.Context
@@ -68,9 +73,11 @@ type Session[S any] struct {
 	lastActivity atomic.Int64 // UnixNano
 	createdAt    time.Time
 
-	// Active during exec() — enables the dual-path pattern.
-	handling bool
-	fx       *effects
+	// handling is true while the loop goroutine is inside exec() or
+	// Update. Used only by State() and Push() to avoid deadlocking
+	// the loop with a synchronous channel read. Atomic because those
+	// methods may be called from any goroutine.
+	handling atomic.Bool
 
 	// Lifecycle timers (replace centralised reaper).
 	idleTimer   *time.Timer
@@ -89,10 +96,6 @@ type Session[S any] struct {
 	// Push — sender is set from Config, subscription arrives at runtime.
 	pushSender *push.Sender
 	pushSub    *push.Subscription
-
-	// Buffered domain event publications, flushed after the client
-	// update is sent. Populated by Bus.Emit via the Emitter interface.
-	emitted []func()
 
 	// Installed by the Handler. Called when the transport reader
 	// goroutine exits. Handles pool transitions
@@ -186,32 +189,54 @@ func (s *Session[S]) Go(fn func(ctx context.Context)) {
 	go fn(s.Context())
 }
 
-// addEmission buffers a domain event publication. Only called when
-// isHandling() is true — the loop goroutine is the only writer.
-func (s *Session[S]) addEmission(fn func()) {
-	s.emitted = append(s.emitted, fn)
-}
-
-// isHandling reports whether the session is inside exec() or an
-// Update command. Used by Bus.Emit for the dual-path decision.
-func (s *Session[S]) isHandling() bool {
-	return s.handling
-}
-
 // sessionID returns the session's unique identifier. Used by
 // Bus.Emit to record the sender for subscriber filtering.
 func (s *Session[S]) sessionID() string {
 	return s.id
 }
 
-// flushEmissions publishes all buffered domain events and clears
-// the buffer. Called at the end of exec() and Update after the
-// client update is sent.
-func (s *Session[S]) flushEmissions() {
-	for _, fn := range s.emitted {
-		fn()
+// enqueueFx sends an effect closure to the effects channel. Under
+// normal load the send is non-blocking. When the buffer is full,
+// an overflow goroutine delivers it — same pattern as [enqueue].
+func (s *Session[S]) enqueueFx(fn func(*effects)) {
+	select {
+	case s.fxCh <- fn:
+	default:
+		go func() {
+			select {
+			case s.fxCh <- fn:
+			case <-s.ctx.Done():
+			}
+		}()
 	}
-	s.emitted = s.emitted[:0]
+}
+
+// drainFx collects all pending effects from fxCh into fx. Called
+// on the loop goroutine after Handle/Update returns, before the
+// render-diff-send pipeline. Pass nil to discard effects (e.g.
+// after a panic).
+func (s *Session[S]) drainFx(fx *effects) {
+	for {
+		select {
+		case fn := <-s.fxCh:
+			if fx != nil {
+				fn(fx)
+			}
+		default:
+			return
+		}
+	}
+}
+
+// sendFx sends any accumulated effects as a standalone update.
+// Used by the loop when effects arrive outside of Handle.
+func (s *Session[S]) sendFx(fx *effects) {
+	if !fx.any() {
+		return
+	}
+	u := update{}
+	fx.merge(&u)
+	s.send(u)
 }
 
 // enqueue pushes a command to the session's loop without blocking the

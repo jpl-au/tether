@@ -13,7 +13,7 @@ import (
 // outside, it performs a synchronous read through the command channel
 // so the value reflects any prior queued updates.
 func (s *Session[S]) State() S {
-	if s.handling {
+	if s.handling.Load() {
 		return s.state
 	}
 	ch := make(chan S, 1)
@@ -46,15 +46,14 @@ func (s *Session[S]) State() S {
 // Safe to call from any goroutine, including from within Handle.
 func (s *Session[S]) Update(fn func(S) S) {
 	s.enqueue(func() {
-		s.handling = true
-		s.fx = &effects{}
+		s.handling.Store(true)
+		fx := &effects{}
 		defer func() {
 			if r := recover(); r != nil {
 				s.logger.Error("panic in Update", "panic", r)
-				s.emitted = s.emitted[:0]
+				s.drainFx(nil)
 			}
-			s.handling = false
-			s.fx = nil
+			s.handling.Store(false)
 		}()
 
 		s.lastActivity.Store(time.Now().UnixNano())
@@ -63,10 +62,12 @@ func (s *Session[S]) Update(fn func(S) S) {
 		}
 		s.state = fn(s.state)
 
+		// Collect effects enqueued during fn.
+		s.drainFx(fx)
+
 		tree := s.render(s.state)
 		patches, change := s.differ.Diff(tree)
-		s.sendDiff("", patches, change, tree)
-		s.flushEmissions()
+		s.sendDiff("", patches, change, tree, fx)
 	})
 }
 
@@ -84,83 +85,54 @@ func (s *Session[S]) Close() {
 
 // Toast sends a global notification to the client. Inside Handle the
 // toast is buffered and sent atomically with the state diff. Outside
-// Handle it is sent immediately.
+// Handle it is sent as a standalone update.
 func (s *Session[S]) Toast(text string) {
-	if s.handling {
-		s.fx.toast = text
-		return
-	}
-	s.enqueue(func() {
-		s.send(update{Toast: text})
-	})
+	s.enqueueFx(func(fx *effects) { fx.toast = text })
 }
 
 // Navigate pushes a URL change to the client (history.pushState).
-// Inside Handle the URL is buffered; outside it is sent immediately.
+// Inside Handle the URL is buffered; outside it is sent as a
+// standalone update.
 func (s *Session[S]) Navigate(rawURL string) {
-	if s.handling {
-		s.fx.url = rawURL
-		s.fx.replace = false
-		return
-	}
-	s.enqueue(func() {
-		s.send(update{URL: rawURL})
+	s.enqueueFx(func(fx *effects) {
+		fx.url = rawURL
+		fx.replace = false
 	})
 }
 
 // ReplaceURL updates the browser URL without a history entry
 // (history.replaceState). Inside Handle the URL is buffered; outside
-// it is sent immediately.
+// it is sent as a standalone update.
 func (s *Session[S]) ReplaceURL(rawURL string) {
-	if s.handling {
-		s.fx.url = rawURL
-		s.fx.replace = true
-		return
-	}
-	s.enqueue(func() {
-		s.send(update{URL: rawURL, Replace: true})
+	s.enqueueFx(func(fx *effects) {
+		fx.url = rawURL
+		fx.replace = true
 	})
 }
 
 // SetTitle updates the browser's document title. Inside Handle the
-// title is buffered; outside it is sent immediately.
+// title is buffered; outside it is sent as a standalone update.
 func (s *Session[S]) SetTitle(title string) {
-	if s.handling {
-		s.fx.title = title
-		return
-	}
-	s.enqueue(func() {
-		s.send(update{Title: title})
-	})
+	s.enqueueFx(func(fx *effects) { fx.title = title })
 }
 
 // Announce sends text to a screen-reader-accessible live region on
 // the client. Inside Handle the text is buffered; outside it is sent
-// immediately.
+// as a standalone update.
 func (s *Session[S]) Announce(text string) {
-	if s.handling {
-		s.fx.announce = text
-		return
-	}
-	s.enqueue(func() {
-		s.send(update{Announce: text})
-	})
+	s.enqueueFx(func(fx *effects) { fx.announce = text })
 }
 
 // Flash sends a one-time notification to the client. The selector is
 // a CSS selector for the target element; the text is displayed for 5
 // seconds. Inside Handle the flash is buffered; outside it is sent
-// immediately.
+// as a standalone update.
 func (s *Session[S]) Flash(selector, text string) {
-	if s.handling {
-		if s.fx.flash == nil {
-			s.fx.flash = make(map[string]string)
+	s.enqueueFx(func(fx *effects) {
+		if fx.flash == nil {
+			fx.flash = make(map[string]string)
 		}
-		s.fx.flash[selector] = text
-		return
-	}
-	s.enqueue(func() {
-		s.send(update{Flash: map[string]string{selector: text}})
+		fx.flash[selector] = text
 	})
 }
 
@@ -168,7 +140,7 @@ func (s *Session[S]) Flash(selector, text string) {
 // signal name via [BindText], [BindShow], [BindClass], or [BindAttr]
 // update instantly — no render cycle, no diff, no HTML. Inside Handle
 // the signal is buffered and sent atomically with the state diff.
-// Outside Handle it is sent immediately.
+// Outside Handle it is sent as a standalone update.
 //
 // Signals are ideal for high-frequency updates (counters, status
 // indicators, progress bars) where the full render/diff pipeline
@@ -177,15 +149,11 @@ func (s *Session[S]) Flash(selector, text string) {
 //	s.Signal("count", 42)
 //	s.Signal("status", "online")
 func (s *Session[S]) Signal(key string, value any) {
-	if s.handling {
-		if s.fx.signals == nil {
-			s.fx.signals = make(map[string]any)
+	s.enqueueFx(func(fx *effects) {
+		if fx.signals == nil {
+			fx.signals = make(map[string]any)
 		}
-		s.fx.signals[key] = value
-		return
-	}
-	s.enqueue(func() {
-		s.send(update{Signals: map[string]any{key: value}})
+		fx.signals[key] = value
 	})
 }
 
@@ -197,15 +165,11 @@ func (s *Session[S]) Signal(key string, value any) {
 //
 //	s.Signals(map[string]any{"count": 42, "status": "online"})
 func (s *Session[S]) Signals(signals map[string]any) {
-	if s.handling {
-		if s.fx.signals == nil {
-			s.fx.signals = make(map[string]any, len(signals))
+	s.enqueueFx(func(fx *effects) {
+		if fx.signals == nil {
+			fx.signals = make(map[string]any, len(signals))
 		}
-		maps.Copy(s.fx.signals, signals)
-		return
-	}
-	s.enqueue(func() {
-		s.send(update{Signals: signals})
+		maps.Copy(fx.signals, signals)
 	})
 }
 
@@ -217,7 +181,7 @@ func (s *Session[S]) Push(n push.Notification) error {
 	// Push subscription is only written from within the loop, so
 	// reading it here is safe when called from within Handle.
 	// When called from outside, we read through the command channel.
-	if s.handling {
+	if s.handling.Load() {
 		return s.sendPush(n)
 	}
 

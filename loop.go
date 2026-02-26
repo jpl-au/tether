@@ -12,10 +12,11 @@ import (
 	"github.com/jpl-au/fluent/node"
 )
 
-// run is the session's command loop. It processes transport events and
-// commands from external callers in a single goroutine — no mutex
-// needed. The loop exits when the session context is cancelled
-// (shutdown, reaper timeout, or explicit destruction).
+// run is the session's command loop. It processes transport events,
+// commands from external callers, and effect closures in a single
+// goroutine — no mutex needed. The loop exits when the session
+// context is cancelled (shutdown, reaper timeout, or explicit
+// destruction).
 //
 // When the transport closes, the events channel is nilled so the loop
 // continues processing commands and shutdown signals. This keeps the
@@ -42,12 +43,29 @@ func (s *Session[S]) run() {
 			s.exec(ev)
 
 		case cmd := <-s.cmds:
-			cmd()
+			s.runCmd(cmd)
+
+		case fn := <-s.fxCh:
+			// Effect arriving outside of Handle — send immediately.
+			fx := &effects{}
+			fn(fx)
+			s.sendFx(fx)
 
 		case <-s.ctx.Done():
 			return
 		}
 	}
+}
+
+// runCmd executes a command with panic recovery so a misbehaving
+// command cannot crash the entire process.
+func (s *Session[S]) runCmd(cmd func()) {
+	defer func() {
+		if r := recover(); r != nil {
+			s.logger.Error("panic in command", "panic", r)
+		}
+	}()
+	cmd()
 }
 
 // readTransport bridges the blocking ReceiveEvent call into the
@@ -68,25 +86,23 @@ func (s *Session[S]) readTransport(out chan<- Event) {
 }
 
 // exec is the core pipeline. Every client event passes through it:
-// handle → state check → render → diff → flush effects → send.
+// handle → drain effects → state check → render → diff → send.
 func (s *Session[S]) exec(ev Event) {
-	s.handling = true
-	s.fx = &effects{}
+	s.handling.Store(true)
+	fx := &effects{}
 	defer func() {
 		if r := recover(); r != nil {
 			s.logger.Error("panic in handler",
 				"action", ev.Action,
 				"panic", r,
 			)
-			// Discard buffered emissions — the handler's state
-			// change is incomplete so its events are invalid.
-			s.emitted = s.emitted[:0]
+			// Discard any effects enqueued during the panicked handler.
+			s.drainFx(nil)
 		}
-		s.handling = false
-		s.fx = nil
+		s.handling.Store(false)
 	}()
 
-	// Phase 1: Handle — produce new state, accumulate effects.
+	// Phase 1: Handle — produce new state.
 	var newState S
 	if ev.Type == event.Navigate && s.handleParams != nil {
 		params := Params{Path: ev.Data["path"]}
@@ -98,27 +114,26 @@ func (s *Session[S]) exec(ev Event) {
 		newState = s.handle(s, s.state, ev)
 	}
 
-	// Phase 2: State check — skip render if unchanged.
+	// Phase 2: Collect effects enqueued during Handle.
+	s.drainFx(fx)
+
+	// Phase 3: State check — skip render if unchanged.
 	if s.equal != nil && s.equal(s.state, newState) {
-		if s.fx.any() || ev.EventID != "" {
+		if fx.any() || ev.EventID != "" {
 			u := update{EventID: ev.EventID}
-			s.fx.merge(&u)
+			fx.merge(&u)
 			s.send(u)
 		}
-		s.flushEmissions()
 		return
 	}
 	s.state = newState
 
-	// Phase 3: Render + Diff.
+	// Phase 4: Render + Diff.
 	tree := s.render(s.state)
 	patches, change := s.differ.Diff(tree)
 
-	// Phase 4: Build and send update.
-	s.sendDiff(ev.EventID, patches, change, tree)
-
-	// Phase 5: Publish buffered domain events.
-	s.flushEmissions()
+	// Phase 5: Build and send update.
+	s.sendDiff(ev.EventID, patches, change, tree, fx)
 }
 
 // onTransportClose handles transport disconnection. The transport is
@@ -152,8 +167,9 @@ func (s *Session[S]) cleanup() {
 
 // sendDiff is the render-diff-send pipeline extracted from exec and
 // Update. It handles patches, structural changes, and the no-diff
-// case where only the eventID needs echoing.
-func (s *Session[S]) sendDiff(eventID string, patches []jit.Patch, change *jit.StructuralChange, tree node.Node) {
+// case where only the eventID needs echoing. fx carries any buffered
+// effects to merge into the update message.
+func (s *Session[S]) sendDiff(eventID string, patches []jit.Patch, change *jit.StructuralChange, tree node.Node, fx *effects) {
 	if change != nil {
 		html := s.differ.Render(tree)
 		s.logger.Warn("structural change, sending root morph",
@@ -175,17 +191,17 @@ func (s *Session[S]) sendDiff(eventID string, patches []jit.Patch, change *jit.S
 			Morphs:  []morph{{Key: "", HTML: html}},
 			EventID: eventID,
 		}
-		if s.fx != nil {
-			s.fx.merge(&u)
+		if fx != nil {
+			fx.merge(&u)
 		}
 		s.send(u)
 		return
 	}
 
-	if len(patches) > 0 || (s.fx != nil && s.fx.any()) {
+	if len(patches) > 0 || (fx != nil && fx.any()) {
 		u := update{Patches: patches, EventID: eventID}
-		if s.fx != nil {
-			s.fx.merge(&u)
+		if fx != nil {
+			fx.merge(&u)
 		}
 		s.send(u)
 		return

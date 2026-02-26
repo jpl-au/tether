@@ -171,6 +171,7 @@ func TestSessionStructuralChange(t *testing.T) {
 			logger:    slog.Default(),
 			events:    make(chan Event),
 			cmds:      make(chan func(), defaultCmdBufferSize),
+			fxCh:      make(chan func(*effects), defaultCmdBufferSize),
 			loopDone:  make(chan struct{}),
 			ctx:       ctx,
 			stop:      cancel,

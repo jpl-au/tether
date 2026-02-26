@@ -180,6 +180,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		logger:           h.cfg.Logger.WithGroup("session").With("id", id),
 		events:           make(chan Event),
 		cmds:             make(chan func(), h.cfg.CmdBufferSize),
+		fxCh:             make(chan func(*effects), h.cfg.CmdBufferSize),
 		loopDone:         make(chan struct{}),
 		ctx:              ctx,
 		stop:             cancel,

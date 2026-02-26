@@ -6,13 +6,12 @@ import (
 )
 
 // Emitter identifies the session that published a domain event. It is
-// the bridge between [Bus] and [Session] — Bus.Emit needs to access
-// session internals without knowing the session's state type parameter
+// the bridge between [Bus] and [Session] — Bus.Emit needs to enqueue
+// a publication without knowing the session's state type parameter
 // S. [*Session] is the only type that implements Emitter; the methods
 // are unexported to prevent external implementations.
 type Emitter interface {
-	addEmission(fn func())
-	isHandling() bool
+	enqueue(fn func())
 	sessionID() string
 }
 
@@ -27,12 +26,11 @@ type Emitter interface {
 // regardless of its state.
 type Bus[E any] struct {
 	mu     sync.RWMutex
-	subs   []subscriber[E]
+	subs   map[uint64]subscriber[E]
 	nextID uint64
 }
 
 type subscriber[E any] struct {
-	id        uint64
 	fn        func(E)
 	sessionID string          // empty for raw subscribers
 	ctx       context.Context // auto-remove on cancellation
@@ -40,23 +38,22 @@ type subscriber[E any] struct {
 
 // NewBus creates an empty bus ready to accept subscribers.
 func NewBus[E any]() *Bus[E] {
-	return &Bus[E]{}
+	return &Bus[E]{
+		subs: make(map[uint64]subscriber[E]),
+	}
 }
 
 // Emit publishes a domain event with sender filtering. Subscriptions
 // registered via [On] whose session ID matches the emitting session
 // are skipped — the sender's Handle already updated its own state.
 //
-// Inside Handle or Update (isHandling == true), the publication is
-// deferred until after the sender's client update is sent. Outside
-// Handle, the event is published immediately.
+// The publication is always enqueued as a command on the emitting
+// session's loop. This ensures the event is published after the
+// current exec/Update cycle completes — the sender's diff is sent
+// to the client before other subscribers react.
 func (b *Bus[E]) Emit(s Emitter, event E) {
 	sid := s.sessionID()
-	if !s.isHandling() {
-		b.publish(event, sid)
-		return
-	}
-	s.addEmission(func() { b.publish(event, sid) })
+	s.enqueue(func() { b.publish(event, sid) })
 }
 
 // Publish sends an event to all subscribers with no sender filter.
@@ -73,18 +70,11 @@ func (b *Bus[E]) Subscribe(ctx context.Context, fn func(E)) func() {
 	return b.subscribe(ctx, fn, "")
 }
 
-// Len returns the number of active subscribers. Dead subscribers
-// (cancelled context) are excluded.
+// Len returns the number of active subscribers.
 func (b *Bus[E]) Len() int {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
-	n := 0
-	for _, s := range b.subs {
-		if s.ctx.Err() == nil {
-			n++
-		}
-	}
-	return n
+	return len(b.subs)
 }
 
 // subscribe is the internal registration method. sessionID is non-empty
@@ -94,12 +84,11 @@ func (b *Bus[E]) subscribe(ctx context.Context, fn func(E), sessionID string) fu
 	b.mu.Lock()
 	id := b.nextID
 	b.nextID++
-	b.subs = append(b.subs, subscriber[E]{
-		id:        id,
+	b.subs[id] = subscriber[E]{
 		fn:        fn,
 		sessionID: sessionID,
 		ctx:       ctx,
-	})
+	}
 	b.mu.Unlock()
 
 	unsub := func() { b.remove(id) }
@@ -107,17 +96,12 @@ func (b *Bus[E]) subscribe(ctx context.Context, fn func(E), sessionID string) fu
 	return unsub
 }
 
-// remove deletes a subscriber by ID. Called by the unsubscribe function
-// and by context.AfterFunc on cancellation.
+// remove deletes a subscriber by ID. O(1) via map lookup. Called by
+// the unsubscribe function and by context.AfterFunc on cancellation.
 func (b *Bus[E]) remove(id uint64) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	for i, s := range b.subs {
-		if s.id == id {
-			b.subs = append(b.subs[:i], b.subs[i+1:]...)
-			return
-		}
-	}
+	delete(b.subs, id)
 }
 
 // publish snapshots subscribers under a read lock, then invokes
@@ -126,8 +110,10 @@ func (b *Bus[E]) remove(id uint64) {
 func (b *Bus[E]) publish(event E, senderID string) {
 	b.mu.RLock()
 	// Snapshot to avoid holding the lock during callbacks.
-	targets := make([]subscriber[E], len(b.subs))
-	copy(targets, b.subs)
+	targets := make([]subscriber[E], 0, len(b.subs))
+	for _, s := range b.subs {
+		targets = append(targets, s)
+	}
 	b.mu.RUnlock()
 
 	for _, s := range targets {

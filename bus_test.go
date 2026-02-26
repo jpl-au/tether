@@ -23,28 +23,26 @@ func TestBusPublishDeliversToSubscribers(t *testing.T) {
 	}
 }
 
-func TestBusEmitBuffersDuringHandle(t *testing.T) {
+func TestBusEmitDefersPublication(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		bus := NewBus[string]()
 		mt := &mockTransport{events: []Event{}}
 		sess := newTestSession(counterState{}, mt)
 
+		go sess.readTransport(sess.events)
+		go sess.run()
+		defer func() { sess.stop(); synctest.Wait() }()
+
 		var received string
 		bus.Subscribe(context.Background(), func(ev string) { received = ev })
 
-		// Simulate being inside Handle.
-		sess.handling = true
-		sess.fx = &effects{}
-		bus.Emit(sess, "buffered")
+		// Emit enqueues the publication — it runs after the loop
+		// processes the command, not immediately.
+		bus.Emit(sess, "deferred")
+		synctest.Wait()
 
-		if received != "" {
-			t.Fatalf("expected no delivery during Handle, got %q", received)
-		}
-
-		sess.flushEmissions()
-
-		if received != "buffered" {
-			t.Errorf("after flush: got %q, want %q", received, "buffered")
+		if received != "deferred" {
+			t.Errorf("got %q, want %q", received, "deferred")
 		}
 	})
 }
@@ -55,10 +53,15 @@ func TestBusEmitPublishesOutsideHandle(t *testing.T) {
 		mt := &mockTransport{events: []Event{}}
 		sess := newTestSession(counterState{}, mt)
 
+		go sess.readTransport(sess.events)
+		go sess.run()
+		defer func() { sess.stop(); synctest.Wait() }()
+
 		var received string
 		bus.Subscribe(context.Background(), func(ev string) { received = ev })
 
 		bus.Emit(sess, "immediate")
+		synctest.Wait()
 
 		if received != "immediate" {
 			t.Errorf("got %q, want %q", received, "immediate")
@@ -78,6 +81,14 @@ func TestBusSenderFiltering(t *testing.T) {
 		sessB := newTestSession(counterState{}, mt2)
 		sessB.id = "B"
 
+		go sessA.readTransport(sessA.events)
+		go sessA.run()
+		defer func() { sessA.stop(); synctest.Wait() }()
+
+		go sessB.readTransport(sessB.events)
+		go sessB.run()
+		defer func() { sessB.stop(); synctest.Wait() }()
+
 		var gotA, gotB string
 		// Subscribe both via the internal subscribe (simulating poly.On).
 		bus.subscribe(sessA.ctx, func(ev string) { gotA = ev }, "A")
@@ -85,6 +96,7 @@ func TestBusSenderFiltering(t *testing.T) {
 
 		// Emit from session A — A should be skipped, B should receive.
 		bus.Emit(sessA, "from-A")
+		synctest.Wait()
 
 		if gotA != "" {
 			t.Errorf("sender A should be filtered, got %q", gotA)
@@ -128,6 +140,10 @@ func TestBusPublishNoSenderFilter(t *testing.T) {
 
 		mt := &mockTransport{events: []Event{}}
 		sess := newTestSession(counterState{}, mt)
+
+		go sess.readTransport(sess.events)
+		go sess.run()
+		defer func() { sess.stop(); synctest.Wait() }()
 
 		var got string
 		// Subscribe with session ID (as poly.On would).
