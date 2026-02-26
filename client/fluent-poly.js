@@ -1130,6 +1130,20 @@ window.Poly.signals = window.Poly.signals || {};
       var confirmMsg = target.getAttribute("data-poly-confirm");
       if (confirmMsg && !window.confirm(confirmMsg)) return;
 
+      // Apply optimistic signal changes before sending the event.
+      // The server's response overwrites these via applySignals.
+      var optSet = target.getAttribute("data-poly-optimistic");
+      if (optSet) {
+        var idx = optSet.indexOf(" ");
+        var key = idx === -1 ? optSet : optSet.substring(0, idx);
+        var val = idx === -1 ? "true" : optSet.substring(idx + 1);
+        Poly.setSignal(key, val);
+      }
+      var optToggle = target.getAttribute("data-poly-optimistic-toggle");
+      if (optToggle) {
+        Poly.setSignal(optToggle, !isTruthy(Poly.signals[optToggle]));
+      }
+
       // Prevent default for submit events and reset the form after
       // sending so the input fields clear. The server re-renders with
       // empty values but the form isn't inside a Dynamic key, so the

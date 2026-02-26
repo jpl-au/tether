@@ -71,3 +71,24 @@ func ToggleSignal[E Settable[E]](el E, signal string) E {
 func SetSignal[E Settable[E]](el E, signal, value string) E {
 	return el.SetData("poly-set-signal", signal+" "+value)
 }
+
+// Optimistic sets a signal to a value immediately on click, before
+// the event is sent to the server. When the server responds, its
+// signals overwrite the optimistic value — if the prediction was
+// wrong, the DOM corrects itself. Use this for predictable mutations
+// where the round-trip delay would feel sluggish.
+//
+//	bind.Click(bind.Optimistic(button.Text("Like"), "liked", "true"), "like")
+func Optimistic[E Settable[E]](el E, signal, value string) E {
+	return el.SetData("poly-optimistic", signal+" "+value)
+}
+
+// OptimisticToggle flips a boolean signal immediately on click,
+// before the event is sent to the server. More natural than
+// [Optimistic] when you don't know the current value — the JS
+// reads the signal and inverts it.
+//
+//	bind.Click(bind.OptimisticToggle(button.Text("Like"), "liked"), "like")
+func OptimisticToggle[E Settable[E]](el E, signal string) E {
+	return el.SetData("poly-optimistic-toggle", signal)
+}
