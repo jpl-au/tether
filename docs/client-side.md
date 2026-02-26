@@ -6,23 +6,35 @@ Toggle CSS classes or attributes without a server round-trip:
 
 ```go
 // Toggle a CSS class on the element itself
-poly.ToggleClass(button.Text("Menu"), "is-open")
+bind.ToggleClass(button.Text("Menu"), "is-open")
 
 // Toggle a CSS class on a different element
-poly.ToggleClass(poly.ToggleTarget(button.Text("Menu"), "#nav"), "is-open")
+bind.ToggleClass(bind.ToggleTarget(button.Text("Menu"), "#nav"), "is-open")
 
 // Toggle visibility via the hidden attribute
-poly.ToggleAttr(poly.ToggleTarget(button.Text("Show Help"), "#help"), "hidden")
+bind.ToggleAttr(bind.ToggleTarget(button.Text("Show Help"), "#help"), "hidden")
 ```
 
-Client-managed state survives server morphs automatically.
+Client-managed state survives server morphs automatically. The morph engine preserves client-toggled classes and attributes so they are not lost when the server re-renders.
+
+Prevent the morph engine from touching an element entirely (useful for video players, iframes, and third-party widgets):
+
+```go
+bind.Permanent(div.New(children...))
+```
+
+Hide an element until the poly runtime initialises (prevents flash of unstyled content):
+
+```go
+bind.Cloak(div.New(children...))
+```
 
 ## Transitions
 
 CSS transitions coordinated with the morph lifecycle:
 
 ```go
-poly.Transition(div.New(children...), "fade")
+bind.Transition(div.New(children...), "fade")
 ```
 
 ```css
@@ -38,7 +50,7 @@ Enter: `poly-{name}-enter` is added before insertion and removed next frame. Lea
 Integrate third-party JavaScript libraries (charts, maps, rich text editors) via lifecycle hooks:
 
 ```go
-poly.Hook(div.New(), "chart")
+bind.Hook(div.New(), "chart")
 ```
 
 ```js

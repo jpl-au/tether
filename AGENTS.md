@@ -21,7 +21,9 @@ Local development uses `replace` directives in `go.mod` pointing to sibling dire
 ## Package layout
 
 ```
-poly/           Root — Transport, Session, Config, Event, Group, protocol, bind helpers
+poly/           Root — Transport, Session, Config, Event, Group, protocol
+poly/bind/      Event bindings, signal bindings, client directives, upload helpers
+poly/router/    URL router — dispatches Render/Handle by path
 poly/ws/        WebSocket transport (only package importing coder/websocket)
 poly/sse/       SSE+POST transport (no external dependencies)
 poly/push/      Web Push notification sending (RFC 8291 + RFC 8292)
@@ -45,9 +47,8 @@ handle.go       HandleFunc type definition
 effects.go      Internal effects accumulator (replaces HandleResult)
 group.go        Broadcasting — Group, Broadcast, BroadcastOthers, All()
 protocol.go     Wire format types and encoding
-transport.go    Transport and EventPusher interfaces
+transport.go    Transport interface
 event.go        Event and Params types
-bind.go         Generic event binding helpers
 embed.go        Client JS embedding, ServeClient
 push/push.go    Web Push protocol — Send(), GenerateVAPIDKeys(), VAPID auth, aes128gcm encryption
 ```
@@ -108,17 +109,17 @@ The callback runs inside the session's command loop, so keep it fast — offload
 
 ## Event binding
 
-There are two equivalent ways to bind events to elements. Both produce the same `data-poly-*` attribute:
+Event binding helpers live in the `bind` package. There are two equivalent ways to bind events to elements. Both produce the same `data-poly-*` attribute:
 
 ```go
 // Helper (convenience — wraps SetData with the correct convention string)
-poly.Click(button.Text("+"), "increment")
+bind.Click(button.Text("+"), "increment")
 
 // Direct (explicit — useful when you need full control)
 button.Text("+").SetData("poly-click", "increment")
 ```
 
-The generic helpers (`Click`, `Submit`, `Input`, `Change`, `KeyDown`, `Focus`, `Blur`) are defined in `bind.go`. They work with any Fluent element type.
+The helpers (`Click`, `Submit`, `Input`, `Change`, `KeyDown`, `Focus`, `Blur`, `Viewport`) are defined in `bind/event.go`. They work with any Fluent element type via a generic `Settable` constraint.
 
 ### Keydown modifiers
 
@@ -138,13 +139,13 @@ func handle(_ *poly.Session[state], s state, ev poly.Event) state {
 Input events are debounced at `DefaultDebounce` (default 300ms). Override per element:
 
 ```go
-poly.Debounce(poly.Input(input.Text("q", ""), "search"), 150) // 150ms
+bind.Debounce(bind.Input(input.Text("q", ""), "search"), 150*time.Millisecond)
 ```
 
 Throttle any event type:
 
 ```go
-poly.Throttle(poly.Click(button.Text("Fire"), "fire"), 1000) // max once per second
+bind.Throttle(bind.Click(button.Text("Fire"), "fire"), time.Second)
 ```
 
 ### Loading states
@@ -152,7 +153,7 @@ poly.Throttle(poly.Click(button.Text("Fire"), "fire"), 1000) // max once per sec
 Elements with `data-poly-disable` are disabled while an event is in flight and restored when the next server update arrives:
 
 ```go
-poly.Disable(poly.Click(button.Text("Save"), "save"), "Saving...")
+bind.Disable(bind.Click(button.Text("Save"), "save"), "Saving...")
 ```
 
 If the text argument is non-empty, the element's text content is temporarily replaced.
@@ -162,7 +163,7 @@ If the text argument is non-empty, the element's text content is temporarily rep
 Elements with `data-poly-confirm` show `window.confirm` before the event is sent:
 
 ```go
-poly.Confirm(poly.Click(button.Text("Delete"), "delete"), "Are you sure?")
+bind.Confirm(bind.Click(button.Text("Delete"), "delete"), "Are you sure?")
 ```
 
 If the user cancels, the event is dropped entirely.
@@ -172,7 +173,7 @@ If the user cancels, the event is dropped entirely.
 Elements with `data-poly-autofocus` receive focus after patches and morphs are applied:
 
 ```go
-poly.AutoFocus(input.Text("name", ""))
+bind.AutoFocus(input.Text("name", ""))
 ```
 
 Focus is applied after patches and morphs. Only one element should have this attribute at a time.
@@ -183,14 +184,13 @@ Bidirectional sync between Go state and the browser URL. Anchors with `data-poly
 
 ```go
 // Config — HandleParams processes URL changes on initial load and navigation
-HandleParams: func(sess *poly.Session[State], state State, params poly.Params) State {
+HandleParams: func(_ poly.PreSession, state State, params poly.Params) State {
     state.Page = params.Path
-    sess.SetTitle(state.Page + " — My App")
     return state
 },
 
 // Mark an anchor for client-side navigation
-poly.Link(a.Link("/profile", "Profile"))
+bind.Link(a.Link("/profile", "Profile"))
 
 // Equivalent using SetData directly
 a.Link("/profile", "Profile").SetData("poly-link", "")
@@ -231,20 +231,20 @@ Client-side toggles run entirely in the browser without a server round-trip. The
 
 ```go
 // Toggle a CSS class on the element itself
-poly.ToggleClass(button.Text("Menu"), "is-open")
+bind.ToggleClass(button.Text("Menu"), "is-open")
 
 // Toggle a CSS class on a different element
-poly.ToggleClass(poly.ToggleTarget(button.Text("Menu"), "#nav"), "is-open")
+bind.ToggleClass(bind.ToggleTarget(button.Text("Menu"), "#nav"), "is-open")
 
 // Toggle visibility via the hidden attribute
-poly.ToggleAttr(poly.ToggleTarget(button.Text("Show Help"), "#help"), "hidden")
+bind.ToggleAttr(bind.ToggleTarget(button.Text("Show Help"), "#help"), "hidden")
 ```
 
 Helpers: `ToggleClass`, `ToggleTarget`, `ToggleAttr`. Data attributes: `data-poly-toggle-class`, `data-poly-toggle-target`, `data-poly-toggle-attr`.
 
 Client-managed state survives server morphs automatically. If the element is removed entirely (not morphed), the client state is lost — this is by design.
 
-**Performance:** The generic helpers are ~47% slower than raw `SetData` and add 2 extra allocations per element. For performance-sensitive code, prefer `SetData` directly. Run `go test -bench=BenchmarkBind -benchmem` to compare.
+**Performance:** The generic bind helpers are ~47% slower than raw `SetData` and add 2 extra allocations per element. For performance-sensitive code, prefer `SetData` directly. Run `go test -bench=BenchmarkBind -benchmem` in the `bind/` directory to compare.
 
 **PGO:** Applications consuming fluent-poly benefit from [Profile-Guided Optimization](https://go.dev/doc/pgo). Collect a CPU profile from production and place it as `default.pgo` in the main package. Do not commit a `default.pgo` into this library — PGO profiles are application-specific.
 
@@ -295,14 +295,14 @@ func handle(sess *poly.Session[state], s state, ev poly.Event) state {
 - **Wrap form + error in a Dynamic key** so the server controls field values via targeted patches:
   ```go
   div.New(
-      poly.Preserve(form.New(/*...*/)),
+      bind.Preserve(form.New(/*...*/)),
       span.Text(s.TodoError).Style("color: #c33"),
   ).Dynamic("todo-form")
   ```
 
-- **`poly.Preserve`** prevents the JS runtime from resetting form fields after submit. Without it, `target.reset()` clears the user's input before the server morph arrives — losing the text on validation failure.
+- **`bind.Preserve`** prevents the JS runtime from resetting form fields after submit. Without it, `target.reset()` clears the user's input before the server morph arrives — losing the text on validation failure.
 
-- **Live validation via `poly.Input`** with a dedicated action (e.g. `"validate-todo"`) gives the user feedback as they type, debounced at 300ms.
+- **Live validation via `bind.Input`** with a dedicated action (e.g. `"validate-todo"`) gives the user feedback as they type, debounced at 300ms.
 
 - **Keep error spans always in the tree** (empty text when no error) to avoid structural changes that trigger root morphs. Toggling between "error present" and "no error" should be a content patch, not a structural one.
 
@@ -311,7 +311,7 @@ func handle(sess *poly.Session[state], s state, ev poly.Event) state {
 Elements with `data-poly-hook` receive JavaScript lifecycle callbacks, enabling integration with third-party libraries (charts, maps, rich text editors):
 
 ```go
-poly.Hook(div.New(), "chart")
+bind.Hook(div.New(), "chart")
 ```
 
 ```js
@@ -331,10 +331,10 @@ All three callbacks are optional.
 
 ## Transitions
 
-Elements can opt into CSS transitions during morph-driven add/remove by setting `data-poly-transition` (or using the `poly.Transition` helper):
+Elements can opt into CSS transitions during morph-driven add/remove by setting `data-poly-transition` (or using the `bind.Transition` helper):
 
 ```go
-poly.Transition(div.New(children...), "fade")
+bind.Transition(div.New(children...), "fade")
 // produces: data-poly-transition="fade"
 ```
 
@@ -434,6 +434,33 @@ OnConnect: func(s *poly.Session[State]) {
 - `wireDisconnect` when `ReconnectTimeout <= 0` — reconnection disabled, session gone on first disconnect
 - `Shutdown` — all sessions destroyed
 
+## Concurrency model
+
+The codebase follows a three-tier pattern for synchronisation:
+
+| Tier | Mechanism | Use case | Examples |
+|------|-----------|----------|----------|
+| **Channels** | Buffered command channels | State mutations, sequential processing | Session command loop, SSE writer goroutine |
+| **Atomics** | `atomic.Value` with copy-on-write | Hot-path reads, lock-free dispatch | `Bus` subscribers, `Group` sessions, `Router` pages, `Value` store |
+| **Mutexes** | `sync.Mutex` on write path only | Infrequent registry writes | `Group.wmu`, `Router.wmu`, `Bus.wmu` |
+
+The copy-on-write pattern: the write path copies the entire map under a mutex, modifies the copy, and stores it atomically. The read path does a single `atomic.Value.Load()` with no locking. This is ideal for registries with many concurrent readers and infrequent writes.
+
+## Reactive signals
+
+Alongside the core server-rendering model, fluent-poly supports a signal-based reactive layer for lightweight targeted updates. Signals let the server push individual values to the client without a full render cycle — bound elements update instantly with no diff.
+
+```go
+sess.Signal("count", 42)                          // push a single value
+sess.Signals(map[string]any{"count": 42})          // push multiple values
+```
+
+Signal bindings in `bind/signal.go` (`BindText`, `BindShow`, `BindHide`, `BindClass`, `BindAttr`, `BindValue`) work document-wide — not just inside the poly root. This means navigation highlights, status indicators, and layout shell elements react instantly.
+
+Client-side signal directives (`bind.ToggleSignal`, `bind.SetSignal`) update signals in the browser without contacting the server. Optimistic updates (`bind.Optimistic`, `bind.OptimisticToggle`) set a signal immediately before the event reaches the server — the server can correct the value in its response.
+
+See [signals docs](docs/signals.md) for the full guide.
+
 ## Transport mode
 
 The `Mode` field on `Config` controls which transports the handler accepts. It is an enum (`TransportMode`) with three values:
@@ -458,13 +485,6 @@ poly.New(poly.Config[State]{
     // ...
 })
 
-// SSE with larger event buffer for high-frequency streams
-poly.New(poly.Config[State]{
-    Mode:     poly.SSEOnly,
-    Fallback: sse.Upgrade(64),
-    // ...
-})
-
 // WebSocket with SSE fallback
 poly.New(poly.Config[State]{
     Mode:     poly.WebSocketWithFallback,
@@ -484,8 +504,6 @@ The initial HTML includes a `data-poly-transport` attribute on the root element 
 
 When SSE is active, client events are sent as HTTP POST requests to the same endpoint.
 
-**SSE buffer size:** `sse.Upgrade()` accepts an optional buffer size parameter (default 16). If the buffer is full, the HTTP handler responds with 429. Increase the buffer for high-frequency event streams: `sse.Upgrade(64)`.
-
 **SSE heartbeat:** Set `HeartbeatInterval` (default 20s) to send keep-alive comments that prevent proxies from closing idle SSE connections. Set to `-1` to disable. WebSocket transports have their own ping/pong and do not need this.
 
 **SSE reconnection:** Reconnection is automatic. When an SSE connection drops, the session is preserved. On reconnect, a full re-render is sent to bring the client up to date.
@@ -494,32 +512,80 @@ When SSE is active, client events are sent as HTTP POST requests to the same end
 
 ## Complete helper reference
 
+All helpers are in the `bind` package. They accept any Fluent element type via a generic `Settable` constraint.
+
+**Server events** (`bind/event.go`):
+
 | Helper | Data attribute | Purpose |
 |--------|---------------|---------|
-| `Click` | `poly-click` | Server event on click |
-| `Submit` | `poly-submit` | Server event on form submit |
-| `Input` | `poly-input` | Server event on input (debounced) |
-| `Change` | `poly-change` | Server event on value commit |
-| `KeyDown` | `poly-keydown` | Server event on keydown (with modifiers) |
-| `Focus` | `poly-focus` | Server event on focus |
-| `Blur` | `poly-blur` | Server event on blur |
-| `Link` | `poly-link` | Client-side navigation |
-| `ToggleClass` | `poly-toggle-class` | Client-side CSS class toggle |
-| `ToggleTarget` | `poly-toggle-target` | Direct toggle at different element |
-| `ToggleAttr` | `poly-toggle-attr` | Client-side boolean attribute toggle |
-| `Debounce` | `poly-debounce` | Override input debounce delay (ms) |
-| `Throttle` | `poly-throttle` | Minimum interval between events (ms) |
-| `Disable` | `poly-disable` | Disable element while event in flight |
-| `Confirm` | `poly-confirm` | Show confirmation before sending event |
-| `Preserve` | `poly-preserve` | Prevent form reset after submit |
-| `AutoFocus` | `poly-autofocus` | Focus element after server update |
-| `Hook` | `poly-hook` | JS lifecycle callbacks |
-| `Transition` | `poly-transition` | CSS enter/leave transitions |
+| `bind.Click` | `poly-click` | Server event on click |
+| `bind.Submit` | `poly-submit` | Server event on form submit |
+| `bind.Input` | `poly-input` | Server event on input (debounced) |
+| `bind.Change` | `poly-change` | Server event on value commit |
+| `bind.KeyDown` | `poly-keydown` | Server event on keydown (with modifiers) |
+| `bind.FilterKey` | `poly-filter-key` | Only fire keydown for a specific key |
+| `bind.Focus` | `poly-focus` | Server event on focus |
+| `bind.Blur` | `poly-blur` | Server event on blur |
+| `bind.Viewport` | `poly-viewport` | Server event on viewport enter/exit |
+| `bind.EventData` | `poly-data-{key}` | Attach extra key-value data to events |
+| `bind.Debounce` | `poly-debounce` | Override input debounce delay |
+| `bind.Throttle` | `poly-throttle` | Minimum interval between events |
+
+**Signal bindings** (`bind/signal.go`):
+
+| Helper | Data attribute | Purpose |
+|--------|---------------|---------|
+| `bind.BindText` | `poly-bind-text` | Set textContent from signal |
+| `bind.BindShow` | `poly-bind-show` | Show element when signal is truthy |
+| `bind.BindHide` | `poly-bind-hide` | Hide element when signal is falsy |
+| `bind.BindClass` | `poly-bind-class` | Toggle CSS class from signal |
+| `bind.BindAttr` | `poly-bind-attr` | Set/remove attribute from signal |
+| `bind.BindValue` | `poly-bind-value` | Set form field value from signal |
+
+**Control directives** (`bind/control.go`):
+
+| Helper | Data attribute | Purpose |
+|--------|---------------|---------|
+| `bind.Disable` | `poly-disable` | Disable element while event in flight |
+| `bind.Confirm` | `poly-confirm` | Show confirmation before sending event |
+| `bind.Preserve` | `poly-preserve` | Prevent form reset after submit |
+| `bind.AutoFocus` | `poly-autofocus` | Focus element after server update |
+| `bind.Indicator` | `poly-indicator` | Show loading indicator at selector |
+| `bind.FocusTrap` | `poly-focus-trap` | Trap keyboard focus within element |
+
+**Client-side directives** (`bind/directive.go`):
+
+| Helper | Data attribute | Purpose |
+|--------|---------------|---------|
+| `bind.Link` | `poly-link` | Client-side navigation |
+| `bind.ToggleClass` | `poly-toggle-class` | Client-side CSS class toggle |
+| `bind.ToggleTarget` | `poly-toggle-target` | Direct toggle at different element |
+| `bind.ToggleAttr` | `poly-toggle-attr` | Client-side boolean attribute toggle |
+| `bind.Cloak` | `poly-cloak` | Hide until runtime initialises |
+| `bind.Permanent` | `poly-permanent` | Exclude element from morphing |
+| `bind.ToggleSignal` | `poly-toggle-signal` | Toggle boolean signal on click |
+| `bind.SetSignal` | `poly-set-signal` | Set signal to value on click |
+| `bind.Optimistic` | `poly-optimistic` | Set signal before server round-trip |
+| `bind.OptimisticToggle` | `poly-optimistic-toggle` | Toggle signal before server round-trip |
+
+**File uploads** (`bind/upload.go`):
+
+| Helper | Data attribute | Purpose |
+|--------|---------------|---------|
+| `bind.Upload` | `poly-upload` | Trigger file upload on click/change |
+| `bind.UploadProgress` | `poly-bind-attr` | Bind progress value to upload signal |
+
+**Lifecycle hooks** (`bind/interop.go`):
+
+| Helper | Data attribute | Purpose |
+|--------|---------------|---------|
+| `bind.Hook` | `poly-hook` | JS lifecycle callbacks |
+| `bind.Transition` | `poly-transition` | CSS enter/leave transitions |
 
 ## Code style
 
 - Comments explain why, not what
-- Names must not repeat their package context (`poly.Click` not `poly.PolyClick`)
+- Names must not repeat their package context (`bind.Click` not `bind.BindClick`)
 - Receiver names: one or two letters (`s` for Session, `h` for handler, `t` for transport)
 - Variable name length proportional to scope size
 - No `Get` prefix on getters (`ID()` not `GetID()`)
@@ -552,8 +618,11 @@ announce_test.go    Live region announcements (Session.Announce, wire format)
 presence_test.go    Group presence (OnJoin, OnLeave, All)
 flash_test.go       Session.Flash one-time notifications
 health_test.go      Handler.Health session pool counts
-sse/sse_test.go     SSE transport
-push/push_test.go   VAPID key generation, JWT signing, Send end-to-end
+sse/sse_test.go             SSE transport
+push/push_test.go           VAPID key generation, JWT signing, Send end-to-end
+router/helpers_test.go      Shared test types and selector function
+router/dispatch_test.go     Render/Handle dispatch (matching, not-found, nil)
+router/route_test.go        Route registration, overwrite, concurrent access
 ```
 
 `mock_test.go` defines `mockTransport` (replays queued events, records sent `Update` values) and `newTestSession` (creates a session with channels, a seeded differ, and a logger — ready for `go sess.readTransport(sess.events)` + `go sess.run()`). Helper functions `patchUpdates()` and `morphUpdates()` filter recorded updates by type. Use these for any new session behaviour tests.
@@ -570,15 +639,21 @@ The JS exposes one global: `window.Poly` with a `hooks` property for JS interop 
 
 Supported data attributes:
 
-**Server events:** `data-poly-click`, `data-poly-input`, `data-poly-submit`, `data-poly-change`, `data-poly-keydown`, `data-poly-focus`, `data-poly-blur`
+**Server events:** `data-poly-click`, `data-poly-input`, `data-poly-submit`, `data-poly-change`, `data-poly-keydown`, `data-poly-filter-key`, `data-poly-focus`, `data-poly-blur`, `data-poly-viewport`
 
 **Navigation:** `data-poly-link`
 
 **Client-side toggles:** `data-poly-toggle-class`, `data-poly-toggle-target`, `data-poly-toggle-attr`
 
+**Signal bindings:** `data-poly-bind-text`, `data-poly-bind-show`, `data-poly-bind-hide`, `data-poly-bind-class`, `data-poly-bind-attr`, `data-poly-bind-value`
+
+**Signal directives:** `data-poly-toggle-signal`, `data-poly-set-signal`, `data-poly-optimistic`, `data-poly-optimistic-toggle`
+
 **Timing:** `data-poly-debounce`, `data-poly-throttle`
 
-**UX:** `data-poly-disable`, `data-poly-confirm`, `data-poly-autofocus`, `data-poly-preserve`
+**UX:** `data-poly-disable`, `data-poly-confirm`, `data-poly-autofocus`, `data-poly-preserve`, `data-poly-indicator`, `data-poly-focus-trap`, `data-poly-cloak`, `data-poly-permanent`
+
+**Uploads:** `data-poly-upload`
 
 **Lifecycle:** `data-poly-hook`, `data-poly-transition`
 
@@ -659,19 +734,55 @@ A fixed bar at the top of the viewport shows "Reconnecting…" when the transpor
 
 ```go
 type PushConfig[S any] struct {
-    VAPIDPublicKey string
-    OnSubscribe    func(session *Session[S], sub PushSubscription)
+    Sender      *push.Sender
+    OnSubscribe func(session *Session[S], sub push.Subscription)
+}
+```
+
+The `push` subpackage defines:
+
+```go
+type Subscription struct {
+    Endpoint string
+    Keys     SubscriptionKeys
 }
 
-type PushSubscription struct {
-    Endpoint string               `json:"endpoint"`
-    Keys     PushSubscriptionKeys `json:"keys"`
+type SubscriptionKeys struct {
+    P256dh string
+    Auth   string
 }
 
-type PushSubscriptionKeys struct {
-    P256dh string `json:"p256dh"`
-    Auth   string `json:"auth"`
+type Notification struct {
+    Title    string
+    Body     string
+    Icon     string
+    Badge    string
+    URL      string
+    Tag      string
+    Renotify bool
+    Silent   bool
+    Actions  []NotificationAction
 }
+```
+
+**Setup:**
+
+```go
+sender := push.NewSender(push.Config{
+    VAPIDPublicKey:  publicKey,
+    VAPIDPrivateKey: privateKey,
+    Subject:         "mailto:admin@example.com",
+})
+
+poly.New(poly.Config[State]{
+    Push: &poly.PushConfig[State]{
+        Sender: sender,
+        OnSubscribe: func(sess *poly.Session[State], sub push.Subscription) {
+            // Store subscription in your database
+        },
+    },
+    // ...
+})
 ```
 
 **Subscription flow:**
@@ -681,24 +792,17 @@ type PushSubscriptionKeys struct {
 3. POSTs subscription JSON to the poly endpoint with `X-Poly-Push-Subscribe: true` and `X-Poly-Session` headers
 4. Server calls `OnSubscribe(session, sub)` in a goroutine
 
-**Sending notifications:** Use the `push` subpackage:
+**Sending notifications:**
 
 ```go
-push.Send(sub, push.Notification{
-    Title:  "Hello",
-    Tag:    "chat",
-    Silent: true,
-    Actions: []push.NotificationAction{
-        {Action: "reply", Title: "Reply", URL: "/chat?reply=1"},
-    },
-}, push.Options{
-    VAPIDPublicKey:  pub,
-    VAPIDPrivateKey: priv,
-    Subject:         "mailto:admin@example.com",
+sess.Push(push.Notification{
+    Title: "New message",
+    Body:  "You have a new message from Alice",
+    URL:   "/messages",
 })
 ```
 
-`push.Send` handles ECDH key agreement, HKDF key derivation (`golang.org/x/crypto/hkdf`), AES-128-GCM payload encryption, and VAPID JWT signing. Returns `push.ErrSubscriptionExpired` for HTTP 410 responses.
+The `push.Sender` handles ECDH key agreement, HKDF key derivation (`golang.org/x/crypto/hkdf`), AES-128-GCM payload encryption, and VAPID JWT signing. Returns `push.ErrSubscriptionExpired` for HTTP 410 responses.
 
 ## Event resilience (SSE)
 

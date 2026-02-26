@@ -4,6 +4,12 @@ Reactive server-driven UI for [Fluent](https://github.com/jpl-au/fluent). Write 
 
 fluent-poly connects Fluent's node trees to the browser via WebSocket (with SSE fallback). When state changes, only the parts that actually changed are sent as targeted patches. The client morphs the DOM in place, preserving input focus, scroll position, and form state.
 
+Three update modes give you the right tool for every situation:
+
+- **Server rendering** — the default. Handle returns new state, the framework diffs and sends patches or morphs. Works for everything.
+- **Signals** — push individual values from the server and bound elements update instantly with no render cycle. Ideal for counters, progress bars, and status indicators.
+- **Client directives** — toggle classes, attributes, and signals entirely in the browser. Perfect for menus, modals, and optimistic updates.
+
 ## Quick example
 
 ```go
@@ -15,7 +21,7 @@ mux.Handle("/counter", poly.New(poly.Config[CounterState]{
     Render: func(state CounterState) node.Node {
         return div.New(
             span.Textf("Count: %d", state.Count).Dynamic("count"),
-            poly.Click(button.Text("+1"), "increment"),
+            bind.Click(button.Text("+1"), "increment"),
         )
     },
     Handle: func(_ *poly.Session[CounterState], state CounterState, event poly.Event) CounterState {
@@ -38,10 +44,12 @@ No WebSocket boilerplate. No JavaScript to write. No diff algorithm to understan
 |-------|-------------|
 | [Getting started](docs/getting-started.md) | Setup, how updates reach the browser |
 | [Events](docs/events.md) | Event binding, timing, loading states, forms |
+| [Signals](docs/signals.md) | Reactive signals, client directives, optimistic updates |
 | [Server updates](docs/server-updates.md) | Update, Navigate, SetTitle, Flash, Announce |
 | [Client-side](docs/client-side.md) | Directives, transitions, JS hooks |
 | [Broadcasting](docs/broadcasting.md) | Groups, broadcast, presence |
-| [Transport](docs/transport.md) | WebSocket, SSE, service worker, resilience |
+| [Extensions](docs/extensions.md) | File uploads, service worker, push notifications |
+| [Transport](docs/transport.md) | WebSocket, SSE, resilience |
 | [Push notifications](docs/push-notifications.md) | Web Push with VAPID |
 | [Operations](docs/operations.md) | Health check, drain, dev mode, error reporting |
 | [Performance](docs/performance.md) | Benchmarks, PGO |

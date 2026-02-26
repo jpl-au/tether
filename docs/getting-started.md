@@ -4,12 +4,13 @@
 
 1. Define your state type
 2. Write a render function that builds a Fluent node tree, marking dynamic elements with `.Dynamic("key")`
-3. Write an event handler that takes state + event and returns a `HandleResult` (state + optional side effects)
+3. Write an event handler that receives the session, current state, and event — return the new state
 4. Mount it as an `http.Handler`
 
 ```go
 import (
     poly "github.com/jpl-au/fluent-poly"
+    "github.com/jpl-au/fluent-poly/bind"
     "github.com/jpl-au/fluent-poly/ws"
 )
 
@@ -21,14 +22,14 @@ mux.Handle("/counter", poly.New(poly.Config[CounterState]{
     Render: func(state CounterState) node.Node {
         return div.New(
             span.Textf("Count: %d", state.Count).Dynamic("count"),
-            poly.Click(button.Text("+1"), "increment"),
+            bind.Click(button.Text("+1"), "increment"),
         )
     },
-    Handle: func(state CounterState, event poly.Event) poly.HandleResult[CounterState] {
-        if event.Action == "increment" {
-            state.Count++
+    Handle: func(sess *poly.Session[CounterState], s CounterState, ev poly.Event) CounterState {
+        if ev.Action == "increment" {
+            s.Count++
         }
-        return poly.Result(state)
+        return s
     },
 }))
 
@@ -38,6 +39,14 @@ mux.Handle("/_poly/", http.StripPrefix("/_poly/", poly.ServeClient()))
 ```
 
 No WebSocket boilerplate. No JavaScript to write. No diff algorithm to understand.
+
+Side effects (toasts, navigation, screen reader announcements) are called directly on the session:
+
+```go
+sess.Toast("Item saved")
+sess.Navigate("/success")
+sess.Announce("Item added to cart")
+```
 
 ## How updates reach the browser
 

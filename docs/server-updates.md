@@ -2,49 +2,42 @@
 
 ## Side effects from Handle
 
-`Handle` returns a `HandleResult` that can carry side effects alongside the new state. Side effects are merged into the same update message as the diff, so the client receives everything atomically:
+Side effects are called directly on the session parameter during `Handle`. They are buffered and merged into the same update message as the state diff, so the client receives everything atomically:
 
 ```go
-Handle: func(_ *poly.Session[State], s State, ev poly.Event) poly.HandleResult[State] {
+Handle: func(sess *poly.Session[State], s State, ev poly.Event) State {
     if ev.Action == "add-todo" {
         s.Todos = append(s.Todos, todo)
-        return poly.Result(s).
-            WithAnnounce("Todo added").
-            WithFlash("#notice", "Item saved")
+        sess.Announce("Todo added")
+        sess.Flash("#notice", "Item saved")
     }
-    return poly.Result(s)
-}
+    return s
+},
 ```
 
 Available side effects:
 
 | Method | Effect |
 |--------|--------|
-| `.WithAnnounce(text)` | Screen reader announcement via aria-live region |
-| `.WithFlash(selector, text)` | Flash notification at CSS selector, cleared after 5s |
-| `.WithTitle(title)` | Set `document.title` |
-| `.WithNavigate(url)` | Push URL change with history entry |
-| `.WithReplaceURL(url)` | Update URL without history entry |
+| `sess.Toast(text)` | Global notification (the client shows and auto-dismisses it) |
+| `sess.Announce(text)` | Screen reader announcement via aria-live region |
+| `sess.Flash(selector, text)` | Notification at CSS selector, cleared after 5s |
+| `sess.SetTitle(title)` | Set `document.title` |
+| `sess.Navigate(url)` | Push URL change with history entry |
+| `sess.ReplaceURL(url)` | Update URL without history entry |
+| `sess.Signal(key, value)` | Push a reactive value to bound elements |
+| `sess.Signals(map)` | Push multiple reactive values at once |
 
-When no side effects are needed, `poly.Result(s)` returns a plain state-only result.
+When no side effects are needed, just return the new state.
 
 ## Pushing state changes
 
 Push state changes from outside the event loop (timers, database changes, broadcasts):
 
 ```go
-session.Update(func(s State) poly.HandleResult[State] {
+session.Update(func(s State) State {
     s.Message = "New data available"
-    return poly.Result(s)
-})
-```
-
-`Update` returns a `HandleResult` just like `Handle`, so side effects work here too:
-
-```go
-session.Update(func(s State) poly.HandleResult[State] {
-    s.Message = "New data available"
-    return poly.Result(s).WithAnnounce("New data available")
+    return s
 })
 ```
 
@@ -62,9 +55,9 @@ OnConnect: func(s *poly.Session[State]) {
             case <-ctx.Done():
                 return
             case <-ticker.C:
-                s.Update(func(st State) poly.HandleResult[State] {
+                s.Update(func(st State) State {
                     st.Uptime++
-                    return poly.Result(st)
+                    return st
                 })
             }
         }
@@ -81,14 +74,16 @@ No global maps, no done channels, no OnDisconnect cleanup needed.
 These methods are safe to call from any goroutine — use them from `OnConnect`, timers, broadcast callbacks, or background workers:
 
 ```go
+session.Toast("Settings saved")
 session.SetTitle("New Page — My App")
 session.Announce("Item added to cart")
 session.Flash("#notice", "Settings saved")
 session.Navigate("/success")           // pushState (adds history entry)
 session.ReplaceURL("/current?saved=1") // replaceState (no history entry)
+session.Signal("count", 42)            // push a reactive value
 ```
 
-Each sends a standalone update message. For side effects in response to events, prefer `HandleResult` methods (above) — they merge into the same message as the state diff.
+Each sends a standalone update message. For side effects during event handling, call them on the session parameter inside `Handle` — they merge into the same message as the state diff.
 
 ## URL routing
 
@@ -96,13 +91,29 @@ Bidirectional sync between Go state and the browser URL:
 
 ```go
 poly.New(poly.Config[State]{
-    HandleParams: func(state State, params poly.Params) poly.HandleResult[State] {
-        state.Page = params.Path
-        return poly.Result(state).WithTitle(state.Page + " — My App")
+    HandleParams: func(_ poly.PreSession, s State, p poly.Params) State {
+        s.Page = p.Path
+        return s
     },
     // ...
 })
 
 // Mark an anchor for client-side navigation
-poly.Link(a.Link("/profile", "Profile"))
+bind.Link(a.Link("/profile", "Profile"))
+```
+
+For multi-page apps, use the `router` package:
+
+```go
+r := router.New[State](func(s State) string { return s.Page })
+r.Route("/", router.Page[State]{Render: homeRender, Handle: homeHandle})
+r.Route("/settings", router.Page[State]{Render: settingsRender})
+r.NotFound(router.Page[State]{Render: notFoundRender})
+
+poly.New(poly.Config[State]{
+    Render:       r.Render,
+    Handle:       r.Handle,
+    HandleParams: r.HandleParams(func(s *State, path string) { s.Page = path }),
+    // ...
+})
 ```
