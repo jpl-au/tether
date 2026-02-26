@@ -18,13 +18,6 @@ poly.New(poly.Config[State]{
     // ...
 })
 
-// SSE with larger event buffer for high-frequency streams
-poly.New(poly.Config[State]{
-    Mode:     poly.SSEOnly,
-    Fallback: sse.Upgrade(64), // default is 16
-    // ...
-})
-
 // WebSocket with SSE fallback
 poly.New(poly.Config[State]{
     Mode:     poly.WebSocketWithFallback,

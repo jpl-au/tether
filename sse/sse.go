@@ -26,22 +26,12 @@ import (
 // Allocated once and shared across all transports — read-only.
 var heartbeatMsg = []byte(": heartbeat\n\n")
 
-// Options configures the SSE transport.
-type Options struct {
-	// BufferSize is unused and retained only for API continuity with
-	// earlier versions. It previously controlled the internal event
-	// channel capacity, but client events now bypass the transport
-	// entirely — the poly handler enqueues them directly on the
-	// session's command channel.
-	BufferSize int
-}
-
 // Upgrade returns an upgrade function for use in [poly.Config].Fallback
 // (or Upgrade when Mode is mode.SSE). When the poly handler receives a
 // GET with Accept: text/event-stream, it calls this function to
 // establish the SSE stream. The stream stays open for the lifetime of
 // the session; server updates are written as SSE "data" lines.
-func Upgrade(opts ...Options) func(http.ResponseWriter, *http.Request) (poly.Transport, error) {
+func Upgrade() func(http.ResponseWriter, *http.Request) (poly.Transport, error) {
 	return func(w http.ResponseWriter, r *http.Request) (poly.Transport, error) {
 		flusher, ok := w.(http.Flusher)
 		if !ok {
@@ -114,6 +104,14 @@ func (t *transport) writeLoop(w io.Writer, flusher http.Flusher) {
 // as an SSE "data" line followed by the message delimiter (double
 // newline). Returns io.EOF if the transport is already closed.
 func (t *transport) Send(data []byte) error {
+	// Fast path: if the transport is already closed, return immediately.
+	// Without this, the select below can non-deterministically choose the
+	// writes case (buffered channel has space) even though done is closed.
+	select {
+	case <-t.done:
+		return io.EOF
+	default:
+	}
 	msg := fmt.Appendf(nil, "data: %s\n\n", data)
 	select {
 	case t.writes <- msg:
