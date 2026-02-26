@@ -3,6 +3,7 @@ package poly
 import (
 	"iter"
 	"sync"
+	"sync/atomic"
 )
 
 // Group tracks a set of sessions for broadcasting state updates.
@@ -23,17 +24,23 @@ import (
 //	    state.Message = "Hello everyone"
 //	    return state
 //	})
+//
+// The session map is stored in an [atomic.Value] so Broadcast (the hot
+// path) is completely lock-free. Add and Remove use a write mutex with
+// copy-on-write semantics.
 type Group[S any] struct {
-	mu       sync.RWMutex
-	sessions map[string]*Session[S]
+	// wmu serialises writes (Add/Remove). Reads go through the
+	// atomic.Value and need no lock.
+	wmu      sync.Mutex
+	sessions atomic.Value // holds map[string]*Session[S]
 
 	// OnJoin is called after a session is added to the group.
-	// Runs outside the group lock so it is safe to call Broadcast
+	// Runs outside the write lock so it is safe to call Broadcast
 	// or other Group methods from within. Optional.
 	OnJoin func(session *Session[S])
 
 	// OnLeave is called after a session is removed from the group.
-	// Runs outside the group lock so it is safe to call Broadcast
+	// Runs outside the write lock so it is safe to call Broadcast
 	// or other Group methods from within. Optional.
 	OnLeave func(session *Session[S])
 }
@@ -42,9 +49,9 @@ type Group[S any] struct {
 // Typically called once at program startup and shared across the
 // OnConnect/OnDisconnect callbacks and any code that broadcasts.
 func NewGroup[S any]() *Group[S] {
-	return &Group[S]{
-		sessions: make(map[string]*Session[S]),
-	}
+	g := &Group[S]{}
+	g.sessions.Store(make(map[string]*Session[S]))
+	return g
 }
 
 // Add registers a session with the group. If the session is new and
@@ -52,11 +59,19 @@ func NewGroup[S any]() *Group[S] {
 // Safe to call from any goroutine. Adding a session that is already
 // in the group is a no-op (OnJoin does not fire).
 func (g *Group[S]) Add(s *Session[S]) {
-	g.mu.Lock()
-	_, exists := g.sessions[s.id]
-	g.sessions[s.id] = s
+	g.wmu.Lock()
+	old := g.loadSessions()
+	_, exists := old[s.id]
+	if !exists {
+		sessions := make(map[string]*Session[S], len(old)+1)
+		for k, v := range old {
+			sessions[k] = v
+		}
+		sessions[s.id] = s
+		g.sessions.Store(sessions)
+	}
 	onJoin := g.OnJoin
-	g.mu.Unlock()
+	g.wmu.Unlock()
 
 	if !exists && onJoin != nil {
 		onJoin(s)
@@ -68,11 +83,20 @@ func (g *Group[S]) Add(s *Session[S]) {
 // Safe to call from any goroutine. Removing a session that is not
 // in the group is a no-op (OnLeave does not fire).
 func (g *Group[S]) Remove(s *Session[S]) {
-	g.mu.Lock()
-	_, exists := g.sessions[s.id]
-	delete(g.sessions, s.id)
+	g.wmu.Lock()
+	old := g.loadSessions()
+	_, exists := old[s.id]
+	if exists {
+		sessions := make(map[string]*Session[S], len(old))
+		for k, v := range old {
+			if k != s.id {
+				sessions[k] = v
+			}
+		}
+		g.sessions.Store(sessions)
+	}
 	onLeave := g.OnLeave
-	g.mu.Unlock()
+	g.wmu.Unlock()
 
 	if exists && onLeave != nil {
 		onLeave(s)
@@ -81,19 +105,18 @@ func (g *Group[S]) Remove(s *Session[S]) {
 
 // Len returns the number of sessions currently in the group. Useful
 // for displaying an "N users online" indicator via [Session.Update].
+// Lock-free.
 func (g *Group[S]) Len() int {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
-	return len(g.sessions)
+	return len(g.loadSessions())
 }
 
-// All returns an iterator over sessions in the group. The sessions
-// are snapshotted under a read lock, then iterated without holding
-// the lock — so it is safe to call Add, Remove, or Broadcast from
-// within the loop body.
+// All returns an iterator over sessions in the group. The map is
+// read via a single atomic load — no lock is held during iteration,
+// so it is safe to call Add, Remove, or Broadcast from within the
+// loop body.
 func (g *Group[S]) All() iter.Seq[*Session[S]] {
 	return func(yield func(*Session[S]) bool) {
-		for _, s := range g.snapshot() {
+		for _, s := range g.loadSessions() {
 			if !yield(s) {
 				return
 			}
@@ -109,8 +132,7 @@ func (g *Group[S]) All() iter.Seq[*Session[S]] {
 //
 // Safe to call from any goroutine, including from within Handle.
 func (g *Group[S]) Broadcast(fn func(target *Session[S], state S) S) {
-	targets := g.snapshot()
-	for _, t := range targets {
+	for _, t := range g.loadSessions() {
 		t.Update(func(state S) S {
 			return fn(t, state)
 		})
@@ -125,8 +147,7 @@ func (g *Group[S]) Broadcast(fn func(target *Session[S], state S) S) {
 //
 // Safe to call from any goroutine, including from within Handle.
 func (g *Group[S]) BroadcastOthers(exclude *Session[S], fn func(target *Session[S], state S) S) {
-	targets := g.snapshot()
-	for _, t := range targets {
+	for _, t := range g.loadSessions() {
 		if t != exclude {
 			t.Update(func(state S) S {
 				return fn(t, state)
@@ -135,15 +156,7 @@ func (g *Group[S]) BroadcastOthers(exclude *Session[S], fn func(target *Session[
 	}
 }
 
-// snapshot returns a slice of current session pointers under a
-// read lock. Used by Broadcast to avoid holding the lock while
-// sending updates (which could block if a command buffer is full).
-func (g *Group[S]) snapshot() []*Session[S] {
-	g.mu.RLock()
-	targets := make([]*Session[S], 0, len(g.sessions))
-	for _, s := range g.sessions {
-		targets = append(targets, s)
-	}
-	g.mu.RUnlock()
-	return targets
+// loadSessions returns the current session map from the atomic.Value.
+func (g *Group[S]) loadSessions() map[string]*Session[S] {
+	return g.sessions.Load().(map[string]*Session[S])
 }
