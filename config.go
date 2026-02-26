@@ -187,7 +187,7 @@ type Config[S any] struct {
 
 	// Worker enables the service worker for asset caching, offline page
 	// shells, and push notification support. When true, the client JS
-	// registers /_poly/poly-worker.js as a service worker with scope
+	// registers /_poly/fluent-poly-worker.js as a service worker with scope
 	// "/". Implicitly true when Push is configured. Default false.
 	Worker bool
 

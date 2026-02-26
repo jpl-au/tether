@@ -15,7 +15,7 @@ import (
 // clientFS embeds the client-side JS runtime and the idiomorph library.
 // These files are served at the /_poly/ path by the Handler.
 //
-//go:embed client/fluent-poly.js client/idiomorph.min.js client/poly-worker.js
+//go:embed client/fluent-poly.js client/idiomorph.min.js client/fluent-poly-worker.js
 var clientFS embed.FS
 
 // clientFiles returns an fs.FS rooted at the client/ directory so that
@@ -48,7 +48,7 @@ func buildWorkerJS(precache []string) []byte {
 	})
 	version := hex.EncodeToString(h.Sum(nil))[:12]
 
-	raw, _ := fs.ReadFile(clientFiles(), "poly-worker.js")
+	raw, _ := fs.ReadFile(clientFiles(), "fluent-poly-worker.js")
 	body := bytes.Replace(raw,
 		[]byte(`"poly-v1"`),
 		[]byte(`"poly-`+version+`"`), 1)
@@ -79,7 +79,7 @@ func newClientHandler(precache []string) http.Handler {
 		// The service worker needs the content-hash cache version
 		// injected and the scope header set, so it is served directly
 		// rather than through the static file server.
-		if r.URL.Path == "/poly-worker.js" || r.URL.Path == "poly-worker.js" {
+		if r.URL.Path == "/fluent-poly-worker.js" || r.URL.Path == "fluent-poly-worker.js" {
 			// Defence-in-depth: reject cross-origin requests for the
 			// worker script. The browser already prevents cross-origin
 			// registration, but this guards against misconfigured proxies.

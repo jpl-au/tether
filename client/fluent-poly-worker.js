@@ -1,4 +1,4 @@
-// poly-worker.js — service worker for Fluent Poly.
+// fluent-poly-worker.js — service worker for Fluent Poly.
 //
 // Provides asset caching for faster loads, offline page shells for
 // graceful disconnects, push notification handling, and background

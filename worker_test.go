@@ -15,8 +15,8 @@ import (
 func TestClientWorkerHeader(t *testing.T) {
 	handler := newTestHandler()
 
-	t.Run("poly-worker.js gets Service-Worker-Allowed header", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/_poly/poly-worker.js", nil)
+	t.Run("fluent-poly-worker.js gets Service-Worker-Allowed header", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/_poly/fluent-poly-worker.js", nil)
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, req)
 
@@ -28,8 +28,8 @@ func TestClientWorkerHeader(t *testing.T) {
 		}
 	})
 
-	t.Run("poly-worker.js has content-hash cache version", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/_poly/poly-worker.js", nil)
+	t.Run("fluent-poly-worker.js has content-hash cache version", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/_poly/fluent-poly-worker.js", nil)
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, req)
 
@@ -62,7 +62,7 @@ func TestClientPrecache(t *testing.T) {
 		Precache:     []string{"/styles.css", "/logo.svg"},
 	})
 
-	req := httptest.NewRequest("GET", "/_poly/poly-worker.js", nil)
+	req := httptest.NewRequest("GET", "/_poly/fluent-poly-worker.js", nil)
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 
@@ -81,7 +81,7 @@ func TestClientPrecache(t *testing.T) {
 func TestClientNoPrecache(t *testing.T) {
 	handler := newTestHandler()
 
-	req := httptest.NewRequest("GET", "/_poly/poly-worker.js", nil)
+	req := httptest.NewRequest("GET", "/_poly/fluent-poly-worker.js", nil)
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 
@@ -95,7 +95,7 @@ func TestClientWorkerOriginCheck(t *testing.T) {
 	handler := newTestHandler()
 
 	t.Run("cross-origin request is rejected", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "http://myapp.com/_poly/poly-worker.js", nil)
+		req := httptest.NewRequest("GET", "http://myapp.com/_poly/fluent-poly-worker.js", nil)
 		req.Header.Set("Origin", "https://evil.com")
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, req)
@@ -106,7 +106,7 @@ func TestClientWorkerOriginCheck(t *testing.T) {
 	})
 
 	t.Run("same-origin request is allowed", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "http://myapp.com/_poly/poly-worker.js", nil)
+		req := httptest.NewRequest("GET", "http://myapp.com/_poly/fluent-poly-worker.js", nil)
 		req.Header.Set("Origin", "http://myapp.com")
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, req)
@@ -117,7 +117,7 @@ func TestClientWorkerOriginCheck(t *testing.T) {
 	})
 
 	t.Run("no origin header is allowed", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/_poly/poly-worker.js", nil)
+		req := httptest.NewRequest("GET", "/_poly/fluent-poly-worker.js", nil)
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, req)
 

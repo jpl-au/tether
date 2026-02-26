@@ -12,6 +12,17 @@ import (
 	"github.com/jpl-au/fluent/node"
 )
 
+// extension maps a data attribute marker to the JS file that handles it.
+// When the rendered HTML contains the marker, the script is included.
+type extension struct {
+	marker []byte // e.g. []byte("data-poly-upload")
+	script string // e.g. "fluent-poly-upload.js"
+}
+
+// extensions is the registry of optional JS files. Add entries here
+// when new extension scripts are created in client/.
+var extensions []extension
+
 // polyBody implements node.Node for the poly root div and client
 // scripts. It exists so the Layout function in Config can receive a
 // composable node and wrap it in a full HTML document (head, body, etc.)
@@ -93,6 +104,17 @@ func (p *polyBody) RenderBuilder(buf *bytes.Buffer) {
 	buf.WriteString(`>`)
 	buf.Write(p.html)
 	buf.WriteString("</div>\n<script src=\"/_poly/idiomorph.min.js\"></script>\n<script src=\"/_poly/fluent-poly.js\"></script>\n")
+
+	// Extension scripts are included only when the rendered HTML uses
+	// the corresponding data attributes. This keeps the client payload
+	// small for apps that don't need optional features.
+	for _, ext := range extensions {
+		if bytes.Contains(p.html, ext.marker) {
+			buf.WriteString("<script src=\"/_poly/")
+			buf.WriteString(ext.script)
+			buf.WriteString("\"></script>\n")
+		}
+	}
 }
 
 func (p *polyBody) Nodes() []node.Node { return nil }

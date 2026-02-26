@@ -105,7 +105,7 @@ window.Poly.signals = window.Poly.signals || {};
       // Register service worker when enabled by the server. The worker
       // provides asset caching, offline page shells, push notification
       // handling, and background sync for SSE event resilience.
-      navigator.serviceWorker.register("/_poly/poly-worker.js", { scope: "/" })
+      navigator.serviceWorker.register("/_poly/fluent-poly-worker.js", { scope: "/" })
         .then(function (reg) {
           var pushKey = root.getAttribute("data-poly-push-key");
           if (pushKey && "PushManager" in window) {
@@ -1380,4 +1380,16 @@ window.Poly.signals = window.Poly.signals || {};
   }
 
   document.addEventListener("click", handleSignalActions);
+
+  // --- Extension API ---
+  //
+  // Expose a minimal surface for extension scripts (fluent-poly-*.js).
+  // Extensions load after this file and use these to communicate with
+  // the server and update client-side state.
+
+  window.Poly.sendEvent = sendEvent;
+  window.Poly.setSignal = function (key, value) {
+    Poly.signals[key] = value;
+    updateSignalBindings(key, value);
+  };
 })();
