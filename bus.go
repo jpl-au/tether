@@ -3,6 +3,7 @@ package poly
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 )
 
 // Emitter identifies the session that published a domain event. It is
@@ -24,9 +25,17 @@ type Emitter interface {
 // Group requires all sessions to share the same state type. Bus is
 // parameterised on the event type, so any session can subscribe
 // regardless of its state.
+//
+// Internally the subscriber map is stored in an [atomic.Value] so
+// publish is completely lock-free. Subscribe and unsubscribe use a
+// write mutex and copy-on-write semantics — they are rare relative
+// to publish so the copy cost is negligible.
 type Bus[E any] struct {
-	mu     sync.RWMutex
-	subs   map[uint64]subscriber[E]
+	// wmu serialises writes (subscribe/unsubscribe). Reads go
+	// through the atomic.Value and need no lock.
+	wmu  sync.Mutex
+	subs atomic.Value // holds map[uint64]subscriber[E]
+
 	nextID uint64
 }
 
@@ -38,9 +47,9 @@ type subscriber[E any] struct {
 
 // NewBus creates an empty bus ready to accept subscribers.
 func NewBus[E any]() *Bus[E] {
-	return &Bus[E]{
-		subs: make(map[uint64]subscriber[E]),
-	}
+	b := &Bus[E]{}
+	b.subs.Store(make(map[uint64]subscriber[E]))
+	return b
 }
 
 // Emit publishes a domain event with sender filtering. Subscriptions
@@ -70,53 +79,62 @@ func (b *Bus[E]) Subscribe(ctx context.Context, fn func(E)) func() {
 	return b.subscribe(ctx, fn, "")
 }
 
-// Len returns the number of active subscribers.
+// Len returns the number of active subscribers. Lock-free.
 func (b *Bus[E]) Len() int {
-	b.mu.RLock()
-	defer b.mu.RUnlock()
-	return len(b.subs)
+	return len(b.loadSubs())
 }
 
 // subscribe is the internal registration method. sessionID is non-empty
 // for subscriptions created via poly.On (sender-filtered) and empty for
-// raw Subscribe calls.
+// raw Subscribe calls. Copy-on-write: a new map is built under the
+// write lock and stored atomically.
 func (b *Bus[E]) subscribe(ctx context.Context, fn func(E), sessionID string) func() {
-	b.mu.Lock()
+	b.wmu.Lock()
 	id := b.nextID
 	b.nextID++
-	b.subs[id] = subscriber[E]{
+
+	old := b.loadSubs()
+	subs := make(map[uint64]subscriber[E], len(old)+1)
+	for k, v := range old {
+		subs[k] = v
+	}
+	subs[id] = subscriber[E]{
 		fn:        fn,
 		sessionID: sessionID,
 		ctx:       ctx,
 	}
-	b.mu.Unlock()
+	b.subs.Store(subs)
+	b.wmu.Unlock()
 
 	unsub := func() { b.remove(id) }
 	context.AfterFunc(ctx, unsub)
 	return unsub
 }
 
-// remove deletes a subscriber by ID. O(1) via map lookup. Called by
-// the unsubscribe function and by context.AfterFunc on cancellation.
+// remove deletes a subscriber by ID via copy-on-write. Called by the
+// unsubscribe function and by context.AfterFunc on cancellation.
 func (b *Bus[E]) remove(id uint64) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	delete(b.subs, id)
+	b.wmu.Lock()
+	defer b.wmu.Unlock()
+
+	old := b.loadSubs()
+	if _, ok := old[id]; !ok {
+		return // already removed (double-cancel or explicit unsub + ctx cancel)
+	}
+	subs := make(map[uint64]subscriber[E], len(old))
+	for k, v := range old {
+		if k != id {
+			subs[k] = v
+		}
+	}
+	b.subs.Store(subs)
 }
 
-// publish snapshots subscribers under a read lock, then invokes
-// callbacks without the lock — same pattern as Group.Broadcast.
-// Subscribers whose sessionID matches senderID are skipped.
+// publish iterates the subscriber map with no lock — the atomic load
+// returns a consistent snapshot. Subscribers whose sessionID matches
+// senderID are skipped.
 func (b *Bus[E]) publish(event E, senderID string) {
-	b.mu.RLock()
-	// Snapshot to avoid holding the lock during callbacks.
-	targets := make([]subscriber[E], 0, len(b.subs))
-	for _, s := range b.subs {
-		targets = append(targets, s)
-	}
-	b.mu.RUnlock()
-
-	for _, s := range targets {
+	for _, s := range b.loadSubs() {
 		if s.ctx.Err() != nil {
 			continue // dead subscriber, skip
 		}
@@ -125,4 +143,9 @@ func (b *Bus[E]) publish(event E, senderID string) {
 		}
 		s.fn(event)
 	}
+}
+
+// loadSubs returns the current subscriber map from the atomic.Value.
+func (b *Bus[E]) loadSubs() map[uint64]subscriber[E] {
+	return b.subs.Load().(map[uint64]subscriber[E])
 }
