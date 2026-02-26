@@ -75,14 +75,24 @@ window.Poly.signals = window.Poly.signals || {};
     defaultDebounce = parseInt(root.getAttribute("data-poly-debounce-default")) || 300;
     transitionTimeout = parseInt(root.getAttribute("data-poly-transition-timeout")) || 5000;
     devMode = root.hasAttribute("data-poly-dev");
+    // Remove cloak attributes so hidden elements become visible now
+    // that the runtime is ready. The server injects a style rule that
+    // hides [data-poly-cloak] elements before JS loads.
+    var cloaked = document.querySelectorAll("[data-poly-cloak]");
+    for (var i = 0; i < cloaked.length; i++) cloaked[i].removeAttribute("data-poly-cloak");
+
+    initViewportObserver();
+
     if (transportMode === "fetch") {
       connectionMode = "fetch";
       bindEvents();
       mountExistingHooks();
+      observeViewportElements(root);
     } else {
       connectionMode = (transportMode === "sse") ? "sse" : "ws";
       connect();
       bindEvents();
+      observeViewportElements(root);
     }
 
     // Dev mode: unregister any existing service worker so cached assets
@@ -729,6 +739,7 @@ window.Poly.signals = window.Poly.signals || {};
       if (newNode.nodeType !== 1) return;
       callHookDeep(newNode, "mounted");
       reapplySignals(newNode);
+      observeViewportElements(newNode);
       var name = newNode.getAttribute("data-poly-transition");
       if (!name) return;
       // Force reflow so the browser registers the enter class,
@@ -739,6 +750,11 @@ window.Poly.signals = window.Poly.signals || {};
 
     beforeNodeMorphed: function (oldNode, newNode) {
       if (oldNode.nodeType !== 1) return true;
+
+      // Permanent elements are never morphed — their subtree is left
+      // untouched. Used for video players, iframes, and third-party
+      // widgets that manage their own DOM.
+      if (oldNode.hasAttribute("data-poly-permanent")) return false;
 
       // Cancel any pending leave transition — the element is being
       // morphed back in rather than removed.
@@ -796,6 +812,45 @@ window.Poly.signals = window.Poly.signals || {};
       }
     }
   };
+
+  // --- Viewport trigger ---
+  //
+  // Elements with data-poly-viewport fire a server event when they
+  // enter the viewport. Uses a single IntersectionObserver instance.
+  // Each element fires once and is then unobserved; after a morph
+  // replaces it, the new element is observed again via afterNodeAdded.
+
+  var viewportObserver = null;
+
+  function initViewportObserver() {
+    if (!("IntersectionObserver" in window)) return;
+    viewportObserver = new IntersectionObserver(function (entries) {
+      for (var i = 0; i < entries.length; i++) {
+        if (!entries[i].isIntersecting) continue;
+        var el = entries[i].target;
+        var action = el.getAttribute("data-poly-viewport");
+        if (action) sendEvent("viewport", action, {});
+        viewportObserver.unobserve(el);
+      }
+    }, {
+      threshold: 0
+    });
+  }
+
+  function observeViewportElements(container) {
+    if (!viewportObserver) return;
+    var els = container.querySelectorAll
+      ? container.querySelectorAll("[data-poly-viewport]")
+      : [];
+    for (var i = 0; i < els.length; i++) {
+      viewportObserver.observe(els[i]);
+    }
+    // The container itself might be a viewport element (e.g. a sentinel
+    // div inserted by a morph).
+    if (container.hasAttribute && container.hasAttribute("data-poly-viewport")) {
+      viewportObserver.observe(container);
+    }
+  }
 
   // --- Patching and morphing ---
 
@@ -1292,4 +1347,37 @@ window.Poly.signals = window.Poly.signals || {};
     }
     el.setAttribute("data-poly-client-attrs", set.join(" "));
   }
+
+  // --- Client-side signal actions ---
+  //
+  // Signal actions let developers toggle or set signal values without
+  // a server round-trip. All signal bindings (BindShow, BindClass,
+  // BindText, etc.) react instantly. The server can override any
+  // client-set signal via Session.Signal at any time.
+  //
+  // Registered on document so they work in the Layout shell, same
+  // as signal bindings themselves.
+
+  function handleSignalActions(e) {
+    var toggle = e.target.closest("[data-poly-toggle-signal]");
+    if (toggle) {
+      var key = toggle.getAttribute("data-poly-toggle-signal");
+      var next = !isTruthy(Poly.signals[key]);
+      Poly.signals[key] = next;
+      updateSignalBindings(key, next);
+      return;
+    }
+
+    var setter = e.target.closest("[data-poly-set-signal]");
+    if (setter) {
+      var raw = setter.getAttribute("data-poly-set-signal");
+      var idx = raw.indexOf(" ");
+      var key = idx === -1 ? raw : raw.substring(0, idx);
+      var value = idx === -1 ? "" : raw.substring(idx + 1);
+      Poly.signals[key] = value;
+      updateSignalBindings(key, value);
+    }
+  }
+
+  document.addEventListener("click", handleSignalActions);
 })();

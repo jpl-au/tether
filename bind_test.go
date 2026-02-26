@@ -178,6 +178,15 @@ func TestThrottleRendersDataAttribute(t *testing.T) {
 	}
 }
 
+func TestViewportRendersDataAttribute(t *testing.T) {
+	el := bind.Viewport(button.Text("Sentinel"), "load-more")
+	html := string(el.Render())
+
+	if !strings.Contains(html, `data-poly-viewport="load-more"`) {
+		t.Errorf("expected data-poly-viewport attribute in HTML:\n%s", html)
+	}
+}
+
 func TestChangeRendersDataAttribute(t *testing.T) {
 	el := bind.Change(dropdown.New(), "filter")
 	html := string(el.Render())
@@ -286,6 +295,51 @@ func TestBindValueRendersDataAttribute(t *testing.T) {
 
 	if !strings.Contains(html, `data-poly-bind-value="email"`) {
 		t.Errorf("expected data-poly-bind-value attribute in HTML:\n%s", html)
+	}
+}
+
+func TestIndicatorRendersDataAttribute(t *testing.T) {
+	el := bind.Indicator(bind.Click(button.Text("Save"), "save"), "#spinner")
+	html := string(el.Render())
+
+	if !strings.Contains(html, `data-poly-indicator="#spinner"`) {
+		t.Errorf("expected data-poly-indicator attribute in HTML:\n%s", html)
+	}
+}
+
+func TestCloakRendersDataAttribute(t *testing.T) {
+	el := bind.Cloak(button.Text("Hidden"))
+	html := string(el.Render())
+
+	if !strings.Contains(html, `data-poly-cloak=""`) {
+		t.Errorf("expected data-poly-cloak attribute in HTML:\n%s", html)
+	}
+}
+
+func TestPermanentRendersDataAttribute(t *testing.T) {
+	el := bind.Permanent(button.Text("Video"))
+	html := string(el.Render())
+
+	if !strings.Contains(html, `data-poly-permanent=""`) {
+		t.Errorf("expected data-poly-permanent attribute in HTML:\n%s", html)
+	}
+}
+
+func TestToggleSignalRendersDataAttribute(t *testing.T) {
+	el := bind.ToggleSignal(button.Text("Menu"), "menuOpen")
+	html := string(el.Render())
+
+	if !strings.Contains(html, `data-poly-toggle-signal="menuOpen"`) {
+		t.Errorf("expected data-poly-toggle-signal attribute in HTML:\n%s", html)
+	}
+}
+
+func TestSetSignalRendersDataAttribute(t *testing.T) {
+	el := bind.SetSignal(button.Text("Settings"), "tab", "settings")
+	html := string(el.Render())
+
+	if !strings.Contains(html, `data-poly-set-signal="tab settings"`) {
+		t.Errorf("expected data-poly-set-signal attribute in HTML:\n%s", html)
 	}
 }
 

@@ -32,6 +32,16 @@ func AutoFocus[E Settable[E]](el E) E {
 	return el.SetData("poly-autofocus", "")
 }
 
+// Indicator points to an element that shows loading state while an
+// event is in flight. The value is a CSS selector. The JS runtime
+// adds poly-pending to the matched element when the event is sent
+// and removes it when the server responds.
+//
+//	bind.Indicator(bind.Click(button.Text("Save"), "save"), "#spinner")
+func Indicator[E Settable[E]](el E, selector string) E {
+	return el.SetData("poly-indicator", selector)
+}
+
 // FocusTrap constrains Tab key navigation to the element's
 // descendants. Useful for modals and dropdown menus.
 func FocusTrap[E Settable[E]](el E) E {

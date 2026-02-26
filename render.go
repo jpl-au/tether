@@ -42,6 +42,9 @@ func (p *polyBody) Render(w ...io.Writer) []byte {
 }
 
 func (p *polyBody) RenderBuilder(buf *bytes.Buffer) {
+	// Inject a style rule that hides cloaked elements before JS loads.
+	// The JS runtime removes the attribute on init, revealing them.
+	buf.WriteString("<style>[data-poly-cloak]{display:none!important}</style>")
 	buf.WriteString(`<div data-poly-root data-poly-endpoint="`)
 	buf.WriteString(html.EscapeString(p.endpoint))
 	buf.WriteString(`"`)

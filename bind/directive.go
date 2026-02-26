@@ -33,3 +33,41 @@ func ToggleTarget[E Settable[E]](el E, selector string) E {
 func ToggleAttr[E Settable[E]](el E, attr string) E {
 	return el.SetData("poly-toggle-attr", attr)
 }
+
+// Cloak hides an element until the poly runtime initialises. The JS
+// removes the attribute on DOMContentLoaded, revealing the element.
+// A built-in style rule ensures zero flash without any extra CSS.
+//
+//	bind.Cloak(div.New(children...))
+func Cloak[E Settable[E]](el E) E {
+	return el.SetData("poly-cloak", "")
+}
+
+// Permanent prevents the morph engine from updating this element.
+// The element and its entire subtree are left untouched across server
+// updates. Use this for video players, iframes, canvas elements, and
+// third-party widget containers that manage their own DOM.
+//
+//	bind.Permanent(div.New(bind.Hook(canvas.New(), "chart")))
+func Permanent[E Settable[E]](el E) E {
+	return el.SetData("poly-permanent", "")
+}
+
+// ToggleSignal flips a boolean signal on click without a server
+// round-trip. All signal bindings ([BindShow], [BindClass], etc.)
+// react instantly. The server can override the value at any time
+// via [Session.Signal].
+//
+//	bind.ToggleSignal(button.Text("Menu"), "menuOpen")
+func ToggleSignal[E Settable[E]](el E, signal string) E {
+	return el.SetData("poly-toggle-signal", signal)
+}
+
+// SetSignal sets a signal to a specific value on click without a
+// server round-trip. Use this for tab bars, radio-style selection,
+// and any UI where clicking picks one value from a set.
+//
+//	bind.SetSignal(button.Text("Settings"), "tab", "settings")
+func SetSignal[E Settable[E]](el E, signal, value string) E {
+	return el.SetData("poly-set-signal", signal+" "+value)
+}

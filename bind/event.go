@@ -72,3 +72,14 @@ func Debounce[E Settable[E]](el E, d time.Duration) E {
 func Throttle[E Settable[E]](el E, d time.Duration) E {
 	return el.SetData("poly-throttle", strconv.Itoa(int(d.Milliseconds())))
 }
+
+// Viewport fires a server event when the element enters the viewport.
+// Uses IntersectionObserver internally. The event fires once per
+// element appearance; after a server morph replaces the element, the
+// new element is observed again automatically. This is the building
+// block for infinite scroll and lazy-loaded sections.
+//
+//	bind.Viewport(div.New(), "load-more")
+func Viewport[E Settable[E]](el E, action string) E {
+	return el.SetData("poly-viewport", action)
+}
