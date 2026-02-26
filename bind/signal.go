@@ -2,9 +2,13 @@ package bind
 
 // Signal bindings connect elements to server-pushed reactive values.
 // When the server calls Session.Signal, the client updates all bound
-// elements instantly — no render, no diff, no HTML. Bindings survive
-// morphs: the client reapplies current signal values after idiomorph
-// reconciliation.
+// elements in the document instantly — no render, no diff, no HTML.
+// Bindings work document-wide, not just inside the poly root. This
+// means elements in the [Config.Layout] shell (navigation highlights,
+// status indicators, body classes) react to signal updates alongside
+// elements in the morphed content area. Bindings inside the poly root
+// survive morphs: the client reapplies current signal values after
+// idiomorph reconciliation.
 
 // BindText binds an element's text content to a named signal. When
 // the server pushes a new value, the client sets textContent directly.

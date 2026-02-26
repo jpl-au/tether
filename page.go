@@ -50,8 +50,10 @@ type PageConfig[S any] struct {
 	// [Config].HandleParams. Optional.
 	HandleParams func(session PreSession, state S, params Params) S
 
-	// Layout wraps the page content in a full HTML document. Same
-	// type as [Config].Layout. Optional.
+	// Layout wraps the page content in a full HTML document. Runs on
+	// every GET request (stateless pages reconstruct state each time).
+	// Signal bindings in the Layout shell work document-wide — see
+	// [Config].Layout for details. Optional.
 	Layout func(state S, content node.Node) node.Node
 
 	// AllowedOrigins restricts POST events to requests whose Origin

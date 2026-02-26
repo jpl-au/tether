@@ -882,29 +882,31 @@ window.Poly.signals = window.Poly.signals || {};
     }
   }
 
+  // updateSignalBindings applies a signal value to all bound elements
+  // in the document — not just inside the poly root. This allows signal
+  // bindings on elements in the Layout shell (nav highlights, body
+  // classes, status indicators) that sit outside the morphed content area.
   function updateSignalBindings(key, value) {
-    if (!root) return;
-
     // Text bindings: data-poly-bind-text="signalName"
-    var els = root.querySelectorAll('[data-poly-bind-text="' + key + '"]');
+    var els = document.querySelectorAll('[data-poly-bind-text="' + key + '"]');
     for (var i = 0; i < els.length; i++) {
       els[i].textContent = value == null ? "" : String(value);
     }
 
     // Show bindings: data-poly-bind-show="signalName"
-    els = root.querySelectorAll('[data-poly-bind-show="' + key + '"]');
+    els = document.querySelectorAll('[data-poly-bind-show="' + key + '"]');
     for (var i = 0; i < els.length; i++) {
       els[i].style.display = isTruthy(value) ? "" : "none";
     }
 
     // Hide bindings: data-poly-bind-hide="signalName"
-    els = root.querySelectorAll('[data-poly-bind-hide="' + key + '"]');
+    els = document.querySelectorAll('[data-poly-bind-hide="' + key + '"]');
     for (var i = 0; i < els.length; i++) {
       els[i].style.display = isTruthy(value) ? "none" : "";
     }
 
     // Class bindings: data-poly-bind-class="className signalName"
-    els = root.querySelectorAll("[data-poly-bind-class]");
+    els = document.querySelectorAll("[data-poly-bind-class]");
     for (var i = 0; i < els.length; i++) {
       var parts = els[i].getAttribute("data-poly-bind-class").split(/\s+/);
       if (parts.length === 2 && parts[1] === key) {
@@ -913,7 +915,7 @@ window.Poly.signals = window.Poly.signals || {};
     }
 
     // Attr bindings: data-poly-bind-attr="attrName signalName"
-    els = root.querySelectorAll("[data-poly-bind-attr]");
+    els = document.querySelectorAll("[data-poly-bind-attr]");
     for (var i = 0; i < els.length; i++) {
       var parts = els[i].getAttribute("data-poly-bind-attr").split(/\s+/);
       if (parts.length === 2 && parts[1] === key) {
@@ -926,7 +928,7 @@ window.Poly.signals = window.Poly.signals || {};
     }
 
     // Value bindings: data-poly-bind-value="signalName"
-    els = root.querySelectorAll('[data-poly-bind-value="' + key + '"]');
+    els = document.querySelectorAll('[data-poly-bind-value="' + key + '"]');
     for (var i = 0; i < els.length; i++) {
       els[i].value = value == null ? "" : String(value);
     }
