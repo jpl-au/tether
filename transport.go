@@ -1,17 +1,6 @@
 package poly
 
-import (
-	"errors"
-	"time"
-)
-
-// ErrEventBufferFull is returned by a transport's PushEvent method
-// when the internal event buffer is at capacity. PushEvent is
-// non-blocking by design — if the session's event loop is not
-// consuming events fast enough, the caller receives this error
-// immediately rather than stalling the HTTP handler goroutine. The
-// handler responds with HTTP 429 so the client can retry.
-var ErrEventBufferFull = errors.New("event buffer full")
+import "time"
 
 // Transport abstracts the persistent connection between server and
 // client. The session event loop calls ReceiveEvent in a tight loop
@@ -40,17 +29,6 @@ type Transport interface {
 	// Close terminates the connection. Must be safe to call from any
 	// goroutine and safe to call more than once.
 	Close() error
-}
-
-// eventPusher is an optional interface for transports that receive
-// client events through a separate channel rather than through the
-// transport connection itself. The SSE transport implements this
-// because EventSource is unidirectional (server→client only) — client
-// events arrive as HTTP POSTs and are routed to PushEvent by the
-// handler. WebSocket transports do not need this because events
-// arrive on the socket.
-type eventPusher interface {
-	PushEvent(Event) error
 }
 
 // heartbeater is an optional interface for transports that need

@@ -7,15 +7,12 @@ import (
 	"net/http"
 	"strings"
 	"testing"
-
-	poly "github.com/jpl-au/fluent-poly"
-	"github.com/jpl-au/fluent-poly/event"
 )
 
 // mockWriter implements http.ResponseWriter and http.Flusher backed
 // by a bytes.Buffer so we can inspect SSE output without a real HTTP
-// connection. The onFlush channel, when set, signals after each Flush
-// so tests can synchronise with the asynchronous writer goroutine.
+// connection. The onFlush channel signals after each Flush so tests
+// can synchronise with the asynchronous writer goroutine.
 type mockWriter struct {
 	buf     bytes.Buffer
 	headers http.Header
@@ -45,7 +42,6 @@ func newTestTransport() (*transport, *mockWriter) {
 	w := newMockWriter()
 	t := &transport{
 		writes: make(chan []byte, 4),
-		events: make(chan poly.Event, 16),
 		done:   make(chan struct{}),
 	}
 	go t.writeLoop(w, w)
@@ -82,24 +78,6 @@ func TestSendWritesSSEFormat(t *testing.T) {
 	}
 }
 
-func TestReceiveEventBlocksUntilPush(t *testing.T) {
-	tr, _ := newTestTransport()
-	defer tr.Close()
-
-	want := poly.Event{Type: event.Click, Action: "increment"}
-	go func() {
-		tr.PushEvent(want)
-	}()
-
-	got, err := tr.ReceiveEvent()
-	if err != nil {
-		t.Fatalf("ReceiveEvent error: %v", err)
-	}
-	if got.Type != want.Type || got.Action != want.Action {
-		t.Errorf("expected event {%s %s}, got {%s %s}", want.Type, want.Action, got.Type, got.Action)
-	}
-}
-
 func TestReceiveEventReturnsEOFOnClose(t *testing.T) {
 	tr, _ := newTestTransport()
 	tr.Close()
@@ -110,31 +88,13 @@ func TestReceiveEventReturnsEOFOnClose(t *testing.T) {
 	}
 }
 
-func TestPushEventReturnsEOFWhenClosed(t *testing.T) {
+func TestSendReturnsEOFWhenClosed(t *testing.T) {
 	tr, _ := newTestTransport()
 	tr.Close()
 
-	err := tr.PushEvent(poly.Event{Type: event.Click, Action: "test"})
+	err := tr.Send([]byte(`{"type":"update"}`))
 	if !errors.Is(err, io.EOF) {
 		t.Errorf("expected io.EOF, got %v", err)
-	}
-}
-
-func TestPushEventReturnsBufferFullWhenFull(t *testing.T) {
-	tr, _ := newTestTransport()
-	defer tr.Close()
-
-	// Fill the buffer (capacity 16).
-	for i := range 16 {
-		if err := tr.PushEvent(poly.Event{Action: "fill"}); err != nil {
-			t.Fatalf("PushEvent %d: unexpected error: %v", i, err)
-		}
-	}
-
-	// The 17th push should return ErrEventBufferFull, not block.
-	err := tr.PushEvent(poly.Event{Action: "overflow"})
-	if !errors.Is(err, poly.ErrEventBufferFull) {
-		t.Errorf("expected ErrEventBufferFull, got %v", err)
 	}
 }
 
@@ -146,15 +106,5 @@ func TestCloseIsIdempotent(t *testing.T) {
 	}
 	if err := tr.Close(); err != nil {
 		t.Errorf("second Close error: %v", err)
-	}
-}
-
-func TestSendReturnsEOFWhenClosed(t *testing.T) {
-	tr, _ := newTestTransport()
-	tr.Close()
-
-	err := tr.Send([]byte(`{"type":"update"}`))
-	if !errors.Is(err, io.EOF) {
-		t.Errorf("expected io.EOF, got %v", err)
 	}
 }

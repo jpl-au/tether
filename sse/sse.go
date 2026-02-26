@@ -1,13 +1,12 @@
-// Package sse provides an SSE+POST transport for fluent-poly. Use it
-// when the deployment environment does not support WebSocket (e.g.
-// certain PaaS providers, corporate proxies, or HTTP/2-only setups).
+// Package sse provides an SSE transport for fluent-poly. Use it when
+// the deployment environment does not support WebSocket (e.g. certain
+// PaaS providers, corporate proxies, or HTTP/2-only setups).
 //
-// The transport splits the connection into two channels:
-//   - Server→client: updates flow as Server-Sent Events over a
-//     long-lived HTTP GET (EventSource on the client side).
-//   - Client→server: events arrive as individual HTTP POST requests
-//     and are routed to the transport's internal channel via the
-//     PushEvent method.
+// The transport is unidirectional — server→client only. Updates flow
+// as Server-Sent Events over a long-lived HTTP GET (EventSource on
+// the client side). Client events arrive as individual HTTP POST
+// requests and are routed directly to the session's command channel
+// by the poly handler.
 //
 // Wire up by passing sse.Upgrade() as the Fallback (or Upgrade) field
 // in [poly.Config] and setting Mode to [mode.SSE] or [mode.Auto].
@@ -23,22 +22,17 @@ import (
 	poly "github.com/jpl-au/fluent-poly"
 )
 
-// defaultBufferSize is the event channel capacity when Options.BufferSize
-// is zero.
-const defaultBufferSize = 16
-
 // heartbeatMsg is the SSE comment written by the heartbeat ticker.
 // Allocated once and shared across all transports — read-only.
 var heartbeatMsg = []byte(": heartbeat\n\n")
 
 // Options configures the SSE transport.
 type Options struct {
-	// BufferSize sets the capacity of the internal event channel. When
-	// the channel is full, PushEvent returns [poly.ErrEventBufferFull]
-	// so the HTTP handler can respond with 429 rather than blocking.
-	// Zero defaults to 16, which is sufficient for typical form-driven
-	// UIs. Increase it for high-frequency event streams such as mouse
-	// tracking or real-time collaboration.
+	// BufferSize is unused and retained only for API continuity with
+	// earlier versions. It previously controlled the internal event
+	// channel capacity, but client events now bypass the transport
+	// entirely — the poly handler enqueues them directly on the
+	// session's command channel.
 	BufferSize int
 }
 
@@ -46,19 +40,8 @@ type Options struct {
 // (or Upgrade when Mode is mode.SSE). When the poly handler receives a
 // GET with Accept: text/event-stream, it calls this function to
 // establish the SSE stream. The stream stays open for the lifetime of
-// the session; server updates are written as SSE "data" lines. Client
-// events arrive separately via HTTP POST — the poly handler routes
-// them through the PushEvent method on this transport.
+// the session; server updates are written as SSE "data" lines.
 func Upgrade(opts ...Options) func(http.ResponseWriter, *http.Request) (poly.Transport, error) {
-	var o Options
-	if len(opts) > 0 {
-		o = opts[0]
-	}
-	size := o.BufferSize
-	if size <= 0 {
-		size = defaultBufferSize
-	}
-
 	return func(w http.ResponseWriter, r *http.Request) (poly.Transport, error) {
 		flusher, ok := w.(http.Flusher)
 		if !ok {
@@ -77,7 +60,6 @@ func Upgrade(opts ...Options) func(http.ResponseWriter, *http.Request) (poly.Tra
 
 		t := &transport{
 			writes: make(chan []byte, 4),
-			events: make(chan poly.Event, size),
 			done:   make(chan struct{}),
 		}
 
@@ -95,15 +77,16 @@ func Upgrade(opts ...Options) func(http.ResponseWriter, *http.Request) (poly.Tra
 }
 
 // transport implements [poly.Transport] using SSE for the server→client
-// direction and a buffered channel for the client→server direction.
-// A dedicated writer goroutine owns the http.ResponseWriter — Send and
-// StartHeartbeat submit payloads to the writes channel, and the writer
-// serialises them onto the wire. This eliminates the mutex that
-// previously guarded concurrent writes and aligns with the WebSocket
-// transport, which relies on the library's internal serialisation.
+// direction. A dedicated writer goroutine owns the http.ResponseWriter
+// — Send and StartHeartbeat submit payloads to the writes channel, and
+// the writer serialises them onto the wire.
+//
+// ReceiveEvent blocks until the transport is closed (returning io.EOF).
+// Client events in SSE mode arrive as HTTP POSTs and are routed
+// directly to the session's command channel by the poly handler — they
+// never pass through the transport.
 type transport struct {
 	writes chan []byte
-	events chan poly.Event
 	done   chan struct{}
 	once   sync.Once
 }
@@ -140,39 +123,15 @@ func (t *transport) Send(data []byte) error {
 	}
 }
 
-// ReceiveEvent blocks until an event is pushed via PushEvent or the
-// transport is closed. Returns io.EOF when closed.
+// ReceiveEvent blocks until the transport is closed, then returns
+// io.EOF. In SSE mode, client events arrive as HTTP POSTs and are
+// routed directly to the session's command channel — they never pass
+// through this method. The session's readTransport goroutine calls
+// ReceiveEvent in a loop; it exits when Close is called (HTTP
+// connection drop or session shutdown).
 func (t *transport) ReceiveEvent() (poly.Event, error) {
-	select {
-	case ev := <-t.events:
-		return ev, nil
-	case <-t.done:
-		return poly.Event{}, io.EOF
-	}
-}
-
-// PushEvent receives a client event from the poly handler via HTTP POST.
-//
-// The send is non-blocking by design. If the session's event loop is
-// not consuming events fast enough and the internal buffer is full,
-// PushEvent returns [poly.ErrEventBufferFull] immediately so the HTTP
-// handler can respond with 429 rather than stalling the request
-// goroutine. The buffer capacity is set via [Options].BufferSize
-// (default 16).
-func (t *transport) PushEvent(ev poly.Event) error {
-	select {
-	case <-t.done:
-		return io.EOF
-	default:
-	}
-	select {
-	case t.events <- ev:
-		return nil
-	case <-t.done:
-		return io.EOF
-	default:
-		return poly.ErrEventBufferFull
-	}
+	<-t.done
+	return poly.Event{}, io.EOF
 }
 
 // StartHeartbeat sends SSE comment lines at the given interval to
