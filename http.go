@@ -92,12 +92,19 @@ func (h *Handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // Requests without an Origin header (e.g. same-origin navigations or
 // non-browser clients) are always allowed.
 func (h *Handler[S]) originAllowed(r *http.Request) bool {
+	return checkOrigin(r, h.cfg.AllowedOrigins)
+}
+
+// checkOrigin is the shared origin-checking logic used by both
+// [Handler] and [pageHandler]. When allowedOrigins is non-empty the
+// Origin must match exactly; otherwise a same-host check is applied.
+func checkOrigin(r *http.Request, allowedOrigins []string) bool {
 	origin := r.Header.Get("Origin")
 	if origin == "" {
 		return true
 	}
-	if len(h.cfg.AllowedOrigins) > 0 {
-		return slices.Contains(h.cfg.AllowedOrigins, origin)
+	if len(allowedOrigins) > 0 {
+		return slices.Contains(allowedOrigins, origin)
 	}
 	// No AllowedOrigins configured — fall back to same-host check
 	// as basic CSRF protection. Compare hostnames only so that

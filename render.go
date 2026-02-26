@@ -44,24 +44,34 @@ func (p *polyBody) Render(w ...io.Writer) []byte {
 func (p *polyBody) RenderBuilder(buf *bytes.Buffer) {
 	buf.WriteString(`<div data-poly-root data-poly-endpoint="`)
 	buf.WriteString(html.EscapeString(p.endpoint))
-	buf.WriteString(`" data-poly-session="`)
-	buf.WriteString(html.EscapeString(p.session))
 	buf.WriteString(`"`)
+	if p.session != "" {
+		buf.WriteString(` data-poly-session="`)
+		buf.WriteString(html.EscapeString(p.session))
+		buf.WriteString(`"`)
+	}
 	switch p.transport {
 	case mode.SSE:
 		buf.WriteString(` data-poly-transport="sse"`)
 	case mode.Auto:
 		buf.WriteString(` data-poly-transport="auto"`)
+	case mode.Fetch:
+		buf.WriteString(` data-poly-transport="fetch"`)
 	default:
 		buf.WriteString(` data-poly-transport="ws"`)
 	}
 	// Pass JS runtime configuration as data attributes so the client
-	// reads them instead of using hardcoded values.
-	buf.WriteString(` data-poly-retry-delay="`)
-	buf.WriteString(strconv.FormatInt(p.retryDelay.Milliseconds(), 10))
-	buf.WriteString(`" data-poly-max-retry-delay="`)
-	buf.WriteString(strconv.FormatInt(p.maxRetryDelay.Milliseconds(), 10))
-	buf.WriteString(`" data-poly-debounce-default="`)
+	// reads them instead of using hardcoded values. Retry-delay and
+	// max-retry-delay are omitted for fetch mode — there is no
+	// persistent connection to reconnect.
+	if p.transport != mode.Fetch {
+		buf.WriteString(` data-poly-retry-delay="`)
+		buf.WriteString(strconv.FormatInt(p.retryDelay.Milliseconds(), 10))
+		buf.WriteString(`" data-poly-max-retry-delay="`)
+		buf.WriteString(strconv.FormatInt(p.maxRetryDelay.Milliseconds(), 10))
+		buf.WriteString(`"`)
+	}
+	buf.WriteString(` data-poly-debounce-default="`)
 	buf.WriteString(strconv.FormatInt(p.defaultDebounce.Milliseconds(), 10))
 	buf.WriteString(`" data-poly-transition-timeout="`)
 	buf.WriteString(strconv.FormatInt(p.transitionTimeout.Milliseconds(), 10))

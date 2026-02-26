@@ -32,4 +32,11 @@ const (
 	// header), it falls back to SSE+POST automatically. Both
 	// Upgrade and Fallback must be set.
 	Auto
+
+	// Fetch uses plain HTTP request/response — no persistent
+	// connection. Client events are sent via individual POST
+	// requests and the response carries the update. Used by
+	// [poly.Page] for stateless pages that don't need a live
+	// transport.
+	Fetch
 )

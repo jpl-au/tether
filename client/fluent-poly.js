@@ -75,9 +75,15 @@ window.Poly.signals = window.Poly.signals || {};
     defaultDebounce = parseInt(root.getAttribute("data-poly-debounce-default")) || 300;
     transitionTimeout = parseInt(root.getAttribute("data-poly-transition-timeout")) || 5000;
     devMode = root.hasAttribute("data-poly-dev");
-    connectionMode = (transportMode === "sse") ? "sse" : "ws";
-    connect();
-    bindEvents();
+    if (transportMode === "fetch") {
+      connectionMode = "fetch";
+      bindEvents();
+      mountExistingHooks();
+    } else {
+      connectionMode = (transportMode === "sse") ? "sse" : "ws";
+      connect();
+      bindEvents();
+    }
 
     // Dev mode: unregister any existing service worker so cached assets
     // are never served stale during development.
@@ -1149,6 +1155,24 @@ window.Poly.signals = window.Poly.signals || {};
     }
     var id = String(++eventCounter);
     var payload = JSON.stringify({type: type, action: action, data: data, event_id: id});
+
+    if (connectionMode === "fetch") {
+      var url = location.protocol + "//" + location.host + endpoint;
+      fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: payload
+      }).then(function (resp) {
+        if (!resp.ok) { restorePending(id); return; }
+        return resp.json();
+      }).then(function (msg) {
+        if (msg) applyMessage(msg);
+      }).catch(function (err) {
+        reportError("fetch", "page event failed: " + err);
+        restorePending(id);
+      });
+      return id;
+    }
 
     if (connectionMode === "sse") {
       var url = location.protocol + "//" + location.host + endpoint;
