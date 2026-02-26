@@ -27,6 +27,10 @@ import (
 // is zero.
 const defaultBufferSize = 16
 
+// heartbeatMsg is the SSE comment written by the heartbeat ticker.
+// Allocated once and shared across all transports — read-only.
+var heartbeatMsg = []byte(": heartbeat\n\n")
+
 // Options configures the SSE transport.
 type Options struct {
 	// BufferSize sets the capacity of the internal event channel. When
@@ -72,11 +76,12 @@ func Upgrade(opts ...Options) func(http.ResponseWriter, *http.Request) (poly.Tra
 		flusher.Flush()
 
 		t := &transport{
-			w:       w,
-			flusher: flusher,
-			events:  make(chan poly.Event, size),
-			done:    make(chan struct{}),
+			writes: make(chan []byte, 4),
+			events: make(chan poly.Event, size),
+			done:   make(chan struct{}),
 		}
+
+		go t.writeLoop(w, flusher)
 
 		// Close when the HTTP connection drops so ReceiveEvent
 		// returns io.EOF and the session event loop exits.
@@ -91,37 +96,48 @@ func Upgrade(opts ...Options) func(http.ResponseWriter, *http.Request) (poly.Tra
 
 // transport implements [poly.Transport] using SSE for the server→client
 // direction and a buffered channel for the client→server direction.
-// The channel is fed by PushEvent, which the poly handler calls when
-// an HTTP POST arrives for this session.
+// A dedicated writer goroutine owns the http.ResponseWriter — Send and
+// StartHeartbeat submit payloads to the writes channel, and the writer
+// serialises them onto the wire. This eliminates the mutex that
+// previously guarded concurrent writes and aligns with the WebSocket
+// transport, which relies on the library's internal serialisation.
 type transport struct {
-	w       http.ResponseWriter
-	flusher http.Flusher
-	events  chan poly.Event
-	done    chan struct{}
-	once    sync.Once
-	// wmu serialises writes to w. Today all Send calls are serialised
-	// by the session loop, but this guard protects against future
-	// callers that might not hold that lock.
-	wmu sync.Mutex
+	writes chan []byte
+	events chan poly.Event
+	done   chan struct{}
+	once   sync.Once
 }
 
-// Send writes pre-encoded JSON bytes as an SSE "data" line followed
-// by a double newline (the SSE message delimiter). The write is
-// immediately flushed so the client receives it without buffering
-// delay.
-func (t *transport) Send(data []byte) error {
-	t.wmu.Lock()
-	// Write "data: <json>\n\n" — the SSE message delimiter is two
-	// newlines. The JSON from marshalUpdate has no trailing newline,
-	// so we add both here.
-	_, err := fmt.Fprintf(t.w, "data: %s\n\n", data)
-	if err != nil {
-		t.wmu.Unlock()
-		return err
+// writeLoop owns the http.ResponseWriter. It reads framed payloads
+// from the writes channel and flushes each one immediately. If a write
+// fails the transport is closed, causing ReceiveEvent to return io.EOF
+// and the session loop to trigger the normal disconnect flow.
+func (t *transport) writeLoop(w io.Writer, flusher http.Flusher) {
+	for {
+		select {
+		case data := <-t.writes:
+			if _, err := w.Write(data); err != nil {
+				t.Close()
+				return
+			}
+			flusher.Flush()
+		case <-t.done:
+			return
+		}
 	}
-	t.flusher.Flush()
-	t.wmu.Unlock()
-	return nil
+}
+
+// Send submits pre-encoded JSON bytes to the writer goroutine, framed
+// as an SSE "data" line followed by the message delimiter (double
+// newline). Returns io.EOF if the transport is already closed.
+func (t *transport) Send(data []byte) error {
+	msg := fmt.Appendf(nil, "data: %s\n\n", data)
+	select {
+	case t.writes <- msg:
+		return nil
+	case <-t.done:
+		return io.EOF
+	}
 }
 
 // ReceiveEvent blocks until an event is pushed via PushEvent or the
@@ -163,6 +179,9 @@ func (t *transport) PushEvent(ev poly.Event) error {
 // prevent intermediate proxies from closing idle connections. SSE
 // comments (lines starting with `:`) are silently discarded by the
 // EventSource client and cost almost nothing on the wire.
+//
+// Heartbeat payloads are submitted to the writer goroutine's channel,
+// so no additional synchronisation is needed.
 func (t *transport) StartHeartbeat(interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	go func() {
@@ -170,15 +189,11 @@ func (t *transport) StartHeartbeat(interval time.Duration) {
 		for {
 			select {
 			case <-ticker.C:
-				t.wmu.Lock()
-				_, err := fmt.Fprintf(t.w, ": heartbeat\n\n")
-				if err != nil {
-					t.wmu.Unlock()
-					t.Close()
+				select {
+				case t.writes <- heartbeatMsg:
+				case <-t.done:
 					return
 				}
-				t.flusher.Flush()
-				t.wmu.Unlock()
 			case <-t.done:
 				return
 			}
