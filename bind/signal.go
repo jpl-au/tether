@@ -46,3 +46,14 @@ func BindClass[E Settable[E]](el E, class, signal string) E {
 func BindAttr[E Settable[E]](el E, attr, signal string) E {
 	return el.SetData("poly-bind-attr", attr+" "+signal)
 }
+
+// BindValue binds a form element's value to a named signal. When the
+// server pushes a new value, the client sets the element's value
+// property directly — not the HTML attribute, the DOM property. This
+// is the correct approach for input, select, and textarea elements
+// where the user's interaction diverges the property from the attribute.
+//
+//	bind.BindValue(input.Text("email", ""), "email")
+func BindValue[E Settable[E]](el E, signal string) E {
+	return el.SetData("poly-bind-value", signal)
+}

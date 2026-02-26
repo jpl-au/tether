@@ -31,6 +31,13 @@ type Event struct {
 	EventID string            `json:"event_id,omitempty"`
 }
 
+// Value returns the input element's value from the event data. This is
+// a convenience for ev.Data["value"], which the client JS populates
+// automatically for input and change events.
+func (e Event) Value() string {
+	return e.Data["value"]
+}
+
 // Params carries URL information from a navigation event. The handler
 // passes this to Config.HandleParams on the initial page load (so the
 // application can derive state from the URL) and whenever the browser

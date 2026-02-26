@@ -924,6 +924,12 @@ window.Poly.signals = window.Poly.signals || {};
         }
       }
     }
+
+    // Value bindings: data-poly-bind-value="signalName"
+    els = root.querySelectorAll('[data-poly-bind-value="' + key + '"]');
+    for (var i = 0; i < els.length; i++) {
+      els[i].value = value == null ? "" : String(value);
+    }
   }
 
   // isTruthy mirrors JavaScript's truthiness but treats null, undefined,
@@ -939,7 +945,7 @@ window.Poly.signals = window.Poly.signals || {};
     applySignalsToElement(el);
     var bound = el.querySelectorAll(
       "[data-poly-bind-text],[data-poly-bind-show],[data-poly-bind-hide]," +
-      "[data-poly-bind-class],[data-poly-bind-attr]"
+      "[data-poly-bind-class],[data-poly-bind-attr],[data-poly-bind-value]"
     );
     for (var i = 0; i < bound.length; i++) {
       applySignalsToElement(bound[i]);
@@ -984,6 +990,11 @@ window.Poly.signals = window.Poly.signals || {};
           el.setAttribute(parts[0], String(val));
         }
       }
+    }
+
+    var valueSignal = el.getAttribute("data-poly-bind-value");
+    if (valueSignal && signals.hasOwnProperty(valueSignal)) {
+      el.value = signals[valueSignal] == null ? "" : String(signals[valueSignal]);
     }
   }
 

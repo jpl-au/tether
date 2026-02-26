@@ -280,6 +280,15 @@ func TestBindAttrRendersDataAttribute(t *testing.T) {
 	}
 }
 
+func TestBindValueRendersDataAttribute(t *testing.T) {
+	el := bind.BindValue(input.Text("email", ""), "email")
+	html := string(el.Render())
+
+	if !strings.Contains(html, `data-poly-bind-value="email"`) {
+		t.Errorf("expected data-poly-bind-value attribute in HTML:\n%s", html)
+	}
+}
+
 func TestClickChains(t *testing.T) {
 	// Verify the return type preserves chainability
 	el := bind.Click(button.Text("+"), "increment").
