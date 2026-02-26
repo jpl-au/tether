@@ -97,33 +97,42 @@ func (h *Handler[S]) handleUpload(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid multipart form", http.StatusBadRequest)
 		return
 	}
-	defer func() {
-		if r.MultipartForm != nil {
-			r.MultipartForm.RemoveAll()
-		}
-	}()
 
 	action := r.Header.Get("X-Poly-Upload")
 
-	// Process every file in the multipart form.
+	// Validate MIME types and collect uploads before spawning the
+	// background goroutine. On validation failure, clean up
+	// immediately and return an error.
+	var uploads []Upload
 	for _, headers := range r.MultipartForm.File {
 		for _, fh := range headers {
 			ct := fh.Header.Get("Content-Type")
 			if !mimeAllowed(ct, h.cfg.Upload.Accept) {
+				r.MultipartForm.RemoveAll()
 				http.Error(w, "file type not allowed", http.StatusUnsupportedMediaType)
 				return
 			}
-
-			u := Upload{
+			uploads = append(uploads, Upload{
 				Action:      action,
 				Name:        fh.Filename,
 				Size:        fh.Size,
 				ContentType: ct,
 				header:      fh,
-			}
-			go h.cfg.Upload.Handle(sess, u)
+			})
 		}
 	}
+
+	// Hand ownership of the multipart form to a single goroutine
+	// that processes all files. Temp files are cleaned up after
+	// every callback has returned — not before.
+	form := r.MultipartForm
+	handler := h.cfg.Upload.Handle
+	go func() {
+		defer form.RemoveAll()
+		for _, u := range uploads {
+			handler(sess, u)
+		}
+	}()
 
 	w.WriteHeader(http.StatusNoContent)
 }
