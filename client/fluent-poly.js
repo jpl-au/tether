@@ -498,6 +498,10 @@ window.Poly.signals = window.Poly.signals || {};
       // event binding attribute for the Focus helper).
       var focusEl = root.querySelector("[data-poly-autofocus]");
       if (focusEl) focusEl.focus();
+
+      // Notify extensions that the DOM has been updated so they can
+      // re-scan for new elements (e.g. upload triggers added by a morph).
+      document.dispatchEvent(new CustomEvent("poly:update", { detail: { root: root } }));
     });
   }
 

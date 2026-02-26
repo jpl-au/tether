@@ -204,6 +204,11 @@ type Config[S any] struct {
 	// Worker is true or Push is configured. Optional.
 	Precache []string
 
+	// Upload enables file upload support. When set, the handler accepts
+	// multipart POST requests from the upload extension JS and delivers
+	// each file to the Handle callback. Optional.
+	Upload *UploadConfig[S]
+
 	// Push enables Web Push notification support. When set, Worker is
 	// implicitly true. Clients subscribe to push notifications after
 	// connecting, and the subscription is delivered via OnSubscribe.

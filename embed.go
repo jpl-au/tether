@@ -15,7 +15,7 @@ import (
 // clientFS embeds the client-side JS runtime and the idiomorph library.
 // These files are served at the /_poly/ path by the Handler.
 //
-//go:embed client/fluent-poly.js client/idiomorph.min.js client/fluent-poly-worker.js
+//go:embed client/fluent-poly.js client/idiomorph.min.js client/fluent-poly-worker.js client/fluent-poly-upload.js
 var clientFS embed.FS
 
 // clientFiles returns an fs.FS rooted at the client/ directory so that

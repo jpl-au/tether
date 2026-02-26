@@ -26,6 +26,14 @@ func (h *Handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// File uploads arrive as multipart POST with an X-Poly-Upload
+	// header. Handle them before the mode switch so they work with
+	// all transport modes.
+	if r.Method == "POST" && r.Header.Get("X-Poly-Upload") != "" {
+		h.handleUpload(w, r)
+		return
+	}
+
 	// Push subscription registrations arrive as POST with a special
 	// header, regardless of transport mode. Handle them before the
 	// mode switch to avoid being mistaken for an SSE event.

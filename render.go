@@ -21,7 +21,9 @@ type extension struct {
 
 // extensions is the registry of optional JS files. Add entries here
 // when new extension scripts are created in client/.
-var extensions []extension
+var extensions = []extension{
+	{marker: []byte("data-poly-upload"), script: "fluent-poly-upload.js"},
+}
 
 // polyBody implements node.Node for the poly root div and client
 // scripts. It exists so the Layout function in Config can receive a

@@ -1,0 +1,141 @@
+// fluent-poly-upload.js — file upload extension for Fluent Poly.
+//
+// Loaded automatically when any element uses data-poly-upload. Handles
+// file selection, multipart POST to the server, and progress tracking
+// via signals. Uses XMLHttpRequest for upload progress events.
+
+(function () {
+  "use strict";
+
+  var root = null;
+  var endpoint = "";
+  var sessionID = "";
+
+  function init() {
+    root = document.querySelector("[data-poly-root]");
+    if (!root) return;
+
+    endpoint = root.getAttribute("data-poly-endpoint") || "";
+    sessionID = root.getAttribute("data-poly-session") || "";
+
+    bindUploads(root);
+  }
+
+  // bindUploads attaches listeners to all upload triggers within a
+  // subtree. Called on init and after each morph to pick up new elements.
+  function bindUploads(container) {
+    var els = container.querySelectorAll("[data-poly-upload]");
+    for (var i = 0; i < els.length; i++) {
+      setupUpload(els[i]);
+    }
+  }
+
+  // setupUpload wires a single upload element. File inputs trigger on
+  // change; buttons and other elements trigger on click and look for a
+  // file input in the closest form or parent.
+  function setupUpload(el) {
+    // Guard against double-binding after morphs.
+    if (el.hasAttribute("data-poly-upload-bound")) return;
+    el.setAttribute("data-poly-upload-bound", "");
+
+    var action = el.getAttribute("data-poly-upload");
+    var isFileInput = el.tagName === "INPUT" && el.type === "file";
+
+    if (isFileInput) {
+      el.addEventListener("change", function () {
+        if (el.files && el.files.length > 0) {
+          uploadFiles(action, el.files, el);
+        }
+      });
+    } else {
+      el.addEventListener("click", function (e) {
+        // Find file input(s) in the closest form, or as a sibling.
+        var form = el.closest("form");
+        var inputs = form
+          ? form.querySelectorAll('input[type="file"]')
+          : el.parentElement
+            ? el.parentElement.querySelectorAll('input[type="file"]')
+            : [];
+
+        var files = collectFiles(inputs);
+        if (files.length === 0) return;
+
+        e.preventDefault();
+        uploadFiles(action, files, el);
+      });
+    }
+  }
+
+  // collectFiles gathers all selected files from a set of file inputs.
+  function collectFiles(inputs) {
+    var files = [];
+    for (var i = 0; i < inputs.length; i++) {
+      if (inputs[i].files) {
+        for (var j = 0; j < inputs[i].files.length; j++) {
+          files.push(inputs[i].files[j]);
+        }
+      }
+    }
+    return files;
+  }
+
+  // uploadFiles sends files to the server via multipart POST and
+  // tracks progress through poly signals.
+  function uploadFiles(action, files, triggerEl) {
+    var formData = new FormData();
+    for (var i = 0; i < files.length; i++) {
+      formData.append("file", files[i]);
+    }
+
+    var xhr = new XMLHttpRequest();
+
+    // Progress signal: 0–100.
+    Poly.setSignal("upload:" + action + ":progress", "0");
+    Poly.setSignal("upload:" + action + ":state", "uploading");
+
+    xhr.upload.addEventListener("progress", function (e) {
+      if (e.lengthComputable) {
+        var pct = Math.round((e.loaded / e.total) * 100);
+        Poly.setSignal("upload:" + action + ":progress", String(pct));
+      }
+    });
+
+    xhr.addEventListener("load", function () {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        Poly.setSignal("upload:" + action + ":progress", "100");
+        Poly.setSignal("upload:" + action + ":state", "done");
+      } else {
+        Poly.setSignal("upload:" + action + ":state", "error");
+      }
+    });
+
+    xhr.addEventListener("error", function () {
+      Poly.setSignal("upload:" + action + ":state", "error");
+    });
+
+    xhr.addEventListener("abort", function () {
+      Poly.setSignal("upload:" + action + ":state", "idle");
+    });
+
+    xhr.open("POST", endpoint);
+    xhr.setRequestHeader("X-Poly-Session", sessionID);
+    xhr.setRequestHeader("X-Poly-Upload", action);
+    xhr.send(formData);
+  }
+
+  // Re-bind after server updates. The core runtime fires poly:update
+  // when it finishes applying patches and morphs.
+  document.addEventListener("poly:update", function (e) {
+    var target = e.detail && e.detail.root ? e.detail.root : root;
+    if (target) bindUploads(target);
+  });
+
+  // Initialise when the DOM is ready. If the document is already
+  // loaded (extension script loaded after DOMContentLoaded), run
+  // immediately.
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+})();
