@@ -13,8 +13,8 @@ func TestPendingSessionRemovedAfterTimeout(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		h := &Handler[counterState]{
 			cfg: Config[counterState]{
-				PendingTimeout: 100 * time.Millisecond,
-				Logger:         slog.Default(),
+				Timeouts: Timeouts{Pending: 100 * time.Millisecond},
+				Logger:   slog.Default(),
 			},
 			pending: map[string]*pendingSession[counterState]{
 				"p1": {

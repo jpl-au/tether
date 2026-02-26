@@ -84,32 +84,32 @@ func New[S any](cfg Config[S]) *Handler[S] {
 	if cfg.Logger == nil {
 		cfg.Logger = slog.Default()
 	}
-	if cfg.ReconnectTimeout == 0 {
-		cfg.ReconnectTimeout = defaultReconnectTimeout
+	if cfg.Timeouts.Reconnect == 0 {
+		cfg.Timeouts.Reconnect = defaultReconnectTimeout
 	}
-	if cfg.MaxEventBytes == 0 {
-		cfg.MaxEventBytes = defaultMaxEventBytes
+	if cfg.Limits.MaxEventBytes == 0 {
+		cfg.Limits.MaxEventBytes = defaultMaxEventBytes
 	}
-	if cfg.PendingTimeout == 0 {
-		cfg.PendingTimeout = defaultPendingTimeout
+	if cfg.Timeouts.Pending == 0 {
+		cfg.Timeouts.Pending = defaultPendingTimeout
 	}
-	if cfg.RetryDelay == 0 {
-		cfg.RetryDelay = defaultRetryDelay
+	if cfg.Timeouts.Retry == 0 {
+		cfg.Timeouts.Retry = defaultRetryDelay
 	}
-	if cfg.MaxRetryDelay == 0 {
-		cfg.MaxRetryDelay = defaultMaxRetryDelay
+	if cfg.Timeouts.MaxRetry == 0 {
+		cfg.Timeouts.MaxRetry = defaultMaxRetryDelay
 	}
-	if cfg.DefaultDebounce == 0 {
-		cfg.DefaultDebounce = defaultDefaultDebounce
+	if cfg.Client.DefaultDebounce == 0 {
+		cfg.Client.DefaultDebounce = defaultDefaultDebounce
 	}
-	if cfg.TransitionTimeout == 0 {
-		cfg.TransitionTimeout = defaultTransitionTimeout
+	if cfg.Client.TransitionTimeout == 0 {
+		cfg.Client.TransitionTimeout = defaultTransitionTimeout
 	}
-	if cfg.HeartbeatInterval == 0 {
-		cfg.HeartbeatInterval = defaultHeartbeatInterval
+	if cfg.Timeouts.Heartbeat == 0 {
+		cfg.Timeouts.Heartbeat = defaultHeartbeatInterval
 	}
-	if cfg.CmdBufferSize == 0 {
-		cfg.CmdBufferSize = defaultCmdBufferSize
+	if cfg.Limits.CmdBufferSize == 0 {
+		cfg.Limits.CmdBufferSize = defaultCmdBufferSize
 	}
 	h := &Handler[S]{
 		cfg:           cfg,

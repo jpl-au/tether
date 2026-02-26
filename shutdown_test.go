@@ -44,7 +44,7 @@ func TestShutdownClosesActiveSessions(t *testing.T) {
 func TestShutdownStopsPendingCleanup(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		h := &Handler[counterState]{
-			cfg:          Config[counterState]{PendingTimeout: 30 * time.Second},
+			cfg:          Config[counterState]{Timeouts: Timeouts{Pending: 30 * time.Second}},
 			pending:      make(map[string]*pendingSession[counterState]),
 			active:       make(map[string]*Session[counterState]),
 			disconnected: make(map[string]*Session[counterState]),

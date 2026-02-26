@@ -27,7 +27,7 @@ func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 	h.cfg.Logger.Info("serving initial page")
 
 	h.mu.Lock()
-	if h.cfg.MaxSessions > 0 && len(h.pending)+len(h.active)+len(h.disconnected) >= h.cfg.MaxSessions {
+	if h.cfg.Limits.MaxSessions > 0 && len(h.pending)+len(h.active)+len(h.disconnected) >= h.cfg.Limits.MaxSessions {
 		h.mu.Unlock()
 		http.Error(w, "too many sessions", http.StatusServiceUnavailable)
 		return
@@ -64,10 +64,10 @@ func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 		endpoint:          r.URL.Path,
 		session:           id,
 		transport:         h.cfg.Mode,
-		retryDelay:        h.cfg.RetryDelay,
-		maxRetryDelay:     h.cfg.MaxRetryDelay,
-		defaultDebounce:   h.cfg.DefaultDebounce,
-		transitionTimeout: h.cfg.TransitionTimeout,
+		retryDelay:        h.cfg.Timeouts.Retry,
+		maxRetryDelay:     h.cfg.Timeouts.MaxRetry,
+		defaultDebounce:   h.cfg.Client.DefaultDebounce,
+		transitionTimeout: h.cfg.Client.TransitionTimeout,
 		worker:            h.cfg.Worker,
 		pushKey:           pushKey,
 		devMode:           h.cfg.DevMode,
@@ -142,9 +142,9 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		}
 
 		// Enforce MaxSessions.
-		if h.cfg.MaxSessions > 0 {
+		if h.cfg.Limits.MaxSessions > 0 {
 			h.mu.Lock()
-			full := len(h.pending)+len(h.active)+len(h.disconnected) >= h.cfg.MaxSessions
+			full := len(h.pending)+len(h.active)+len(h.disconnected) >= h.cfg.Limits.MaxSessions
 			h.mu.Unlock()
 			if full {
 				return
@@ -179,14 +179,14 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		transport:        transport,
 		logger:           h.cfg.Logger.WithGroup("session").With("id", id),
 		events:           make(chan Event),
-		cmds:             make(chan func(), h.cfg.CmdBufferSize),
-		fxCh:             make(chan func(*effects), h.cfg.CmdBufferSize),
+		cmds:             make(chan func(), h.cfg.Limits.CmdBufferSize),
+		fxCh:             make(chan func(*effects), h.cfg.Limits.CmdBufferSize),
 		loopDone:         make(chan struct{}),
 		ctx:              ctx,
 		stop:             cancel,
 		createdAt:        now,
-		idleTimeout:      h.cfg.IdleTimeout,
-		reconnectTimeout: h.cfg.ReconnectTimeout,
+		idleTimeout:      h.cfg.Timeouts.Idle,
+		reconnectTimeout: h.cfg.Timeouts.Reconnect,
 	}
 	sess.lastActivity.Store(now.UnixNano())
 
@@ -199,8 +199,8 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 	if h.cfg.OnStructuralChange != nil {
 		sess.onStructuralChange = h.cfg.OnStructuralChange
 	}
-	if h.cfg.MaxLifetime > 0 {
-		time.AfterFunc(h.cfg.MaxLifetime, func() {
+	if h.cfg.Timeouts.MaxLifetime > 0 {
+		time.AfterFunc(h.cfg.Timeouts.MaxLifetime, func() {
 			sess.stop()
 		})
 	}
@@ -222,8 +222,8 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 
 	// Start keep-alive writes for transports that need them (SSE).
 	// For reconnects, reattach handles this.
-	if hb, ok := transport.(heartbeater); ok && h.cfg.HeartbeatInterval > 0 {
-		hb.StartHeartbeat(h.cfg.HeartbeatInterval)
+	if hb, ok := transport.(heartbeater); ok && h.cfg.Timeouts.Heartbeat > 0 {
+		hb.StartHeartbeat(h.cfg.Timeouts.Heartbeat)
 	}
 
 	started = true

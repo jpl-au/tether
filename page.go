@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/jpl-au/fluent-poly/mode"
 	"github.com/jpl-au/fluent/node"
@@ -56,24 +55,15 @@ type PageConfig[S any] struct {
 	// [Config].Layout for details. Optional.
 	Layout func(state S, content node.Node) node.Node
 
-	// AllowedOrigins restricts POST events to requests whose Origin
-	// header matches one of these values. Same semantics as
-	// [Config].AllowedOrigins. Optional.
-	AllowedOrigins []string
+	// Limits groups capacity constraints. Only MaxEventBytes is
+	// relevant for stateless pages.
+	Limits Limits
 
-	// MaxEventBytes limits the size of a POST event body. Zero
-	// defaults to 64 KB.
-	MaxEventBytes int64
+	// Client groups browser-side settings (debounce, transitions).
+	Client Client
 
-	// DefaultDebounce is the debounce interval applied to input
-	// events when the element does not specify data-poly-debounce.
-	// Zero defaults to 300 milliseconds.
-	DefaultDebounce time.Duration
-
-	// TransitionTimeout is how long the client waits for a CSS
-	// transitionend event before forcibly removing a leaving element.
-	// Zero defaults to 5 seconds.
-	TransitionTimeout time.Duration
+	// Security groups origin-checking settings.
+	Security Security
 
 	// DevMode sets Cache-Control: no-store and emits the
 	// data-poly-dev attribute. Enable via this field or the POLY_DEV
@@ -107,14 +97,14 @@ func Page[S any](cfg PageConfig[S]) http.Handler {
 	if cfg.Logger == nil {
 		cfg.Logger = slog.Default()
 	}
-	if cfg.MaxEventBytes == 0 {
-		cfg.MaxEventBytes = defaultMaxEventBytes
+	if cfg.Limits.MaxEventBytes == 0 {
+		cfg.Limits.MaxEventBytes = defaultMaxEventBytes
 	}
-	if cfg.DefaultDebounce == 0 {
-		cfg.DefaultDebounce = defaultDefaultDebounce
+	if cfg.Client.DefaultDebounce == 0 {
+		cfg.Client.DefaultDebounce = defaultDefaultDebounce
 	}
-	if cfg.TransitionTimeout == 0 {
-		cfg.TransitionTimeout = defaultTransitionTimeout
+	if cfg.Client.TransitionTimeout == 0 {
+		cfg.Client.TransitionTimeout = defaultTransitionTimeout
 	}
 
 	return &pageHandler[S]{
@@ -167,8 +157,8 @@ func (p *pageHandler[S]) serveGET(w http.ResponseWriter, r *http.Request) {
 		html:              html,
 		endpoint:          r.URL.Path,
 		transport:         mode.Fetch,
-		defaultDebounce:   p.cfg.DefaultDebounce,
-		transitionTimeout: p.cfg.TransitionTimeout,
+		defaultDebounce:   p.cfg.Client.DefaultDebounce,
+		transitionTimeout: p.cfg.Client.TransitionTimeout,
 		devMode:           p.cfg.DevMode,
 	}
 
@@ -185,7 +175,7 @@ func (p *pageHandler[S]) serveGET(w http.ResponseWriter, r *http.Request) {
 }
 
 func (p *pageHandler[S]) servePOST(w http.ResponseWriter, r *http.Request) {
-	if !checkOrigin(r, p.cfg.AllowedOrigins) {
+	if !checkOrigin(r, p.cfg.Security.AllowedOrigins) {
 		http.Error(w, "origin not allowed", http.StatusForbidden)
 		return
 	}
@@ -197,7 +187,7 @@ func (p *pageHandler[S]) servePOST(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	r.Body = http.MaxBytesReader(w, r.Body, p.cfg.MaxEventBytes)
+	r.Body = http.MaxBytesReader(w, r.Body, p.cfg.Limits.MaxEventBytes)
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)

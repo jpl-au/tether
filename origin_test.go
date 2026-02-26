@@ -8,7 +8,9 @@ import (
 func TestOriginAllowedWithExplicitList(t *testing.T) {
 	h := &Handler[counterState]{
 		cfg: Config[counterState]{
-			AllowedOrigins: []string{"https://example.com", "https://staging.example.com"},
+			Security: Security{
+				AllowedOrigins: []string{"https://example.com", "https://staging.example.com"},
+			},
 		},
 	}
 

@@ -99,7 +99,7 @@ func (h *Handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // Requests without an Origin header (e.g. same-origin navigations or
 // non-browser clients) are always allowed.
 func (h *Handler[S]) originAllowed(r *http.Request) bool {
-	return checkOrigin(r, h.cfg.AllowedOrigins)
+	return checkOrigin(r, h.cfg.Security.AllowedOrigins)
 }
 
 // checkOrigin is the shared origin-checking logic used by both
@@ -174,7 +174,7 @@ func (h *Handler[S]) handlePostEvent(w http.ResponseWriter, r *http.Request) {
 
 	// Cap the request body to prevent a malicious client from sending
 	// a multi-gigabyte payload and exhausting server memory.
-	r.Body = http.MaxBytesReader(w, r.Body, h.cfg.MaxEventBytes)
+	r.Body = http.MaxBytesReader(w, r.Body, h.cfg.Limits.MaxEventBytes)
 
 	var ev Event
 	if err := json.NewDecoder(r.Body).Decode(&ev); err != nil {
@@ -225,7 +225,7 @@ func (h *Handler[S]) handlePushSubscribe(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	r.Body = http.MaxBytesReader(w, r.Body, h.cfg.MaxEventBytes)
+	r.Body = http.MaxBytesReader(w, r.Body, h.cfg.Limits.MaxEventBytes)
 
 	var sub push.Subscription
 	if err := json.NewDecoder(r.Body).Decode(&sub); err != nil {

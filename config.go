@@ -85,86 +85,6 @@ type Config[S any] struct {
 	// keystrokes that don't affect the model). Optional.
 	Equal func(a, b S) bool
 
-	// Logger is used for session errors. Defaults to slog.Default().
-	Logger *slog.Logger
-
-	// CmdBufferSize sets the capacity of each session's internal
-	// command channel. Commands include state updates, broadcasts,
-	// and side effects. When the buffer is full, a short-lived
-	// goroutine delivers the command to prevent cross-session
-	// deadlocks during broadcasts. Zero defaults to 64.
-	CmdBufferSize int
-
-	// MaxSessions limits the total number of concurrent sessions
-	// (pending + active + disconnected). Zero means unlimited.
-	MaxSessions int
-
-	// IdleTimeout closes sessions that receive no client events within
-	// this duration. Zero means no idle timeout.
-	IdleTimeout time.Duration
-
-	// MaxLifetime closes sessions after this duration regardless of
-	// activity. Zero means no maximum lifetime.
-	MaxLifetime time.Duration
-
-	// ReconnectTimeout is how long a disconnected session is kept so the
-	// client can reattach. Zero defaults to 30 seconds. Set to -1 to
-	// disable reconnection (sessions are destroyed on disconnect).
-	ReconnectTimeout time.Duration
-
-	// AllowedOrigins restricts WebSocket upgrades, SSE streams, and POST
-	// events to requests whose Origin header matches one of these values.
-	// This provides consistent CSRF protection across all transport types
-	// from a single configuration point.
-	//
-	// Example: []string{"https://example.com", "https://staging.example.com"}
-	//
-	// When empty, the handler falls back to same-host checking (the
-	// Origin header's host must match the request's Host header). This
-	// is suitable for development but should be replaced with an
-	// explicit list in production.
-	AllowedOrigins []string
-
-	// MaxEventBytes limits the size of a POST event body. Events carry
-	// a type, action, and a map of string values (typically form fields).
-	// Zero defaults to 64 KB. Increase this if your forms contain large
-	// text fields (e.g. a rich-text editor).
-	MaxEventBytes int64
-
-	// PendingTimeout is how long a pre-warmed session waits for the
-	// browser to open a transport connection. If the browser never
-	// connects (e.g. the user closes the tab before the JS loads),
-	// the session is discarded after this duration. Zero defaults to
-	// 30 seconds.
-	PendingTimeout time.Duration
-
-	// RetryDelay is the initial delay before the client JS attempts to
-	// reconnect after a WebSocket close. The delay doubles on each
-	// failed attempt up to MaxRetryDelay. Zero defaults to 1 second.
-	RetryDelay time.Duration
-
-	// MaxRetryDelay caps the exponential backoff for client reconnection
-	// attempts. Zero defaults to 30 seconds.
-	MaxRetryDelay time.Duration
-
-	// DefaultDebounce is the debounce interval applied to input events
-	// when the element does not specify data-poly-debounce. Zero
-	// defaults to 300 milliseconds.
-	DefaultDebounce time.Duration
-
-	// TransitionTimeout is how long the client waits for a CSS
-	// transitionend event before forcibly removing a leaving element.
-	// This prevents nodes from getting stuck in the DOM when no CSS
-	// transition is defined. Zero defaults to 5 seconds.
-	TransitionTimeout time.Duration
-
-	// HeartbeatInterval controls how often the SSE transport sends a
-	// keep-alive comment to prevent intermediate proxies (AWS ALB,
-	// Nginx, Cloudflare) from closing idle connections. Has no effect
-	// on WebSocket transports which have their own ping/pong frames.
-	// Zero defaults to 20 seconds. Set to -1 to disable heartbeats.
-	HeartbeatInterval time.Duration
-
 	// OnStructuralChange is called whenever the diff engine detects that
 	// the render tree's structure has changed (Dynamic keys added,
 	// removed, or reordered). Structural changes force a full root morph
@@ -197,6 +117,9 @@ type Config[S any] struct {
 	// When nil, the handler outputs a bare HTML fragment (the poly root
 	// div and scripts only), which puts the browser in quirks mode.
 	Layout func(state S, content node.Node) node.Node
+
+	// Logger is used for session errors. Defaults to slog.Default().
+	Logger *slog.Logger
 
 	// Worker enables the service worker for asset caching, offline page
 	// shells, and push notification support. When true, the client JS
@@ -233,6 +156,112 @@ type Config[S any] struct {
 	// permanently destroyed. Using Groups on Config avoids repetitive
 	// Add/Remove boilerplate in OnConnect/OnDisconnect. Optional.
 	Groups []*Group[S]
+
+	// Timeouts groups all duration-based settings that control session
+	// lifecycle, reconnection, and transport keep-alive timing.
+	Timeouts Timeouts
+
+	// Limits groups capacity constraints: session counts, channel
+	// buffer sizes, and request body limits.
+	Limits Limits
+
+	// Client groups settings that are passed to the browser as data
+	// attributes on the poly root element.
+	Client Client
+
+	// Security groups origin-checking and CSRF protection settings.
+	Security Security
+}
+
+// Timeouts groups duration-based settings for session lifecycle,
+// reconnection, and transport keep-alive.
+type Timeouts struct {
+	// Idle closes sessions that receive no client events within this
+	// duration. Zero means no idle timeout.
+	Idle time.Duration
+
+	// MaxLifetime closes sessions after this duration regardless of
+	// activity. Zero means no maximum lifetime.
+	MaxLifetime time.Duration
+
+	// Reconnect is how long a disconnected session is kept so the
+	// client can reattach. Zero defaults to 30 seconds. Set to -1 to
+	// disable reconnection (sessions are destroyed on disconnect).
+	Reconnect time.Duration
+
+	// Pending is how long a pre-warmed session waits for the browser
+	// to open a transport connection. If the browser never connects
+	// (e.g. the user closes the tab before the JS loads), the session
+	// is discarded after this duration. Zero defaults to 30 seconds.
+	Pending time.Duration
+
+	// Heartbeat controls how often the SSE transport sends a keep-alive
+	// comment to prevent intermediate proxies (AWS ALB, Nginx,
+	// Cloudflare) from closing idle connections. Has no effect on
+	// WebSocket transports which have their own ping/pong frames.
+	// Zero defaults to 20 seconds. Set to -1 to disable heartbeats.
+	Heartbeat time.Duration
+
+	// Retry is the initial delay before the client JS attempts to
+	// reconnect after a WebSocket close. The delay doubles on each
+	// failed attempt up to MaxRetry. Zero defaults to 1 second.
+	Retry time.Duration
+
+	// MaxRetry caps the exponential backoff for client reconnection
+	// attempts. Zero defaults to 30 seconds.
+	MaxRetry time.Duration
+}
+
+// Limits groups capacity constraints for sessions and requests.
+type Limits struct {
+	// MaxSessions limits the total number of concurrent sessions
+	// (pending + active + disconnected). Zero means unlimited.
+	MaxSessions int
+
+	// CmdBufferSize sets the capacity of each session's internal
+	// command channel. Commands include state updates, broadcasts,
+	// and side effects. When the buffer is full, a short-lived
+	// goroutine delivers the command to prevent cross-session
+	// deadlocks during broadcasts. Zero defaults to 64.
+	CmdBufferSize int
+
+	// MaxEventBytes limits the size of a POST event body. Events carry
+	// a type, action, and a map of string values (typically form
+	// fields). Zero defaults to 64 KB. Increase this if your forms
+	// contain large text fields (e.g. a rich-text editor).
+	MaxEventBytes int64
+}
+
+// Client groups settings that control the browser-side JS runtime.
+// These are passed to the browser as data attributes on the poly
+// root element.
+type Client struct {
+	// DefaultDebounce is the debounce interval applied to input events
+	// when the element does not specify data-poly-debounce. Zero
+	// defaults to 300 milliseconds.
+	DefaultDebounce time.Duration
+
+	// TransitionTimeout is how long the client waits for a CSS
+	// transitionend event before forcibly removing a leaving element.
+	// This prevents nodes from getting stuck in the DOM when no CSS
+	// transition is defined. Zero defaults to 5 seconds.
+	TransitionTimeout time.Duration
+}
+
+// Security groups origin-checking and CSRF protection settings.
+type Security struct {
+	// AllowedOrigins restricts WebSocket upgrades, SSE streams, and
+	// POST events to requests whose Origin header matches one of these
+	// values. This provides consistent CSRF protection across all
+	// transport types from a single configuration point.
+	//
+	// Example: []string{"https://example.com", "https://staging.example.com"}
+	//
+	// When empty, the handler falls back to same-host checking (the
+	// Origin header's host must match the request's Host header). This
+	// is suitable for development but should be replaced with an
+	// explicit list in production.
+	AllowedOrigins []string
 }
 
 // PushConfig enables Web Push notifications for the page. When set on

@@ -22,7 +22,7 @@ func (h *Handler[S]) reapPending() {
 		case now := <-ticker.C:
 			h.mu.Lock()
 			for id, ps := range h.pending {
-				if now.Sub(ps.createdAt) > h.cfg.PendingTimeout {
+				if now.Sub(ps.createdAt) > h.cfg.Timeouts.Pending {
 					delete(h.pending, id)
 				}
 			}
