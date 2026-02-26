@@ -3,12 +3,17 @@ package poly
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 )
 
 // Value is a thread-safe container for shared state that notifies
 // observers when it changes. Built on top of [Bus] internally — when
 // Set or Update is called, the new value is published to all observers
 // registered via [Observe].
+//
+// Get is lock-free (atomic load). Set and Update serialise writes
+// under a mutex and store the new value atomically, so concurrent
+// readers never block.
 //
 // Use Value for state that multiple sessions need to stay in sync with
 // (online counts, shared configuration, room membership). For discrete
@@ -25,31 +30,35 @@ import (
 //	    return state
 //	})
 type Value[V any] struct {
-	mu  sync.RWMutex
-	val V
+	// wmu serialises writes (Set, Update, observe). Reads go through
+	// the atomic.Value and need no lock.
+	wmu sync.Mutex
+	val atomic.Value // holds valueBox[V]
 	bus *Bus[V]
 }
 
+// valueBox wraps the stored value so atomic.Value.Store never receives
+// a nil interface — which would panic. The box is always non-nil even
+// when V itself is nil (e.g. Value[*Foo] with a nil pointer).
+type valueBox[V any] struct{ v V }
+
 // NewValue creates a Value with an initial state.
 func NewValue[V any](initial V) *Value[V] {
-	return &Value[V]{
-		val: initial,
-		bus: NewBus[V](),
-	}
+	v := &Value[V]{bus: NewBus[V]()}
+	v.val.Store(valueBox[V]{initial})
+	return v
 }
 
-// Get returns the current value.
+// Get returns the current value. Lock-free.
 func (v *Value[V]) Get() V {
-	v.mu.RLock()
-	defer v.mu.RUnlock()
-	return v.val
+	return v.val.Load().(valueBox[V]).v
 }
 
 // Set writes a new value and publishes it to all observers.
 func (v *Value[V]) Set(val V) {
-	v.mu.Lock()
-	v.val = val
-	v.mu.Unlock()
+	v.wmu.Lock()
+	v.val.Store(valueBox[V]{val})
+	v.wmu.Unlock()
 	v.bus.Publish(val)
 }
 
@@ -58,10 +67,10 @@ func (v *Value[V]) Set(val V) {
 // observers. Useful for counters and accumulators where the new value
 // depends on the old.
 func (v *Value[V]) Update(fn func(V) V) {
-	v.mu.Lock()
-	v.val = fn(v.val)
-	current := v.val
-	v.mu.Unlock()
+	v.wmu.Lock()
+	current := fn(v.Get())
+	v.val.Store(valueBox[V]{current})
+	v.wmu.Unlock()
 	v.bus.Publish(current)
 }
 
@@ -71,13 +80,14 @@ func (v *Value[V]) Len() int {
 }
 
 // observe registers a subscriber and returns the current value
-// atomically. The read lock is held during subscription so a
-// concurrent Set cannot interleave between the subscribe and the
-// read — preventing duplicate delivery of the initial value.
+// atomically. The write mutex is held during both the read and the
+// subscribe so a concurrent Set cannot publish between the two —
+// preventing duplicate delivery of the initial value. Get() callers
+// are unaffected because reads are lock-free.
 func (v *Value[V]) observe(ctx context.Context, fn func(V), sessionID string) V {
-	v.mu.RLock()
-	current := v.val
+	v.wmu.Lock()
+	current := v.Get()
 	v.bus.subscribe(ctx, fn, sessionID)
-	v.mu.RUnlock()
+	v.wmu.Unlock()
 	return current
 }
