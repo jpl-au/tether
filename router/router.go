@@ -16,7 +16,7 @@
 //	poly.New(poly.Config[State]{
 //	    Render: r.Render,
 //	    Handle: r.Handle,
-//	    HandleParams: r.HandleParams(func(s *State, path string) { s.Page = path }),
+//	    OnNavigate: r.OnNavigate(func(s *State, path string) { s.Page = path }),
 //	})
 package router
 
@@ -122,9 +122,9 @@ func (r *Router[S]) loadNotFound() Page[S] {
 	return r.notFound.Load().(Page[S])
 }
 
-// HandleParams is a helper for [poly.Config].HandleParams that simply
+// OnNavigate is a helper for [poly.Config].OnNavigate that simply
 // updates the page field in the state.
-func (r *Router[S]) HandleParams(setter func(*S, string)) func(poly.PreSession, S, poly.Params) S {
+func (r *Router[S]) OnNavigate(setter func(*S, string)) func(poly.PreSession, S, poly.Params) S {
 	return func(_ poly.PreSession, s S, p poly.Params) S {
 		setter(&s, p.Path)
 		return s

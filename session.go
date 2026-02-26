@@ -46,12 +46,12 @@ type Session[S any] struct {
 	id    string
 	state S
 
-	render       RenderFunc[S]
-	handle       HandleFunc[S]
-	handleParams func(PreSession, S, Params) S
-	differ       *jit.Differ
-	transport    Transport
-	logger       *slog.Logger
+	render     RenderFunc[S]
+	handle     HandleFunc[S]
+	onNavigate func(PreSession, S, Params) S
+	differ     *jit.Differ
+	transport  Transport
+	logger     *slog.Logger
 
 	// Channel pair: events from transport, commands from everything else.
 	events chan Event
@@ -117,8 +117,8 @@ type Session[S any] struct {
 }
 
 // PreSession is the subset of Session methods available in
-// [Config.HandleParams]. During pre-warming (initial GET) no real
-// session exists yet, so HandleParams receives a capture
+// [Config.OnNavigate]. During pre-warming (initial GET) no real
+// session exists yet, so OnNavigate receives a capture
 // implementation that buffers side effects. During live navigation
 // the real [Session] satisfies the interface.
 type PreSession interface {
@@ -134,7 +134,7 @@ type PreSession interface {
 }
 
 // captureSession implements PreSession by buffering side effects.
-// Used during pre-warming to allow HandleParams to call SetTitle,
+// Used during pre-warming to allow OnNavigate to call SetTitle,
 // Toast, etc. without panicking on a nil session.
 type captureSession struct {
 	id string

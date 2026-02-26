@@ -27,9 +27,9 @@ func TestRouteOverwritesExistingPage(t *testing.T) {
 	}
 }
 
-func TestHandleParams(t *testing.T) {
+func TestOnNavigate(t *testing.T) {
 	r := New(selector)
-	hp := r.HandleParams(func(s *state, path string) { s.Page = path })
+	hp := r.OnNavigate(func(s *state, path string) { s.Page = path })
 
 	got := hp(nil, state{}, poly.Params{Path: "/settings"})
 	if got.Page != "/settings" {

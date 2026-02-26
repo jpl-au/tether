@@ -87,12 +87,12 @@ func TestPageGETNoRetryDelayAttributes(t *testing.T) {
 	}
 }
 
-func TestPageGETWithHandleParams(t *testing.T) {
+func TestPageGETWithOnNavigate(t *testing.T) {
 	handler := Page(PageConfig[counterState]{
 		State:  func(r *http.Request) counterState { return counterState{} },
 		Render: renderCounter,
 		Handle: pageHandleCounter,
-		HandleParams: func(_ PreSession, state counterState, p Params) counterState {
+		OnNavigate: func(_ PreSession, state counterState, p Params) counterState {
 			if p.Query.Get("count") == "5" {
 				state.Count = 5
 			}
@@ -105,7 +105,7 @@ func TestPageGETWithHandleParams(t *testing.T) {
 	handler.ServeHTTP(w, req)
 
 	if !strings.Contains(w.Body.String(), "Count: 5") {
-		t.Error("expected HandleParams to set count to 5")
+		t.Error("expected OnNavigate to set count to 5")
 	}
 }
 
@@ -360,12 +360,12 @@ func TestPagePanicsOnMissingHandle(t *testing.T) {
 	})
 }
 
-func TestPagePOSTWithHandleParams(t *testing.T) {
+func TestPagePOSTWithOnNavigate(t *testing.T) {
 	handler := Page(PageConfig[counterState]{
 		State:  func(r *http.Request) counterState { return counterState{} },
 		Render: renderCounter,
 		Handle: pageHandleCounter,
-		HandleParams: func(_ PreSession, state counterState, p Params) counterState {
+		OnNavigate: func(_ PreSession, state counterState, p Params) counterState {
 			if p.Query.Get("count") == "5" {
 				state.Count = 5
 			}

@@ -111,12 +111,12 @@ func (s *Session[S]) exec(ev Event) {
 
 	// Phase 1: Handle — produce new state.
 	var newState S
-	if ev.Type == event.Navigate && s.handleParams != nil {
+	if ev.Type == event.Navigate && s.onNavigate != nil {
 		params := Params{Path: ev.Data["path"]}
 		if search := ev.Data["search"]; search != "" {
 			params.Query, _ = url.ParseQuery(search)
 		}
-		newState = s.handleParams(s, s.state, params)
+		newState = s.onNavigate(s, s.state, params)
 	} else {
 		newState = s.handle(s, s.state, ev)
 	}

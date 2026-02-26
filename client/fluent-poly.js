@@ -1088,7 +1088,7 @@ window.Poly.signals = window.Poly.signals || {};
   //
   // Anchors with data-poly-link are intercepted. Instead of a full page
   // load the JS pushes the URL into the browser history and sends a
-  // navigate event to the server so HandleParams can update state.
+  // navigate event to the server so OnNavigate can update state.
 
   function handleLinks(e) {
     var link = e.target.closest("a[data-poly-link]");

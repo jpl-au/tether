@@ -35,13 +35,13 @@ func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 	h.mu.Unlock()
 
 	state := h.cfg.InitialState(r)
-	if h.cfg.HandleParams != nil {
+	if h.cfg.OnNavigate != nil {
 		params := Params{
 			Path:  r.URL.Path,
 			Query: r.URL.Query(),
 		}
 		cs := &captureSession{id: "pre-warm", fx: &effects{}}
-		state = h.cfg.HandleParams(cs, state, params)
+		state = h.cfg.OnNavigate(cs, state, params)
 	}
 	tree := h.cfg.Render(state)
 
@@ -153,13 +153,13 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 
 		id = newID()
 		state = h.cfg.InitialState(r)
-		if h.cfg.HandleParams != nil {
+		if h.cfg.OnNavigate != nil {
 			params := Params{
 				Path:  r.URL.Path,
 				Query: r.URL.Query(),
 			}
 			cs := &captureSession{id: "pre-warm", fx: &effects{}}
-			state = h.cfg.HandleParams(cs, state, params)
+			state = h.cfg.OnNavigate(cs, state, params)
 		}
 		differ = jit.NewDiffer()
 
@@ -174,7 +174,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		state:            state,
 		render:           h.cfg.Render,
 		handle:           h.cfg.Handle,
-		handleParams:     h.cfg.HandleParams,
+		onNavigate:       h.cfg.OnNavigate,
 		differ:           differ,
 		transport:        transport,
 		logger:           h.cfg.Logger.WithGroup("session").With("id", id),

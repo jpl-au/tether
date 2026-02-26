@@ -25,7 +25,7 @@ func TestSessionNavigateEvent(t *testing.T) {
 			)
 		}
 
-		handleParams := func(_ PreSession, s state, params Params) state {
+		onNavigate := func(_ PreSession, s state, params Params) state {
 			s.Page = params.Path
 			return s
 		}
@@ -39,20 +39,20 @@ func TestSessionNavigateEvent(t *testing.T) {
 		differ := jit.NewDiffer()
 		ctx, cancel := context.WithCancel(context.Background())
 		sess := &Session[state]{
-			id:           "test",
-			state:        state{Page: "/"},
-			render:       render,
-			handle:       func(_ *Session[state], s state, ev Event) state { return s },
-			handleParams: handleParams,
-			differ:       differ,
-			transport:    mt,
-			logger:       slog.Default(),
-			events:       make(chan Event),
-			cmds:         make(chan func(), defaultCmdBufferSize),
-			fxCh:         make(chan func(*effects), defaultCmdBufferSize),
-			loopDone:     make(chan struct{}),
-			ctx:          ctx,
-			stop:         cancel,
+			id:         "test",
+			state:      state{Page: "/"},
+			render:     render,
+			handle:     func(_ *Session[state], s state, ev Event) state { return s },
+			onNavigate: onNavigate,
+			differ:     differ,
+			transport:  mt,
+			logger:     slog.Default(),
+			events:     make(chan Event),
+			cmds:       make(chan func(), defaultCmdBufferSize),
+			fxCh:       make(chan func(*effects), defaultCmdBufferSize),
+			loopDone:   make(chan struct{}),
+			ctx:        ctx,
+			stop:       cancel,
 		}
 
 		tree := sess.render(sess.state)
@@ -83,7 +83,7 @@ func TestSessionNavigateEventWithQuery(t *testing.T) {
 			Tab  string
 		}
 
-		handleParams := func(_ PreSession, s state, params Params) state {
+		onNavigate := func(_ PreSession, s state, params Params) state {
 			s.Page = params.Path
 			if params.Query != nil {
 				s.Tab = params.Query.Get("tab")
@@ -100,20 +100,20 @@ func TestSessionNavigateEventWithQuery(t *testing.T) {
 		differ := jit.NewDiffer()
 		ctx, cancel := context.WithCancel(context.Background())
 		sess := &Session[state]{
-			id:           "test",
-			state:        state{Page: "/"},
-			render:       func(s state) node.Node { return div.New(span.Text(s.Page).Dynamic("page")) },
-			handle:       func(_ *Session[state], s state, ev Event) state { return s },
-			handleParams: handleParams,
-			differ:       differ,
-			transport:    mt,
-			logger:       slog.Default(),
-			events:       make(chan Event),
-			cmds:         make(chan func(), defaultCmdBufferSize),
-			fxCh:         make(chan func(*effects), defaultCmdBufferSize),
-			loopDone:     make(chan struct{}),
-			ctx:          ctx,
-			stop:         cancel,
+			id:         "test",
+			state:      state{Page: "/"},
+			render:     func(s state) node.Node { return div.New(span.Text(s.Page).Dynamic("page")) },
+			handle:     func(_ *Session[state], s state, ev Event) state { return s },
+			onNavigate: onNavigate,
+			differ:     differ,
+			transport:  mt,
+			logger:     slog.Default(),
+			events:     make(chan Event),
+			cmds:       make(chan func(), defaultCmdBufferSize),
+			fxCh:       make(chan func(*effects), defaultCmdBufferSize),
+			loopDone:   make(chan struct{}),
+			ctx:        ctx,
+			stop:       cancel,
 		}
 
 		tree := sess.render(sess.state)
@@ -130,7 +130,7 @@ func TestSessionNavigateEventWithQuery(t *testing.T) {
 	})
 }
 
-func TestSessionNavigateEventWithoutHandleParams(t *testing.T) {
+func TestSessionNavigateEventWithoutOnNavigate(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		var receivedAction event.Type
 
@@ -242,20 +242,20 @@ func TestCaptureSessionBuffersEffects(t *testing.T) {
 	}
 }
 
-func TestHandleParamsWithCaptureSession(t *testing.T) {
+func TestOnNavigateWithCaptureSession(t *testing.T) {
 	type state struct {
 		Page  string
 		Title string
 	}
 
-	handleParams := func(s PreSession, st state, params Params) state {
+	onNavigate := func(s PreSession, st state, params Params) state {
 		st.Page = params.Path
 		s.SetTitle("My App - " + params.Path)
 		return st
 	}
 
 	cs := &captureSession{id: "pre", fx: &effects{}}
-	result := handleParams(cs, state{}, Params{Path: "/about"})
+	result := onNavigate(cs, state{}, Params{Path: "/about"})
 
 	if result.Page != "/about" {
 		t.Errorf("Page = %q, want %q", result.Page, "/about")

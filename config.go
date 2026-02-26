@@ -54,7 +54,7 @@ type Config[S any] struct {
 	// layer of the chain. Optional.
 	Middleware []Middleware[S]
 
-	// HandleParams processes a URL change and returns the new state.
+	// OnNavigate processes a URL change and returns the new state.
 	// Called on initial page load (after InitialState) and when the
 	// browser navigates via link click or back/forward. If nil,
 	// navigation events fall through to Handle.
@@ -64,7 +64,7 @@ type Config[S any] struct {
 	// exists) and during live navigation. Side-effect methods (SetTitle,
 	// Toast, etc.) are always safe to call. During pre-warming, effects
 	// are captured; during navigation, they are sent to the client.
-	HandleParams func(session PreSession, state S, params Params) S
+	OnNavigate func(session PreSession, state S, params Params) S
 
 	// OnConnect is called after a new session is created and its
 	// transport is ready. Use this to add the session to a [Group]

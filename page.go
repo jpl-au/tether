@@ -41,14 +41,14 @@ type PageConfig[S any] struct {
 	// Handle processes a client event and returns the new state. Side
 	// effects (toast, navigate, title, etc.) are expressed as calls on
 	// the [PreSession] parameter — the same interface used by
-	// [Config].HandleParams. The effects are included in the JSON
+	// [Config].OnNavigate. The effects are included in the JSON
 	// response so the client can apply them atomically.
 	Handle func(session PreSession, state S, event Event) S
 
-	// HandleParams processes URL parameters on every request. Called
+	// OnNavigate processes URL parameters on every request. Called
 	// after State on both GET and POST. Same signature as
-	// [Config].HandleParams. Optional.
-	HandleParams func(session PreSession, state S, params Params) S
+	// [Config].OnNavigate. Optional.
+	OnNavigate func(session PreSession, state S, params Params) S
 
 	// Layout wraps the page content in a full HTML document. Runs on
 	// every GET request (stateless pages reconstruct state each time).
@@ -154,10 +154,10 @@ func (p *pageHandler[S]) serveGET(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	state := p.cfg.State(r)
-	if p.cfg.HandleParams != nil {
+	if p.cfg.OnNavigate != nil {
 		cs := &captureSession{id: "", fx: &effects{}}
 		params := Params{Path: r.URL.Path, Query: r.URL.Query()}
-		state = p.cfg.HandleParams(cs, state, params)
+		state = p.cfg.OnNavigate(cs, state, params)
 	}
 
 	tree := p.cfg.Render(state)
@@ -214,9 +214,9 @@ func (p *pageHandler[S]) servePOST(w http.ResponseWriter, r *http.Request) {
 
 	fx := &effects{}
 	cs := &captureSession{id: "", fx: fx}
-	if p.cfg.HandleParams != nil {
+	if p.cfg.OnNavigate != nil {
 		params := Params{Path: r.URL.Path, Query: r.URL.Query()}
-		state = p.cfg.HandleParams(cs, state, params)
+		state = p.cfg.OnNavigate(cs, state, params)
 	}
 
 	state = p.cfg.Handle(cs, state, ev)
