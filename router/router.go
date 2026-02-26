@@ -21,6 +21,9 @@
 package router
 
 import (
+	"sync"
+	"sync/atomic"
+
 	poly "github.com/jpl-au/fluent-poly"
 	"github.com/jpl-au/fluent/node"
 )
@@ -38,56 +41,85 @@ type Page[S any] struct {
 // To use Router, your state must have a field that tracks the current
 // page (typically a string path). Pass a selector function to [New]
 // that returns this field.
+//
+// The page registry is stored in an [atomic.Value] so dispatch (Render
+// and Handle) is completely lock-free. Route and NotFound use a write
+// mutex with copy-on-write semantics.
 type Router[S any] struct {
 	selector func(S) string
-	pages    map[string]Page[S]
-	notFound Page[S]
+	wmu      sync.Mutex
+	pages    atomic.Value // holds map[string]Page[S]
+	notFound atomic.Value // holds Page[S]
 }
 
 // New creates a router that dispatches based on the string returned
 // by the selector function.
 func New[S any](selector func(S) string) *Router[S] {
-	return &Router[S]{
+	r := &Router[S]{
 		selector: selector,
-		pages:    make(map[string]Page[S]),
 	}
+	r.pages.Store(make(map[string]Page[S]))
+	r.notFound.Store(Page[S]{})
+	return r
 }
 
-// Route registers a page for a specific path.
+// Route registers a page for a specific path. Thread-safe via
+// copy-on-write.
 func (r *Router[S]) Route(path string, page Page[S]) {
-	r.pages[path] = page
+	r.wmu.Lock()
+	defer r.wmu.Unlock()
+
+	old := r.loadPages()
+	newPages := make(map[string]Page[S], len(old)+1)
+	for k, v := range old {
+		newPages[k] = v
+	}
+	newPages[path] = page
+	r.pages.Store(newPages)
 }
 
 // NotFound sets the page used when the selector returns an unknown
-// path.
+// path. Thread-safe.
 func (r *Router[S]) NotFound(page Page[S]) {
-	r.notFound = page
+	r.notFound.Store(page)
 }
 
 // Render implements [poly.RenderFunc]. It dispatches to the active
-// page's Render function.
+// page's Render function. Lock-free.
 func (r *Router[S]) Render(s S) node.Node {
 	path := r.selector(s)
-	if p, ok := r.pages[path]; ok {
+	pages := r.loadPages()
+	if p, ok := pages[path]; ok {
 		return p.Render(s)
 	}
-	if r.notFound.Render != nil {
-		return r.notFound.Render(s)
+	nf := r.loadNotFound()
+	if nf.Render != nil {
+		return nf.Render(s)
 	}
 	return nil
 }
 
 // Handle implements [poly.HandleFunc]. It dispatches to the active
-// page's Handle function.
+// page's Handle function. Lock-free.
 func (r *Router[S]) Handle(sess *poly.Session[S], s S, ev poly.Event) S {
 	path := r.selector(s)
-	if p, ok := r.pages[path]; ok && p.Handle != nil {
+	pages := r.loadPages()
+	if p, ok := pages[path]; ok && p.Handle != nil {
 		return p.Handle(sess, s, ev)
 	}
-	if r.notFound.Handle != nil {
-		return r.notFound.Handle(sess, s, ev)
+	nf := r.loadNotFound()
+	if nf.Handle != nil {
+		return nf.Handle(sess, s, ev)
 	}
 	return s
+}
+
+func (r *Router[S]) loadPages() map[string]Page[S] {
+	return r.pages.Load().(map[string]Page[S])
+}
+
+func (r *Router[S]) loadNotFound() Page[S] {
+	return r.notFound.Load().(Page[S])
 }
 
 // HandleParams is a helper for [poly.Config].HandleParams that simply
