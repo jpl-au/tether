@@ -32,18 +32,19 @@ func (s *Session[S]) State() S {
 // call it from timers, database change listeners, message queue
 // consumers, or [Group.Broadcast].
 //
-// When called inside Handle, the state change is applied directly and
-// will be rendered as part of the current exec cycle.
+// A full render-diff-send cycle is queued as a command and runs after
+// the current event (if any) has been fully processed. This means
+// that when called inside Handle, the update does not take effect
+// until Handle returns — the Handle return value is always
+// authoritative for the triggering event. Non-blocking — returns
+// immediately after queuing.
 //
-// When called from outside, a full render-diff-send cycle is queued
-// as a command. Non-blocking — returns immediately after queuing.
+// Inside Handle, prefer returning the new state directly rather than
+// calling Update. Update is designed for side-effects like broadcasts
+// where the caller does not control Handle's return value.
 //
 // Safe to call from any goroutine, including from within Handle.
 func (s *Session[S]) Update(fn func(S) S) {
-	if s.handling {
-		s.state = fn(s.state)
-		return
-	}
 	s.enqueue(func() {
 		s.handling = true
 		s.fx = &effects{}
