@@ -42,21 +42,19 @@ func (h *Handler[S]) Shutdown(ctx context.Context) error {
 	h.closeOnce.Do(func() { close(h.done) })
 
 	h.mu.Lock()
-	sessions := make([]*Session[S], 0, len(h.active))
+	sessions := make([]*Session[S], 0, len(h.active)+len(h.disconnected))
 	for _, sess := range h.active {
 		sessions = append(sessions, sess)
 	}
-	// Cancel disconnected session contexts — they will never be
-	// reclaimed.
 	for _, sess := range h.disconnected {
-		sess.stop()
+		sessions = append(sessions, sess)
 	}
 	// Clear pending and disconnected maps to release memory.
 	clear(h.pending)
 	clear(h.disconnected)
 	h.mu.Unlock()
 
-	// Cancel all active sessions and close their transports.
+	// Cancel all sessions and close their transports.
 	for _, sess := range sessions {
 		sess.stop()
 	}

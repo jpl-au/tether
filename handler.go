@@ -104,6 +104,9 @@ func New[S any](cfg Config[S]) *Handler[S] {
 	if cfg.HeartbeatInterval == 0 {
 		cfg.HeartbeatInterval = defaultHeartbeatInterval
 	}
+	if cfg.CmdBufferSize == 0 {
+		cfg.CmdBufferSize = defaultCmdBufferSize
+	}
 	h := &Handler[S]{
 		cfg:           cfg,
 		pending:       make(map[string]*pendingSession[S]),

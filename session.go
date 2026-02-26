@@ -31,10 +31,9 @@ type StructuralChange struct {
 // engine compares consecutive renders to compute patches.
 type RenderFunc[S any] func(state S) node.Node
 
-// cmdBufferSize is the capacity of the command channel. When full, the
-// sender blocks — providing natural backpressure. Convention over
-// configuration: no knob.
-const cmdBufferSize = 64
+// defaultCmdBufferSize is the capacity of the command channel when
+// [Config].CmdBufferSize is zero.
+const defaultCmdBufferSize = 64
 
 // Session represents a single connected client. Each browser tab gets
 // its own Session with independent state, a dedicated diff engine, and
@@ -228,6 +227,10 @@ func (s *Session[S]) enqueue(fn func()) {
 	select {
 	case s.cmds <- fn:
 	default:
+		// Command buffer full — overflow to a goroutine to prevent
+		// deadlock. This is expected during broadcast storms but
+		// sustained overflow suggests the buffer is too small.
+		s.logger.Warn("command buffer full, overflow to goroutine")
 		go func() {
 			select {
 			case s.cmds <- fn:

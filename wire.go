@@ -112,6 +112,12 @@ func encodeUpdate(u update) updateMessage {
 // marshalUpdate encodes an update as JSON with HTML escaping disabled.
 // This is the single encoding path — called from Session.send() so
 // transports only deal with raw bytes.
+//
+// HTML escaping is intentionally off because patches carry pre-rendered
+// HTML from the fluent template engine, which is responsible for
+// escaping user-provided values. No secondary sanitisation is performed
+// at the transport layer — if the template engine produces unsafe HTML,
+// it will reach the client as-is.
 func marshalUpdate(u update) ([]byte, error) {
 	msg := encodeUpdate(u)
 

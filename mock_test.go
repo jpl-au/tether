@@ -125,7 +125,7 @@ func newTestSession(state counterState, mt *mockTransport) *Session[counterState
 		transport: mt,
 		logger:    slog.Default().WithGroup("session").With("id", "test"),
 		events:    make(chan Event),
-		cmds:      make(chan func(), cmdBufferSize),
+		cmds:      make(chan func(), defaultCmdBufferSize),
 		loopDone:  make(chan struct{}),
 		ctx:       ctx,
 		stop:      cancel,

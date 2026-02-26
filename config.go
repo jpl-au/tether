@@ -82,8 +82,15 @@ type Config[S any] struct {
 	// Logger is used for session errors. Defaults to slog.Default().
 	Logger *slog.Logger
 
+	// CmdBufferSize sets the capacity of each session's internal
+	// command channel. Commands include state updates, broadcasts,
+	// and side effects. When the buffer is full, a short-lived
+	// goroutine delivers the command to prevent cross-session
+	// deadlocks during broadcasts. Zero defaults to 64.
+	CmdBufferSize int
+
 	// MaxSessions limits the total number of concurrent sessions
-	// (pending + active). Zero means unlimited.
+	// (pending + active + disconnected). Zero means unlimited.
 	MaxSessions int
 
 	// IdleTimeout closes sessions that receive no client events within

@@ -46,6 +46,12 @@ func buildWorkerJS(precache []string) []byte {
 		h.Write(data)
 		return nil
 	})
+	// Include precache URLs in the hash so the worker version changes
+	// when the developer updates the precache list, even if no JS
+	// files change.
+	for _, u := range precache {
+		h.Write([]byte(u))
+	}
 	version := hex.EncodeToString(h.Sum(nil))[:12]
 
 	raw, _ := fs.ReadFile(clientFiles(), "fluent-poly-worker.js")

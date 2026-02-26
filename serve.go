@@ -26,13 +26,8 @@ func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 
 	h.cfg.Logger.Info("serving initial page")
 
-	// Disconnected sessions are excluded from the limit because they
-	// are not actively consuming transport resources — they are just
-	// holding state in memory while waiting for the client to reconnect.
-	// Including them would cause new connections to be rejected during
-	// brief network interruptions when many clients disconnect at once.
 	h.mu.Lock()
-	if h.cfg.MaxSessions > 0 && len(h.pending)+len(h.active) >= h.cfg.MaxSessions {
+	if h.cfg.MaxSessions > 0 && len(h.pending)+len(h.active)+len(h.disconnected) >= h.cfg.MaxSessions {
 		h.mu.Unlock()
 		http.Error(w, "too many sessions", http.StatusServiceUnavailable)
 		return
@@ -149,7 +144,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		// Enforce MaxSessions.
 		if h.cfg.MaxSessions > 0 {
 			h.mu.Lock()
-			full := len(h.pending)+len(h.active) >= h.cfg.MaxSessions
+			full := len(h.pending)+len(h.active)+len(h.disconnected) >= h.cfg.MaxSessions
 			h.mu.Unlock()
 			if full {
 				return
@@ -184,7 +179,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		transport:        transport,
 		logger:           h.cfg.Logger.WithGroup("session").With("id", id),
 		events:           make(chan Event),
-		cmds:             make(chan func(), cmdBufferSize),
+		cmds:             make(chan func(), h.cfg.CmdBufferSize),
 		loopDone:         make(chan struct{}),
 		ctx:              ctx,
 		stop:             cancel,
