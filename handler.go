@@ -70,6 +70,10 @@ func New[S any](cfg Config[S]) *Handler[S] {
 		panic("poly: Config.Fallback is required for SSE mode")
 	}
 
+	if len(cfg.Middleware) > 0 {
+		cfg.Handle = chain(cfg.Handle, cfg.Middleware)
+	}
+
 	if cfg.Push != nil {
 		cfg.Worker = true
 	}

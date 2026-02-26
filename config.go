@@ -48,6 +48,12 @@ type Config[S any] struct {
 	// from within Handle — there is no deadlock risk.
 	Handle HandleFunc[S]
 
+	// Middleware wraps the Handle function with cross-cutting behaviour
+	// such as logging, authentication, or metrics. Middleware is applied
+	// outermost-first: the first entry in the slice is the outermost
+	// layer of the chain. Optional.
+	Middleware []Middleware[S]
+
 	// HandleParams processes a URL change and returns the new state.
 	// Called on initial page load (after InitialState) and when the
 	// browser navigates via link click or back/forward. If nil,
