@@ -42,6 +42,7 @@ No WebSocket boilerplate. No JavaScript to write. No diff algorithm to understan
 
 | Guide | Description |
 |-------|-------------|
+| [API reference](docs/api.md) | Config, Session, Group, Router, bind helpers |
 | [Getting started](docs/getting-started.md) | Setup, how updates reach the browser |
 | [Events](docs/events.md) | Event binding, timing, loading states, forms |
 | [Signals](docs/signals.md) | Reactive signals, client directives, optimistic updates |

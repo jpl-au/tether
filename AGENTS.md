@@ -459,7 +459,7 @@ Signal bindings in `bind/signal.go` (`BindText`, `BindShow`, `BindHide`, `BindCl
 
 Client-side signal directives (`bind.ToggleSignal`, `bind.SetSignal`) update signals in the browser without contacting the server. Optimistic updates (`bind.Optimistic`, `bind.OptimisticToggle`) set a signal immediately before the event reaches the server — the server can correct the value in its response.
 
-See [signals docs](docs/signals.md) for the full guide.
+See [signals docs](docs/signals.md) for the full guide. For the complete public API surface, see [API reference](docs/api.md).
 
 ## Transport mode
 
