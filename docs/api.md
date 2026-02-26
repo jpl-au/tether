@@ -20,7 +20,8 @@ poly.New(poly.Config[State]{
 | `InitialState` | `func(*http.Request) S` | Creates initial state per connection |
 | `Render` | `func(S) node.Node` | Builds the node tree from state |
 | `Handle` | `func(*Session[S], S, Event) S` | Processes events, returns new state |
-| `HandleParams` | `func(PreSession, S, Params) S` | Handles URL navigation and initial load |
+| `Middleware` | `[]Middleware[S]` | Wraps Handle with cross-cutting behaviour |
+| `OnNavigate` | `func(PreSession, S, Params) S` | Handles URL navigation and initial load |
 | `Layout` | `func(S, node.Node) node.Node` | Wraps the poly root in a full HTML document |
 | `Equal` | `func(a, b S) bool` | Skips render when state is unchanged |
 
@@ -45,25 +46,36 @@ Mode constants: `mode.WebSocket`, `mode.SSE`, `mode.Auto`, `mode.Fetch`.
 
 ### Timeouts
 
+`Config.Timeouts` groups duration-based settings:
+
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `IdleTimeout` | `time.Duration` | 0 (disabled) | Close sessions inactive for this long |
+| `Idle` | `time.Duration` | 0 (disabled) | Close sessions inactive for this long |
 | `MaxLifetime` | `time.Duration` | 0 (disabled) | Close sessions after this long regardless |
-| `ReconnectTimeout` | `time.Duration` | 30s | Keep disconnected sessions alive for reconnection |
-| `PendingTimeout` | `time.Duration` | 30s | Wait for browser to claim pre-warmed session |
-| `HeartbeatInterval` | `time.Duration` | 20s | SSE keep-alive interval (-1 disables) |
+| `Reconnect` | `time.Duration` | 30s | Keep disconnected sessions alive for reconnection |
+| `Pending` | `time.Duration` | 30s | Wait for browser to claim pre-warmed session |
+| `Heartbeat` | `time.Duration` | 20s | SSE keep-alive interval (-1 disables) |
+| `Retry` | `time.Duration` | 1s | Initial client reconnection delay |
+| `MaxRetry` | `time.Duration` | 30s | Maximum exponential backoff |
 
-### Tuning
+### Limits
+
+`Config.Limits` groups capacity constraints:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `MaxSessions` | `int` | 0 (unlimited) | Maximum concurrent sessions |
 | `CmdBufferSize` | `int` | 64 | Session command channel capacity |
 | `MaxEventBytes` | `int64` | 64 KB | Maximum POST event body size |
+
+### Client
+
+`Config.Client` groups browser-side settings:
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
 | `DefaultDebounce` | `time.Duration` | 300ms | Default input event debounce |
 | `TransitionTimeout` | `time.Duration` | 5s | Fallback for CSS `transitionend` |
-| `RetryDelay` | `time.Duration` | 1s | Initial reconnection delay |
-| `MaxRetryDelay` | `time.Duration` | 30s | Maximum exponential backoff |
 
 ### Extensions
 
@@ -77,9 +89,16 @@ Mode constants: `mode.WebSocket`, `mode.SSE`, `mode.Auto`, `mode.Fetch`.
 
 ### Security
 
+`Config.Security` groups CSRF protection:
+
 | Field | Type | Description |
 |-------|------|-------------|
 | `AllowedOrigins` | `[]string` | Restrict connections to these origins |
+
+### Other
+
+| Field | Type | Description |
+|-------|------|-------------|
 | `Logger` | `*slog.Logger` | Session error logger (default `slog.Default()`) |
 
 ---
@@ -120,7 +139,7 @@ s.Push(push.Notification{...})         // Web Push notification
 
 ### PreSession
 
-`poly.PreSession` is the subset of Session available in `HandleParams`. It exposes: `ID`, `Toast`, `Navigate`, `ReplaceURL`, `SetTitle`, `Announce`, `Flash`, `Signal`, `Signals`.
+`poly.PreSession` is the subset of Session available in `OnNavigate` and stateless page handlers. It exposes: `ID`, `Toast`, `Navigate`, `ReplaceURL`, `SetTitle`, `Announce`, `Flash`, `Signal`, `Signals`.
 
 ---
 
@@ -134,10 +153,30 @@ type Event struct {
     EventID string            // monotonic counter for correlation
 }
 
-func (e Event) Value() string // shorthand for e.Data["value"]
+// Accessors
+func (e Event) Value() string                      // e.Data["value"]
+func (e Event) Key() string                        // keydown key name
+func (e Event) Get(key string) (string, bool)      // check and get
+func (e Event) Int(key string) (int, error)        // parse integer
+func (e Event) Float64(key string) (float64, error) // parse float
+func (e Event) Bool(key string) bool               // "true" → true
+func (e Event) Bind(dest any) error                // struct-tag form binding
 ```
 
 Event type constants live in the `event` package: `event.Click`, `event.Input`, `event.Submit`, `event.Change`, `event.KeyDown`, `event.Focus`, `event.Blur`, `event.Navigate`. Create custom types with `event.Custom("name")`.
+
+### Typed data extraction
+
+```go
+count, _ := ev.Int("count")
+if ev.Bool("confirmed") { ... }
+
+var form struct {
+    Email string `poly:"email"`
+    Age   int    `poly:"age"`
+}
+ev.Bind(&form)
+```
 
 ### Params
 
@@ -206,7 +245,7 @@ r.NotFound(router.Page[State]{Render: notFoundRender})
 poly.New(poly.Config[State]{
     Render:       r.Render,
     Handle:       r.Handle,
-    HandleParams: r.HandleParams(func(s *State, path string) { s.Page = path }),
+    OnNavigate: r.OnNavigate(func(s *State, path string) { s.Page = path }),
 })
 ```
 
@@ -282,6 +321,71 @@ bind.UploadProgress(el, "avatar")      // bind to upload progress signal
 ```go
 bind.Hook(el, "chart")           // JS lifecycle callbacks
 bind.Transition(el, "fade")      // CSS enter/leave transitions
+```
+
+### Composition with Apply
+
+Stack multiple behaviours top-to-bottom instead of nested inside-out:
+
+```go
+bind.Apply(btn,
+    bind.OnClick("delete"),
+    bind.WithConfirm("Sure?"),
+    bind.WithDisable("Deleting..."),
+)
+```
+
+---
+
+## Middleware
+
+Wraps `Handle` for cross-cutting concerns. Applied outermost-first:
+
+```go
+type Middleware[S any] func(HandleFunc[S]) HandleFunc[S]
+
+poly.New(poly.Config[State]{
+    Middleware: []poly.Middleware[State]{withLogging, withAuth},
+})
+```
+
+---
+
+## Catch
+
+Render-level error boundary:
+
+```go
+poly.Catch(func() node.Node {
+    return riskyWidget(s)
+}, span.Text("Unavailable"))
+```
+
+Recovers panics, logs them, and returns the fallback node.
+
+---
+
+## polytest
+
+Test harness for Handle functions:
+
+```go
+h := polytest.New(polytest.Config[State]{
+    State:  State{Count: 0},
+    Render: render,
+    Handle: handle,
+})
+
+h.Send("increment")
+h.SendInput("search", "query")
+h.SendSubmit("save", map[string]string{"name": "Bob"})
+
+h.State()       // accumulated state
+h.HTML()        // rendered HTML
+h.Toast()       // last toast
+h.URL()         // last navigation
+h.Title()       // last title change
+h.Render()      // full GET render
 ```
 
 ---

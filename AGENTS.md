@@ -27,6 +27,7 @@ poly/router/    URL router — dispatches Render/Handle by path
 poly/ws/        WebSocket transport (only package importing coder/websocket)
 poly/sse/       SSE+POST transport (no external dependencies)
 poly/push/      Web Push notification sending (RFC 8291 + RFC 8292)
+poly/polytest/  Test harness for Handle functions (no channels, no transports)
 poly/client/    Embedded JS files (fluent-poly.js, idiomorph.min.js, poly-worker.js)
 ```
 
@@ -48,7 +49,10 @@ effects.go      Internal effects accumulator (replaces HandleResult)
 group.go        Broadcasting — Group, Broadcast, BroadcastOthers, All()
 protocol.go     Wire format types and encoding
 transport.go    Transport interface
-event.go        Event and Params types
+event.go        Event and Params types, convenience helpers (Key, Int, Bool, Get, Float64)
+event_bind.go   Event.Bind — reflection-based form field decoding
+middleware.go   Middleware type and chain function
+catch.go        Catch — render-level error boundary with panic recovery
 embed.go        Client JS embedding, ServeClient
 push/push.go    Web Push protocol — Send(), GenerateVAPIDKeys(), VAPID auth, aes128gcm encryption
 ```
@@ -183,8 +187,8 @@ Focus is applied after patches and morphs. Only one element should have this att
 Bidirectional sync between Go state and the browser URL. Anchors with `data-poly-link` are intercepted by the JS runtime — instead of a full page load, the URL is pushed via `history.pushState` and a navigate event is sent to the server.
 
 ```go
-// Config — HandleParams processes URL changes on initial load and navigation
-HandleParams: func(_ poly.PreSession, state State, params poly.Params) State {
+// Config — OnNavigate processes URL changes on initial load and navigation
+OnNavigate: func(_ poly.PreSession, state State, params poly.Params) State {
     state.Page = params.Path
     return state
 },
@@ -196,12 +200,12 @@ bind.Link(a.Link("/profile", "Profile"))
 a.Link("/profile", "Profile").SetData("poly-link", "")
 ```
 
-`HandleParams` is called:
+`OnNavigate` is called:
 1. On initial page load (after `InitialState`), with the request URL
 2. On link clicks within `[data-poly-link]` anchors
 3. On browser back/forward (popstate)
 
-If `HandleParams` is nil, navigation events fall through to `Handle` as `Event{Type: "navigate", Data: {"path": "...", "search": "..."}}`.
+If `OnNavigate` is nil, navigation events fall through to `Handle` as `Event{Type: "navigate", Data: {"path": "...", "search": "..."}}`.
 
 **Server-initiated URL and title updates:**
 
@@ -247,6 +251,86 @@ Client-managed state survives server morphs automatically. If the element is rem
 **Performance:** The generic bind helpers are ~47% slower than raw `SetData` and add 2 extra allocations per element. For performance-sensitive code, prefer `SetData` directly. Run `go test -bench=BenchmarkBind -benchmem` in the `bind/` directory to compare.
 
 **PGO:** Applications consuming fluent-poly benefit from [Profile-Guided Optimization](https://go.dev/doc/pgo). Collect a CPU profile from production and place it as `default.pgo` in the main package. Do not commit a `default.pgo` into this library — PGO profiles are application-specific.
+
+## Event helpers
+
+Typed accessors on `Event` for convenient data extraction:
+
+```go
+ev.Value()                    // shorthand for ev.Data["value"]
+ev.Key()                      // keydown key name (ev.Data["key"])
+name, ok := ev.Get("name")   // check and get value
+count, err := ev.Int("count") // parse integer
+ratio, err := ev.Float64("ratio") // parse float
+if ev.Bool("confirmed") { ... }   // "true" → true
+
+// Decode multiple form fields into a struct
+var form struct {
+    Email string `poly:"email"`
+    Age   int    `poly:"age"`
+}
+if err := ev.Bind(&form); err != nil { ... }
+```
+
+`Bind` uses reflection with `poly` struct tags. Supports `string`, `int`, `int64`, `float64`, and `bool` fields. Untagged exported fields default to the lowercased field name.
+
+## Middleware
+
+`Middleware[S]` wraps the Handle function for cross-cutting concerns. Applied outermost-first — the first entry in the slice is the outermost layer:
+
+```go
+type Middleware[S any] func(HandleFunc[S]) HandleFunc[S]
+
+func withLogging[S any](next poly.HandleFunc[S]) poly.HandleFunc[S] {
+    return func(sess *poly.Session[S], s S, ev poly.Event) S {
+        slog.Info("event", "action", ev.Action)
+        return next(sess, s, ev)
+    }
+}
+
+poly.New(poly.Config[State]{
+    Middleware: []poly.Middleware[State]{withLogging, withAuth},
+    // ...
+})
+```
+
+Middleware is applied during `New()` by composing the chain around `Handle`.
+
+## Error boundaries with Catch
+
+`poly.Catch` wraps a render function with panic recovery, returning a fallback node if the component panics:
+
+```go
+func render(s State) node.Node {
+    return div.New(
+        header(s),
+        poly.Catch(func() node.Node {
+            return riskyWidget(s)
+        }, span.Text("Widget unavailable")),
+        footer(s),
+    )
+}
+```
+
+The rest of the page renders normally. Panics are logged via `slog.Error`.
+
+## Apply composition helper
+
+`bind.Apply` chains multiple behaviours on an element top-to-bottom instead of inside-out nesting:
+
+```go
+// Nested (inside-out)
+bind.Disable(bind.Confirm(bind.Click(btn, "delete"), "Sure?"), "Deleting...")
+
+// Applied (top-to-bottom)
+bind.Apply(btn,
+    bind.OnClick("delete"),
+    bind.WithConfirm("Sure?"),
+    bind.WithDisable("Deleting..."),
+)
+```
+
+Option helpers: `OnClick`, `OnSubmit`, `OnInput`, `OnChange`, `OnKeyDown`, `OnFocus`, `OnBlur`, `OnViewport`, `WithDisable`, `WithConfirm`, `WithPreserve`, `WithAutoFocus`, `WithIndicator`, `WithFocusTrap`, `WithDebounce`, `WithThrottle`, `WithFilterKey`, `WithEventData`, `WithLink`, `WithToggleClass`, `WithToggleTarget`, `WithToggleAttr`, `WithCloak`, `WithPermanent`, `WithHook`, `WithTransition`.
 
 ## Form validation
 
@@ -631,6 +715,35 @@ Most tests that start a session loop use `testing/synctest.Test` for determinist
 
 `bind_test.go` uses `package poly_test` (black-box) because it verifies the public API with real Fluent elements. All other test files use `package poly` (white-box).
 
+### Testing with polytest
+
+The `polytest` package provides a test harness for Handle functions without channels, transports, or goroutines:
+
+```go
+h := polytest.New(polytest.Config[State]{
+    State:  State{Count: 0},
+    Render: render,
+    Handle: handle,
+})
+
+h.Send("increment")
+h.SendInput("search", "query")
+h.SendSubmit("save", map[string]string{"name": "Bob"})
+
+// Assertions
+h.State()       // accumulated state
+h.HTML()        // rendered HTML from last Send
+h.Toast()       // last toast message
+h.HasToast("x") // convenience check
+h.URL()         // last navigated URL
+h.Title()       // last title change
+h.Announce()    // last accessibility announcement
+h.Flash()       // last flash messages
+h.Signals()     // last signal values
+h.Render()      // full GET render of current state
+h.RenderNode()  // node tree for direct inspection
+```
+
 ## Client JS
 
 `client/fluent-poly.js` is plain JS with no build step or bundler. It uses `Idiomorph.morph()` from the bundled `idiomorph.min.js` (0BSD licence). Both are embedded via `go:embed` in `embed.go` and served by `ServeClient()`.
@@ -821,7 +934,7 @@ IndexedDB helpers (`openEventDB`, `queueFailedEvent`, `drainEvents`) are shared 
 
 ## Security
 
-- **Origin checking:** `Config.AllowedOrigins` provides a single configuration point for origin enforcement across all transport types (WebSocket upgrades, SSE streams, and POST events). When set, the `Origin` header must match one of the listed values exactly. When empty, the handler falls back to same-host checking (the Origin host must match the request Host header) as basic CSRF protection. `ws.Upgrade()` skips the websocket library's own origin check because the poly handler enforces it first.
+- **Origin checking:** `Config.Security.AllowedOrigins` provides a single configuration point for origin enforcement across all transport types (WebSocket upgrades, SSE streams, and POST events). When set, the `Origin` header must match one of the listed values exactly. When empty, the handler falls back to same-host checking (the Origin host must match the request Host header) as basic CSRF protection. `ws.Upgrade()` skips the websocket library's own origin check because the poly handler enforces it first.
 - Event data comes from the client — always validate in the `Handle` function.
 - **Session IDs** are cryptographically random strings (`crypto/rand.Text`). They appear in query parameters for WebSocket upgrades and SSE streams, and in the `X-Poly-Session` header for POST events. Treat them as bearer tokens.
 - **Referrer-Policy:** The initial page response sets `Referrer-Policy: same-origin` to prevent session ID leakage via the Referer header on external links.

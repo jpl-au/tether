@@ -91,7 +91,7 @@ Bidirectional sync between Go state and the browser URL:
 
 ```go
 poly.New(poly.Config[State]{
-    HandleParams: func(_ poly.PreSession, s State, p poly.Params) State {
+    OnNavigate: func(_ poly.PreSession, s State, p poly.Params) State {
         s.Page = p.Path
         return s
     },
@@ -113,7 +113,7 @@ r.NotFound(router.Page[State]{Render: notFoundRender})
 poly.New(poly.Config[State]{
     Render:       r.Render,
     Handle:       r.Handle,
-    HandleParams: r.HandleParams(func(s *State, path string) { s.Page = path }),
+    OnNavigate: r.OnNavigate(func(s *State, path string) { s.Page = path }),
     // ...
 })
 ```
