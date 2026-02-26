@@ -1,6 +1,9 @@
 package bind
 
-import "strconv"
+import (
+	"strconv"
+	"time"
+)
 
 // Click binds a poly-click event. When the element is clicked, the
 // server receives an Event with the given action.
@@ -48,24 +51,24 @@ func Blur[E Settable[E]](el E, action string) E {
 	return el.SetData("poly-blur", action)
 }
 
-// Data attaches an arbitrary data value to an element. When an event
-// fires from this element, the key and value are included in the
+// EventData attaches an arbitrary data value to an element. When an
+// event fires from this element, the key and value are included in the
 // Event.Data map sent to the server. Use this to avoid encoding IDs
 // or other parameters into action strings.
 //
-//	bind.Data(bind.Click(el, "delete"), "id", "123")
-func Data[E Settable[E]](el E, key, value string) E {
+//	bind.EventData(bind.Click(el, "delete"), "id", "123")
+func EventData[E Settable[E]](el E, key, value string) E {
 	return el.SetData("poly-data-"+key, value)
 }
 
 // Debounce overrides the default 300ms debounce delay on input events.
 // Only meaningful on elements that also have an [Input] binding.
-func Debounce[E Settable[E]](el E, ms int) E {
-	return el.SetData("poly-debounce", strconv.Itoa(ms))
+func Debounce[E Settable[E]](el E, d time.Duration) E {
+	return el.SetData("poly-debounce", strconv.Itoa(int(d.Milliseconds())))
 }
 
 // Throttle sets a minimum interval between repeated events. The JS
 // runtime drops events that arrive within the throttle window.
-func Throttle[E Settable[E]](el E, ms int) E {
-	return el.SetData("poly-throttle", strconv.Itoa(ms))
+func Throttle[E Settable[E]](el E, d time.Duration) E {
+	return el.SetData("poly-throttle", strconv.Itoa(int(d.Milliseconds())))
 }

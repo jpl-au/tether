@@ -76,7 +76,7 @@ func TestVAPIDAuth(t *testing.T) {
 		t.Fatalf("GenerateVAPIDKeys: %v", err)
 	}
 
-	opts := Options{
+	opts := Config{
 		VAPIDPublicKey:  pub,
 		VAPIDPrivateKey: priv,
 		Subject:         "mailto:test@example.com",
@@ -177,12 +177,13 @@ func TestSendSuccess(t *testing.T) {
 		t.Fatalf("GenerateVAPIDKeys: %v", err)
 	}
 
-	err = Send(sub, Notification{Title: "Test", Body: "Hello"}, Options{
+	sender := NewSender(Config{
 		VAPIDPublicKey:  pub,
 		VAPIDPrivateKey: priv,
 		Subject:         "mailto:test@example.com",
 		HTTPClient:      srv.Client(),
 	})
+	err = sender.Send(sub, Notification{Title: "Test", Body: "Hello"})
 	if err != nil {
 		t.Fatalf("Send: %v", err)
 	}
@@ -197,12 +198,13 @@ func TestSendExpiredSubscription(t *testing.T) {
 	sub := newTestSubscription(t, srv.URL)
 	pub, priv, _ := GenerateVAPIDKeys()
 
-	err := Send(sub, Notification{Title: "Test"}, Options{
+	sender := NewSender(Config{
 		VAPIDPublicKey:  pub,
 		VAPIDPrivateKey: priv,
 		Subject:         "mailto:test@example.com",
 		HTTPClient:      srv.Client(),
 	})
+	err := sender.Send(sub, Notification{Title: "Test"})
 	if err != ErrSubscriptionExpired {
 		t.Fatalf("Send = %v, want ErrSubscriptionExpired", err)
 	}
@@ -217,12 +219,13 @@ func TestSendServerError(t *testing.T) {
 	sub := newTestSubscription(t, srv.URL)
 	pub, priv, _ := GenerateVAPIDKeys()
 
-	err := Send(sub, Notification{Title: "Test"}, Options{
+	sender := NewSender(Config{
 		VAPIDPublicKey:  pub,
 		VAPIDPrivateKey: priv,
 		Subject:         "mailto:test@example.com",
 		HTTPClient:      srv.Client(),
 	})
+	err := sender.Send(sub, Notification{Title: "Test"})
 	if err == nil {
 		t.Fatal("Send should return error for 500")
 	}
@@ -308,18 +311,19 @@ func TestSendWithActions(t *testing.T) {
 	sub := newTestSubscription(t, srv.URL)
 	pub, priv, _ := GenerateVAPIDKeys()
 
-	err := Send(sub, Notification{
+	sender := NewSender(Config{
+		VAPIDPublicKey:  pub,
+		VAPIDPrivateKey: priv,
+		Subject:         "mailto:test@example.com",
+		HTTPClient:      srv.Client(),
+	})
+	err := sender.Send(sub, Notification{
 		Title:  "Chat",
 		Body:   "New message",
 		Silent: true,
 		Actions: []NotificationAction{
 			{Action: "reply", Title: "Reply", URL: "/chat?reply=1"},
 		},
-	}, Options{
-		VAPIDPublicKey:  pub,
-		VAPIDPrivateKey: priv,
-		Subject:         "mailto:test@example.com",
-		HTTPClient:      srv.Client(),
 	})
 	if err != nil {
 		t.Fatalf("Send: %v", err)

@@ -1,12 +1,12 @@
 // Package push sends Web Push notifications to browsers using the Web
 // Push protocol (RFC 8291, RFC 8292). It handles VAPID JWT signing and
-// payload encryption so the caller only needs a subscription, a
-// notification, and VAPID keys.
+// payload encryption so the caller only needs a [Sender] and a
+// subscription.
 //
 // Use [GenerateVAPIDKeys] once during initial setup to create a key
-// pair. Configure the public key in [poly.PushConfig] so clients can
-// subscribe. When [poly.PushConfig.OnSubscribe] delivers a subscription,
-// store it and call [Send] to deliver notifications.
+// pair. Create a [Sender] with [NewSender] and pass it to
+// [poly.PushConfig]. When a subscription arrives, call
+// [Sender.Send] to deliver notifications.
 package push
 
 import (
@@ -57,9 +57,9 @@ type NotificationAction struct {
 	URL    string `json:"url,omitempty"`  // URL to open when this action is clicked.
 }
 
-// Options configures VAPID authentication for push requests. The same
-// Options value should be reused across calls to [Send].
-type Options struct {
+// Config holds application-level VAPID credentials for push delivery.
+// Create a [Sender] from a Config to send notifications.
+type Config struct {
 	// VAPIDPublicKey is the base64url-encoded ECDSA P-256 public key.
 	VAPIDPublicKey string
 
@@ -73,6 +73,25 @@ type Options struct {
 	// HTTPClient is the HTTP client used to send push requests. When
 	// nil, http.DefaultClient is used.
 	HTTPClient *http.Client
+}
+
+// Sender delivers Web Push notifications using pre-configured VAPID
+// credentials. Create one at startup with [NewSender] and reuse it
+// for all push calls.
+type Sender struct {
+	cfg Config
+}
+
+// NewSender creates a Sender from the given configuration.
+func NewSender(cfg Config) *Sender {
+	return &Sender{cfg: cfg}
+}
+
+// PublicKey returns the VAPID public key for client-side push
+// subscription. Pass this to [poly.PushConfig] so the browser can
+// subscribe to notifications.
+func (s *Sender) PublicKey() string {
+	return s.cfg.VAPIDPublicKey
 }
 
 // Subscription holds the endpoint and encryption keys the browser
@@ -102,7 +121,8 @@ var ErrSubscriptionExpired = errors.New("push: subscription expired (410 Gone)")
 // Returns [ErrSubscriptionExpired] when the push service responds with
 // HTTP 410 Gone. Other non-2xx responses are returned as errors with
 // the status code in the message.
-func Send(sub Subscription, n Notification, opts Options) error {
+func (s *Sender) Send(sub Subscription, n Notification) error {
+	opts := s.cfg
 	payload, err := json.Marshal(n)
 	if err != nil {
 		return fmt.Errorf("push: marshal notification: %w", err)
@@ -297,7 +317,7 @@ func buildAES128GCMBody(salt, keyID, ciphertext []byte) []byte {
 }
 
 // vapidAuth creates the VAPID Authorisation header value per RFC 8292.
-func vapidAuth(endpoint string, opts Options) (string, error) {
+func vapidAuth(endpoint string, opts Config) (string, error) {
 	u, err := url.Parse(endpoint)
 	if err != nil {
 		return "", fmt.Errorf("parse endpoint: %w", err)

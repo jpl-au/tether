@@ -209,28 +209,32 @@ func (s *Session[S]) Signals(signals map[string]any) {
 }
 
 // Push sends a Web Push notification to the browser. Only works when
-// the session has an active push subscription. Returns an error if no
-// subscription exists. Safe to call from any goroutine.
-func (s *Session[S]) Push(n push.Notification, opts push.Options) error {
+// the session has an active push subscription and a [push.Sender] is
+// configured. Returns an error if either is missing. Safe to call
+// from any goroutine.
+func (s *Session[S]) Push(n push.Notification) error {
 	// Push subscription is only written from within the loop, so
 	// reading it here is safe when called from within Handle.
 	// When called from outside, we read through the command channel.
 	if s.handling {
-		return s.sendPush(n, opts)
+		return s.sendPush(n)
 	}
 
 	ch := make(chan error, 1)
 	select {
-	case s.cmds <- func() { ch <- s.sendPush(n, opts) }:
+	case s.cmds <- func() { ch <- s.sendPush(n) }:
 		return <-ch
 	case <-s.ctx.Done():
 		return errors.New("poly: session closed")
 	}
 }
 
-func (s *Session[S]) sendPush(n push.Notification, opts push.Options) error {
+func (s *Session[S]) sendPush(n push.Notification) error {
+	if s.pushSender == nil {
+		return errors.New("poly: push not configured")
+	}
 	if s.pushSub == nil {
 		return errors.New("poly: no push subscription for session")
 	}
-	return push.Send(*s.pushSub, n, opts)
+	return s.pushSender.Send(*s.pushSub, n)
 }

@@ -3,6 +3,7 @@ package poly_test
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jpl-au/fluent-poly/bind"
 	"github.com/jpl-au/fluent/html5/a"
@@ -160,7 +161,7 @@ func TestConfirmRendersDataAttribute(t *testing.T) {
 }
 
 func TestDebounceRendersDataAttribute(t *testing.T) {
-	el := bind.Debounce(bind.Input(input.Text("q", ""), "search"), 500)
+	el := bind.Debounce(bind.Input(input.Text("q", ""), "search"), 500*time.Millisecond)
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-poly-debounce="500"`) {
@@ -169,7 +170,7 @@ func TestDebounceRendersDataAttribute(t *testing.T) {
 }
 
 func TestThrottleRendersDataAttribute(t *testing.T) {
-	el := bind.Throttle(bind.Click(button.Text("Go"), "fire"), 1000)
+	el := bind.Throttle(bind.Click(button.Text("Go"), "fire"), 1*time.Second)
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-poly-throttle="1000"`) {

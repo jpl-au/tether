@@ -87,8 +87,9 @@ type Session[S any] struct {
 	lastURL   string
 	lastTitle string
 
-	// Push subscription — accessed only from within the loop.
-	pushSub *push.Subscription
+	// Push — sender is set from Config, subscription arrives at runtime.
+	pushSender *push.Sender
+	pushSub    *push.Subscription
 
 	// Buffered domain event publications, flushed after the client
 	// update is sent. Populated by Bus.Emit via the Emitter interface.

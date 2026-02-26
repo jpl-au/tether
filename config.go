@@ -213,15 +213,15 @@ type Config[S any] struct {
 // notifications require a service worker to receive messages when no
 // tab is open.
 type PushConfig[S any] struct {
-	// VAPIDPublicKey is the base64url-encoded ECDSA P-256 public key
-	// used to authenticate the application with the push service.
-	// Generate a key pair with [push.GenerateVAPIDKeys].
-	VAPIDPublicKey string
+	// Sender handles push notification delivery. Create with
+	// [push.NewSender]. The sender's public key is automatically
+	// used for client-side push subscription.
+	Sender *push.Sender
 
 	// OnSubscribe is called when a client sends its push subscription
 	// to the server. Store the subscription to send notifications later
-	// via [push.Send]. The callback runs in its own goroutine so it is
-	// safe to perform I/O (e.g. database writes). Optional.
+	// via [push.Sender.Send]. The callback runs in its own goroutine so
+	// it is safe to perform I/O (e.g. database writes). Optional.
 	OnSubscribe func(session *Session[S], sub push.Subscription)
 }
 

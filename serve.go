@@ -60,8 +60,8 @@ func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 	h.mu.Unlock()
 
 	var pushKey string
-	if h.cfg.Push != nil {
-		pushKey = h.cfg.Push.VAPIDPublicKey
+	if h.cfg.Push != nil && h.cfg.Push.Sender != nil {
+		pushKey = h.cfg.Push.Sender.PublicKey()
 	}
 
 	content := &polyBody{
@@ -194,6 +194,9 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 	}
 	sess.lastActivity.Store(now.UnixNano())
 
+	if h.cfg.Push != nil && h.cfg.Push.Sender != nil {
+		sess.pushSender = h.cfg.Push.Sender
+	}
 	if h.cfg.Equal != nil {
 		sess.equal = h.cfg.Equal
 	}
