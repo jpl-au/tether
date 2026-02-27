@@ -19,7 +19,7 @@ poly.New(poly.Config[State]{
 |-------|------|-------------|
 | `InitialState` | `func(*http.Request) S` | Creates initial state per connection |
 | `Render` | `func(S) node.Node` | Builds the node tree from state |
-| `Handle` | `func(*Session[S], S, Event) S` | Processes events, returns new state |
+| `Handle` | `func(PreSession, S, Event) S` | Processes events, returns new state |
 | `Middleware` | `[]Middleware[S]` | Wraps Handle with cross-cutting behaviour |
 | `OnNavigate` | `func(PreSession, S, Params) S` | Handles URL navigation and initial load |
 | `Layout` | `func(S, node.Node) node.Node` | Wraps the poly root in a full HTML document |
@@ -151,9 +151,9 @@ func todoHandle(sess poly.PreSession, ts TodoState, ev poly.Event) TodoState {
 }
 ```
 
-Methods: `ID`, `Toast`, `Navigate`, `ReplaceURL`, `SetTitle`, `Announce`, `Flash`, `Signal`, `Signals`, `Push`.
+Methods: `ID`, `Context`, `Go`, `Toast`, `Navigate`, `ReplaceURL`, `SetTitle`, `Announce`, `Flash`, `Signal`, `Signals`, `SignalBatch`, `Push`.
 
-`Push` returns an error during pre-warming (initial GET) since no browser subscription exists yet. During live sessions it works normally.
+`ID` returns an empty string in stateless page mode (PageConfig) — there is no persistent session. `Push` returns an error during pre-warming (initial GET) since no browser subscription exists yet. During live sessions both work normally.
 
 ---
 
@@ -327,6 +327,7 @@ bind.FocusTrap(el)               // trap Tab within descendants
 
 ```go
 bind.Upload(el, "avatar")              // trigger file upload
+bind.UploadInput(el, "#avatar-input")  // CSS selector for distant file inputs
 bind.UploadProgress(el, "avatar")      // bind to upload progress signal
 ```
 
@@ -404,6 +405,7 @@ Upload:
 
 ```go
 bind.WithUpload("avatar")
+bind.WithUploadInput("#avatar-input")
 bind.WithUploadProgress("avatar")
 ```
 
@@ -534,8 +536,8 @@ Shared observable state:
 
 ```go
 v := poly.NewValue(initial)
-v.Get()                      // lock-free read
-v.Set(val)                   // set and notify observers
+v.Load()                     // lock-free read
+v.Store(val)                 // set and notify observers
 v.Update(func(V) V)          // atomic read-modify-write
 poly.Observe(v, sess, func(val V, s State) State { ... })
 ```
@@ -548,8 +550,8 @@ Focus session state onto a component:
 
 ```go
 sc := poly.Scope[State, FormState]{
-    Get: func(s State) FormState { return s.Form },
-    Set: func(s State, f FormState) State { s.Form = f; return s },
+    View:   func(s State) FormState { return s.Form },
+    Update: func(s State, f FormState) State { s.Form = f; return s },
 }
 
 // In Handle:

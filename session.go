@@ -127,6 +127,10 @@ type Session[S any] struct {
 // accept it without inheriting the application's state type
 // parameter, making them reusable across different page states.
 type PreSession interface {
+	// ID returns the session identifier. In live mode this is the
+	// unique, cryptographically random session ID. In stateless page
+	// mode (PageConfig) this returns an empty string because there is
+	// no persistent session. In polytest it returns "polytest".
 	ID() string
 	Context() context.Context
 	Go(fn func(context.Context))

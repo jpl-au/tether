@@ -180,6 +180,10 @@ func WithOptimisticToggle(signal string) Option { return Option{"poly-optimistic
 // WithUpload marks the element as an upload trigger.
 func WithUpload(action string) Option { return Option{"poly-upload", action} }
 
+// WithUploadInput sets a CSS selector for finding file inputs when the
+// upload trigger is not adjacent to them in the DOM.
+func WithUploadInput(selector string) Option { return Option{"poly-upload-input", selector} }
+
 // WithUploadProgress binds an element's value attribute to upload progress.
 func WithUploadProgress(action string) Option {
 	return Option{"poly-bind-attr", "value upload:" + action + ":progress"}

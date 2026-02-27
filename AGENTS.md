@@ -658,6 +658,7 @@ All helpers are in the `bind` package. They accept any Fluent element type via a
 | Helper | Data attribute | Purpose |
 |--------|---------------|---------|
 | `bind.Upload` | `poly-upload` | Trigger file upload on click/change |
+| `bind.UploadInput` | `poly-upload-input` | CSS selector to find file inputs (for distant triggers) |
 | `bind.UploadProgress` | `poly-bind-attr` | Bind progress value to upload signal |
 
 **Lifecycle hooks** (`bind/interop.go`):
@@ -787,7 +788,7 @@ Supported data attributes:
 
 **UX:** `data-poly-disable`, `data-poly-confirm`, `data-poly-autofocus`, `data-poly-preserve`, `data-poly-indicator`, `data-poly-focus-trap`, `data-poly-cloak`, `data-poly-permanent`
 
-**Uploads:** `data-poly-upload`
+**Uploads:** `data-poly-upload`, `data-poly-upload-input`
 
 **Lifecycle:** `data-poly-hook`, `data-poly-transition`
 

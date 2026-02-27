@@ -49,13 +49,23 @@
       });
     } else {
       el.addEventListener("click", function (e) {
-        // Find file input(s) in the closest form, or as a sibling.
-        var form = el.closest("form");
-        var inputs = form
-          ? form.querySelectorAll('input[type="file"]')
-          : el.parentElement
-            ? el.parentElement.querySelectorAll('input[type="file"]')
-            : [];
+        // If data-poly-upload-input is set, use it as a CSS selector
+        // to find file inputs anywhere in the document. This supports
+        // layouts where the trigger button is distant from the file
+        // input (e.g. in a different part of a modal).
+        var selector = el.getAttribute("data-poly-upload-input");
+        var inputs;
+        if (selector) {
+          inputs = document.querySelectorAll(selector);
+        } else {
+          // Default: find file inputs in the closest form, or as siblings.
+          var form = el.closest("form");
+          inputs = form
+            ? form.querySelectorAll('input[type="file"]')
+            : el.parentElement
+              ? el.parentElement.querySelectorAll('input[type="file"]')
+              : [];
+        }
 
         var files = collectFiles(inputs);
         if (files.length === 0) return;

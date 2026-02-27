@@ -10,6 +10,15 @@ func Upload[E Settable[E]](el E, action string) E {
 	return el.SetData("poly-upload", action)
 }
 
+// UploadInput sets a CSS selector for finding file inputs when the
+// upload trigger is not adjacent to them in the DOM. Without this,
+// the JS looks in the closest form or parent element.
+//
+//	bind.UploadInput(button.Text("Upload"), "#avatar-input")
+func UploadInput[E Settable[E]](el E, selector string) E {
+	return el.SetData("poly-upload-input", selector)
+}
+
 // UploadProgress binds an element's value attribute to the upload
 // progress signal. This is a convenience for
 // BindAttr(el, "value", "upload:{action}:progress").
