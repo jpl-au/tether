@@ -408,6 +408,41 @@ func TestPageDevModeFromEnv(t *testing.T) {
 	}
 }
 
+func TestPagePOSTNavigateSkipsHandle(t *testing.T) {
+	handler := Page(PageConfig[counterState]{
+		State:  func(r *http.Request) counterState { return counterState{} },
+		Render: renderCounter,
+		Handle: func(_ PreSession, state counterState, _ Event) counterState {
+			// Handle should NOT run for navigate events when
+			// OnNavigate is set — this matches live session behaviour.
+			state.Count = 999
+			return state
+		},
+		OnNavigate: func(_ PreSession, state counterState, p Params) counterState {
+			if p.Query.Get("count") == "5" {
+				state.Count = 5
+			}
+			return state
+		},
+	})
+
+	body := `{"type":"navigate","action":"","data":{"path":"/app","search":"?count=5"},"event_id":"1"}`
+	req := httptest.NewRequest("POST", "/app?count=5", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	var msg updateMessage
+	json.Unmarshal(w.Body.Bytes(), &msg)
+	if len(msg.Morphs) != 1 {
+		t.Fatalf("morphs = %d, want 1", len(msg.Morphs))
+	}
+	// Should be 5 from OnNavigate, NOT 999 from Handle.
+	if !strings.Contains(msg.Morphs[0].HTML, "Count: 5") {
+		t.Errorf("expected Count: 5, got %s", msg.Morphs[0].HTML)
+	}
+}
+
 // Verify the event.Type import compiles (used for event constants in
 // tests above via string literals, but callers use event.Click etc.).
 var _ event.Type = event.Click

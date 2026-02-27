@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/jpl-au/fluent-poly/event"
 	"github.com/jpl-au/fluent-poly/mode"
 	"github.com/jpl-au/fluent/node"
 )
@@ -204,12 +205,21 @@ func (p *pageHandler[S]) servePOST(w http.ResponseWriter, r *http.Request) {
 
 	fx := &effects{}
 	cs := &captureSession{id: "", fx: fx}
-	if p.cfg.OnNavigate != nil {
+	if ev.Type == event.Navigate && p.cfg.OnNavigate != nil {
+		// Navigate events are routed to OnNavigate only, matching
+		// the live session behaviour in Session.exec().
 		params := Params{Path: r.URL.Path, Query: r.URL.Query()}
 		state = p.cfg.OnNavigate(cs, state, params)
+	} else {
+		// For all other events, derive state from the URL first
+		// (stateless mode reconstructs state each request), then
+		// process the event via Handle.
+		if p.cfg.OnNavigate != nil {
+			params := Params{Path: r.URL.Path, Query: r.URL.Query()}
+			state = p.cfg.OnNavigate(cs, state, params)
+		}
+		state = p.cfg.Handle(cs, state, ev)
 	}
-
-	state = p.cfg.Handle(cs, state, ev)
 
 	tree := p.cfg.Render(state)
 	html := tree.Render()
