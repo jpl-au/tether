@@ -44,14 +44,14 @@ poly.New(poly.Config[State]{
 
 The service worker caches the JS runtime (`fluent-poly.js`, `idiomorph.min.js`) using a cache-first strategy, and caches page HTML using a network-first strategy. On subsequent visits, the JS loads from cache. If the server is unreachable, the last cached page is served instead of a browser error.
 
-To precache application assets (CSS, icons, fonts), use the `Precache` field on `AssetConfig`:
+To precache application assets (CSS, icons, fonts), use the `Precache` field on `Asset`:
 
 ```go
-var assets = poly.NewAsset(poly.AssetConfig{
+var assets = &poly.Asset{
     FS:       staticFS,
     Prefix:   "/static/",
     Precache: []string{"styles.css", "logo.svg"},
-})
+}
 
 poly.New(poly.Config[State]{
     Assets: []*poly.Asset{assets},

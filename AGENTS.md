@@ -847,17 +847,17 @@ When `Poly.onError` is not set, non-silent errors fall through to `console.warn`
 
 ## Embedded assets
 
-`Asset` manages an embedded filesystem (`embed.FS` / `fs.FS`) with automatic per-file content hashing for cache-busting. Create one with `NewAsset(AssetConfig)` and pass it to `Config.Assets`:
+`Asset` manages an embedded filesystem (`embed.FS` / `fs.FS`) with automatic per-file content hashing for cache-busting. Create one with `&Asset{}` and pass it to `Config.Assets`:
 
 ```go
 //go:embed static
 var staticFS embed.FS
 
-var assets = poly.NewAsset(poly.AssetConfig{
+var assets = &poly.Asset{
     FS:       staticFS,
     Prefix:   "/static/",
     Precache: []string{"styles.css", "logo.svg"},
-})
+}
 
 handler := poly.New(poly.Config[State]{
     Assets: []*poly.Asset{assets},

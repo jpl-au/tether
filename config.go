@@ -135,7 +135,7 @@ type Config[S any] struct {
 	DevMode bool
 
 	// Assets lists embedded asset collections to auto-serve. Each
-	// [Asset] is created with [NewAsset] and provides content-hashed
+	// [Asset] provides content-hashed
 	// URLs for cache-busting. Assets are served at their configured
 	// prefix (default "/assets/") with appropriate cache headers —
 	// immutable in production, no-store in DevMode. Precache entries

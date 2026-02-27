@@ -9,7 +9,7 @@ import (
 )
 
 func testAssetFS() *Asset {
-	return NewAsset(AssetConfig{
+	return &Asset{
 		FS: fstest.MapFS{
 			"styles.css": &fstest.MapFile{Data: []byte("body{color:red}")},
 			"app.js":     &fstest.MapFile{Data: []byte("console.log('hello')")},
@@ -17,7 +17,7 @@ func testAssetFS() *Asset {
 		},
 		Prefix:   "/static/",
 		Precache: []string{"styles.css", "logo.svg"},
-	})
+	}
 }
 
 func TestAssetURL(t *testing.T) {
@@ -89,28 +89,28 @@ func TestAssetHashDeterministic(t *testing.T) {
 }
 
 func TestAssetHashChangesWithContent(t *testing.T) {
-	a := NewAsset(AssetConfig{
+	a := &Asset{
 		FS: fstest.MapFS{
 			"styles.css": &fstest.MapFile{Data: []byte("v1")},
 		},
-	})
-	b := NewAsset(AssetConfig{
+	}
+	b := &Asset{
 		FS: fstest.MapFS{
 			"styles.css": &fstest.MapFile{Data: []byte("v2")},
 		},
-	})
+	}
 
 	if a.URL("styles.css") == b.URL("styles.css") {
 		t.Error("different content should produce different hashes")
 	}
 }
 
-func TestNewAssetDefaultPrefix(t *testing.T) {
-	a := NewAsset(AssetConfig{
+func TestAssetDefaultPrefix(t *testing.T) {
+	a := &Asset{
 		FS: fstest.MapFS{
 			"styles.css": &fstest.MapFile{Data: []byte("body{}")},
 		},
-	})
+	}
 
 	u := a.URL("styles.css")
 	if !strings.HasPrefix(u, "/assets/") {
@@ -118,36 +118,38 @@ func TestNewAssetDefaultPrefix(t *testing.T) {
 	}
 }
 
-func TestNewAssetPanicsOnNilFS(t *testing.T) {
+func TestAssetPanicsOnNilFS(t *testing.T) {
 	defer func() {
 		if recover() == nil {
 			t.Fatal("expected panic for nil FS")
 		}
 	}()
 
-	NewAsset(AssetConfig{})
+	a := &Asset{}
+	a.URL("anything")
 }
 
-func TestNewAssetPanicsOnBadPrefix(t *testing.T) {
+func TestAssetPanicsOnBadPrefix(t *testing.T) {
 	defer func() {
 		if recover() == nil {
 			t.Fatal("expected panic for prefix without trailing slash")
 		}
 	}()
 
-	NewAsset(AssetConfig{
+	a := &Asset{
 		FS:     fstest.MapFS{"a.css": &fstest.MapFile{Data: []byte("a")}},
 		Prefix: "/static",
-	})
+	}
+	a.URL("a.css")
 }
 
 func TestAssetAutoMount(t *testing.T) {
-	assets := NewAsset(AssetConfig{
+	assets := &Asset{
 		FS: fstest.MapFS{
 			"styles.css": &fstest.MapFile{Data: []byte("body{color:red}")},
 		},
 		Prefix: "/static/",
-	})
+	}
 
 	handler := New(Config[counterState]{
 		Upgrade:      stubUpgrade,
@@ -170,12 +172,12 @@ func TestAssetAutoMount(t *testing.T) {
 }
 
 func TestAssetAutoMountPage(t *testing.T) {
-	assets := NewAsset(AssetConfig{
+	assets := &Asset{
 		FS: fstest.MapFS{
 			"app.js": &fstest.MapFile{Data: []byte("console.log('hi')")},
 		},
 		Prefix: "/assets/",
-	})
+	}
 
 	handler := Page(PageConfig[counterState]{
 		State:  func(r *http.Request) counterState { return counterState{} },
@@ -197,12 +199,12 @@ func TestAssetAutoMountPage(t *testing.T) {
 }
 
 func TestAssetCacheHeadersProduction(t *testing.T) {
-	assets := NewAsset(AssetConfig{
+	assets := &Asset{
 		FS: fstest.MapFS{
 			"styles.css": &fstest.MapFile{Data: []byte("body{}")},
 		},
 		Prefix: "/static/",
-	})
+	}
 
 	handler := New(Config[counterState]{
 		Upgrade:      stubUpgrade,
@@ -228,12 +230,12 @@ func TestAssetCacheHeadersProduction(t *testing.T) {
 }
 
 func TestAssetCacheHeadersDevMode(t *testing.T) {
-	assets := NewAsset(AssetConfig{
+	assets := &Asset{
 		FS: fstest.MapFS{
 			"styles.css": &fstest.MapFile{Data: []byte("body{}")},
 		},
 		Prefix: "/static/",
-	})
+	}
 
 	handler := New(Config[counterState]{
 		Upgrade:      stubUpgrade,
@@ -257,18 +259,18 @@ func TestAssetCacheHeadersDevMode(t *testing.T) {
 }
 
 func TestMultipleAssets(t *testing.T) {
-	css := NewAsset(AssetConfig{
+	css := &Asset{
 		FS: fstest.MapFS{
 			"styles.css": &fstest.MapFile{Data: []byte("body{}")},
 		},
 		Prefix: "/css/",
-	})
-	js := NewAsset(AssetConfig{
+	}
+	js := &Asset{
 		FS: fstest.MapFS{
 			"app.js": &fstest.MapFile{Data: []byte("alert(1)")},
 		},
 		Prefix: "/js/",
-	})
+	}
 
 	handler := New(Config[counterState]{
 		Upgrade:      stubUpgrade,
@@ -308,14 +310,14 @@ func TestAssetChangesWorkerVersion(t *testing.T) {
 		return w.Body.String()
 	}
 
-	a1 := NewAsset(AssetConfig{
+	a1 := &Asset{
 		FS:       fstest.MapFS{"a.css": &fstest.MapFile{Data: []byte("v1")}},
 		Precache: []string{"a.css"},
-	})
-	a2 := NewAsset(AssetConfig{
+	}
+	a2 := &Asset{
 		FS:       fstest.MapFS{"a.css": &fstest.MapFile{Data: []byte("v2")}},
 		Precache: []string{"a.css"},
-	})
+	}
 
 	body1 := workerBody([]*Asset{a1})
 	body2 := workerBody([]*Asset{a2})

@@ -46,7 +46,7 @@ Serve CSS, JS, and images from an `embed.FS` with automatic content-hashed URLs.
 //go:embed static
 var staticFS embed.FS
 
-var assets = poly.NewAsset(poly.AssetConfig{FS: staticFS, Prefix: "/static/"})
+var assets = &poly.Asset{FS: staticFS, Prefix: "/static/"}
 
 poly.New(poly.Config[State]{
     Assets: []*poly.Asset{assets},

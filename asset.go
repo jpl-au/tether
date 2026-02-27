@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/jpl-au/fluent/html5/attr/rel"
 	"github.com/jpl-au/fluent/html5/link"
@@ -14,9 +15,22 @@ import (
 	"github.com/jpl-au/fluent/node"
 )
 
-// AssetConfig configures an embedded asset collection. Use [NewAsset]
-// to create an [Asset] from this configuration.
-type AssetConfig struct {
+// Asset manages an embedded asset filesystem with content-hashed URLs.
+// Construct one as a struct literal and pass it to [Config].Assets.
+// The first call to [Asset.URL], [Asset.Stylesheet], or [Asset.Script]
+// (or handler startup) walks the filesystem and hashes every file.
+//
+//	//go:embed static
+//	var staticFS embed.FS
+//
+//	var assets = &poly.Asset{
+//	    FS:     staticFS,
+//	    Prefix: "/static/",
+//	}
+//
+//	// In your Layout:
+//	assets.Stylesheet("styles.css") // <link rel="stylesheet" href="/static/styles.css?v=a1b2c3d4e5f6">
+type Asset struct {
 	// FS is the filesystem containing application assets (CSS, images,
 	// JS). Use embed.FS for single-binary deployments or os.DirFS for
 	// development with live reloading. Required.
@@ -30,63 +44,43 @@ type AssetConfig struct {
 	// worker should cache on install. These are served with
 	// content-hashed query strings for cache-busting. Optional.
 	Precache []string
+
+	once    sync.Once
+	prefix  string
+	hashes  map[string]string // path → 12-char hex hash
+	handler http.Handler
 }
 
-// Asset manages an embedded asset filesystem with content-hashed URLs.
-// Create one with [NewAsset], then use [Asset.Stylesheet],
-// [Asset.Script], or [Asset.URL] to reference assets in templates.
-//
-//	//go:embed static
-//	var staticFS embed.FS
-//
-//	var assets = poly.NewAsset(poly.AssetConfig{
-//	    FS:     staticFS,
-//	    Prefix: "/static/",
-//	})
-//
-//	// In your Layout:
-//	assets.Stylesheet("styles.css") // <link rel="stylesheet" href="/static/styles.css?v=a1b2c3d4e5f6">
-type Asset struct {
-	prefix   string
-	fs       fs.FS
-	precache []string
-	hashes   map[string]string // path → 12-char hex hash
-	handler  http.Handler
-}
-
-// NewAsset walks the filesystem, computes per-file content hashes, and
-// returns a ready-to-use [Asset]. Panics if FS is nil.
-func NewAsset(cfg AssetConfig) *Asset {
-	if cfg.FS == nil {
-		panic("poly: AssetConfig.FS is required")
-	}
-
-	prefix := cfg.Prefix
-	if prefix == "" {
-		prefix = "/assets/"
-	}
-	if !strings.HasSuffix(prefix, "/") {
-		panic("poly: AssetConfig.Prefix must end with \"/\"")
-	}
-
-	hashes := make(map[string]string)
-	fs.WalkDir(cfg.FS, ".", func(path string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
-			return err
+// init walks the filesystem and computes per-file content hashes.
+// Called lazily via sync.Once on first access. Panics on invalid
+// configuration so typos surface at startup.
+func (a *Asset) init() {
+	a.once.Do(func() {
+		if a.FS == nil {
+			panic("poly: Asset.FS is required")
 		}
-		data, _ := fs.ReadFile(cfg.FS, path)
-		h := sha256.Sum256(data)
-		hashes[path] = hex.EncodeToString(h[:])[:12]
-		return nil
-	})
 
-	return &Asset{
-		prefix:   prefix,
-		fs:       cfg.FS,
-		precache: cfg.Precache,
-		hashes:   hashes,
-		handler:  http.FileServer(http.FS(cfg.FS)),
-	}
+		a.prefix = a.Prefix
+		if a.prefix == "" {
+			a.prefix = "/assets/"
+		}
+		if !strings.HasSuffix(a.prefix, "/") {
+			panic("poly: Asset.Prefix must end with \"/\"")
+		}
+
+		a.hashes = make(map[string]string)
+		fs.WalkDir(a.FS, ".", func(path string, d fs.DirEntry, err error) error {
+			if err != nil || d.IsDir() {
+				return err
+			}
+			data, _ := fs.ReadFile(a.FS, path)
+			h := sha256.Sum256(data)
+			a.hashes[path] = hex.EncodeToString(h[:])[:12]
+			return nil
+		})
+
+		a.handler = http.FileServer(http.FS(a.FS))
+	})
 }
 
 // URL returns the hashed URL for the given asset path. The path is
@@ -97,6 +91,7 @@ func NewAsset(cfg AssetConfig) *Asset {
 // Panics if the path does not exist in the filesystem — this catches
 // typos at startup rather than serving broken links at runtime.
 func (a *Asset) URL(path string) string {
+	a.init()
 	h, ok := a.hashes[path]
 	if !ok {
 		panic(fmt.Sprintf("poly: asset %q not found in filesystem", path))
@@ -125,6 +120,7 @@ func (a *Asset) Script(path string) node.Node {
 // contentHash returns a single hash representing all files in the
 // asset filesystem. Used to mix into the service worker CACHE_VERSION.
 func (a *Asset) contentHash() string {
+	a.init()
 	h := sha256.New()
 	for path, hash := range a.hashes {
 		h.Write([]byte(path))
@@ -135,8 +131,9 @@ func (a *Asset) contentHash() string {
 
 // precacheURLs returns the hashed URLs for all precache entries.
 func (a *Asset) precacheURLs() []string {
-	urls := make([]string, len(a.precache))
-	for i, path := range a.precache {
+	a.init()
+	urls := make([]string, len(a.Precache))
+	for i, path := range a.Precache {
 		urls[i] = a.URL(path)
 	}
 	return urls
@@ -147,6 +144,7 @@ func (a *Asset) precacheURLs() []string {
 func buildAssetMounts(assets []*Asset, devMode bool) []assetMount {
 	mounts := make([]assetMount, len(assets))
 	for i, a := range assets {
+		a.init()
 		handler := http.StripPrefix(a.prefix, a.handler)
 		if devMode {
 			handler = noCacheHandler(handler)

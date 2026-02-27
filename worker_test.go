@@ -55,14 +55,14 @@ func TestClientWorkerHeader(t *testing.T) {
 }
 
 func TestClientPrecache(t *testing.T) {
-	assets := NewAsset(AssetConfig{
+	assets := &Asset{
 		FS: fstest.MapFS{
 			"styles.css": &fstest.MapFile{Data: []byte("body{}")},
 			"logo.svg":   &fstest.MapFile{Data: []byte("<svg></svg>")},
 		},
 		Prefix:   "/static/",
 		Precache: []string{"styles.css", "logo.svg"},
-	})
+	}
 
 	handler := New(Config[counterState]{
 		Upgrade:      stubUpgrade,
