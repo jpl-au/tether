@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 
 	poly "github.com/jpl-au/fluent-poly"
@@ -28,6 +29,16 @@ import (
 	"github.com/jpl-au/fluent-poly/push"
 	"github.com/jpl-au/fluent/node"
 )
+
+// HandleFunc is the handler signature used by polytest and
+// [poly.PageConfig]. It takes a [poly.PreSession] rather than a full
+// [poly.Session] because no live transport exists during testing.
+type HandleFunc[S any] func(session poly.PreSession, state S, event poly.Event) S
+
+// Middleware wraps a [HandleFunc] to add cross-cutting behaviour.
+// Same concept as [poly.Middleware] but for the [poly.PreSession]-based
+// handler used by polytest and [poly.PageConfig].
+type Middleware[S any] func(next HandleFunc[S]) HandleFunc[S]
 
 // Config configures the test harness.
 type Config[S any] struct {
@@ -39,6 +50,11 @@ type Config[S any] struct {
 
 	// Handle processes a client event and returns the new state.
 	Handle func(session poly.PreSession, state S, event poly.Event) S
+
+	// Middleware wraps the Handle function with cross-cutting
+	// behaviour. Applied outermost-first: the first entry in the
+	// slice is the outermost layer of the chain. Optional.
+	Middleware []Middleware[S]
 
 	// OnNavigate processes URL parameters. Optional.
 	OnNavigate func(session poly.PreSession, state S, params poly.Params) S
@@ -128,14 +144,27 @@ func (s *testSession) ensureFlash() {
 	}
 }
 
+// chainMiddleware applies middleware outermost-first, mirroring the
+// order used by [poly.Config].Middleware.
+func chainMiddleware[S any](h HandleFunc[S], mw []Middleware[S]) HandleFunc[S] {
+	for i := len(mw) - 1; i >= 0; i-- {
+		h = mw[i](h)
+	}
+	return h
+}
+
 // New creates a test harness. The harness uses [poly.Page] internally
 // so each Send call is a stateless HTTP round-trip — no goroutines,
 // no channels, no transport plumbing.
 func New[S any](cfg Config[S]) *Harness[S] {
+	handle := HandleFunc[S](cfg.Handle)
+	if len(cfg.Middleware) > 0 {
+		handle = chainMiddleware(handle, cfg.Middleware)
+	}
 	h := &Harness[S]{
 		state:      cfg.State,
 		render:     cfg.Render,
-		handle:     cfg.Handle,
+		handle:     handle,
 		onNavigate: cfg.OnNavigate,
 	}
 	h.rebuildHandler()
@@ -185,9 +214,20 @@ func (h *Harness[S]) SendSubmit(action string, data map[string]string) {
 // this call, [Harness.State], [Harness.HTML], [Harness.Toast], etc.
 // reflect the result of handling this event.
 func (h *Harness[S]) SendEvent(ev poly.Event) {
+	// Use the navigate path as the request URL so the Page handler's
+	// OnNavigate receives the correct Params.
+	target := "/"
+	if ev.Type == event.Navigate {
+		path := ev.Data["path"]
+		search := ev.Data["search"]
+		if path != "" {
+			target = path + search
+		}
+	}
+
 	// Run through the Page handler to get the wire response (HTML + effects).
 	body, _ := json.Marshal(ev)
-	req := httptest.NewRequest("POST", "/", strings.NewReader(string(body)))
+	req := httptest.NewRequest("POST", target, strings.NewReader(string(body)))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	h.handler.ServeHTTP(w, req)
@@ -214,6 +254,13 @@ func (h *Harness[S]) SendEvent(ev poly.Event) {
 	// Re-derive state locally using a testSession that captures effects.
 	// This allows subsequent Send calls to see accumulated state changes.
 	ts := &testSession{}
+	if h.onNavigate != nil && ev.Type == event.Navigate {
+		params := poly.Params{
+			Path:  ev.Data["path"],
+			Query: parseQuery(ev.Data["search"]),
+		}
+		h.state = h.onNavigate(ts, h.state, params)
+	}
 	h.state = h.handle(ts, h.state, ev)
 
 	// Rebuild the handler with the updated state.
@@ -288,4 +335,55 @@ func (h *Harness[S]) Render() string {
 // structure directly.
 func (h *Harness[S]) RenderNode() node.Node {
 	return h.render(h.state)
+}
+
+// Navigate sends a navigate event with the given path. Query
+// parameters in the path are parsed and delivered to OnNavigate.
+func (h *Harness[S]) Navigate(path string) {
+	data := map[string]string{"path": path}
+	if i := strings.Index(path, "?"); i >= 0 {
+		data["path"] = path[:i]
+		data["search"] = path[i:]
+	}
+	h.SendEvent(poly.Event{
+		Type:   event.Navigate,
+		Action: "",
+		Data:   data,
+	})
+}
+
+// HasSignal reports whether the most recent Send call pushed a signal
+// matching the given key and value.
+func (h *Harness[S]) HasSignal(key string, value any) bool {
+	v, ok := h.last.signals[key]
+	return ok && v == value
+}
+
+// HasAnnounce reports whether the most recent Send call triggered an
+// accessibility announcement matching the given text.
+func (h *Harness[S]) HasAnnounce(text string) bool {
+	return h.last.announce == text
+}
+
+// HasFlash reports whether the most recent Send call triggered a flash
+// message matching the given selector and text.
+func (h *Harness[S]) HasFlash(selector, text string) bool {
+	return h.last.flash != nil && h.last.flash[selector] == text
+}
+
+// URLWasReplaced reports whether the most recent URL change used
+// ReplaceURL rather than Navigate. Returns false if no URL was set.
+func (h *Harness[S]) URLWasReplaced() bool {
+	return h.last.replace
+}
+
+// parseQuery extracts query parameters from a search string (e.g.
+// "?id=42"). Returns nil for empty input.
+func parseQuery(search string) url.Values {
+	search = strings.TrimPrefix(search, "?")
+	if search == "" {
+		return nil
+	}
+	v, _ := url.ParseQuery(search)
+	return v
 }

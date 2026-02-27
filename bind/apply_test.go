@@ -108,6 +108,91 @@ func TestApplyDirectiveOptions(t *testing.T) {
 	}
 }
 
+func TestApplySignalBindingOptions(t *testing.T) {
+	tests := []struct {
+		name string
+		opt  bind.Option
+		attr string
+	}{
+		{"WithBindText", bind.WithBindText("count"), `data-poly-bind-text="count"`},
+		{"WithBindShow", bind.WithBindShow("isOpen"), `data-poly-bind-show="isOpen"`},
+		{"WithBindHide", bind.WithBindHide("isHidden"), `data-poly-bind-hide="isHidden"`},
+		{"WithBindClass", bind.WithBindClass("active", "isSelected"), `data-poly-bind-class="active isSelected"`},
+		{"WithBindAttr", bind.WithBindAttr("disabled", "isLoading"), `data-poly-bind-attr="disabled isLoading"`},
+		{"WithBindValue", bind.WithBindValue("email"), `data-poly-bind-value="email"`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			html := string(bind.Apply(div.New(), tt.opt).Render())
+			if !strings.Contains(html, tt.attr) {
+				t.Errorf("missing %s in:\n%s", tt.attr, html)
+			}
+		})
+	}
+}
+
+func TestApplySignalDirectiveOptions(t *testing.T) {
+	tests := []struct {
+		name string
+		opt  bind.Option
+		attr string
+	}{
+		{"WithToggleSignal", bind.WithToggleSignal("menuOpen"), `data-poly-toggle-signal="menuOpen"`},
+		{"WithSetSignal", bind.WithSetSignal("tab", "settings"), `data-poly-set-signal="tab settings"`},
+		{"WithOptimistic", bind.WithOptimistic("liked", "true"), `data-poly-optimistic="liked true"`},
+		{"WithOptimisticToggle", bind.WithOptimisticToggle("liked"), `data-poly-optimistic-toggle="liked"`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			html := string(bind.Apply(button.Text("x"), tt.opt).Render())
+			if !strings.Contains(html, tt.attr) {
+				t.Errorf("missing %s in:\n%s", tt.attr, html)
+			}
+		})
+	}
+}
+
+func TestApplyUploadOptions(t *testing.T) {
+	el := bind.Apply(button.Text("Upload"),
+		bind.WithUpload("avatar"),
+	)
+	html := string(el.Render())
+	if !strings.Contains(html, `data-poly-upload="avatar"`) {
+		t.Errorf("missing upload attribute in:\n%s", html)
+	}
+}
+
+func TestApplyUploadProgressOption(t *testing.T) {
+	el := bind.Apply(div.New(),
+		bind.WithUploadProgress("avatar"),
+	)
+	html := string(el.Render())
+	if !strings.Contains(html, `data-poly-bind-attr="value upload:avatar:progress"`) {
+		t.Errorf("missing upload progress attribute in:\n%s", html)
+	}
+}
+
+func TestApplyCompositionWithSignalBindings(t *testing.T) {
+	el := bind.Apply(button.Text("Like"),
+		bind.OnClick("like"),
+		bind.WithDisable("Liking..."),
+		bind.WithBindShow("isLiked"),
+		bind.WithOptimisticToggle("liked"),
+	)
+	html := string(el.Render())
+
+	for _, want := range []string{
+		`data-poly-click="like"`,
+		`data-poly-disable="Liking..."`,
+		`data-poly-bind-show="isLiked"`,
+		`data-poly-optimistic-toggle="liked"`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Errorf("missing %s in:\n%s", want, html)
+		}
+	}
+}
+
 func TestApplyNoOptions(t *testing.T) {
 	el := bind.Apply(button.Text("plain"))
 	html := string(el.Render())

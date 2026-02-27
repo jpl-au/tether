@@ -118,6 +118,61 @@ func WithCloak() Option { return Option{"poly-cloak", ""} }
 // WithPermanent excludes the element from morphing.
 func WithPermanent() Option { return Option{"poly-permanent", ""} }
 
+// Signal binding options.
+
+// WithBindText binds an element's text content to a named signal.
+func WithBindText(signal string) Option { return Option{"poly-bind-text", signal} }
+
+// WithBindShow shows an element when the named signal is truthy.
+func WithBindShow(signal string) Option { return Option{"poly-bind-show", signal} }
+
+// WithBindHide hides an element when the named signal is truthy.
+func WithBindHide(signal string) Option { return Option{"poly-bind-hide", signal} }
+
+// WithBindClass binds a CSS class to a named signal. The class is
+// added when truthy and removed when falsy.
+func WithBindClass(class, signal string) Option {
+	return Option{"poly-bind-class", class + " " + signal}
+}
+
+// WithBindAttr binds an HTML attribute to a named signal.
+func WithBindAttr(attr, signal string) Option {
+	return Option{"poly-bind-attr", attr + " " + signal}
+}
+
+// WithBindValue binds a form element's value property to a named signal.
+func WithBindValue(signal string) Option { return Option{"poly-bind-value", signal} }
+
+// Signal directive options.
+
+// WithToggleSignal flips a boolean signal on click without a server round-trip.
+func WithToggleSignal(signal string) Option { return Option{"poly-toggle-signal", signal} }
+
+// WithSetSignal sets a signal to a specific value on click without a server round-trip.
+func WithSetSignal(signal, value string) Option {
+	return Option{"poly-set-signal", signal + " " + value}
+}
+
+// WithOptimistic sets a signal immediately on click, before the event
+// is sent to the server.
+func WithOptimistic(signal, value string) Option {
+	return Option{"poly-optimistic", signal + " " + value}
+}
+
+// WithOptimisticToggle flips a boolean signal immediately on click,
+// before the event is sent to the server.
+func WithOptimisticToggle(signal string) Option { return Option{"poly-optimistic-toggle", signal} }
+
+// Upload options.
+
+// WithUpload marks the element as an upload trigger.
+func WithUpload(action string) Option { return Option{"poly-upload", action} }
+
+// WithUploadProgress binds an element's value attribute to upload progress.
+func WithUploadProgress(action string) Option {
+	return Option{"poly-bind-attr", "value upload:" + action + ":progress"}
+}
+
 // Lifecycle options.
 
 // WithHook attaches a JS lifecycle hook.

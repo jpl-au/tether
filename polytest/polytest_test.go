@@ -178,6 +178,139 @@ func TestRenderNode(t *testing.T) {
 	}
 }
 
+func TestHasSignal(t *testing.T) {
+	h := newHarness()
+	h.Send("signal")
+
+	if !h.HasSignal("count", float64(0)) {
+		t.Errorf("HasSignal(count, 0) = false, want true; signals = %v", h.Signals())
+	}
+	if h.HasSignal("count", float64(99)) {
+		t.Error("HasSignal(count, 99) = true, want false")
+	}
+	if h.HasSignal("missing", nil) {
+		t.Error("HasSignal(missing, nil) = true, want false")
+	}
+}
+
+func TestHasAnnounce(t *testing.T) {
+	h := newHarness()
+	h.Send("announce")
+
+	if !h.HasAnnounce("done") {
+		t.Errorf("HasAnnounce(done) = false, want true")
+	}
+	if h.HasAnnounce("other") {
+		t.Errorf("HasAnnounce(other) = true, want false")
+	}
+}
+
+func TestHasFlash(t *testing.T) {
+	h := newHarness()
+	h.Send("flash")
+
+	if !h.HasFlash("#msg", "saved") {
+		t.Errorf("HasFlash(#msg, saved) = false, want true")
+	}
+	if h.HasFlash("#msg", "wrong") {
+		t.Errorf("HasFlash(#msg, wrong) = true, want false")
+	}
+	if h.HasFlash("#other", "saved") {
+		t.Errorf("HasFlash(#other, saved) = true, want false")
+	}
+}
+
+func TestURLWasReplaced(t *testing.T) {
+	h := polytest.New(polytest.Config[state]{
+		State:  state{},
+		Render: render,
+		Handle: func(sess poly.PreSession, s state, ev poly.Event) state {
+			switch ev.Action {
+			case "nav":
+				sess.Navigate("/new")
+			case "replace":
+				sess.ReplaceURL("/replaced")
+			}
+			return s
+		},
+	})
+
+	h.Send("nav")
+	if h.URLWasReplaced() {
+		t.Error("URLWasReplaced() = true after Navigate, want false")
+	}
+
+	h.Send("replace")
+	if !h.URLWasReplaced() {
+		t.Error("URLWasReplaced() = false after ReplaceURL, want true")
+	}
+}
+
+func TestNavigateWithPath(t *testing.T) {
+	h := polytest.New(polytest.Config[state]{
+		State:  state{},
+		Render: render,
+		Handle: func(_ poly.PreSession, s state, _ poly.Event) state {
+			return s
+		},
+		OnNavigate: func(sess poly.PreSession, s state, params poly.Params) state {
+			s.Name = params.Path
+			if id := params.Query.Get("id"); id != "" {
+				s.Name += ":" + id
+			}
+			return s
+		},
+	})
+
+	h.Navigate("/users?id=42")
+	if h.State().Name != "/users:42" {
+		t.Errorf("Name = %q, want %q", h.State().Name, "/users:42")
+	}
+}
+
+func TestMiddleware(t *testing.T) {
+	// Encode call order into state so we verify the local re-derivation
+	// path rather than capturing closure side effects from both HTTP and
+	// local paths.
+	outer := func(next polytest.HandleFunc[state]) polytest.HandleFunc[state] {
+		return func(sess poly.PreSession, s state, ev poly.Event) state {
+			s.Name += "A"
+			s = next(sess, s, ev)
+			s.Name += "E"
+			return s
+		}
+	}
+
+	inner := func(next polytest.HandleFunc[state]) polytest.HandleFunc[state] {
+		return func(sess poly.PreSession, s state, ev poly.Event) state {
+			s.Name += "B"
+			s = next(sess, s, ev)
+			s.Name += "D"
+			return s
+		}
+	}
+
+	h := polytest.New(polytest.Config[state]{
+		State:  state{},
+		Render: render,
+		Handle: func(_ poly.PreSession, s state, ev poly.Event) state {
+			s.Name += "C"
+			s.Count++
+			return s
+		},
+		Middleware: []polytest.Middleware[state]{outer, inner},
+	})
+
+	h.Send("anything")
+
+	if h.State().Count != 1 {
+		t.Errorf("Count = %d, want 1", h.State().Count)
+	}
+	if h.State().Name != "ABCDE" {
+		t.Errorf("Name = %q, want %q (outer→inner→handle→inner→outer)", h.State().Name, "ABCDE")
+	}
+}
+
 func TestEffectsResetBetweenSends(t *testing.T) {
 	h := newHarness()
 
