@@ -64,10 +64,10 @@ func New[S any](cfg Config[S]) *Handler[S] {
 		panic("poly: Config.Handle is required")
 	}
 	if cfg.Mode != mode.SSE && cfg.Upgrade == nil {
-		panic("poly: Config.Upgrade is required for WebSocket mode")
+		panic("poly: Config.Upgrade is required — use ws.Upgrade() or set Mode to mode.SSE")
 	}
 	if cfg.Mode != mode.WebSocket && cfg.Fallback == nil {
-		panic("poly: Config.Fallback is required for SSE mode")
+		panic("poly: Config.Fallback is required — use sse.Upgrade() or set Mode to mode.WebSocket")
 	}
 
 	if len(cfg.Middleware) > 0 {
