@@ -53,7 +53,7 @@ event.go        Event and Params types, convenience helpers (Key, Int, Bool, Get
 event_bind.go   Event.Bind — reflection-based form field decoding
 middleware.go   Middleware type and chain function
 catch.go        Catch — render-level error boundary with panic recovery
-embed.go        Client JS embedding, ServeClient
+embed.go        Client JS embedding, ServeClient, clientVersion (content hash for cache-busting)
 push/push.go    Web Push protocol — Send(), GenerateVAPIDKeys(), VAPID auth, aes128gcm encryption
 ```
 
@@ -848,7 +848,7 @@ When `Poly.onError` is not set, non-silent errors fall through to `console.warn`
 
 The service worker provides:
 
-- **Asset caching:** Cache-first for `/_poly/*` GET requests (JS runtime files). On install, precaches `fluent-poly.js` and `idiomorph.min.js`, plus any extra URLs passed to `ServeClient(precache ...string)`.
+- **Asset caching:** Cache-first for `/_poly/*` GET requests (JS runtime files). On install, precaches `fluent-poly.js` and `idiomorph.min.js`, plus any extra URLs passed to `ServeClient(precache ...string)`. All internal script tags include a `?v=<hash>` query string (derived from `clientVersion()`) for cache-busting even without the service worker.
 - **Page caching:** Network-first for navigation requests. Caches successful HTML responses; serves the cached version when offline.
 - **Push event handling:** Receives push messages and shows notifications via `showNotification()`. Handles `notificationclick` for URL navigation.
 - **Background sync:** Replays failed SSE POST events from IndexedDB when connectivity returns (Chromium only; other browsers replay on tab reconnect).

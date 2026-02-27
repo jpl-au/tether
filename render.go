@@ -105,7 +105,15 @@ func (p *polyBody) RenderBuilder(buf *bytes.Buffer) {
 	}
 	buf.WriteString(`>`)
 	buf.Write(p.html)
-	buf.WriteString("</div>\n<script src=\"/_poly/idiomorph.min.js\"></script>\n<script src=\"/_poly/fluent-poly.js\"></script>\n")
+
+	// Append a content hash to all script URLs so browsers fetch fresh
+	// copies after a library upgrade, even without a service worker.
+	v := clientVersion()
+	buf.WriteString("</div>\n<script src=\"/_poly/idiomorph.min.js?v=")
+	buf.WriteString(v)
+	buf.WriteString("\"></script>\n<script src=\"/_poly/fluent-poly.js?v=")
+	buf.WriteString(v)
+	buf.WriteString("\"></script>\n")
 
 	// Extension scripts are included only when the rendered HTML uses
 	// the corresponding data attributes. This keeps the client payload
@@ -114,6 +122,8 @@ func (p *polyBody) RenderBuilder(buf *bytes.Buffer) {
 		if bytes.Contains(p.html, ext.marker) {
 			buf.WriteString("<script src=\"/_poly/")
 			buf.WriteString(ext.script)
+			buf.WriteString("?v=")
+			buf.WriteString(v)
 			buf.WriteString("\"></script>\n")
 		}
 	}

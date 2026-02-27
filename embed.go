@@ -31,24 +31,42 @@ func clientFiles() fs.FS {
 	return sub
 }
 
+var (
+	clientVersionOnce sync.Once
+	clientVersionVal  string
+)
+
+// clientVersion returns a 12-character hex hash of the embedded client
+// files. The hash is computed once and cached — the embedded content is
+// immutable for the lifetime of the process. Used for cache-busting
+// query strings on script tags and as the base for the service worker
+// CACHE_VERSION.
+func clientVersion() string {
+	clientVersionOnce.Do(func() {
+		h := sha256.New()
+		fs.WalkDir(clientFS, ".", func(path string, d fs.DirEntry, err error) error {
+			if err != nil || d.IsDir() {
+				return err
+			}
+			data, _ := fs.ReadFile(clientFS, path)
+			h.Write(data)
+			return nil
+		})
+		clientVersionVal = hex.EncodeToString(h.Sum(nil))[:12]
+	})
+	return clientVersionVal
+}
+
 // buildWorkerJS returns the service worker JS with the cache version set
 // to a content hash of the embedded client files and any extra precache
 // URLs injected. The version is injected at serve time so the browser's
 // service worker update check detects changes whenever the library is
 // rebuilt with new client code.
 func buildWorkerJS(precache []string) []byte {
+	// Start from the base client hash and mix in precache URLs so the
+	// worker version changes when the precache list changes.
 	h := sha256.New()
-	fs.WalkDir(clientFS, ".", func(path string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
-			return err
-		}
-		data, _ := fs.ReadFile(clientFS, path)
-		h.Write(data)
-		return nil
-	})
-	// Include precache URLs in the hash so the worker version changes
-	// when the developer updates the precache list, even if no JS
-	// files change.
+	h.Write([]byte(clientVersion()))
 	for _, u := range precache {
 		h.Write([]byte(u))
 	}

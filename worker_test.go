@@ -127,6 +127,46 @@ func TestClientWorkerOriginCheck(t *testing.T) {
 	})
 }
 
+func TestPolyBodyScriptHashes(t *testing.T) {
+	body := &polyBody{
+		html:     []byte(`<input type="file" data-poly-upload="avatar">`),
+		endpoint: "/app",
+		session:  "abc",
+	}
+	var buf bytes.Buffer
+	body.RenderBuilder(&buf)
+	html := buf.String()
+
+	v := clientVersion()
+	if len(v) != 12 {
+		t.Fatalf("clientVersion() = %q, want 12-character hex string", v)
+	}
+
+	want := "/_poly/idiomorph.min.js?v=" + v
+	if !strings.Contains(html, want) {
+		t.Errorf("expected %q in rendered HTML", want)
+	}
+
+	want = "/_poly/fluent-poly.js?v=" + v
+	if !strings.Contains(html, want) {
+		t.Errorf("expected %q in rendered HTML", want)
+	}
+
+	// Extension scripts also get the hash.
+	want = "/_poly/fluent-poly-upload.js?v=" + v
+	if !strings.Contains(html, want) {
+		t.Errorf("expected %q in rendered HTML", want)
+	}
+}
+
+func TestClientVersionDeterministic(t *testing.T) {
+	a := clientVersion()
+	b := clientVersion()
+	if a != b {
+		t.Errorf("clientVersion() not deterministic: %q != %q", a, b)
+	}
+}
+
 func TestPolyBodyWorkerAttribute(t *testing.T) {
 	t.Run("worker true emits data-poly-worker", func(t *testing.T) {
 		body := &polyBody{
