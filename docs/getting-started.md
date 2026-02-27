@@ -39,8 +39,7 @@ mux.Handle("/counter", poly.New(poly.Config[CounterState]{
     },
 }))
 
-// Serve the client JS runtime.
-// Optional: pass asset URLs to precache in the service worker.
+// Serve the client JS runtime (only needed when the handler is not at "/").
 mux.Handle("/_poly/", http.StripPrefix("/_poly/", poly.ServeClient()))
 ```
 

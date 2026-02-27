@@ -84,7 +84,7 @@ Mode constants: `mode.WebSocket`, `mode.SSE`, `mode.Auto`, `mode.Fetch`.
 | `Upload` | `*UploadConfig[S]` | File upload support (see [extensions](extensions.md)) |
 | `Push` | `*PushConfig[S]` | Web Push notifications (see [push](push-notifications.md)) |
 | `Worker` | `bool` | Enable service worker (auto-enabled by Push) |
-| `Precache` | `[]string` | Extra URLs for service worker to cache |
+| `Assets` | `[]*Asset` | Embedded asset collections — auto-served with content-hashed URLs |
 | `DevMode` | `bool` | Development mode (or set `POLY_DEV=1`) |
 
 ### Security

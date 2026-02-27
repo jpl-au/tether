@@ -44,13 +44,20 @@ poly.New(poly.Config[State]{
 
 The service worker caches the JS runtime (`fluent-poly.js`, `idiomorph.min.js`) using a cache-first strategy, and caches page HTML using a network-first strategy. On subsequent visits, the JS loads from cache. If the server is unreachable, the last cached page is served instead of a browser error.
 
-To precache additional app-specific assets (CSS, icons, fonts), pass their URLs to `ServeClient`:
+To precache application assets (CSS, icons, fonts), use the `Precache` field on `AssetConfig`:
 
 ```go
-mux.Handle("/_poly/", http.StripPrefix("/_poly/", poly.ServeClient(
-    "/styles.css",
-    "/logo.svg",
-)))
+var assets = poly.NewAsset(poly.AssetConfig{
+    FS:       staticFS,
+    Prefix:   "/static/",
+    Precache: []string{"styles.css", "logo.svg"},
+})
+
+poly.New(poly.Config[State]{
+    Assets: []*poly.Asset{assets},
+    Worker: true,
+    // ...
+})
 ```
 
 A reconnecting indicator bar appears automatically when the connection drops and disappears when it reconnects. This works with all transport modes, regardless of the `Worker` setting.

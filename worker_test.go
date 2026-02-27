@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"testing/fstest"
 	"time"
 
 	"github.com/jpl-au/fluent-poly/push"
@@ -54,12 +55,21 @@ func TestClientWorkerHeader(t *testing.T) {
 }
 
 func TestClientPrecache(t *testing.T) {
+	assets := NewAsset(AssetConfig{
+		FS: fstest.MapFS{
+			"styles.css": &fstest.MapFile{Data: []byte("body{}")},
+			"logo.svg":   &fstest.MapFile{Data: []byte("<svg></svg>")},
+		},
+		Prefix:   "/static/",
+		Precache: []string{"styles.css", "logo.svg"},
+	})
+
 	handler := New(Config[counterState]{
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
 		Handle:       handleCounter,
-		Precache:     []string{"/styles.css", "/logo.svg"},
+		Assets:       []*Asset{assets},
 	})
 
 	req := httptest.NewRequest("GET", "/_poly/fluent-poly-worker.js", nil)
@@ -67,11 +77,11 @@ func TestClientPrecache(t *testing.T) {
 	handler.ServeHTTP(w, req)
 
 	body := w.Body.String()
-	if !strings.Contains(body, "/styles.css") {
-		t.Error("worker JS should contain precache URL /styles.css")
+	if !strings.Contains(body, "/static/styles.css?v=") {
+		t.Error("worker JS should contain hashed precache URL for styles.css")
 	}
-	if !strings.Contains(body, "/logo.svg") {
-		t.Error("worker JS should contain precache URL /logo.svg")
+	if !strings.Contains(body, "/static/logo.svg?v=") {
+		t.Error("worker JS should contain hashed precache URL for logo.svg")
 	}
 	if strings.Contains(body, "PRECACHE_EXTRA = []") {
 		t.Error("worker JS should have replaced the empty PRECACHE_EXTRA placeholder")

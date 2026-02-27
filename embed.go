@@ -57,18 +57,20 @@ func clientVersion() string {
 	return clientVersionVal
 }
 
-// buildWorkerJS returns the service worker JS with the cache version set
-// to a content hash of the embedded client files and any extra precache
-// URLs injected. The version is injected at serve time so the browser's
-// service worker update check detects changes whenever the library is
-// rebuilt with new client code.
-func buildWorkerJS(precache []string) []byte {
-	// Start from the base client hash and mix in precache URLs so the
-	// worker version changes when the precache list changes.
+// buildWorkerJS returns the service worker JS with the cache version
+// derived from the embedded client files and any application assets.
+// The version hash and precache URLs are injected at serve time so the
+// browser's service worker update check detects changes whenever the
+// library is rebuilt or any precached asset changes.
+func buildWorkerJS(assets []*Asset) []byte {
+	// Start from the base client hash and mix in each asset collection
+	// so the worker version changes when any asset content changes.
 	h := sha256.New()
 	h.Write([]byte(clientVersion()))
-	for _, u := range precache {
-		h.Write([]byte(u))
+	var precache []string
+	for _, a := range assets {
+		h.Write([]byte(a.contentHash()))
+		precache = append(precache, a.precacheURLs()...)
 	}
 	version := hex.EncodeToString(h.Sum(nil))[:12]
 
@@ -93,14 +95,10 @@ func buildWorkerJS(precache []string) []byte {
 //
 //	mux.Handle("/_poly/", http.StripPrefix("/_poly/", poly.ServeClient()))
 //
-// Pass additional asset URLs to precache them in the service worker:
-//
-//	poly.ServeClient("/styles.css", "/logo.svg")
-//
 // When the poly handler IS mounted at "/" the client runtime is
 // served automatically and this function is not needed.
-func ServeClient(precache ...string) http.Handler {
-	return newClientHandler(precache)
+func ServeClient() http.Handler {
+	return newClientHandler(nil)
 }
 
 // newClientHandler builds an http.Handler that serves the embedded
@@ -109,7 +107,7 @@ func ServeClient(precache ...string) http.Handler {
 // gets special treatment: its CACHE_VERSION is set to a content hash
 // of the embedded files, and a Service-Worker-Allowed header is added
 // so it can control the entire origin.
-func newClientHandler(precache []string) http.Handler {
+func newClientHandler(assets []*Asset) http.Handler {
 	fileServer := http.FileServer(http.FS(clientFiles()))
 
 	var workerOnce sync.Once
@@ -130,7 +128,7 @@ func newClientHandler(precache []string) http.Handler {
 				}
 			}
 			workerOnce.Do(func() {
-				workerBody = buildWorkerJS(precache)
+				workerBody = buildWorkerJS(assets)
 			})
 			w.Header().Set("Service-Worker-Allowed", "/")
 			w.Header().Set("Content-Type", "application/javascript")

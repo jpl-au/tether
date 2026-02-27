@@ -121,3 +121,58 @@ func (a *Asset) Stylesheet(path string) node.Node {
 func (a *Asset) Script(path string) node.Node {
 	return script.New().Src(a.URL(path))
 }
+
+// contentHash returns a single hash representing all files in the
+// asset filesystem. Used to mix into the service worker CACHE_VERSION.
+func (a *Asset) contentHash() string {
+	h := sha256.New()
+	for path, hash := range a.hashes {
+		h.Write([]byte(path))
+		h.Write([]byte(hash))
+	}
+	return hex.EncodeToString(h.Sum(nil))[:12]
+}
+
+// precacheURLs returns the hashed URLs for all precache entries.
+func (a *Asset) precacheURLs() []string {
+	urls := make([]string, len(a.precache))
+	for i, path := range a.precache {
+		urls[i] = a.URL(path)
+	}
+	return urls
+}
+
+// buildAssetMounts creates an [assetMount] for each [Asset], wrapping
+// the file server with DevMode-aware cache headers.
+func buildAssetMounts(assets []*Asset, devMode bool) []assetMount {
+	mounts := make([]assetMount, len(assets))
+	for i, a := range assets {
+		handler := http.StripPrefix(a.prefix, a.handler)
+		if devMode {
+			handler = noCacheHandler(handler)
+		} else {
+			handler = immutableCacheHandler(handler)
+		}
+		mounts[i] = assetMount{prefix: a.prefix, handler: handler}
+	}
+	return mounts
+}
+
+// noCacheHandler wraps h with Cache-Control: no-store for DevMode.
+func noCacheHandler(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		h.ServeHTTP(w, r)
+	})
+}
+
+// immutableCacheHandler sets long-lived cache headers on responses
+// when the request URL contains a ?v= content hash.
+func immutableCacheHandler(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("v") != "" {
+			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		}
+		h.ServeHTTP(w, r)
+	})
+}

@@ -845,7 +845,7 @@ When `Poly.onError` is not set, non-silent errors fall through to `console.warn`
 
 ## Embedded assets
 
-`Asset` manages an embedded filesystem (`embed.FS` / `fs.FS`) with automatic per-file content hashing for cache-busting. Create one with `NewAsset(AssetConfig)`:
+`Asset` manages an embedded filesystem (`embed.FS` / `fs.FS`) with automatic per-file content hashing for cache-busting. Create one with `NewAsset(AssetConfig)` and pass it to `Config.Assets`:
 
 ```go
 //go:embed static
@@ -855,6 +855,11 @@ var assets = poly.NewAsset(poly.AssetConfig{
     FS:       staticFS,
     Prefix:   "/static/",
     Precache: []string{"styles.css", "logo.svg"},
+})
+
+handler := poly.New(poly.Config[State]{
+    Assets: []*poly.Asset{assets},
+    // ...
 })
 ```
 
@@ -866,13 +871,19 @@ var assets = poly.NewAsset(poly.AssetConfig{
 
 All hashes are computed eagerly at construction time. The hash is a 12-character hex prefix of the file's SHA256.
 
+**Auto-mounting:** When `Config.Assets` is set, the handler intercepts requests matching each asset's prefix and serves files directly — no extra mux setup needed. Multiple `Asset` entries with different prefixes are supported.
+
+**Cache headers:** In production, requests with `?v=` get `Cache-Control: public, max-age=31536000, immutable`. In DevMode, all asset responses get `Cache-Control: no-store`.
+
+**Service worker integration:** Precache entries from all assets are automatically injected into the service worker with their hashed URLs. Changing an asset file changes its hash, which changes the worker's `CACHE_VERSION`, triggering a browser re-cache.
+
 ## Service worker
 
 `client/poly-worker.js` is registered by the client JS when `data-poly-worker` is present on the root element. Set `Config.Worker = true` (or configure `Push`) to enable it.
 
 The service worker provides:
 
-- **Asset caching:** Cache-first for `/_poly/*` GET requests (JS runtime files). On install, precaches `fluent-poly.js` and `idiomorph.min.js`, plus any extra URLs passed to `ServeClient(precache ...string)`. All internal script tags include a `?v=<hash>` query string (derived from `clientVersion()`) for cache-busting even without the service worker.
+- **Asset caching:** Cache-first for `/_poly/*` GET requests (JS runtime files). On install, precaches `fluent-poly.js` and `idiomorph.min.js`, plus hashed URLs from `Config.Assets` precache lists. All internal script tags include a `?v=<hash>` query string (derived from `clientVersion()`) for cache-busting even without the service worker.
 - **Page caching:** Network-first for navigation requests. Caches successful HTML responses; serves the cached version when offline.
 - **Push event handling:** Receives push messages and shows notifications via `showNotification()`. Handles `notificationclick` for URL navigation.
 - **Background sync:** Replays failed SSE POST events from IndexedDB when connectivity returns (Chromium only; other browsers replay on tab reconnect).

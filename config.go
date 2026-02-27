@@ -134,11 +134,13 @@ type Config[S any] struct {
 	// POLY_DEV environment variable to any non-empty value.
 	DevMode bool
 
-	// Precache lists additional app-specific asset URLs (e.g.
-	// "/styles.css", "/logo.svg") that the service worker should cache
-	// on install alongside the poly runtime files. Only relevant when
-	// Worker is true or Push is configured. Optional.
-	Precache []string
+	// Assets lists embedded asset collections to auto-serve. Each
+	// [Asset] is created with [NewAsset] and provides content-hashed
+	// URLs for cache-busting. Assets are served at their configured
+	// prefix (default "/assets/") with appropriate cache headers —
+	// immutable in production, no-store in DevMode. Precache entries
+	// are automatically injected into the service worker. Optional.
+	Assets []*Asset
 
 	// Upload enables file upload support. When set, the handler accepts
 	// multipart POST requests from the upload extension JS and delivers

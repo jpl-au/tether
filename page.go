@@ -66,6 +66,10 @@ type PageConfig[S any] struct {
 	// Security groups origin-checking settings.
 	Security Security
 
+	// Assets lists embedded asset collections to auto-serve. See
+	// [Config].Assets for details. Optional.
+	Assets []*Asset
+
 	// DevMode sets Cache-Control: no-store and emits the
 	// data-poly-dev attribute. Enable via this field or the POLY_DEV
 	// environment variable.
@@ -110,7 +114,8 @@ func Page[S any](cfg PageConfig[S]) http.Handler {
 
 	return &pageHandler[S]{
 		cfg:           cfg,
-		clientHandler: newClientHandler(nil),
+		clientHandler: newClientHandler(cfg.Assets),
+		assetMounts:   buildAssetMounts(cfg.Assets, cfg.DevMode),
 	}
 }
 
@@ -118,12 +123,20 @@ func Page[S any](cfg PageConfig[S]) http.Handler {
 type pageHandler[S any] struct {
 	cfg           PageConfig[S]
 	clientHandler http.Handler
+	assetMounts   []assetMount
 }
 
 func (p *pageHandler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if strings.HasPrefix(r.URL.Path, "/_poly/") {
 		http.StripPrefix("/_poly", p.clientHandler).ServeHTTP(w, r)
 		return
+	}
+
+	for _, m := range p.assetMounts {
+		if strings.HasPrefix(r.URL.Path, m.prefix) {
+			m.handler.ServeHTTP(w, r)
+			return
+		}
 	}
 
 	switch r.Method {

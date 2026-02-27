@@ -76,16 +76,23 @@ The service worker caches the JS runtime (`fluent-poly.js`, `idiomorph.min.js`) 
 
 ### Precaching additional assets
 
-Pass URLs to `ServeClient` to cache app-specific assets (CSS, icons, fonts) on service worker install:
+Use the `Precache` field on `AssetConfig` to cache app-specific assets on service worker install:
 
 ```go
-mux.Handle("/_poly/", http.StripPrefix("/_poly/", poly.ServeClient(
-    "/styles.css",
-    "/logo.svg",
-)))
+var assets = poly.NewAsset(poly.AssetConfig{
+    FS:       staticFS,
+    Prefix:   "/static/",
+    Precache: []string{"styles.css", "logo.svg"},
+})
+
+poly.New(poly.Config[State]{
+    Assets: []*poly.Asset{assets},
+    Worker: true,
+    // ...
+})
 ```
 
-The cache version is derived from a content hash of all embedded files, so updates to the library automatically invalidate the cache.
+The cache version is derived from a content hash of all embedded files and application assets, so updates to either automatically invalidate the cache.
 
 ### Dev mode
 

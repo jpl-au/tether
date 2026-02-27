@@ -25,6 +25,14 @@ func (h *Handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Serve embedded application assets at their configured prefixes.
+	for _, m := range h.assetMounts {
+		if strings.HasPrefix(r.URL.Path, m.prefix) {
+			m.handler.ServeHTTP(w, r)
+			return
+		}
+	}
+
 	// File uploads arrive as multipart POST with an X-Poly-Upload
 	// header. Handle them before the mode switch so they work with
 	// all transport modes.

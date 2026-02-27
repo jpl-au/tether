@@ -43,6 +43,17 @@ type Handler[S any] struct {
 
 	// clientHandler serves the embedded JS runtime at /_poly/*.
 	clientHandler http.Handler
+
+	// assetMounts serves embedded application assets at their
+	// configured URL prefixes, one per [Asset] in Config.Assets.
+	assetMounts []assetMount
+}
+
+// assetMount pairs a URL prefix with a handler that serves files from
+// the corresponding [Asset] filesystem.
+type assetMount struct {
+	prefix  string
+	handler http.Handler
 }
 
 // New creates a [Handler] from the given configuration. Session
@@ -111,13 +122,16 @@ func New[S any](cfg Config[S]) *Handler[S] {
 	if cfg.Limits.CmdBufferSize == 0 {
 		cfg.Limits.CmdBufferSize = defaultCmdBufferSize
 	}
+	mounts := buildAssetMounts(cfg.Assets, cfg.DevMode)
+
 	h := &Handler[S]{
 		cfg:           cfg,
 		pending:       make(map[string]*pendingSession[S]),
 		active:        make(map[string]*Session[S]),
 		disconnected:  make(map[string]*Session[S]),
 		done:          make(chan struct{}),
-		clientHandler: newClientHandler(cfg.Precache),
+		clientHandler: newClientHandler(cfg.Assets),
+		assetMounts:   mounts,
 	}
 
 	go h.reapPending()
