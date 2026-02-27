@@ -73,6 +73,16 @@ func Throttle[E Settable[E]](el E, d time.Duration) E {
 	return el.SetData("poly-throttle", strconv.Itoa(int(d.Milliseconds())))
 }
 
+// On binds an arbitrary DOM event. Use this for events not covered by
+// the built-in helpers (Click, Submit, Input, etc.). The eventType is
+// appended to the "poly-" prefix, so On(el, "mouseover", "hover")
+// sets data-poly-mouseover="hover".
+//
+//	bind.On(div.New(), "dblclick", "open-editor")
+func On[E Settable[E]](el E, eventType, action string) E {
+	return el.SetData("poly-"+eventType, action)
+}
+
 // Viewport fires a server event when the element enters the viewport.
 // Uses IntersectionObserver internally. The event fires once per
 // element appearance; after a server morph replaces the element, the

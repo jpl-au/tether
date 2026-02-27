@@ -60,6 +60,14 @@ func OnBlur(action string) Option { return Option{"poly-blur", action} }
 // OnViewport binds a poly-viewport event.
 func OnViewport(action string) Option { return Option{"poly-viewport", action} }
 
+// WithEvent binds an arbitrary DOM event. Use this for events not
+// covered by the built-in options (OnClick, OnSubmit, etc.).
+//
+//	bind.Apply(el, bind.WithEvent("dblclick", "open-editor"))
+func WithEvent(eventType, action string) Option {
+	return Option{"poly-" + eventType, action}
+}
+
 // Control options.
 
 // WithDisable disables the element while an event is in flight.

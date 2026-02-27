@@ -221,3 +221,19 @@ func TestApplyNoOptions(t *testing.T) {
 		t.Errorf("expected no poly attributes in:\n%s", html)
 	}
 }
+
+func TestOnArbitraryEvent(t *testing.T) {
+	el := bind.On(div.New(), "dblclick", "open-editor")
+	html := string(el.Render())
+	if !strings.Contains(html, `data-poly-dblclick="open-editor"`) {
+		t.Errorf("missing dblclick attribute in:\n%s", html)
+	}
+}
+
+func TestWithEventOption(t *testing.T) {
+	el := bind.Apply(div.New(), bind.WithEvent("mouseover", "hover"))
+	html := string(el.Render())
+	if !strings.Contains(html, `data-poly-mouseover="hover"`) {
+		t.Errorf("missing mouseover attribute in:\n%s", html)
+	}
+}
