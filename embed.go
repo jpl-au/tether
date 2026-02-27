@@ -69,6 +69,22 @@ func buildWorkerJS(precache []string) []byte {
 	return body
 }
 
+// ServeClient returns an http.Handler that serves the embedded client
+// JS runtime (fluent-poly.js, idiomorph, service worker). Mount it at
+// /_poly/ when the poly handler is not at the root path:
+//
+//	mux.Handle("/_poly/", http.StripPrefix("/_poly/", poly.ServeClient()))
+//
+// Pass additional asset URLs to precache them in the service worker:
+//
+//	poly.ServeClient("/styles.css", "/logo.svg")
+//
+// When the poly handler IS mounted at "/" the client runtime is
+// served automatically and this function is not needed.
+func ServeClient(precache ...string) http.Handler {
+	return newClientHandler(precache)
+}
+
 // newClientHandler builds an http.Handler that serves the embedded
 // client runtime. The Handler mounts this at /_poly/ so the HTML page
 // can load fluent-poly.js and idiomorph. The service worker script
