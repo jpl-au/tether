@@ -1,7 +1,6 @@
 package poly
 
 import (
-	"errors"
 	"maps"
 	"time"
 
@@ -197,11 +196,11 @@ func (s *Session[S]) SignalBatch(pairs ...any) {
 // needed.
 func (s *Session[S]) Push(n push.Notification) error {
 	if s.pushSender == nil {
-		return errors.New("poly: push not configured")
+		return ErrPushNotConfigured
 	}
 	sub := s.pushSub.Load()
 	if sub == nil {
-		return errors.New("poly: no push subscription for session")
+		return ErrPushNoSubscription
 	}
 	return s.pushSender.Send(*sub, n)
 }

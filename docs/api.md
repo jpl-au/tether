@@ -585,3 +585,12 @@ sess.Push(push.Notification{
 // Generate new VAPID keys
 pub, priv, err := push.GenerateVAPIDKeys()
 ```
+
+**Sentinel errors** — check with `errors.Is()`:
+
+| Error | Meaning |
+|-------|---------|
+| `poly.ErrPushNotConfigured` | Handler created without `PushConfig` |
+| `poly.ErrPushNoSubscription` | Browser has not registered a push subscription |
+| `poly.ErrPushPreWarm` | Push called during pre-warming (no browser yet) |
+| `push.ErrSubscriptionExpired` | Push service returned HTTP 410 |

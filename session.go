@@ -2,7 +2,6 @@ package poly
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"maps"
 	"sync/atomic"
@@ -168,7 +167,7 @@ func (c *captureSession) Announce(text string)     { c.fx.announce = text }
 // Push returns an error during pre-warming because no browser
 // subscription exists yet.
 func (c *captureSession) Push(push.Notification) error {
-	return errors.New("poly: push not available during pre-warming")
+	return ErrPushPreWarm
 }
 
 func (c *captureSession) Flash(selector, text string) {

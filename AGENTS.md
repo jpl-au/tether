@@ -44,6 +44,7 @@ page.go         Initial page rendering — polyBody, newID
 session.go      Session struct, ID(), Context(), Go(), constants
 loop.go         Command loop — run(), readTransport(), exec(), onTransportClose(), cleanup()
 methods.go      Dual-path methods — State(), Update(), Toast(), Navigate(), SetTitle(), etc.
+errors.go       Sentinel errors — ErrPushNotConfigured, ErrPushNoSubscription, ErrPushPreWarm
 handle.go       HandleFunc type definition
 effects.go      Internal effects accumulator (replaces HandleResult)
 group.go        Broadcasting — Group, Broadcast, BroadcastOthers, All()
@@ -972,6 +973,15 @@ sess.Push(push.Notification{
 ```
 
 The `push.Sender` handles ECDH key agreement, HKDF key derivation (`golang.org/x/crypto/hkdf`), AES-128-GCM payload encryption, and VAPID JWT signing. Returns `push.ErrSubscriptionExpired` for HTTP 410 responses.
+
+**Sentinel errors** (defined in `errors.go`):
+
+| Error | Returned by | Meaning |
+|-------|-------------|---------|
+| `ErrPushNotConfigured` | `Session.Push` | Handler created without `PushConfig` |
+| `ErrPushNoSubscription` | `Session.Push` | Browser has not registered a push subscription |
+| `ErrPushPreWarm` | `captureSession.Push` | Push called during pre-warming (no browser yet) |
+| `push.ErrSubscriptionExpired` | `push.Sender.Send` | Push service returned HTTP 410 |
 
 ## Event resilience (SSE)
 
