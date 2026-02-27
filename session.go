@@ -138,6 +138,7 @@ type PreSession interface {
 	Flash(selector, text string)
 	Signal(key string, value any)
 	Signals(signals map[string]any)
+	SignalBatch(pairs ...any)
 	Push(n push.Notification) error
 }
 
@@ -185,6 +186,27 @@ func (c *captureSession) Signals(signals map[string]any) {
 		c.fx.signals = make(map[string]any, len(signals))
 	}
 	maps.Copy(c.fx.signals, signals)
+}
+
+func (c *captureSession) SignalBatch(pairs ...any) {
+	c.Signals(pairsToMap(pairs))
+}
+
+// pairsToMap converts a flat key-value list ("k1", v1, "k2", v2, ...)
+// into a map. Panics if the count is odd or any key is not a string.
+func pairsToMap(pairs []any) map[string]any {
+	if len(pairs)%2 != 0 {
+		panic("poly: SignalBatch requires an even number of arguments")
+	}
+	m := make(map[string]any, len(pairs)/2)
+	for i := 0; i < len(pairs); i += 2 {
+		key, ok := pairs[i].(string)
+		if !ok {
+			panic("poly: SignalBatch keys must be strings")
+		}
+		m[key] = pairs[i+1]
+	}
+	return m
 }
 
 // ID returns the unique session identifier. This is a cryptographically

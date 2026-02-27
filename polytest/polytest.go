@@ -147,6 +147,19 @@ func (s *testSession) Signals(m map[string]any) {
 		s.signals[k] = v
 	}
 }
+func (s *testSession) SignalBatch(pairs ...any) {
+	if len(pairs)%2 != 0 {
+		panic("polytest: SignalBatch requires an even number of arguments")
+	}
+	s.ensureSignals()
+	for i := 0; i < len(pairs); i += 2 {
+		key, ok := pairs[i].(string)
+		if !ok {
+			panic("polytest: SignalBatch keys must be strings")
+		}
+		s.signals[key] = pairs[i+1]
+	}
+}
 func (s *testSession) Flash(sel, text string)       { s.ensureFlash(); s.flash[sel] = text }
 func (s *testSession) Push(push.Notification) error { return nil }
 
