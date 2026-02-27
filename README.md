@@ -38,6 +38,21 @@ mux.Handle("/_poly/", http.StripPrefix("/_poly/", poly.ServeClient()))
 
 No WebSocket boilerplate. No JavaScript to write. No diff algorithm to understand.
 
+## Embedded assets
+
+Serve CSS, JS, and images from an `embed.FS` with automatic content-hashed URLs:
+
+```go
+//go:embed static
+var staticFS embed.FS
+
+var assets = poly.NewAsset(poly.AssetConfig{FS: staticFS, Prefix: "/static/"})
+
+// In your Layout:
+assets.Stylesheet("styles.css") // <link rel="stylesheet" href="/static/styles.css?v=a1b2c3d4e5f6">
+assets.Script("app.js")         // <script src="/static/app.js?v=a1b2c3d4e5f6"></script>
+```
+
 ## Documentation
 
 | Guide | Description |

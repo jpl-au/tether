@@ -54,6 +54,7 @@ event_bind.go   Event.Bind — reflection-based form field decoding
 middleware.go   Middleware type and chain function
 catch.go        Catch — render-level error boundary with panic recovery
 embed.go        Client JS embedding, ServeClient, clientVersion (content hash for cache-busting)
+asset.go        Asset type — embedded filesystem with per-file content hashing, URL/Stylesheet/Script helpers
 push/push.go    Web Push protocol — Send(), GenerateVAPIDKeys(), VAPID auth, aes128gcm encryption
 ```
 
@@ -841,6 +842,29 @@ Error types:
 - `"render"` — Patch or morph contains multiple root elements
 
 When `Poly.onError` is not set, non-silent errors fall through to `console.warn` and silent errors (parse, indexeddb, fetch) are swallowed. The `reportError(type, message, silent)` helper inside the IIFE handles the routing.
+
+## Embedded assets
+
+`Asset` manages an embedded filesystem (`embed.FS` / `fs.FS`) with automatic per-file content hashing for cache-busting. Create one with `NewAsset(AssetConfig)`:
+
+```go
+//go:embed static
+var staticFS embed.FS
+
+var assets = poly.NewAsset(poly.AssetConfig{
+    FS:       staticFS,
+    Prefix:   "/static/",
+    Precache: []string{"styles.css", "logo.svg"},
+})
+```
+
+**Methods:**
+
+- `URL(path string) string` — returns the hashed URL, e.g. `/static/styles.css?v=a1b2c3d4e5f6`. Panics on missing files to catch typos at startup.
+- `Stylesheet(path string) node.Node` — `<link rel="stylesheet" href="...">` with hashed URL
+- `Script(path string) node.Node` — `<script src="..."></script>` with hashed URL
+
+All hashes are computed eagerly at construction time. The hash is a 12-character hex prefix of the file's SHA256.
 
 ## Service worker
 
