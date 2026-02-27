@@ -87,6 +87,27 @@ func TestApplyTimingOptions(t *testing.T) {
 	}
 }
 
+func TestWithFilterKeyMatchesFilterKey(t *testing.T) {
+	// WithFilterKey must produce the same attribute as bind.FilterKey.
+	nested := string(bind.FilterKey(input.Text("q", ""), "Enter").Render())
+	applied := string(bind.Apply(input.Text("q", ""), bind.WithFilterKey("Enter")).Render())
+	want := `data-poly-key="Enter"`
+	if !strings.Contains(nested, want) {
+		t.Errorf("FilterKey missing %s in:\n%s", want, nested)
+	}
+	if !strings.Contains(applied, want) {
+		t.Errorf("WithFilterKey missing %s in:\n%s", want, applied)
+	}
+}
+
+func TestWithData(t *testing.T) {
+	el := bind.Apply(div.New(), bind.WithData("poly-custom", "value"))
+	html := string(el.Render())
+	if !strings.Contains(html, `data-poly-custom="value"`) {
+		t.Errorf("missing custom attribute in:\n%s", html)
+	}
+}
+
 func TestApplyDirectiveOptions(t *testing.T) {
 	el := bind.Apply(div.New(),
 		bind.WithCloak(),

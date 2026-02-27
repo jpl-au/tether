@@ -246,6 +246,31 @@ func TestURLWasReplaced(t *testing.T) {
 	}
 }
 
+func TestNavigateSkipsHandle(t *testing.T) {
+	h := polytest.New(polytest.Config[state]{
+		State:  state{},
+		Render: render,
+		Handle: func(_ poly.PreSession, s state, _ poly.Event) state {
+			// Handle should NOT be called for navigate events when
+			// OnNavigate is set — this mirrors live session behaviour.
+			s.Count = 999
+			return s
+		},
+		OnNavigate: func(_ poly.PreSession, s state, params poly.Params) state {
+			s.Name = params.Path
+			return s
+		},
+	})
+
+	h.Navigate("/hello")
+	if h.State().Name != "/hello" {
+		t.Errorf("Name = %q, want %q", h.State().Name, "/hello")
+	}
+	if h.State().Count != 0 {
+		t.Errorf("Count = %d, want 0 — Handle should not run for navigate events", h.State().Count)
+	}
+}
+
 func TestNavigateWithPath(t *testing.T) {
 	h := polytest.New(polytest.Config[state]{
 		State:  state{},

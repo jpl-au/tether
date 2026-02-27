@@ -93,7 +93,11 @@ func WithThrottle(d time.Duration) Option {
 }
 
 // WithFilterKey restricts a keydown event to a specific key.
-func WithFilterKey(key string) Option { return Option{"poly-filter-key", key} }
+func WithFilterKey(key string) Option { return Option{"poly-key", key} }
+
+// WithData sets a custom data-poly-* attribute. Use this for
+// attributes that don't have a dedicated With* helper.
+func WithData(key, value string) Option { return Option{key, value} }
 
 // WithEventData attaches an extra key-value pair to events.
 func WithEventData(key, value string) Option { return Option{"poly-data-" + key, value} }

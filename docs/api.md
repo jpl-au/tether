@@ -413,6 +413,12 @@ Lifecycle:
 bind.WithHook("chart")      bind.WithTransition("fade")
 ```
 
+Escape hatch for custom attributes:
+
+```go
+bind.WithData("poly-custom", "value")  // data-poly-custom="value"
+```
+
 ---
 
 ## Middleware

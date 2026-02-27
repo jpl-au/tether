@@ -330,7 +330,7 @@ bind.Apply(btn,
 )
 ```
 
-Option helpers: `OnClick`, `OnSubmit`, `OnInput`, `OnChange`, `OnKeyDown`, `OnFocus`, `OnBlur`, `OnViewport`, `WithDisable`, `WithConfirm`, `WithPreserve`, `WithAutoFocus`, `WithIndicator`, `WithFocusTrap`, `WithDebounce`, `WithThrottle`, `WithFilterKey`, `WithEventData`, `WithLink`, `WithToggleClass`, `WithToggleTarget`, `WithToggleAttr`, `WithCloak`, `WithPermanent`, `WithHook`, `WithTransition`, `WithBindText`, `WithBindShow`, `WithBindHide`, `WithBindClass`, `WithBindAttr`, `WithBindValue`, `WithToggleSignal`, `WithSetSignal`, `WithOptimistic`, `WithOptimisticToggle`, `WithUpload`, `WithUploadProgress`.
+Option helpers: `OnClick`, `OnSubmit`, `OnInput`, `OnChange`, `OnKeyDown`, `OnFocus`, `OnBlur`, `OnViewport`, `WithDisable`, `WithConfirm`, `WithPreserve`, `WithAutoFocus`, `WithIndicator`, `WithFocusTrap`, `WithDebounce`, `WithThrottle`, `WithFilterKey`, `WithEventData`, `WithLink`, `WithToggleClass`, `WithToggleTarget`, `WithToggleAttr`, `WithCloak`, `WithPermanent`, `WithHook`, `WithTransition`, `WithBindText`, `WithBindShow`, `WithBindHide`, `WithBindClass`, `WithBindAttr`, `WithBindValue`, `WithToggleSignal`, `WithSetSignal`, `WithOptimistic`, `WithOptimisticToggle`, `WithUpload`, `WithUploadProgress`, `WithData`.
 
 ## Form validation
 
@@ -607,7 +607,7 @@ All helpers are in the `bind` package. They accept any Fluent element type via a
 | `bind.Input` | `poly-input` | Server event on input (debounced) |
 | `bind.Change` | `poly-change` | Server event on value commit |
 | `bind.KeyDown` | `poly-keydown` | Server event on keydown (with modifiers) |
-| `bind.FilterKey` | `poly-filter-key` | Only fire keydown for a specific key |
+| `bind.FilterKey` | `poly-key` | Only fire keydown for a specific key |
 | `bind.Focus` | `poly-focus` | Server event on focus |
 | `bind.Blur` | `poly-blur` | Server event on blur |
 | `bind.Viewport` | `poly-viewport` | Server event on viewport enter/exit |
@@ -772,7 +772,7 @@ The JS exposes one global: `window.Poly` with a `hooks` property for JS interop 
 
 Supported data attributes:
 
-**Server events:** `data-poly-click`, `data-poly-input`, `data-poly-submit`, `data-poly-change`, `data-poly-keydown`, `data-poly-filter-key`, `data-poly-focus`, `data-poly-blur`, `data-poly-viewport`
+**Server events:** `data-poly-click`, `data-poly-input`, `data-poly-submit`, `data-poly-change`, `data-poly-keydown`, `data-poly-key`, `data-poly-focus`, `data-poly-blur`, `data-poly-viewport`
 
 **Navigation:** `data-poly-link`
 

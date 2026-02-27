@@ -254,14 +254,18 @@ func (h *Harness[S]) SendEvent(ev poly.Event) {
 	// Re-derive state locally using a testSession that captures effects.
 	// This allows subsequent Send calls to see accumulated state changes.
 	ts := &testSession{}
-	if h.onNavigate != nil && ev.Type == event.Navigate {
+	if ev.Type == event.Navigate && h.onNavigate != nil {
+		// Navigate events are routed to OnNavigate, not Handle. This
+		// mirrors the live session behaviour where navigation bypasses
+		// the event handler entirely.
 		params := poly.Params{
 			Path:  ev.Data["path"],
 			Query: parseQuery(ev.Data["search"]),
 		}
 		h.state = h.onNavigate(ts, h.state, params)
+	} else {
+		h.state = h.handle(ts, h.state, ev)
 	}
-	h.state = h.handle(ts, h.state, ev)
 
 	// Rebuild the handler with the updated state.
 	h.rebuildHandler()
