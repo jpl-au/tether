@@ -127,10 +127,17 @@ func (h *Handler[S]) handleUpload(w http.ResponseWriter, r *http.Request) {
 	// every callback has returned — not before.
 	form := r.MultipartForm
 	handler := h.cfg.Upload.Handle
+	logger := sess.logger
 	go func() {
 		defer form.RemoveAll()
 		for _, u := range uploads {
-			handler(sess, u)
+			if err := handler(sess, u); err != nil {
+				logger.Error("upload handler failed",
+					"action", u.Action,
+					"file", u.Name,
+					"err", err,
+				)
+			}
 		}
 	}()
 
