@@ -60,6 +60,16 @@ type Config[S any] struct {
 
 	// OnNavigate processes URL parameters. Optional.
 	OnNavigate func(session poly.PreSession, state S, params poly.Params) S
+
+	// OnConnect is called when [Harness.Connect] is called. Use this
+	// to test session registration logic (e.g. joining a [poly.Group]
+	// or starting background tasks). Optional.
+	OnConnect func(session poly.PreSession)
+
+	// OnDisconnect is called when [Harness.Disconnect] is called. Use
+	// this to test cleanup logic (e.g. removing from a [poly.Group]
+	// or decrementing counters). Optional.
+	OnDisconnect func(session poly.PreSession)
 }
 
 // Harness drives a poly page handler for testing. Create one with
@@ -71,6 +81,10 @@ type Harness[S any] struct {
 	handle     func(poly.PreSession, S, poly.Event) S
 	onNavigate func(poly.PreSession, S, poly.Params) S
 	handler    http.Handler
+
+	// Lifecycle callbacks stored from Config.
+	onConnect    func(poly.PreSession)
+	onDisconnect func(poly.PreSession)
 
 	// Last response fields.
 	last response
@@ -166,10 +180,12 @@ func New[S any](cfg Config[S]) *Harness[S] {
 		handle = chainMiddleware(handle, cfg.Middleware)
 	}
 	h := &Harness[S]{
-		state:      cfg.State,
-		render:     cfg.Render,
-		handle:     handle,
-		onNavigate: cfg.OnNavigate,
+		state:        cfg.State,
+		render:       cfg.Render,
+		handle:       handle,
+		onNavigate:   cfg.OnNavigate,
+		onConnect:    cfg.OnConnect,
+		onDisconnect: cfg.OnDisconnect,
 	}
 	h.rebuildHandler()
 	return h
@@ -377,6 +393,24 @@ func (h *Harness[S]) HasAnnounce(text string) bool {
 // message matching the given selector and text.
 func (h *Harness[S]) HasFlash(selector, text string) bool {
 	return h.last.flash != nil && h.last.flash[selector] == text
+}
+
+// Connect triggers the OnConnect callback, simulating a client
+// connecting to the server. Panics if OnConnect was not configured.
+func (h *Harness[S]) Connect() {
+	if h.onConnect == nil {
+		panic("polytest: Connect called but OnConnect is not configured")
+	}
+	h.onConnect(&testSession{})
+}
+
+// Disconnect triggers the OnDisconnect callback, simulating a client
+// disconnecting from the server. Panics if OnDisconnect was not configured.
+func (h *Harness[S]) Disconnect() {
+	if h.onDisconnect == nil {
+		panic("polytest: Disconnect called but OnDisconnect is not configured")
+	}
+	h.onDisconnect(&testSession{})
 }
 
 // URLWasReplaced reports whether the most recent URL change used

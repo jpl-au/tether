@@ -350,6 +350,60 @@ func TestEffectsResetBetweenSends(t *testing.T) {
 	}
 }
 
+func TestConnect(t *testing.T) {
+	called := false
+	h := polytest.New(polytest.Config[state]{
+		State:  state{},
+		Render: render,
+		Handle: handle,
+		OnConnect: func(_ poly.PreSession) {
+			called = true
+		},
+	})
+
+	h.Connect()
+	if !called {
+		t.Error("OnConnect was not called")
+	}
+}
+
+func TestDisconnect(t *testing.T) {
+	called := false
+	h := polytest.New(polytest.Config[state]{
+		State:  state{},
+		Render: render,
+		Handle: handle,
+		OnDisconnect: func(_ poly.PreSession) {
+			called = true
+		},
+	})
+
+	h.Disconnect()
+	if !called {
+		t.Error("OnDisconnect was not called")
+	}
+}
+
+func TestConnectPanicsWithoutCallback(t *testing.T) {
+	h := newHarness()
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("expected panic from Connect without OnConnect")
+		}
+	}()
+	h.Connect()
+}
+
+func TestDisconnectPanicsWithoutCallback(t *testing.T) {
+	h := newHarness()
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("expected panic from Disconnect without OnDisconnect")
+		}
+	}()
+	h.Disconnect()
+}
+
 func contains(s, substr string) bool {
 	return len(s) > 0 && len(substr) > 0 && // avoid trivial matches
 		stringContains(s, substr)
