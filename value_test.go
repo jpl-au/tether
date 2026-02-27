@@ -6,17 +6,17 @@ import (
 	"testing/synctest"
 )
 
-func TestValueGetSet(t *testing.T) {
+func TestValueLoadStore(t *testing.T) {
 	v := NewValue(10)
 
-	if got := v.Get(); got != 10 {
-		t.Errorf("Get() = %d, want 10", got)
+	if got := v.Load(); got != 10 {
+		t.Errorf("Load() = %d, want 10", got)
 	}
 
-	v.Set(42)
+	v.Store(42)
 
-	if got := v.Get(); got != 42 {
-		t.Errorf("Get() after Set = %d, want 42", got)
+	if got := v.Load(); got != 42 {
+		t.Errorf("Load() after Store = %d, want 42", got)
 	}
 }
 
@@ -25,12 +25,12 @@ func TestValueUpdate(t *testing.T) {
 
 	v.Update(func(n int) int { return n + 3 })
 
-	if got := v.Get(); got != 8 {
-		t.Errorf("Get() after Update = %d, want 8", got)
+	if got := v.Load(); got != 8 {
+		t.Errorf("Load() after Update = %d, want 8", got)
 	}
 }
 
-func TestValuePublishesOnSet(t *testing.T) {
+func TestValuePublishesOnStore(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		v := NewValue(0)
 
@@ -39,7 +39,7 @@ func TestValuePublishesOnSet(t *testing.T) {
 			received = val
 		})
 
-		v.Set(99)
+		v.Store(99)
 
 		if received != 99 {
 			t.Errorf("subscriber received %d, want 99", received)

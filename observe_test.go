@@ -50,7 +50,7 @@ func TestObserveDeliversFutureChanges(t *testing.T) {
 		})
 		synctest.Wait()
 
-		v.Set(100)
+		v.Store(100)
 		synctest.Wait()
 
 		if s := sess.State(); s.Count != 100 {
@@ -123,15 +123,15 @@ func TestObserveCrossHandler(t *testing.T) {
 			t.Errorf("B.Active = %d, want 5", s.Active)
 		}
 
-		// Set a new value — both should update.
-		v.Set(20)
+		// Store a new value — both should update.
+		v.Store(20)
 		synctest.Wait()
 
 		if s := sessA.State(); s.Count != 20 {
-			t.Errorf("A.Count after Set = %d, want 20", s.Count)
+			t.Errorf("A.Count after Store = %d, want 20", s.Count)
 		}
 		if s := sessB.State(); s.Active != 20 {
-			t.Errorf("B.Active after Set = %d, want 20", s.Active)
+			t.Errorf("B.Active after Store = %d, want 20", s.Active)
 		}
 	})
 }
@@ -219,16 +219,16 @@ func TestObserveMultipleValues(t *testing.T) {
 			t.Errorf("B = %q, want %q", s.B, "hello")
 		}
 
-		vA.Set(99)
-		vB.Set("world")
+		vA.Store(99)
+		vB.Store("world")
 		synctest.Wait()
 
 		s = sess.State()
 		if s.A != 99 {
-			t.Errorf("A after Set = %d, want 99", s.A)
+			t.Errorf("A after Store = %d, want 99", s.A)
 		}
 		if s.B != "world" {
-			t.Errorf("B after Set = %q, want %q", s.B, "world")
+			t.Errorf("B after Store = %q, want %q", s.B, "world")
 		}
 	})
 }

@@ -6,7 +6,7 @@ package poly
 //
 // The current value is delivered immediately so the session's state
 // is up to date from the moment of subscription. Future changes via
-// [Value.Set] or [Value.Update] are delivered automatically.
+// [Value.Store] or [Value.Update] are delivered automatically.
 //
 // The subscription and initial value read happen atomically — a
 // concurrent Set cannot slip between the two and cause duplicate
@@ -20,7 +20,7 @@ package poly
 //	})
 func Observe[V any, S any](val *Value[V], s *Session[S], fn func(V, S) S) {
 	// Subscribe and read the current value under the Value's lock so
-	// a concurrent Set cannot interleave and deliver the same value
+	// a concurrent Store cannot interleave and deliver the same value
 	// via both the subscriber callback and the initial Update below.
 	current := val.observe(s.Context(), func(v V) {
 		s.Update(func(state S) S {

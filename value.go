@@ -8,10 +8,10 @@ import (
 
 // Value is a thread-safe container for shared state that notifies
 // observers when it changes. Built on top of [Bus] internally — when
-// Set or Update is called, the new value is published to all observers
-// registered via [Observe].
+// Store or Update is called, the new value is published to all
+// observers registered via [Observe].
 //
-// Get is lock-free (atomic load). Set and Update serialise writes
+// Load is lock-free (atomic load). Store and Update serialise writes
 // under a mutex and store the new value atomically, so concurrent
 // readers never block.
 //
@@ -49,13 +49,13 @@ func NewValue[V any](initial V) *Value[V] {
 	return v
 }
 
-// Get returns the current value. Lock-free.
-func (v *Value[V]) Get() V {
+// Load returns the current value. Lock-free.
+func (v *Value[V]) Load() V {
 	return v.val.Load().(valueBox[V]).v
 }
 
-// Set writes a new value and publishes it to all observers.
-func (v *Value[V]) Set(val V) {
+// Store writes a new value and publishes it to all observers.
+func (v *Value[V]) Store(val V) {
 	v.wmu.Lock()
 	v.val.Store(valueBox[V]{val})
 	v.wmu.Unlock()
@@ -68,7 +68,7 @@ func (v *Value[V]) Set(val V) {
 // depends on the old.
 func (v *Value[V]) Update(fn func(V) V) {
 	v.wmu.Lock()
-	current := fn(v.Get())
+	current := fn(v.Load())
 	v.val.Store(valueBox[V]{current})
 	v.wmu.Unlock()
 	v.bus.Publish(current)
@@ -86,7 +86,7 @@ func (v *Value[V]) Len() int {
 // are unaffected because reads are lock-free.
 func (v *Value[V]) observe(ctx context.Context, fn func(V), sessionID string) V {
 	v.wmu.Lock()
-	current := v.Get()
+	current := v.Load()
 	v.bus.subscribe(ctx, fn, sessionID)
 	v.wmu.Unlock()
 	return current
