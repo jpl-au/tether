@@ -12,11 +12,11 @@ import (
 
 func TestRouteOverwritesExistingPage(t *testing.T) {
 	r := New(selector)
-	r.Route("/", Page[state]{Handle: func(_ *poly.Session[state], s state, _ poly.Event) state {
+	r.Route("/", Page[state]{Handle: func(_ poly.PreSession, s state, _ poly.Event) state {
 		s.Count = 1
 		return s
 	}})
-	r.Route("/", Page[state]{Handle: func(_ *poly.Session[state], s state, _ poly.Event) state {
+	r.Route("/", Page[state]{Handle: func(_ poly.PreSession, s state, _ poly.Event) state {
 		s.Count = 2
 		return s
 	}})

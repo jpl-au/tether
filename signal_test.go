@@ -41,7 +41,7 @@ func TestSignalInsideHandle(t *testing.T) {
 			{Type: event.Click, Action: "increment"},
 		}}
 
-		handle := func(s *Session[counterState], state counterState, ev Event) counterState {
+		handle := func(s PreSession, state counterState, ev Event) counterState {
 			s.Signal("status", "active")
 			state.Count++
 			return state
@@ -80,7 +80,7 @@ func TestSignalMultipleKeys(t *testing.T) {
 			{Type: event.Click, Action: "increment"},
 		}}
 
-		handle := func(s *Session[counterState], state counterState, ev Event) counterState {
+		handle := func(s PreSession, state counterState, ev Event) counterState {
 			s.Signal("count", 1)
 			s.Signal("status", "online")
 			s.Signal("count", 2) // overwrite
@@ -140,7 +140,7 @@ func TestSignalWithoutStateChange(t *testing.T) {
 			{Type: event.Click, Action: "noop", EventID: "e1"},
 		}}
 
-		handle := func(s *Session[counterState], state counterState, ev Event) counterState {
+		handle := func(s PreSession, state counterState, ev Event) counterState {
 			s.Signal("ping", "pong")
 			// State unchanged — signal should still be sent.
 			return state

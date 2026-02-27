@@ -44,8 +44,8 @@ type Config[S any] struct {
 
 	// Handle processes a client event and returns the new state. Side
 	// effects (toast, navigate, title, etc.) are expressed as imperative
-	// calls on the session parameter. Safe to call any Session method
-	// from within Handle — there is no deadlock risk.
+	// calls on the session parameter. In live mode the session is a
+	// [*Session] which can be type-asserted for Update, Go, and Close.
 	Handle HandleFunc[S]
 
 	// Middleware wraps the Handle function with cross-cutting behaviour

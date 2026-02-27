@@ -31,14 +31,15 @@ import (
 	"github.com/jpl-au/fluent/node"
 )
 
-// HandleFunc is the handler signature used by polytest and
-// [poly.PageConfig]. It takes a [poly.PreSession] rather than a full
-// [poly.Session] because no live transport exists during testing.
+// HandleFunc is the handler signature for polytest. It is identical
+// to [poly.HandleFunc] — both take [poly.PreSession] — so handler
+// functions can be shared across live mode, page mode, and tests
+// without changing their signature.
 type HandleFunc[S any] func(session poly.PreSession, state S, event poly.Event) S
 
 // Middleware wraps a [HandleFunc] to add cross-cutting behaviour.
-// Same concept as [poly.Middleware] but for the [poly.PreSession]-based
-// handler used by polytest and [poly.PageConfig].
+// Identical to [poly.Middleware] so middleware can be shared across
+// live mode and tests.
 type Middleware[S any] func(next HandleFunc[S]) HandleFunc[S]
 
 // Config configures the test harness.

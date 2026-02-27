@@ -146,7 +146,7 @@ func TestSessionStructuralChange(t *testing.T) {
 			return div.New(children...)
 		}
 
-		handle := func(_ *Session[state], s state, ev Event) state {
+		handle := func(_ PreSession, s state, ev Event) state {
 			if ev.Action == "toggle-help" {
 				s.ShowHelp = !s.ShowHelp
 			}

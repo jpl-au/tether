@@ -6,7 +6,7 @@ package poly
 // session before and after calling next:
 //
 //	func withLogging[S any](next poly.HandleFunc[S]) poly.HandleFunc[S] {
-//	    return func(sess *poly.Session[S], s S, ev poly.Event) S {
+//	    return func(sess poly.PreSession, s S, ev poly.Event) S {
 //	        slog.Info("event", "action", ev.Action)
 //	        return next(sess, s, ev)
 //	    }

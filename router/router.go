@@ -101,7 +101,7 @@ func (r *Router[S]) Render(s S) node.Node {
 
 // Handle implements [poly.HandleFunc]. It dispatches to the active
 // page's Handle function. Lock-free.
-func (r *Router[S]) Handle(sess *poly.Session[S], s S, ev poly.Event) S {
+func (r *Router[S]) Handle(sess poly.PreSession, s S, ev poly.Event) S {
 	path := r.selector(s)
 	pages := r.loadPages()
 	if p, ok := pages[path]; ok && p.Handle != nil {

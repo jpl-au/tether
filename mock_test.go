@@ -97,7 +97,7 @@ func renderCounter(state counterState) node.Node {
 	)
 }
 
-func handleCounter(_ *Session[counterState], state counterState, ev Event) counterState {
+func handleCounter(_ PreSession, state counterState, ev Event) counterState {
 	switch ev.Action {
 	case "increment":
 		state.Count++

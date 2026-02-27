@@ -114,7 +114,7 @@ func benchRender(s benchState) node.Node {
 	)
 }
 
-func benchHandle(_ *Session[benchState], s benchState, ev Event) benchState {
+func benchHandle(_ PreSession, s benchState, ev Event) benchState {
 	if ev.Action == "increment" {
 		s.Count++
 	}
