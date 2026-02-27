@@ -2,6 +2,7 @@ package poly
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"maps"
 	"sync/atomic"
@@ -117,10 +118,14 @@ type Session[S any] struct {
 }
 
 // PreSession is the subset of Session methods available in
-// [Config.OnNavigate]. During pre-warming (initial GET) no real
-// session exists yet, so OnNavigate receives a capture
-// implementation that buffers side effects. During live navigation
-// the real [Session] satisfies the interface.
+// [Config.OnNavigate] and reusable components. During pre-warming
+// (initial GET) no real session exists yet, so OnNavigate receives
+// a capture implementation that buffers side effects. During live
+// navigation the real [Session] satisfies the interface.
+//
+// PreSession is deliberately non-generic — component handlers can
+// accept it without inheriting the application's state type
+// parameter, making them reusable across different page states.
 type PreSession interface {
 	ID() string
 	Toast(text string)
@@ -131,6 +136,7 @@ type PreSession interface {
 	Flash(selector, text string)
 	Signal(key string, value any)
 	Signals(signals map[string]any)
+	Push(n push.Notification) error
 }
 
 // captureSession implements PreSession by buffering side effects.
@@ -147,6 +153,12 @@ func (c *captureSession) Navigate(rawURL string)   { c.fx.url = rawURL; c.fx.rep
 func (c *captureSession) ReplaceURL(rawURL string) { c.fx.url = rawURL; c.fx.replace = true }
 func (c *captureSession) SetTitle(title string)    { c.fx.title = title }
 func (c *captureSession) Announce(text string)     { c.fx.announce = text }
+
+// Push returns an error during pre-warming because no browser
+// subscription exists yet.
+func (c *captureSession) Push(push.Notification) error {
+	return errors.New("poly: push not available during pre-warming")
+}
 
 func (c *captureSession) Flash(selector, text string) {
 	if c.fx.flash == nil {

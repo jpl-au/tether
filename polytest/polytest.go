@@ -25,6 +25,7 @@ import (
 
 	poly "github.com/jpl-au/fluent-poly"
 	"github.com/jpl-au/fluent-poly/event"
+	"github.com/jpl-au/fluent-poly/push"
 	"github.com/jpl-au/fluent/node"
 )
 
@@ -112,7 +113,8 @@ func (s *testSession) Signals(m map[string]any) {
 		s.signals[k] = v
 	}
 }
-func (s *testSession) Flash(sel, text string) { s.ensureFlash(); s.flash[sel] = text }
+func (s *testSession) Flash(sel, text string)       { s.ensureFlash(); s.flash[sel] = text }
+func (s *testSession) Push(push.Notification) error { return nil }
 
 func (s *testSession) ensureSignals() {
 	if s.signals == nil {

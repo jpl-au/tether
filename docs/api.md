@@ -139,7 +139,21 @@ s.Push(push.Notification{...})         // Web Push notification
 
 ### PreSession
 
-`poly.PreSession` is the subset of Session available in `OnNavigate` and stateless page handlers. It exposes: `ID`, `Toast`, `Navigate`, `ReplaceURL`, `SetTitle`, `Announce`, `Flash`, `Signal`, `Signals`.
+`poly.PreSession` is a non-generic interface exposing Session's side-effect methods without the state type parameter. It is available in `OnNavigate`, stateless page handlers, and reusable components.
+
+Because PreSession has no generic parameter, component handlers can accept it directly — they don't need to know the application's state type:
+
+```go
+func todoHandle(sess poly.PreSession, ts TodoState, ev poly.Event) TodoState {
+    sess.Toast("Saved")   // works — no generic needed
+    sess.Signal("count", len(ts.Items))
+    return ts
+}
+```
+
+Methods: `ID`, `Toast`, `Navigate`, `ReplaceURL`, `SetTitle`, `Announce`, `Flash`, `Signal`, `Signals`, `Push`.
+
+`Push` returns an error during pre-warming (initial GET) since no browser subscription exists yet. During live sessions it works normally.
 
 ---
 
