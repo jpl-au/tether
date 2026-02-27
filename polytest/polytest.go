@@ -18,6 +18,7 @@
 package polytest
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -116,13 +117,15 @@ type testSession struct {
 	signals  map[string]any
 }
 
-func (s *testSession) ID() string               { return "polytest" }
-func (s *testSession) Toast(text string)        { s.toast = text }
-func (s *testSession) SetTitle(title string)    { s.title = title }
-func (s *testSession) Announce(text string)     { s.announce = text }
-func (s *testSession) Navigate(rawURL string)   { s.url = rawURL; s.replace = false }
-func (s *testSession) ReplaceURL(rawURL string) { s.url = rawURL; s.replace = true }
-func (s *testSession) Signal(key string, v any) { s.ensureSignals(); s.signals[key] = v }
+func (s *testSession) ID() string                  { return "polytest" }
+func (s *testSession) Context() context.Context    { return context.Background() }
+func (s *testSession) Go(fn func(context.Context)) { go fn(context.Background()) }
+func (s *testSession) Toast(text string)           { s.toast = text }
+func (s *testSession) SetTitle(title string)       { s.title = title }
+func (s *testSession) Announce(text string)        { s.announce = text }
+func (s *testSession) Navigate(rawURL string)      { s.url = rawURL; s.replace = false }
+func (s *testSession) ReplaceURL(rawURL string)    { s.url = rawURL; s.replace = true }
+func (s *testSession) Signal(key string, v any)    { s.ensureSignals(); s.signals[key] = v }
 func (s *testSession) Signals(m map[string]any) {
 	s.ensureSignals()
 	for k, v := range m {

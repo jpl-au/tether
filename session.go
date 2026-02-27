@@ -128,6 +128,8 @@ type Session[S any] struct {
 // parameter, making them reusable across different page states.
 type PreSession interface {
 	ID() string
+	Context() context.Context
+	Go(fn func(context.Context))
 	Toast(text string)
 	Navigate(rawURL string)
 	ReplaceURL(rawURL string)
@@ -148,6 +150,10 @@ type captureSession struct {
 }
 
 func (c *captureSession) ID() string               { return c.id }
+func (c *captureSession) Context() context.Context { return context.Background() }
+func (c *captureSession) Go(fn func(context.Context)) {
+	go fn(context.Background())
+}
 func (c *captureSession) Toast(text string)        { c.fx.toast = text }
 func (c *captureSession) Navigate(rawURL string)   { c.fx.url = rawURL; c.fx.replace = false }
 func (c *captureSession) ReplaceURL(rawURL string) { c.fx.url = rawURL; c.fx.replace = true }
