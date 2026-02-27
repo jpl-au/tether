@@ -9,9 +9,15 @@
 
 ```go
 import (
+    "net/http"
+
     poly "github.com/jpl-au/fluent-poly"
     "github.com/jpl-au/fluent-poly/bind"
     "github.com/jpl-au/fluent-poly/ws"
+    "github.com/jpl-au/fluent/html5/button"
+    "github.com/jpl-au/fluent/html5/div"
+    "github.com/jpl-au/fluent/html5/span"
+    "github.com/jpl-au/fluent/node"
 )
 
 mux.Handle("/counter", poly.New(poly.Config[CounterState]{

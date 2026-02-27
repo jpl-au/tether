@@ -349,6 +349,70 @@ bind.Apply(btn,
 )
 ```
 
+Every nested helper has a `With*` Apply option. Server events:
+
+```go
+bind.OnClick("act")         bind.OnSubmit("act")
+bind.OnInput("act")         bind.OnChange("act")
+bind.OnKeyDown("act")       bind.OnFocus("act")
+bind.OnBlur("act")          bind.OnViewport("act")
+```
+
+Control:
+
+```go
+bind.WithDisable("...")     bind.WithConfirm("...")
+bind.WithPreserve()         bind.WithAutoFocus()
+bind.WithIndicator("#el")   bind.WithFocusTrap()
+```
+
+Timing:
+
+```go
+bind.WithDebounce(150*time.Millisecond)
+bind.WithThrottle(time.Second)
+bind.WithFilterKey("Enter")
+bind.WithEventData("key", "val")
+```
+
+Directives:
+
+```go
+bind.WithLink()             bind.WithCloak()
+bind.WithPermanent()        bind.WithToggleClass("cls")
+bind.WithToggleTarget("#x") bind.WithToggleAttr("hidden")
+```
+
+Signal bindings:
+
+```go
+bind.WithBindText("count")           bind.WithBindShow("isOpen")
+bind.WithBindHide("isOpen")          bind.WithBindClass("active", "sel")
+bind.WithBindAttr("disabled", "busy") bind.WithBindValue("email")
+```
+
+Signal directives:
+
+```go
+bind.WithToggleSignal("menuOpen")
+bind.WithSetSignal("tab", "settings")
+bind.WithOptimistic("liked", "true")
+bind.WithOptimisticToggle("liked")
+```
+
+Upload:
+
+```go
+bind.WithUpload("avatar")
+bind.WithUploadProgress("avatar")
+```
+
+Lifecycle:
+
+```go
+bind.WithHook("chart")      bind.WithTransition("fade")
+```
+
 ---
 
 ## Middleware
@@ -385,21 +449,61 @@ Test harness for Handle functions:
 
 ```go
 h := polytest.New(polytest.Config[State]{
-    State:  State{Count: 0},
-    Render: render,
-    Handle: handle,
+    State:      State{Count: 0},
+    Render:     render,
+    Handle:     handle,
+    Middleware: []polytest.Middleware[State]{withAuth},
+    OnNavigate: onNavigate,
 })
+```
 
-h.Send("increment")
-h.SendInput("search", "query")
-h.SendSubmit("save", map[string]string{"name": "Bob"})
+### Sending events
 
-h.State()       // accumulated state
-h.HTML()        // rendered HTML
-h.Toast()       // last toast
-h.URL()         // last navigation
+```go
+h.Send("increment")                              // click event
+h.SendInput("search", "query")                   // input event with value
+h.SendSubmit("save", map[string]string{"n": "v"}) // submit event with form data
+h.SendEvent(poly.Event{...})                      // arbitrary event
+h.Navigate("/users?id=42")                        // navigate event with URL params
+```
+
+### State and render
+
+```go
+h.State()       // accumulated state after all events
+h.HTML()        // rendered HTML from last Send
+h.Render()      // full GET render (initial page load)
+h.RenderNode()  // raw node tree for direct inspection
+```
+
+### Side-effect accessors
+
+```go
+h.Toast()       // last toast text (empty if none)
+h.URL()         // last navigation URL
 h.Title()       // last title change
-h.Render()      // full GET render
+h.Announce()    // last screen reader announcement
+h.Flash()       // last flash messages (map[string]string)
+h.Signals()     // last signal values (map[string]any)
+```
+
+### Assertion helpers
+
+```go
+h.HasToast("Saved")              // toast matches text
+h.HasSignal("count", float64(1)) // signal matches key and value
+h.HasAnnounce("Done")            // announcement matches text
+h.HasFlash("#msg", "Saved")      // flash matches selector and text
+h.URLWasReplaced()               // last URL used ReplaceURL (not Navigate)
+```
+
+### Middleware
+
+`polytest.Middleware` wraps the `PreSession`-based handler used by polytest and `PageConfig`:
+
+```go
+type HandleFunc[S any] func(poly.PreSession, S, poly.Event) S
+type Middleware[S any] func(next HandleFunc[S]) HandleFunc[S]
 ```
 
 ---

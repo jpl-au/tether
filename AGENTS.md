@@ -330,7 +330,7 @@ bind.Apply(btn,
 )
 ```
 
-Option helpers: `OnClick`, `OnSubmit`, `OnInput`, `OnChange`, `OnKeyDown`, `OnFocus`, `OnBlur`, `OnViewport`, `WithDisable`, `WithConfirm`, `WithPreserve`, `WithAutoFocus`, `WithIndicator`, `WithFocusTrap`, `WithDebounce`, `WithThrottle`, `WithFilterKey`, `WithEventData`, `WithLink`, `WithToggleClass`, `WithToggleTarget`, `WithToggleAttr`, `WithCloak`, `WithPermanent`, `WithHook`, `WithTransition`.
+Option helpers: `OnClick`, `OnSubmit`, `OnInput`, `OnChange`, `OnKeyDown`, `OnFocus`, `OnBlur`, `OnViewport`, `WithDisable`, `WithConfirm`, `WithPreserve`, `WithAutoFocus`, `WithIndicator`, `WithFocusTrap`, `WithDebounce`, `WithThrottle`, `WithFilterKey`, `WithEventData`, `WithLink`, `WithToggleClass`, `WithToggleTarget`, `WithToggleAttr`, `WithCloak`, `WithPermanent`, `WithHook`, `WithTransition`, `WithBindText`, `WithBindShow`, `WithBindHide`, `WithBindClass`, `WithBindAttr`, `WithBindValue`, `WithToggleSignal`, `WithSetSignal`, `WithOptimistic`, `WithOptimisticToggle`, `WithUpload`, `WithUploadProgress`.
 
 ## Form validation
 
@@ -721,27 +721,47 @@ The `polytest` package provides a test harness for Handle functions without chan
 
 ```go
 h := polytest.New(polytest.Config[State]{
-    State:  State{Count: 0},
-    Render: render,
-    Handle: handle,
+    State:      State{Count: 0},
+    Render:     render,
+    Handle:     handle,
+    Middleware: []polytest.Middleware[State]{withAuth},
+    OnNavigate: onNavigate,
 })
 
-h.Send("increment")
-h.SendInput("search", "query")
-h.SendSubmit("save", map[string]string{"name": "Bob"})
+// Sending events
+h.Send("increment")                              // click event
+h.SendInput("search", "query")                   // input event with value
+h.SendSubmit("save", map[string]string{"n": "v"}) // submit event with form data
+h.SendEvent(poly.Event{...})                      // arbitrary event
+h.Navigate("/users?id=42")                        // navigate event with URL params
 
-// Assertions
+// State and render
 h.State()       // accumulated state
 h.HTML()        // rendered HTML from last Send
+h.Render()      // full GET render of current state
+h.RenderNode()  // node tree for direct inspection
+
+// Side-effect accessors
 h.Toast()       // last toast message
-h.HasToast("x") // convenience check
 h.URL()         // last navigated URL
 h.Title()       // last title change
 h.Announce()    // last accessibility announcement
-h.Flash()       // last flash messages
-h.Signals()     // last signal values
-h.Render()      // full GET render of current state
-h.RenderNode()  // node tree for direct inspection
+h.Flash()       // last flash messages (map[string]string)
+h.Signals()     // last signal values (map[string]any)
+
+// Assertion helpers
+h.HasToast("Saved")              // toast matches text
+h.HasSignal("count", float64(1)) // signal matches key and value
+h.HasAnnounce("Done")            // announcement matches text
+h.HasFlash("#msg", "Saved")      // flash matches selector and text
+h.URLWasReplaced()               // last URL used ReplaceURL (not Navigate)
+```
+
+`polytest.Middleware` wraps `PreSession`-based handlers (same signature as `PageConfig.Handle`):
+
+```go
+type HandleFunc[S any] func(poly.PreSession, S, poly.Event) S
+type Middleware[S any] func(next HandleFunc[S]) HandleFunc[S]
 ```
 
 ## Client JS
