@@ -1,20 +1,20 @@
 package poly
 
 // Scope focuses a [Session]'s state onto a smaller component type.
-// Get extracts the component state from the full session state; Set
-// injects a modified component state back. Handlers and render
+// View extracts the component state from the full session state;
+// Update injects a modified component state back. Handlers and render
 // functions that work through a Scope only see the component type C
 // — never the full state S.
 //
 // Define scopes as package-level variables:
 //
 //	var todos = poly.Scope[AppState, TodoState]{
-//	    Get: func(s AppState) TodoState { return s.Todos },
-//	    Set: func(s AppState, c TodoState) AppState { s.Todos = c; return s },
+//	    View:   func(s AppState) TodoState { return s.Todos },
+//	    Update: func(s AppState, c TodoState) AppState { s.Todos = c; return s },
 //	}
 type Scope[S, C any] struct {
-	Get func(S) C
-	Set func(S, C) S
+	View   func(S) C
+	Update func(S, C) S
 }
 
 // Handle dispatches an event to a component handler that only sees
@@ -37,7 +37,7 @@ type Scope[S, C any] struct {
 //	    return ts
 //	}
 func (sc Scope[S, C]) Handle(sess PreSession, state S, ev Event, fn func(PreSession, C, Event) C) S {
-	return sc.Set(state, fn(sess, sc.Get(state), ev))
+	return sc.Update(state, fn(sess, sc.View(state), ev))
 }
 
 // With applies a pure transformation to the component's sub-state.
@@ -51,5 +51,5 @@ func (sc Scope[S, C]) Handle(sess PreSession, state S, ev Event, fn func(PreSess
 //	    })
 //	})
 func (sc Scope[S, C]) With(state S, fn func(C) C) S {
-	return sc.Set(state, fn(sc.Get(state)))
+	return sc.Update(state, fn(sc.View(state)))
 }

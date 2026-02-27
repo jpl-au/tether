@@ -12,13 +12,13 @@ type innerState struct {
 }
 
 var testScope = Scope[outerState, innerState]{
-	Get: func(s outerState) innerState { return s.Inner },
-	Set: func(s outerState, c innerState) outerState { s.Inner = c; return s },
+	View:   func(s outerState) innerState { return s.Inner },
+	Update: func(s outerState, c innerState) outerState { s.Inner = c; return s },
 }
 
-func TestScopeGet(t *testing.T) {
+func TestScopeView(t *testing.T) {
 	state := outerState{Inner: innerState{Count: 5}, Other: "hello"}
-	sub := testScope.Get(state)
+	sub := testScope.View(state)
 	if sub.Count != 5 {
 		t.Errorf("Count = %d, want 5", sub.Count)
 	}
