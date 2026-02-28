@@ -122,6 +122,25 @@ window.Poly.signals = window.Poly.signals || {};
           reportError("worker", "push worker registration failed: " + err);
         });
     }
+
+    // Subscribe to push when the user clicks a [data-poly-push-subscribe]
+    // element. This ensures the browser permission prompt fires from a
+    // genuine user gesture.
+    root.addEventListener("click", function (e) {
+      var el = e.target.closest("[data-poly-push-subscribe]");
+      if (!el) return;
+      var pushKey = root.getAttribute("data-poly-push-key");
+      if (!pushKey || !("PushManager" in window) || !("serviceWorker" in navigator)) return;
+      navigator.serviceWorker.ready.then(function (reg) {
+        subscribePush(reg, pushKey);
+      });
+    });
+
+    // Signal actions (toggle/set) are bound on document — not root —
+    // because signal bindings query the whole document. This lets signal
+    // actions on elements in the Layout shell (outside the morphed root)
+    // work the same as those inside it.
+    document.addEventListener("click", handleSignalActions);
   });
 
   // --- Connection ---
@@ -345,19 +364,6 @@ window.Poly.signals = window.Poly.signals || {};
     for (var i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
     return arr;
   }
-
-  // Subscribe to push when the user clicks a [data-poly-push-subscribe]
-  // element. This ensures the browser permission prompt fires from a
-  // genuine user gesture.
-  root.addEventListener("click", function (e) {
-    var el = e.target.closest("[data-poly-push-subscribe]");
-    if (!el) return;
-    var pushKey = root.getAttribute("data-poly-push-key");
-    if (!pushKey || !("PushManager" in window) || !("serviceWorker" in navigator)) return;
-    navigator.serviceWorker.ready.then(function (reg) {
-      subscribePush(reg, pushKey);
-    });
-  });
 
   // --- SSE event resilience ---
   //
@@ -1385,9 +1391,6 @@ window.Poly.signals = window.Poly.signals || {};
   // a server round-trip. All signal bindings (BindShow, BindClass,
   // BindText, etc.) react instantly. The server can override any
   // client-set signal via Session.Signal at any time.
-  //
-  // Registered on document so they work in the Layout shell, same
-  // as signal bindings themselves.
 
   function handleSignalActions(e) {
     var toggle = e.target.closest("[data-poly-toggle-signal]");
@@ -1409,8 +1412,6 @@ window.Poly.signals = window.Poly.signals || {};
       updateSignalBindings(key, value);
     }
   }
-
-  document.addEventListener("click", handleSignalActions);
 
   // --- Extension API ---
   //
