@@ -68,6 +68,8 @@ func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 		maxRetryDelay:     h.cfg.Timeouts.MaxRetry,
 		defaultDebounce:   h.cfg.Client.DefaultDebounce,
 		transitionTimeout: h.cfg.Client.TransitionTimeout,
+		flashDuration:     h.cfg.Client.FlashDuration,
+		toastDuration:     h.cfg.Client.ToastDuration,
 		worker:            h.cfg.Worker,
 		pushKey:           pushKey,
 		backgroundSync:    h.cfg.Client.BackgroundSync,

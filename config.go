@@ -260,6 +260,14 @@ type Client struct {
 	// transition is defined. Zero defaults to 5 seconds.
 	TransitionTimeout time.Duration
 
+	// FlashDuration is how long flash messages remain visible before
+	// auto-clearing. Zero defaults to 5 seconds.
+	FlashDuration time.Duration
+
+	// ToastDuration is how long toast notifications remain visible
+	// before animating out. Zero defaults to 5 seconds.
+	ToastDuration time.Duration
+
 	// BackgroundSync enables IndexedDB event queuing and background
 	// sync for SSE mode. When true, failed POST events are stored in
 	// IndexedDB and replayed on reconnect (or via the service worker's
@@ -319,4 +327,6 @@ const (
 	defaultMaxRetryDelay     = 30 * time.Second
 	defaultDefaultDebounce   = 300 * time.Millisecond
 	defaultTransitionTimeout = 5 * time.Second
+	defaultFlashDuration     = 5 * time.Second
+	defaultToastDuration     = 5 * time.Second
 )

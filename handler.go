@@ -116,6 +116,12 @@ func New[S any](cfg Config[S]) *Handler[S] {
 	if cfg.Client.TransitionTimeout == 0 {
 		cfg.Client.TransitionTimeout = defaultTransitionTimeout
 	}
+	if cfg.Client.FlashDuration == 0 {
+		cfg.Client.FlashDuration = defaultFlashDuration
+	}
+	if cfg.Client.ToastDuration == 0 {
+		cfg.Client.ToastDuration = defaultToastDuration
+	}
 	if cfg.Timeouts.Heartbeat == 0 {
 		cfg.Timeouts.Heartbeat = defaultHeartbeatInterval
 	}

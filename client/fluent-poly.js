@@ -49,6 +49,8 @@ window.Poly.signals = window.Poly.signals || {};
   var sseOpened = false;
   var devMode = false;
   var backgroundSync = false;
+  var flashDuration = 5000;
+  var toastDuration = 5000;
   var pendingCount = 0;
 
   // Report an error or warning to the Poly.onError callback if set.
@@ -77,6 +79,8 @@ window.Poly.signals = window.Poly.signals || {};
     transitionTimeout = parseInt(root.getAttribute("data-poly-transition-timeout")) || 5000;
     devMode = root.hasAttribute("data-poly-dev");
     backgroundSync = root.hasAttribute("data-poly-background-sync");
+    flashDuration = parseInt(root.getAttribute("data-poly-flash-duration")) || 5000;
+    toastDuration = parseInt(root.getAttribute("data-poly-toast-duration")) || 5000;
     // Remove cloak attributes so hidden elements become visible now
     // that the runtime is ready. The server injects a style rule that
     // hides [data-poly-cloak] elements before JS loads.
@@ -491,7 +495,7 @@ window.Poly.signals = window.Poly.signals || {};
           if (el) {
             el.textContent = msg.flash[selector];
             (function (target) {
-              setTimeout(function () { target.textContent = ""; }, 5000);
+              setTimeout(function () { target.textContent = ""; }, flashDuration);
             })(el);
           }
         }
@@ -614,7 +618,7 @@ window.Poly.signals = window.Poly.signals || {};
       el.addEventListener("transitionend", function () {
         if (el.parentNode) el.parentNode.removeChild(el);
       });
-    }, 5000);
+    }, toastDuration);
   }
 
   // --- JS hooks ---

@@ -39,6 +39,8 @@ type polyBody struct {
 	maxRetryDelay     time.Duration
 	defaultDebounce   time.Duration
 	transitionTimeout time.Duration
+	flashDuration     time.Duration
+	toastDuration     time.Duration
 	worker            bool
 	pushKey           string
 	backgroundSync    bool
@@ -97,6 +99,10 @@ func (p *polyBody) RenderBuilder(buf *bytes.Buffer) {
 	buf.WriteString(strconv.FormatInt(p.defaultDebounce.Milliseconds(), 10))
 	buf.WriteString(`" data-poly-transition-timeout="`)
 	buf.WriteString(strconv.FormatInt(p.transitionTimeout.Milliseconds(), 10))
+	buf.WriteString(`" data-poly-flash-duration="`)
+	buf.WriteString(strconv.FormatInt(p.flashDuration.Milliseconds(), 10))
+	buf.WriteString(`" data-poly-toast-duration="`)
+	buf.WriteString(strconv.FormatInt(p.toastDuration.Milliseconds(), 10))
 	buf.WriteString(`"`)
 	if p.worker {
 		buf.WriteString(` data-poly-worker`)
