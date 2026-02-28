@@ -105,8 +105,9 @@ func ServeClient() http.Handler {
 // client runtime. The Handler mounts this at /_poly/ so the HTML page
 // can load fluent-poly.js and idiomorph. The service worker script
 // gets special treatment: its CACHE_VERSION is set to a content hash
-// of the embedded files, and a Service-Worker-Allowed header is added
-// so it can control the entire origin.
+// of the embedded files, and a Service-Worker-Allowed header permits
+// the client to register the worker at any scope (the client scopes
+// to the handler's endpoint via data-poly-endpoint).
 func newClientHandler(assets []*Asset) http.Handler {
 	fileServer := http.FileServer(http.FS(clientFiles()))
 
