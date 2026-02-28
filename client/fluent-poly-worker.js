@@ -61,17 +61,20 @@ self.addEventListener("fetch", function (e) {
     return;
   }
 
-  // Navigation requests: network-first with cache fallback. On
-  // success, cache the page so offline refreshes show the last
-  // rendered shell instead of a browser error.
+  // Navigation requests: pass through to the network by default.
+  // Only cache the response when the server opts in with the
+  // X-Poly-Cache header — this prevents caching sensitive or
+  // session-specific pages without explicit intent.
   if (e.request.mode === "navigate") {
     e.respondWith(
       fetch(e.request)
         .then(function (resp) {
-          var clone = resp.clone();
-          caches.open(CACHE_VERSION).then(function (c) {
-            c.put(e.request, clone);
-          });
+          if (resp.headers.get("X-Poly-Cache") === "true") {
+            var clone = resp.clone();
+            caches.open(CACHE_VERSION).then(function (c) {
+              c.put(e.request, clone);
+            });
+          }
           return resp;
         })
         .catch(function () {

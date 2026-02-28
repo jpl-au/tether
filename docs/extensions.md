@@ -72,7 +72,7 @@ poly.New(poly.Config[State]{
 })
 ```
 
-The service worker caches the JS runtime (`fluent-poly.js`, `idiomorph.min.js`) using a cache-first strategy, and caches page HTML using a network-first strategy. On subsequent visits, the JS loads from cache. If the server is unreachable, the last cached page is served instead of a browser error.
+The service worker caches the JS runtime (`fluent-poly.js`, `idiomorph.min.js`) using a cache-first strategy. Navigation responses are only cached when the server sends the `X-Poly-Cache: true` header. Cached pages are served as a fallback when offline.
 
 ### Precaching additional assets
 
