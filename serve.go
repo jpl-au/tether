@@ -184,7 +184,6 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		state:            state,
 		render:           h.cfg.Render,
 		handle:           h.cfg.Handle,
-		onNavigate:       h.cfg.OnNavigate,
 		differ:           differ,
 		transport:        transport,
 		logger:           h.cfg.Logger.WithGroup("session").With("id", id),

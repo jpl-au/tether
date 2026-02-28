@@ -49,7 +49,8 @@ type Config[S any] struct {
 	Handle HandleFunc[S]
 
 	// Middleware wraps the Handle function with cross-cutting behaviour
-	// such as logging, authentication, or metrics. Middleware is applied
+	// such as logging, authentication, or metrics. Middleware fires for
+	// all client events including navigation. Middleware is applied
 	// outermost-first: the first entry in the slice is the outermost
 	// layer of the chain. Optional.
 	Middleware []Middleware[S]

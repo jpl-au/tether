@@ -46,12 +46,11 @@ type Session[S any] struct {
 	id    string
 	state S
 
-	render     RenderFunc[S]
-	handle     HandleFunc[S]
-	onNavigate func(PreSession, S, Params) S
-	differ     *jit.Differ
-	transport  Transport
-	logger     *slog.Logger
+	render    RenderFunc[S]
+	handle    HandleFunc[S]
+	differ    *jit.Differ
+	transport Transport
+	logger    *slog.Logger
 
 	// Channel pair: events from transport, commands from everything else.
 	events chan Event

@@ -3,6 +3,7 @@ package poly
 import (
 	"context"
 	"log/slog"
+	"net/url"
 	"testing"
 	"testing/synctest"
 
@@ -12,6 +13,21 @@ import (
 	"github.com/jpl-au/fluent/html5/span"
 	"github.com/jpl-au/fluent/node"
 )
+
+// composeNav mirrors the composition in handler.go: navigate events
+// dispatch to onNavigate, everything else to appHandle.
+func composeNav[S any](appHandle HandleFunc[S], onNavigate func(PreSession, S, Params) S) HandleFunc[S] {
+	return func(sess PreSession, s S, ev Event) S {
+		if ev.Type == event.Navigate {
+			params := Params{Path: ev.Data["path"]}
+			if search := ev.Data["search"]; search != "" {
+				params.Query, _ = url.ParseQuery(search)
+			}
+			return onNavigate(sess, s, params)
+		}
+		return appHandle(sess, s, ev)
+	}
+}
 
 func TestSessionNavigateEvent(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
@@ -30,6 +46,12 @@ func TestSessionNavigateEvent(t *testing.T) {
 			return s
 		}
 
+		// Compose OnNavigate into Handle, mirroring handler.go.
+		handle := composeNav(
+			func(_ PreSession, s state, _ Event) state { return s },
+			onNavigate,
+		)
+
 		mt := &mockTransport{
 			events: []Event{
 				{Type: event.Navigate, Data: map[string]string{"path": "/profile", "search": ""}},
@@ -39,20 +61,19 @@ func TestSessionNavigateEvent(t *testing.T) {
 		differ := jit.NewDiffer()
 		ctx, cancel := context.WithCancel(context.Background())
 		sess := &Session[state]{
-			id:         "test",
-			state:      state{Page: "/"},
-			render:     render,
-			handle:     func(_ PreSession, s state, ev Event) state { return s },
-			onNavigate: onNavigate,
-			differ:     differ,
-			transport:  mt,
-			logger:     slog.Default(),
-			events:     make(chan Event),
-			cmds:       make(chan func(), defaultCmdBufferSize),
-			fxCh:       make(chan func(*effects), defaultCmdBufferSize),
-			loopDone:   make(chan struct{}),
-			ctx:        ctx,
-			stop:       cancel,
+			id:        "test",
+			state:     state{Page: "/"},
+			render:    render,
+			handle:    handle,
+			differ:    differ,
+			transport: mt,
+			logger:    slog.Default(),
+			events:    make(chan Event),
+			cmds:      make(chan func(), defaultCmdBufferSize),
+			fxCh:      make(chan func(*effects), defaultCmdBufferSize),
+			loopDone:  make(chan struct{}),
+			ctx:       ctx,
+			stop:      cancel,
 		}
 
 		tree := sess.render(sess.state)
@@ -91,6 +112,11 @@ func TestSessionNavigateEventWithQuery(t *testing.T) {
 			return s
 		}
 
+		handle := composeNav(
+			func(_ PreSession, s state, _ Event) state { return s },
+			onNavigate,
+		)
+
 		mt := &mockTransport{
 			events: []Event{
 				{Type: event.Navigate, Data: map[string]string{"path": "/settings", "search": "tab=security"}},
@@ -100,20 +126,19 @@ func TestSessionNavigateEventWithQuery(t *testing.T) {
 		differ := jit.NewDiffer()
 		ctx, cancel := context.WithCancel(context.Background())
 		sess := &Session[state]{
-			id:         "test",
-			state:      state{Page: "/"},
-			render:     func(s state) node.Node { return div.New(span.Text(s.Page).Dynamic("page")) },
-			handle:     func(_ PreSession, s state, ev Event) state { return s },
-			onNavigate: onNavigate,
-			differ:     differ,
-			transport:  mt,
-			logger:     slog.Default(),
-			events:     make(chan Event),
-			cmds:       make(chan func(), defaultCmdBufferSize),
-			fxCh:       make(chan func(*effects), defaultCmdBufferSize),
-			loopDone:   make(chan struct{}),
-			ctx:        ctx,
-			stop:       cancel,
+			id:        "test",
+			state:     state{Page: "/"},
+			render:    func(s state) node.Node { return div.New(span.Text(s.Page).Dynamic("page")) },
+			handle:    handle,
+			differ:    differ,
+			transport: mt,
+			logger:    slog.Default(),
+			events:    make(chan Event),
+			cmds:      make(chan func(), defaultCmdBufferSize),
+			fxCh:      make(chan func(*effects), defaultCmdBufferSize),
+			loopDone:  make(chan struct{}),
+			ctx:       ctx,
+			stop:      cancel,
 		}
 
 		tree := sess.render(sess.state)

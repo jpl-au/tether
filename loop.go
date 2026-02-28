@@ -3,11 +3,9 @@ package poly
 import (
 	"errors"
 	"io"
-	"net/url"
 	"time"
 
 	jit "github.com/jpl-au/fluent-jit"
-	"github.com/jpl-au/fluent-poly/event"
 	"github.com/jpl-au/fluent/node"
 )
 
@@ -109,17 +107,10 @@ func (s *Session[S]) exec(ev Event) {
 		s.handling.Store(false)
 	}()
 
-	// Phase 1: Handle — produce new state.
-	var newState S
-	if ev.Type == event.Navigate && s.onNavigate != nil {
-		params := Params{Path: ev.Data["path"]}
-		if search := ev.Data["search"]; search != "" {
-			params.Query, _ = url.ParseQuery(search)
-		}
-		newState = s.onNavigate(s, s.state, params)
-	} else {
-		newState = s.handle(s, s.state, ev)
-	}
+	// Phase 1: Handle — produce new state. Navigate events are
+	// dispatched to OnNavigate inside the composed Handle function
+	// (see handler.go), so middleware applies to all event types.
+	newState := s.handle(s, s.state, ev)
 
 	// Phase 2: Collect effects enqueued during Handle.
 	s.drainFx(fx)

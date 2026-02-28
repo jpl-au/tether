@@ -3,12 +3,14 @@ package poly
 import (
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	jit "github.com/jpl-au/fluent-jit"
+	"github.com/jpl-au/fluent-poly/event"
 	"github.com/jpl-au/fluent-poly/mode"
 )
 
@@ -79,6 +81,24 @@ func New[S any](cfg Config[S]) *Handler[S] {
 	}
 	if cfg.Mode != mode.WebSocket && cfg.Fallback == nil {
 		panic("poly: Config.Fallback is required — use sse.Upgrade() or set Mode to mode.WebSocket")
+	}
+
+	// Compose OnNavigate into Handle so the middleware chain applies
+	// to navigate events. Without this, navigate events bypass
+	// middleware entirely because exec dispatches them directly.
+	if cfg.OnNavigate != nil {
+		appHandle := cfg.Handle
+		appNav := cfg.OnNavigate
+		cfg.Handle = func(sess PreSession, s S, ev Event) S {
+			if ev.Type == event.Navigate {
+				params := Params{Path: ev.Data["path"]}
+				if search := ev.Data["search"]; search != "" {
+					params.Query, _ = url.ParseQuery(search)
+				}
+				return appNav(sess, s, params)
+			}
+			return appHandle(sess, s, ev)
+		}
 	}
 
 	if len(cfg.Middleware) > 0 {
