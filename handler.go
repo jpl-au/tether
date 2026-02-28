@@ -85,12 +85,12 @@ func New[S any](cfg Config[S]) *Handler[S] {
 		cfg.Handle = chain(cfg.Handle, cfg.Middleware)
 	}
 
-	if !cfg.DevMode && os.Getenv("POLY_DEV") != "" {
-		cfg.DevMode = true
-	}
-
 	if cfg.Logger == nil {
 		cfg.Logger = slog.Default()
+	}
+	if !cfg.DevMode && os.Getenv("POLY_DEV") != "" {
+		cfg.DevMode = true
+		cfg.Logger.Info("poly: dev mode enabled via POLY_DEV environment variable")
 	}
 	if cfg.Timeouts.Reconnect == 0 {
 		cfg.Timeouts.Reconnect = defaultReconnectTimeout

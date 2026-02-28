@@ -134,7 +134,9 @@ type Config[S any] struct {
 	// on disconnect instead of reconnecting. This ensures fresh assets
 	// and state during development. Also sets Cache-Control: no-store
 	// on the initial page response. Enable via this field or set the
-	// POLY_DEV environment variable to any non-empty value.
+	// POLY_DEV environment variable to any non-empty value. When the
+	// env var enables dev mode, an INFO log is emitted so the override
+	// is visible.
 	DevMode bool
 
 	// Assets lists embedded asset collections to auto-serve. Each
