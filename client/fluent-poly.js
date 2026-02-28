@@ -902,24 +902,28 @@ window.Poly.signals = window.Poly.signals || {};
       console.log("fluent-poly: morph", morph.key || "root");
     }
 
-    var template = document.createElement("template");
-    template.innerHTML = morph.html;
-    if (template.content.childElementCount > 1) {
-      reportError("render", "morph for key '" + morph.key + "' contains multiple root elements; only the first will be used");
-    }
-    var newEl = template.content.firstElementChild;
-    if (!newEl) return;
-
     if (!morph.key) {
-      // Empty key targets the root element. Use innerHTML mode so
-      // idiomorph morphs root's children without replacing root itself
-      // (which carries data-poly-root, data-poly-session, etc.).
-      if (root) {
+      // Empty key targets the root element. Pass the HTML string
+      // directly so idiomorph parses it into a DocumentFragment
+      // whose children are the rendered tree. With innerHTML mode
+      // this morphs root's children to match the fragment's
+      // children, preserving the outermost wrapper element (e.g.
+      // div.shell) across renders. Pre-parsing and passing the
+      // firstElementChild would strip that wrapper because
+      // idiomorph would use the element's children instead.
+      if (root && morph.html) {
         if (devMode) flashElement(root);
-        Idiomorph.morph(root, newEl, {morphStyle: "innerHTML", callbacks: morphCallbacks});
+        Idiomorph.morph(root, morph.html, {morphStyle: "innerHTML", callbacks: morphCallbacks});
       }
     } else {
       // Scoped morph targets a keyed container.
+      var template = document.createElement("template");
+      template.innerHTML = morph.html;
+      if (template.content.childElementCount > 1) {
+        reportError("render", "morph for key '" + morph.key + "' contains multiple root elements; only the first will be used");
+      }
+      var newEl = template.content.firstElementChild;
+      if (!newEl) return;
       var el = document.querySelector('[data-poly-key="' + morph.key + '"]');
       if (el) {
         if (devMode) flashElement(el);
