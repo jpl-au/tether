@@ -56,9 +56,14 @@ func (p *polyBody) Render(w ...io.Writer) []byte {
 }
 
 func (p *polyBody) RenderBuilder(buf *bytes.Buffer) {
-	// Inject a style rule that hides cloaked elements before JS loads.
-	// The JS runtime removes the attribute on init, revealing them.
-	buf.WriteString("<style>[data-poly-cloak]{display:none!important}</style>")
+	// Inject default styles: cloak hiding, reconnect bar, and toast.
+	// Cosmetic properties use the class so developers can override them
+	// without fighting inline style specificity.
+	buf.WriteString("<style>")
+	buf.WriteString("[data-poly-cloak]{display:none!important}")
+	buf.WriteString(".poly-reconnecting{background:#ef4444;color:#fff;text-align:center;padding:6px 12px;font:14px/1.4 system-ui,sans-serif}")
+	buf.WriteString(".poly-toast{background:#333;color:#fff;padding:10px 20px;border-radius:8px;font:14px/1.4 system-ui,sans-serif;box-shadow:0 4px 12px rgba(0,0,0,.15)}")
+	buf.WriteString("</style>")
 	buf.WriteString(`<div data-poly-root data-poly-endpoint="`)
 	buf.WriteString(html.EscapeString(p.endpoint))
 	buf.WriteString(`"`)

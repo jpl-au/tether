@@ -896,7 +896,7 @@ Cache is keyed by a content hash of the embedded files (injected at serve time).
 
 ### Reconnecting indicator
 
-A fixed bar at the top of the viewport shows "Reconnecting…" when the transport connection drops. It applies to all transport modes regardless of the `Worker` setting. Styled with inline styles, overridable via the `.poly-reconnecting` class. Uses `role="status"` and `aria-live="polite"` for accessibility.
+A fixed bar at the top of the viewport shows "Reconnecting…" when the transport connection drops. It applies to all transport modes regardless of the `Worker` setting. Structural styles (position, z-index, transform) are inline; cosmetic styles (background, colour, font, padding) are on the `.poly-reconnecting` class so developers can override them. Uses `role="status"` and `aria-live="polite"` for accessibility.
 
 ## Push notifications
 

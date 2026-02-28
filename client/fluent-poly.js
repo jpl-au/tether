@@ -259,17 +259,15 @@ window.Poly.signals = window.Poly.signals || {};
     bar.setAttribute("role", "status");
     bar.setAttribute("aria-live", "polite");
     bar.textContent = "Reconnecting\u2026";
+    // Structural styles are inline so the bar works without any CSS.
+    // Cosmetic styles (background, colour, font, padding) live on the
+    // .poly-reconnecting class so developers can override them.
     bar.style.cssText = [
       "position:fixed",
       "top:0",
       "left:0",
       "right:0",
       "z-index:2147483647",
-      "background:#ef4444",
-      "color:#fff",
-      "text-align:center",
-      "padding:6px 12px",
-      "font:14px/1.4 system-ui,sans-serif",
       "transform:translateY(-100%)",
       "transition:transform .3s ease",
       "pointer-events:none"
@@ -591,13 +589,9 @@ window.Poly.signals = window.Poly.signals || {};
     var el = document.createElement("div");
     el.className = "poly-toast";
     el.textContent = text;
+    // Structural styles are inline; cosmetic styles (background,
+    // colour, font, border-radius, shadow) live on .poly-toast.
     el.style.cssText = [
-      "background:#333",
-      "color:#fff",
-      "padding:10px 20px",
-      "border-radius:8px",
-      "font:14px/1.4 system-ui,sans-serif",
-      "box-shadow:0 4px 12px rgba(0,0,0,.15)",
       "opacity:0",
       "transform:translateY(20px)",
       "transition:opacity .3s, transform .3s",
