@@ -16,12 +16,12 @@ func Confirm[E Settable[E]](el E, message string) E {
 	return el.SetData("poly-confirm", message)
 }
 
-// Preserve prevents the JS runtime from resetting a form's fields
-// after submit. Use this when the form is inside a Dynamic key and
-// the server controls field values — the morph will clear fields on
-// success and preserve them on validation failure.
-func Preserve[E Settable[E]](el E) E {
-	return el.SetData("poly-preserve", "")
+// Reset tells the JS runtime to reset a form's fields after submit.
+// Without this, the server controls field values via the re-render.
+// Use this for chat inputs, search bars, or any form where the fields
+// should clear after submission.
+func Reset[E Settable[E]](el E) E {
+	return el.SetData("poly-reset", "")
 }
 
 // AutoFocus marks an element to receive focus after the next server

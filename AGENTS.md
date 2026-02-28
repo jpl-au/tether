@@ -382,12 +382,12 @@ func handle(sess *poly.Session[state], s state, ev poly.Event) state {
 - **Wrap form + error in a Dynamic key** so the server controls field values via targeted patches:
   ```go
   div.New(
-      bind.Preserve(form.New(/*...*/)),
+      form.New(/*...*/),
       span.Text(s.TodoError).Style("color: #c33"),
   ).Dynamic("todo-form")
   ```
 
-- **`bind.Preserve`** prevents the JS runtime from resetting form fields after submit. Without it, `target.reset()` clears the user's input before the server morph arrives — losing the text on validation failure.
+- Forms are **not auto-reset** after submit — the server controls field values via the re-render. Use `bind.Reset` on a form to opt into client-side reset (e.g. for chat inputs that should clear after send).
 
 - **Live validation via `bind.Input`** with a dedicated action (e.g. `"validate-todo"`) gives the user feedback as they type, debounced at 300ms.
 
@@ -635,7 +635,7 @@ All helpers are in the `bind` package. They accept any Fluent element type via a
 |--------|---------------|---------|
 | `bind.Disable` | `poly-disable` | Disable element while event in flight |
 | `bind.Confirm` | `poly-confirm` | Show confirmation before sending event |
-| `bind.Preserve` | `poly-preserve` | Prevent form reset after submit |
+| `bind.Reset` | `poly-reset` | Reset form fields after submit |
 | `bind.AutoFocus` | `poly-autofocus` | Focus element after server update |
 | `bind.Indicator` | `poly-indicator` | Show loading indicator at selector |
 | `bind.FocusTrap` | `poly-focus-trap` | Trap keyboard focus within element |

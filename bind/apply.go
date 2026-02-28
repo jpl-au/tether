@@ -76,8 +76,8 @@ func WithDisable(text string) Option { return Option{"poly-disable", text} }
 // WithConfirm shows a confirmation prompt before sending the event.
 func WithConfirm(message string) Option { return Option{"poly-confirm", message} }
 
-// WithPreserve prevents form field reset after submit.
-func WithPreserve() Option { return Option{"poly-preserve", ""} }
+// WithReset resets form fields after submit.
+func WithReset() Option { return Option{"poly-reset", ""} }
 
 // WithAutoFocus gives the element focus after the next server update.
 func WithAutoFocus() Option { return Option{"poly-autofocus", ""} }

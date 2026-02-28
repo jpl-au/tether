@@ -1241,10 +1241,10 @@ window.Poly.signals = window.Poly.signals || {};
       var eid = sendEvent(domEvent, action, data);
       if (eid) disablePending(target, eid);
 
-      // Clear form fields after submit unless the form opts out via
-      // data-poly-preserve (used when the server controls field values
-      // through a Dynamic key).
-      if (domEvent === "submit" && !target.hasAttribute("data-poly-preserve")) {
+      // Reset form fields after submit only when explicitly requested.
+      // In a server-driven framework the server controls field values
+      // via the re-render — auto-resetting races the server's state.
+      if (domEvent === "submit" && target.hasAttribute("data-poly-reset")) {
         target.reset();
       }
     }, domEvent === "focus" || domEvent === "blur");

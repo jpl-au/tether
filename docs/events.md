@@ -95,16 +95,16 @@ bind.Viewport(div.New(), "load-more")
 Validation is handled server-side in the `Handle` function. The key patterns:
 
 - Wrap form + error in a `Dynamic` key so the server controls field values
-- Use `bind.Preserve` to prevent JS form reset after submit
+- Forms are not auto-reset — the server controls field values via the re-render
 - Use `bind.Input` with a validation action for live feedback
 - Keep error spans always in the tree (empty when no error) to avoid structural changes
 
 ```go
 div.New(
-    bind.Preserve(form.New(
+    form.New(
         bind.Input(input.Text("text", s.TodoText), "validate-todo"),
         button.Submit("Add"),
-    ).SetData("poly-submit", "add")),
+    ).SetData("poly-submit", "add"),
     span.Text(s.TodoError).Style("color: #c33"),
 ).Dynamic("todo-form")
 ```

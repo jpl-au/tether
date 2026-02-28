@@ -58,7 +58,7 @@ func TestApplyEventOptions(t *testing.T) {
 func TestApplyControlOptions(t *testing.T) {
 	el := bind.Apply(input.Text("name", ""),
 		bind.WithAutoFocus(),
-		bind.WithPreserve(),
+		bind.WithReset(),
 		bind.WithFocusTrap(),
 		bind.WithIndicator("#spin"),
 	)
@@ -66,7 +66,7 @@ func TestApplyControlOptions(t *testing.T) {
 
 	for _, want := range []string{
 		`data-poly-autofocus`,
-		`data-poly-preserve`,
+		`data-poly-reset`,
 		`data-poly-focus-trap`,
 		`data-poly-indicator="#spin"`,
 	} {

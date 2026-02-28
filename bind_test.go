@@ -106,12 +106,12 @@ func TestTransitionRendersDataAttribute(t *testing.T) {
 	}
 }
 
-func TestPreserveRendersDataAttribute(t *testing.T) {
-	el := bind.Preserve(form.New())
+func TestResetRendersDataAttribute(t *testing.T) {
+	el := bind.Reset(form.New())
 	html := string(el.Render())
 
-	if !strings.Contains(html, `data-poly-preserve=""`) {
-		t.Errorf("expected data-poly-preserve attribute in HTML:\n%s", html)
+	if !strings.Contains(html, `data-poly-reset=""`) {
+		t.Errorf("expected data-poly-reset attribute in HTML:\n%s", html)
 	}
 }
 

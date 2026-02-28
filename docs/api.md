@@ -317,7 +317,7 @@ bind.Permanent(el)                     // exclude from morphing
 ```go
 bind.Disable(el, "Saving...")    // disable during event, optional text swap
 bind.Confirm(el, "Are you sure?") // confirmation prompt before send
-bind.Preserve(el)                // prevent form reset after submit
+bind.Reset(el)                   // reset form fields after submit
 bind.AutoFocus(el)               // focus after next server update
 bind.Indicator(el, "#spinner")   // show loading indicator at selector
 bind.FocusTrap(el)               // trap Tab within descendants
