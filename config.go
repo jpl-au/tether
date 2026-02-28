@@ -257,6 +257,13 @@ type Client struct {
 	// This prevents nodes from getting stuck in the DOM when no CSS
 	// transition is defined. Zero defaults to 5 seconds.
 	TransitionTimeout time.Duration
+
+	// BackgroundSync enables IndexedDB event queuing and background
+	// sync for SSE mode. When true, failed POST events are stored in
+	// IndexedDB and replayed on reconnect (or via the service worker's
+	// Background Sync API). When false (default), failed events are
+	// reported as errors and not retried.
+	BackgroundSync bool
 }
 
 // Security groups origin-checking and CSRF protection settings.

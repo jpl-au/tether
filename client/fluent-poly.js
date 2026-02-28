@@ -48,6 +48,7 @@ window.Poly.signals = window.Poly.signals || {};
   var wsOpened = false;
   var sseOpened = false;
   var devMode = false;
+  var backgroundSync = false;
   var pendingCount = 0;
 
   // Report an error or warning to the Poly.onError callback if set.
@@ -75,6 +76,7 @@ window.Poly.signals = window.Poly.signals || {};
     defaultDebounce = parseInt(root.getAttribute("data-poly-debounce-default")) || 300;
     transitionTimeout = parseInt(root.getAttribute("data-poly-transition-timeout")) || 5000;
     devMode = root.hasAttribute("data-poly-dev");
+    backgroundSync = root.hasAttribute("data-poly-background-sync");
     // Remove cloak attributes so hidden elements become visible now
     // that the runtime is ready. The server injects a style rule that
     // hides [data-poly-cloak] elements before JS loads.
@@ -204,7 +206,7 @@ window.Poly.signals = window.Poly.signals || {};
       if (root) root.classList.remove("poly-disconnected");
       hideReconnectBar();
       if (isReconnect) {
-        replayQueuedEvents();
+        if (backgroundSync) replayQueuedEvents();
         sendNavigate(location.pathname + location.search);
       } else {
         mountExistingHooks();
@@ -1289,7 +1291,7 @@ window.Poly.signals = window.Poly.signals || {};
       }).catch(function (err) {
         reportError("fetch", "event POST failed: " + err, true);
         restorePending(id);
-        queueFailedEvent(payload);
+        if (backgroundSync) queueFailedEvent(payload);
       });
       return id;
     }

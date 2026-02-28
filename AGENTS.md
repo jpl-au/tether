@@ -890,7 +890,7 @@ The service worker provides:
 - **Asset caching:** Cache-first for `/_poly/*` GET requests (JS runtime files). On install, precaches `fluent-poly.js` and `idiomorph.min.js`, plus hashed URLs from `Config.Assets` precache lists. All internal script tags include a `?v=<hash>` query string (derived from `clientVersion()`) for cache-busting even without the service worker.
 - **Page caching:** Navigation responses are only cached when the server sends `X-Poly-Cache: true`. Cached pages are served as a fallback when offline.
 - **Push event handling:** Receives push messages and shows notifications via `showNotification()`. Handles `notificationclick` for URL navigation.
-- **Background sync:** Replays failed SSE POST events from IndexedDB when connectivity returns (Chromium only; other browsers replay on tab reconnect).
+- **Background sync:** Replays failed SSE POST events from IndexedDB when connectivity returns (Chromium only; other browsers replay on tab reconnect). Only active when `Client.BackgroundSync` is true.
 
 Cache is keyed by a content hash of the embedded files (injected at serve time). Old caches are deleted on activate.
 
@@ -988,7 +988,7 @@ The `push.Sender` handles ECDH key agreement, HKDF key derivation (`golang.org/x
 
 ## Event resilience (SSE)
 
-In SSE mode, failed POST events are queued in IndexedDB (`poly-events` object store) and replayed on reconnect. The replay happens before the navigate event so the server processes queued events first.
+Background sync is disabled by default. Set `Client.BackgroundSync` to true to enable it. When enabled, failed SSE POST events are queued in IndexedDB (`poly-events` object store) and replayed on reconnect. The replay happens before the navigate event so the server processes queued events first.
 
 When the service worker is active and Background Sync is available, a `poly-event-sync` sync tag is registered so queued events replay even if the tab was closed. Events older than 60 seconds are discarded as stale.
 

@@ -70,6 +70,7 @@ func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 		transitionTimeout: h.cfg.Client.TransitionTimeout,
 		worker:            h.cfg.Worker,
 		pushKey:           pushKey,
+		backgroundSync:    h.cfg.Client.BackgroundSync,
 		devMode:           h.cfg.DevMode,
 	}
 

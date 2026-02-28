@@ -41,6 +41,7 @@ type polyBody struct {
 	transitionTimeout time.Duration
 	worker            bool
 	pushKey           string
+	backgroundSync    bool
 	devMode           bool
 }
 
@@ -99,6 +100,9 @@ func (p *polyBody) RenderBuilder(buf *bytes.Buffer) {
 		buf.WriteString(` data-poly-push-key="`)
 		buf.WriteString(html.EscapeString(p.pushKey))
 		buf.WriteString(`"`)
+	}
+	if p.backgroundSync {
+		buf.WriteString(` data-poly-background-sync`)
 	}
 	if p.devMode {
 		buf.WriteString(` data-poly-dev`)

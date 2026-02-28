@@ -64,6 +64,12 @@ A reconnecting indicator bar appears automatically when the connection drops and
 
 ## Event resilience (SSE)
 
-In SSE mode, events that fail to send (due to network interruptions) are automatically queued in IndexedDB and replayed when the connection is restored. This happens transparently — the user does not need to redo their action.
+Set `Client.BackgroundSync` to true to enable event queuing. When enabled, SSE events that fail to send (due to network interruptions) are queued in IndexedDB and replayed when the connection is restored.
+
+```go
+Client: poly.Client{
+    BackgroundSync: true,
+},
+```
 
 When the service worker is active and the browser supports Background Sync (Chromium), queued events are replayed even if the tab was closed. On other browsers, replay occurs when the tab reopens and the SSE connection restores.
