@@ -17,12 +17,29 @@ mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 })
 ```
 
-## Graceful drain
+## Graceful shutdown
 
-Stop accepting new sessions while letting existing ones finish:
+`ListenAndServe` handles shutdown automatically — draining sessions on
+SIGINT or SIGTERM, then force-closing after the grace period:
 
 ```go
-// On SIGINT, drain then shut down.
+h := poly.New(poly.Config[State]{
+    // ...
+    Timeouts: poly.Timeouts{
+        ShutdownGrace: 15 * time.Second, // default: 10s
+    },
+})
+
+h.ListenAndServe("") // PORT env var, then :8080
+```
+
+A second Ctrl+C during shutdown forces an immediate exit.
+
+### Manual shutdown
+
+When using a custom `http.Server`, call `Drain` and `Shutdown` directly:
+
+```go
 ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 defer stop()
 
@@ -30,7 +47,7 @@ handler.Drain(ctx)    // blocks until all sessions disconnect or ctx cancels
 handler.Shutdown(ctx) // stops the reaper and releases resources
 ```
 
-`Drain` rejects new page loads with 503 but allows existing sessions to continue and disconnected clients to reconnect. The background reaper keeps enforcing idle and lifetime limits during the drain period.
+`Drain` rejects new page loads with 503 but allows existing sessions to continue and disconnected clients to reconnect. Per-session timers keep enforcing idle and lifetime limits during the drain period.
 
 ## Dev mode
 

@@ -20,6 +20,7 @@ package polytest
 import (
 	"context"
 	"encoding/json"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -143,9 +144,7 @@ func (s *testSession) ReplaceURL(rawURL string)    { s.url = rawURL; s.replace =
 func (s *testSession) Signal(key string, v any)    { s.ensureSignals(); s.signals[key] = v }
 func (s *testSession) Signals(m map[string]any) {
 	s.ensureSignals()
-	for k, v := range m {
-		s.signals[k] = v
-	}
+	maps.Copy(s.signals, m)
 }
 func (s *testSession) SignalBatch(pairs ...any) {
 	if len(pairs)%2 != 0 {

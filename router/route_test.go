@@ -46,22 +46,18 @@ func TestConcurrentRouteAndRender(t *testing.T) {
 	var wg sync.WaitGroup
 	// Concurrent writers adding routes.
 	for i := range 50 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			path := "/" + string(rune('a'+i%26))
 			r.Route(path, Page[state]{Render: func(s state) node.Node {
 				return span.Text(path)
 			}})
-		}()
+		})
 	}
 	// Concurrent readers dispatching renders.
 	for range 100 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			r.Render(state{Page: "/"})
-		}()
+		})
 	}
 	wg.Wait()
 }

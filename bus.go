@@ -2,6 +2,7 @@ package poly
 
 import (
 	"context"
+	"maps"
 	"sync"
 	"sync/atomic"
 )
@@ -95,9 +96,7 @@ func (b *Bus[E]) subscribe(ctx context.Context, fn func(E), sessionID string) fu
 
 	old := b.loadSubs()
 	subs := make(map[uint64]subscriber[E], len(old)+1)
-	for k, v := range old {
-		subs[k] = v
-	}
+	maps.Copy(subs, old)
 	subs[id] = subscriber[E]{
 		fn:        fn,
 		sessionID: sessionID,

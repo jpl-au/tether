@@ -63,3 +63,58 @@ fluent-poly uses a unified update protocol. Every message sent to the client is 
 ```
 
 When only content changes (the common case), patches target specific keyed elements. When the structure changes — keys added, removed, or reordered — the server sends a root morph and the client uses [idiomorph](https://github.com/bigskysoftware/idiomorph) to update the entire root while preserving focus, scroll position, and form state.
+
+## Running the server
+
+For a full-page application, `ListenAndServe` handles startup, signal
+trapping, and graceful shutdown:
+
+```go
+h := poly.New(poly.Config[State]{
+    Upgrade:      ws.Upgrade(),
+    Fallback:     sse.Upgrade(),
+    Mode:         mode.Auto,
+    InitialState: func(r *http.Request) State { return State{} },
+    Render:       render,
+    Handle:       handle,
+})
+
+if err := h.ListenAndServe(""); err != nil {
+    log.Fatal(err)
+}
+```
+
+`ListenAndServe` checks the `PORT` environment variable (standard for
+cloud platforms such as Cloud Run, Fly.io, and Railway), then defaults
+to `:8080`. It handles SIGINT and SIGTERM, drains sessions gracefully,
+and returns nil on clean shutdown. A second signal forces an immediate
+exit.
+
+The grace period defaults to 10 seconds and is configurable via
+`Timeouts.ShutdownGrace`:
+
+```go
+Timeouts: poly.Timeouts{
+    ShutdownGrace: 15 * time.Second,
+},
+```
+
+To add routes or HTTP-level middleware alongside poly, pass a custom
+mux as the second argument:
+
+```go
+mux := http.NewServeMux()
+mux.HandleFunc("GET /health", healthCheck)
+mux.Handle("/{path...}", h)
+
+h.ListenAndServe("", mux)
+```
+
+Signal handling, drain, and shutdown still work exactly the same. For
+sub-path mounting, use `poly.ServeClient()` to serve the client JS
+runtime separately:
+
+```go
+mux.Handle("/app", h)
+mux.Handle("/_poly/", http.StripPrefix("/_poly/", poly.ServeClient()))
+```

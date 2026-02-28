@@ -21,6 +21,7 @@
 package router
 
 import (
+	"maps"
 	"sync"
 	"sync/atomic"
 
@@ -71,9 +72,7 @@ func (r *Router[S]) Route(path string, page Page[S]) {
 
 	old := r.loadPages()
 	newPages := make(map[string]Page[S], len(old)+1)
-	for k, v := range old {
-		newPages[k] = v
-	}
+	maps.Copy(newPages, old)
 	newPages[path] = page
 	r.pages.Store(newPages)
 }

@@ -2,6 +2,7 @@ package poly
 
 import (
 	"iter"
+	"maps"
 	"sync"
 	"sync/atomic"
 )
@@ -64,9 +65,7 @@ func (g *Group[S]) Add(s *Session[S]) {
 	_, exists := old[s.id]
 	if !exists {
 		sessions := make(map[string]*Session[S], len(old)+1)
-		for k, v := range old {
-			sessions[k] = v
-		}
+		maps.Copy(sessions, old)
 		sessions[s.id] = s
 		g.sessions.Store(sessions)
 	}

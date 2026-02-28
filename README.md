@@ -36,7 +36,36 @@ mux.Handle("/counter", poly.New(poly.Config[CounterState]{
 mux.Handle("/_poly/", http.StripPrefix("/_poly/", poly.ServeClient()))
 ```
 
+When the handler is not at root, mount the client JS runtime separately:
+
+```go
+mux.Handle("/_poly/", http.StripPrefix("/_poly/", poly.ServeClient()))
+```
+
 No WebSocket boilerplate. No JavaScript to write. No diff algorithm to understand.
+
+## Full-page app
+
+When the handler owns the entire page, `ListenAndServe` handles signal
+trapping, graceful shutdown, and sensible defaults:
+
+```go
+h := poly.New(poly.Config[State]{
+    Upgrade:      ws.Upgrade(),
+    Fallback:     sse.Upgrade(),
+    Mode:         mode.Auto,
+    InitialState: func(r *http.Request) State { return State{} },
+    Render:       render,
+    Handle:       handle,
+})
+
+h.ListenAndServe("") // checks PORT env var, then defaults to :8080
+```
+
+No mux, no signal handling, no shutdown boilerplate. The handler serves
+the client JS runtime, your pages, and manages the full session lifecycle.
+On SIGINT or SIGTERM, sessions are drained gracefully before the process
+exits.
 
 ## Embedded assets
 
