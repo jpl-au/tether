@@ -85,9 +85,6 @@ func New[S any](cfg Config[S]) *Handler[S] {
 		cfg.Handle = chain(cfg.Handle, cfg.Middleware)
 	}
 
-	if cfg.Push != nil {
-		cfg.Worker = true
-	}
 	if !cfg.DevMode && os.Getenv("POLY_DEV") != "" {
 		cfg.DevMode = true
 	}
@@ -103,6 +100,9 @@ func New[S any](cfg Config[S]) *Handler[S] {
 	}
 	if cfg.Timeouts.Pending == 0 {
 		cfg.Timeouts.Pending = defaultPendingTimeout
+	}
+	if cfg.Timeouts.ShutdownGrace == 0 {
+		cfg.Timeouts.ShutdownGrace = defaultShutdownGrace
 	}
 	if cfg.Timeouts.Retry == 0 {
 		cfg.Timeouts.Retry = defaultRetryDelay

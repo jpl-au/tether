@@ -102,12 +102,18 @@ window.Poly.signals = window.Poly.signals || {};
         for (var i = 0; i < regs.length; i++) regs[i].unregister();
       });
     } else if (root.hasAttribute("data-poly-worker") && "serviceWorker" in navigator) {
-      // Register service worker when enabled by the server. The worker
-      // provides asset caching, offline page shells, push notification
-      // handling, and background sync for SSE event resilience.
+      // Full service worker: asset caching, offline page shells, push
+      // notification handling, and background sync for SSE resilience.
       navigator.serviceWorker.register("/_poly/fluent-poly-worker.js", { scope: "/" })
         .catch(function (err) {
           reportError("worker", "service worker registration failed: " + err);
+        });
+    } else if (root.hasAttribute("data-poly-push-key") && "serviceWorker" in navigator) {
+      // Push-only service worker: receives push events and shows
+      // notifications without intercepting fetch requests or caching.
+      navigator.serviceWorker.register("/_poly/fluent-poly-push-worker.js", { scope: "/" })
+        .catch(function (err) {
+          reportError("worker", "push worker registration failed: " + err);
         });
     }
   });

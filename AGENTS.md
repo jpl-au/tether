@@ -900,7 +900,7 @@ A fixed bar at the top of the viewport shows "Reconnecting…" when the transpor
 
 ## Push notifications
 
-`Config.Push` enables Web Push support. Setting it implicitly enables `Worker`.
+`Config.Push` enables Web Push support. A lightweight push-only service worker is registered automatically; set `Worker` to true for the full service worker with caching and sync.
 
 **Go types:**
 

@@ -121,10 +121,13 @@ type Config[S any] struct {
 	// Logger is used for session errors. Defaults to slog.Default().
 	Logger *slog.Logger
 
-	// Worker enables the service worker for asset caching, offline page
-	// shells, and push notification support. When true, the client JS
-	// registers /_poly/fluent-poly-worker.js as a service worker with scope
-	// "/". Implicitly true when Push is configured. Default false.
+	// Worker enables the full service worker for asset caching, offline
+	// page shells, and background sync. When true, the client JS
+	// registers /_poly/fluent-poly-worker.js as a service worker with
+	// scope "/". When false and Push is configured, a lightweight
+	// push-only service worker is registered instead — it handles push
+	// events without intercepting fetch requests or caching. Default
+	// false.
 	Worker bool
 
 	// DevMode disables service worker registration and reloads the page
@@ -147,10 +150,11 @@ type Config[S any] struct {
 	// each file to the Handle callback. Optional.
 	Upload *UploadConfig[S]
 
-	// Push enables Web Push notification support. When set, Worker is
-	// implicitly true. Clients subscribe to push notifications after
-	// connecting, and the subscription is delivered via OnSubscribe.
-	// Use the push subpackage to send notifications. Optional.
+	// Push enables Web Push notification support. A lightweight
+	// push-only service worker is registered automatically; set Worker
+	// to true for the full service worker with caching and sync.
+	// Subscription requires a user gesture via [bind.PushSubscribe].
+	// Optional.
 	Push *PushConfig[S]
 
 	// Groups are collections that the session will automatically join
