@@ -12,6 +12,13 @@ import (
 // session with the diff state and embeds the session ID in the root
 // element so the client can reclaim it when the transport connects.
 func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
+	// Check origin on the initial GET. Without this, a cross-origin page
+	// could trigger pending session creation via <img> tags, consuming
+	// memory up to MaxSessions.
+	if !h.originAllowed(r) {
+		http.Error(w, "origin not allowed", http.StatusForbidden)
+		return
+	}
 	if h.draining.Load() {
 		http.Error(w, "server is shutting down", http.StatusServiceUnavailable)
 		return
