@@ -83,6 +83,17 @@ func Optimistic[E Settable[E]](el E, signal, value string) E {
 	return el.SetData("poly-optimistic", signal+" "+value)
 }
 
+// PushSubscribe marks an element as the trigger for push notification
+// subscription. When clicked, the JS runtime prompts the user for
+// notification permission and subscribes via the service worker's
+// PushManager. This ensures the browser permission dialog appears in
+// response to a genuine user gesture, as required by browser policy.
+//
+//	bind.PushSubscribe(button.Text("Enable notifications"))
+func PushSubscribe[E Settable[E]](el E) E {
+	return el.SetData("poly-push-subscribe", "")
+}
+
 // OptimisticToggle flips a boolean signal immediately on click,
 // before the event is sent to the server. More natural than
 // [Optimistic] when you don't know the current value — the JS

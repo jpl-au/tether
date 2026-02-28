@@ -197,6 +197,11 @@ type Timeouts struct {
 	// is discarded after this duration. Zero defaults to 30 seconds.
 	Pending time.Duration
 
+	// ShutdownGrace is how long [Handler.ListenAndServe] waits for
+	// sessions to drain during graceful shutdown. After this period,
+	// remaining sessions are force-closed. Zero defaults to 10 seconds.
+	ShutdownGrace time.Duration
+
 	// Heartbeat controls how often the SSE transport sends a keep-alive
 	// comment to prevent intermediate proxies (AWS ALB, Nginx,
 	// Cloudflare) from closing idle connections. Has no effect on
@@ -266,10 +271,10 @@ type Security struct {
 	AllowedOrigins []string
 }
 
-// PushConfig enables Web Push notifications for the page. When set on
-// [Config], the service worker is implicitly enabled because push
-// notifications require a service worker to receive messages when no
-// tab is open.
+// PushConfig enables Web Push notifications for the page. The VAPID
+// public key is passed to the client so it can subscribe when the user
+// clicks a [bind.PushSubscribe] element. Subscription is never
+// automatic — it always requires a user gesture.
 type PushConfig[S any] struct {
 	// Sender handles push notification delivery. Create with
 	// [push.NewSender]. The sender's public key is automatically
@@ -294,6 +299,8 @@ const defaultHeartbeatInterval = 20 * time.Second
 
 // Defaults for the client-side JS runtime. These are passed to the
 // browser as data attributes on the poly root element.
+const defaultShutdownGrace = 10 * time.Second
+
 const (
 	defaultRetryDelay        = 1000 * time.Millisecond
 	defaultMaxRetryDelay     = 30 * time.Second

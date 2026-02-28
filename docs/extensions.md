@@ -118,7 +118,7 @@ poly.New(poly.Config[State]{
 })
 ```
 
-Setting `Push` implicitly enables the service worker. The client subscribes via the browser's Push API and the subscription is stored on the session. Send notifications with:
+Use `bind.PushSubscribe` on a button so the user opts in with a click — browsers require a user gesture for the push permission prompt. Send notifications with:
 
 ```go
 sess.Push(push.Notification{

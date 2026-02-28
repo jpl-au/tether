@@ -35,6 +35,12 @@ push.Send(sub, push.Notification{
 })
 ```
 
-Setting `Push` implicitly enables the service worker. The client subscribes automatically when the push manager is available and sends the subscription to the server via `OnSubscribe`.
+Subscription is never automatic — browsers require a user gesture for the push permission prompt. Use `bind.PushSubscribe` on a button or link to let the user opt in:
+
+```go
+bind.PushSubscribe(button.Text("Enable notifications"))
+```
+
+When clicked, the JS runtime requests notification permission, subscribes via the service worker's PushManager, and sends the subscription to the server via `OnSubscribe`.
 
 The `push` subpackage implements the Web Push protocol (RFC 8291 + RFC 8292) with VAPID JWT signing and aes128gcm payload encryption. It depends on `golang.org/x/crypto` for HKDF key derivation.

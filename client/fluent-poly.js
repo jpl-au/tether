@@ -106,12 +106,6 @@ window.Poly.signals = window.Poly.signals || {};
       // provides asset caching, offline page shells, push notification
       // handling, and background sync for SSE event resilience.
       navigator.serviceWorker.register("/_poly/fluent-poly-worker.js", { scope: "/" })
-        .then(function (reg) {
-          var pushKey = root.getAttribute("data-poly-push-key");
-          if (pushKey && "PushManager" in window) {
-            subscribePush(reg, pushKey);
-          }
-        })
         .catch(function (err) {
           reportError("worker", "service worker registration failed: " + err);
         });
@@ -293,10 +287,10 @@ window.Poly.signals = window.Poly.signals || {};
 
   // --- Push notification subscription ---
   //
-  // When the server provides a VAPID public key via data-poly-push-key,
-  // the client subscribes to push notifications through the service
-  // worker's PushManager. The subscription is sent to the server so it
-  // can deliver notifications later via the push subpackage.
+  // Push subscription is deferred until the user clicks an element with
+  // data-poly-push-subscribe. Browsers require a user gesture for
+  // pushManager.subscribe — auto-prompting causes permission denials
+  // and can permanently block the site from ever prompting again.
 
   function subscribePush(reg, vapidKey) {
     reg.pushManager.getSubscription().then(function (sub) {
@@ -341,6 +335,19 @@ window.Poly.signals = window.Poly.signals || {};
     for (var i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
     return arr;
   }
+
+  // Subscribe to push when the user clicks a [data-poly-push-subscribe]
+  // element. This ensures the browser permission prompt fires from a
+  // genuine user gesture.
+  root.addEventListener("click", function (e) {
+    var el = e.target.closest("[data-poly-push-subscribe]");
+    if (!el) return;
+    var pushKey = root.getAttribute("data-poly-push-key");
+    if (!pushKey || !("PushManager" in window) || !("serviceWorker" in navigator)) return;
+    navigator.serviceWorker.ready.then(function (reg) {
+      subscribePush(reg, pushKey);
+    });
+  });
 
   // --- SSE event resilience ---
   //

@@ -39,6 +39,7 @@ handler.go      Package doc, Handler, New(), ServeHTTP, origin checking, POST ha
 lifecycle.go    serveInitialPage, serveSession, reattach, wireDisconnect
 pending.go      reapPending — periodic cleanup for pre-warmed sessions
 drain.go        Drain, Shutdown
+listen.go       ListenAndServe — signal handling, graceful shutdown, address resolution
 health.go       HealthStatus, Health()
 page.go         Initial page rendering — polyBody, newID
 session.go      Session struct, ID(), Context(), Go(), constants
@@ -653,6 +654,7 @@ All helpers are in the `bind` package. They accept any Fluent element type via a
 | `bind.SetSignal` | `poly-set-signal` | Set signal to value on click |
 | `bind.Optimistic` | `poly-optimistic` | Set signal before server round-trip |
 | `bind.OptimisticToggle` | `poly-optimistic-toggle` | Toggle signal before server round-trip |
+| `bind.PushSubscribe` | `poly-push-subscribe` | Subscribe to push on user click |
 
 **File uploads** (`bind/upload.go`):
 
@@ -881,7 +883,7 @@ All hashes are computed eagerly at construction time. The hash is a 12-character
 
 ## Service worker
 
-`client/poly-worker.js` is registered by the client JS when `data-poly-worker` is present on the root element. Set `Config.Worker = true` (or configure `Push`) to enable it.
+`client/poly-worker.js` is registered by the client JS when `data-poly-worker` is present on the root element. Set `Config.Worker = true` to enable it.
 
 The service worker provides:
 
@@ -957,10 +959,11 @@ poly.New(poly.Config[State]{
 
 **Subscription flow:**
 
-1. Client JS reads `data-poly-push-key` from the root element
-2. Calls `pushManager.subscribe()` with the VAPID key
-3. POSTs subscription JSON to the poly endpoint with `X-Poly-Push-Subscribe: true` and `X-Poly-Session` headers
-4. Server calls `OnSubscribe(session, sub)` in a goroutine
+1. User clicks an element with `data-poly-push-subscribe` (added by `bind.PushSubscribe`)
+2. Client JS reads `data-poly-push-key` from the root element
+3. Calls `pushManager.subscribe()` with the VAPID key (requires user gesture)
+4. POSTs subscription JSON to the poly endpoint with `X-Poly-Push-Subscribe: true` and `X-Poly-Session` headers
+5. Server calls `OnSubscribe(session, sub)` in a goroutine
 
 **Sending notifications:**
 
