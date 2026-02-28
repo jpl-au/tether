@@ -127,8 +127,11 @@
       Poly.setSignal("upload:" + action + ":state", "idle");
     });
 
+    // Read the session ID fresh from the root element each time.
+    // After reconnection the ID may have changed.
+    var sid = root ? root.getAttribute("data-poly-session") : sessionID;
     xhr.open("POST", endpoint);
-    xhr.setRequestHeader("X-Poly-Session", sessionID);
+    xhr.setRequestHeader("X-Poly-Session", sid);
     xhr.setRequestHeader("X-Poly-Upload", action);
     xhr.send(formData);
   }
