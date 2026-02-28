@@ -193,9 +193,14 @@ type Timeouts struct {
 	MaxLifetime time.Duration
 
 	// Reconnect is how long a disconnected session is kept so the
-	// client can reattach. Zero defaults to 30 seconds. Set to -1 to
-	// disable reconnection (sessions are destroyed on disconnect).
+	// client can reattach. Zero defaults to 30 seconds. Ignored when
+	// DisableReconnect is true.
 	Reconnect time.Duration
+
+	// DisableReconnect destroys sessions immediately on disconnect
+	// instead of keeping them for the Reconnect duration. Use this
+	// when every connection should start fresh.
+	DisableReconnect bool
 
 	// Pending is how long a pre-warmed session waits for the browser
 	// to open a transport connection. If the browser never connects
@@ -212,8 +217,14 @@ type Timeouts struct {
 	// comment to prevent intermediate proxies (AWS ALB, Nginx,
 	// Cloudflare) from closing idle connections. Has no effect on
 	// WebSocket transports which have their own ping/pong frames.
-	// Zero defaults to 20 seconds. Set to -1 to disable heartbeats.
+	// Zero defaults to 20 seconds. Ignored when DisableHeartbeat is
+	// true.
 	Heartbeat time.Duration
+
+	// DisableHeartbeat stops the SSE transport from sending periodic
+	// keep-alive comments. Only use this when you know that no
+	// intermediate proxy will close idle connections.
+	DisableHeartbeat bool
 
 	// Retry is the initial delay before the client JS attempts to
 	// reconnect after a WebSocket close. The delay doubles on each

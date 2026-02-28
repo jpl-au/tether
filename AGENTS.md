@@ -591,7 +591,7 @@ The initial HTML includes a `data-poly-transport` attribute on the root element 
 
 When SSE is active, client events are sent as HTTP POST requests to the same endpoint.
 
-**SSE heartbeat:** Set `HeartbeatInterval` (default 20s) to send keep-alive comments that prevent proxies from closing idle SSE connections. Set to `-1` to disable. WebSocket transports have their own ping/pong and do not need this.
+**SSE heartbeat:** Set `Timeouts.Heartbeat` (default 20s) to send keep-alive comments that prevent proxies from closing idle SSE connections. Set `Timeouts.DisableHeartbeat` to true to stop them. WebSocket transports have their own ping/pong and do not need this.
 
 **SSE reconnection:** Reconnection is automatic. When an SSE connection drops, the session is preserved. On reconnect, a full re-render is sent to bring the client up to date.
 

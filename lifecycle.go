@@ -5,7 +5,7 @@ package poly
 // and re-render. This avoids any locking — only the loop touches
 // session state.
 func (h *Handler[S]) reattach(sess *Session[S], transport Transport) {
-	if hb, ok := transport.(heartbeater); ok && h.cfg.Timeouts.Heartbeat > 0 {
+	if hb, ok := transport.(heartbeater); ok && !h.cfg.Timeouts.DisableHeartbeat {
 		hb.StartHeartbeat(h.cfg.Timeouts.Heartbeat)
 	}
 
@@ -54,7 +54,7 @@ func (h *Handler[S]) wireDisconnect(sess *Session[S]) {
 	sess.onDisconnect = func() {
 		h.mu.Lock()
 		delete(h.active, sess.id)
-		destroy := h.cfg.Timeouts.Reconnect <= 0
+		destroy := h.cfg.Timeouts.DisableReconnect
 		if !destroy {
 			h.disconnected[sess.id] = sess
 		}

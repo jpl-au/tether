@@ -53,8 +53,10 @@ Mode constants: `mode.WebSocket`, `mode.SSE`, `mode.Auto`, `mode.Fetch`.
 | `Idle` | `time.Duration` | 0 (disabled) | Close sessions inactive for this long |
 | `MaxLifetime` | `time.Duration` | 0 (disabled) | Close sessions after this long regardless |
 | `Reconnect` | `time.Duration` | 30s | Keep disconnected sessions alive for reconnection |
+| `DisableReconnect` | `bool` | false | Destroy sessions immediately on disconnect |
 | `Pending` | `time.Duration` | 30s | Wait for browser to claim pre-warmed session |
-| `Heartbeat` | `time.Duration` | 20s | SSE keep-alive interval (-1 disables) |
+| `Heartbeat` | `time.Duration` | 20s | SSE keep-alive interval |
+| `DisableHeartbeat` | `bool` | false | Stop SSE keep-alive comments |
 | `Retry` | `time.Duration` | 1s | Initial client reconnection delay |
 | `MaxRetry` | `time.Duration` | 30s | Maximum exponential backoff |
 
