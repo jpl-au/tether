@@ -1,6 +1,7 @@
 package poly
 
 import (
+	"log/slog"
 	"mime"
 	"mime/multipart"
 	"net/http"
@@ -127,12 +128,13 @@ func (h *Handler[S]) handleUpload(w http.ResponseWriter, r *http.Request) {
 	// every callback has returned — not before.
 	form := r.MultipartForm
 	handler := h.cfg.Upload.Handle
-	logger := sess.logger
+	sessionID := sess.id
 	go func() {
 		defer form.RemoveAll()
 		for _, u := range uploads {
 			if err := handler(sess, u); err != nil {
-				logger.Error("upload handler failed",
+				slog.Error("upload handler failed",
+					"session", sessionID,
 					"action", u.Action,
 					"file", u.Name,
 					"err", err,

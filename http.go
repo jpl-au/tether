@@ -2,6 +2,7 @@ package poly
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
@@ -37,7 +38,7 @@ func (h *Handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// header. Handle them before the mode switch so they work with
 	// all transport modes.
 	if r.Method == "POST" && r.Header.Get("X-Poly-Upload") != "" {
-		h.cfg.Logger.Debug("upload received", "session", r.Header.Get("X-Poly-Session"))
+		slog.Debug("upload received", "session", r.Header.Get("X-Poly-Session"))
 		h.handleUpload(w, r)
 		return
 	}
@@ -46,7 +47,7 @@ func (h *Handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// header, regardless of transport mode. Handle them before the
 	// mode switch to avoid being mistaken for an SSE event.
 	if r.Method == "POST" && r.Header.Get("X-Poly-Push-Subscribe") == "true" {
-		h.cfg.Logger.Debug("push subscription received", "session", r.Header.Get("X-Poly-Session"))
+		slog.Debug("push subscription received", "session", r.Header.Get("X-Poly-Session"))
 		h.handlePushSubscribe(w, r)
 		return
 	}
@@ -192,7 +193,7 @@ func (h *Handler[S]) handlePostEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sess.logger.Debug("POST event", "action", ev.Action, "type", ev.Type)
+	slog.Debug("POST event", "session", id, "action", ev.Action, "type", ev.Type)
 
 	// Non-blocking send: if the buffer has room the event is accepted
 	// immediately. If not, check whether the session is closing (410)

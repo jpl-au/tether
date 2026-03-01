@@ -2,6 +2,7 @@ package poly
 
 import (
 	"iter"
+	"log/slog"
 	"maps"
 	"sync"
 	"sync/atomic"
@@ -72,8 +73,11 @@ func (g *Group[S]) Add(s *Session[S]) {
 	onJoin := g.OnJoin
 	g.wmu.Unlock()
 
-	if !exists && onJoin != nil {
-		onJoin(s)
+	if !exists {
+		slog.Debug("group.Add", "session", s.id, "members", len(g.loadSessions()))
+		if onJoin != nil {
+			onJoin(s)
+		}
 	}
 }
 
@@ -97,8 +101,11 @@ func (g *Group[S]) Remove(s *Session[S]) {
 	onLeave := g.OnLeave
 	g.wmu.Unlock()
 
-	if exists && onLeave != nil {
-		onLeave(s)
+	if exists {
+		slog.Debug("group.Remove", "session", s.id, "members", len(g.loadSessions()))
+		if onLeave != nil {
+			onLeave(s)
+		}
 	}
 }
 

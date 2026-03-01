@@ -100,8 +100,15 @@ func Page[S any](cfg PageConfig[S]) http.Handler {
 		cfg.DevMode = true
 	}
 	if cfg.Logger == nil {
-		cfg.Logger = slog.Default()
+		level := slog.LevelInfo
+		if cfg.DevMode {
+			level = slog.LevelDebug
+		}
+		cfg.Logger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+			Level: level,
+		}))
 	}
+	slog.SetDefault(cfg.Logger)
 	if cfg.Limits.MaxEventBytes == 0 {
 		cfg.Limits.MaxEventBytes = defaultMaxEventBytes
 	}
@@ -152,7 +159,7 @@ func (p *pageHandler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (p *pageHandler[S]) serveGET(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		if v := recover(); v != nil {
-			p.cfg.Logger.Error("panic in page render", "panic", v)
+			slog.Error("panic in page render", "panic", v)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		}
 	}()
@@ -196,7 +203,7 @@ func (p *pageHandler[S]) servePOST(w http.ResponseWriter, r *http.Request) {
 
 	defer func() {
 		if v := recover(); v != nil {
-			p.cfg.Logger.Error("panic in page handler", "panic", v)
+			slog.Error("panic in page handler", "panic", v)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		}
 	}()
@@ -245,7 +252,7 @@ func (p *pageHandler[S]) servePOST(w http.ResponseWriter, r *http.Request) {
 
 	data, err := marshalUpdate(u)
 	if err != nil {
-		p.cfg.Logger.Error("encode response error", "err", err)
+		slog.Error("encode response error", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}

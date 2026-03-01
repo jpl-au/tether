@@ -50,7 +50,6 @@ type Session[S any] struct {
 	handle    HandleFunc[S]
 	differ    *jit.Differ
 	transport Transport
-	logger    *slog.Logger
 
 	// Channel pair: events from transport, commands from everything else.
 	events chan Event
@@ -308,7 +307,7 @@ func (s *Session[S]) enqueue(fn func()) {
 		// Command buffer full — overflow to a goroutine to prevent
 		// deadlock. This is expected during broadcast storms but
 		// sustained overflow suggests the buffer is too small.
-		s.logger.Warn("command buffer full, overflow to goroutine")
+		slog.Warn("command buffer full, overflow to goroutine", "session", s.id)
 		go func() {
 			select {
 			case s.cmds <- fn:

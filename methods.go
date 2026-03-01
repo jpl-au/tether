@@ -1,6 +1,7 @@
 package poly
 
 import (
+	"log/slog"
 	"maps"
 	"time"
 
@@ -61,7 +62,7 @@ func (s *Session[S]) Update(fn func(S) S) {
 		fx := &effects{}
 		defer func() {
 			if r := recover(); r != nil {
-				s.logger.Error("panic in Update", "panic", r)
+				slog.Error("panic in Update", "session", s.id, "panic", r)
 				s.drainFx(nil)
 			}
 			s.handling.Store(false)

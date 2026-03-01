@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"io"
-	"log/slog"
 	"sync"
 
 	jit "github.com/jpl-au/fluent-jit"
@@ -108,7 +107,7 @@ func handleCounter(_ PreSession, state counterState, ev Event) counterState {
 }
 
 // newTestSession creates a session with a seeded differ, ready for
-// testing. The session has channels and a logger. Caller must start
+// testing. The session has channels configured. Caller must start
 // the transport reader and run loop:
 //
 //	go sess.readTransport(sess.events)
@@ -123,7 +122,6 @@ func newTestSession(state counterState, mt *mockTransport) *Session[counterState
 		handle:    handleCounter,
 		differ:    differ,
 		transport: mt,
-		logger:    slog.Default().WithGroup("session").With("id", "test"),
 		events:    make(chan Event),
 		cmds:      make(chan func(), defaultCmdBufferSize),
 		fxCh:      make(chan func(*effects), defaultCmdBufferSize),

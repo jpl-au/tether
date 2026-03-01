@@ -124,8 +124,9 @@ func New[S any](cfg Config[S]) *Handler[S] {
 			Level: slog.LevelDebug,
 		}))
 	}
+	slog.SetDefault(cfg.Logger)
 	if cfg.DevMode {
-		cfg.Logger.Info("poly: dev mode enabled")
+		slog.Info("poly: dev mode enabled")
 	}
 	if cfg.Timeouts.Reconnect == 0 {
 		cfg.Timeouts.Reconnect = defaultReconnectTimeout
@@ -164,10 +165,10 @@ func New[S any](cfg Config[S]) *Handler[S] {
 		cfg.Limits.CmdBufferSize = defaultCmdBufferSize
 	}
 	if cfg.OnNavigate != nil {
-		cfg.Logger.Debug("OnNavigate composed into Handle")
+		slog.Debug("OnNavigate composed into Handle")
 	}
 	if len(cfg.Middleware) > 0 {
-		cfg.Logger.Debug("middleware chain applied", "count", len(cfg.Middleware))
+		slog.Debug("middleware chain applied", "count", len(cfg.Middleware))
 	}
 
 	mounts := buildAssetMounts(cfg.Assets, cfg.DevMode)

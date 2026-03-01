@@ -2,6 +2,7 @@ package poly
 
 import (
 	"context"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -77,7 +78,7 @@ func (h *Handler[S]) serve(srv *http.Server, start func() error, url string) err
 		errCh <- start()
 	}()
 
-	h.cfg.Logger.Info("listening", "url", url)
+	slog.Info("listening", "url", url)
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
@@ -89,12 +90,12 @@ func (h *Handler[S]) serve(srv *http.Server, start func() error, url string) err
 	case <-sigCh:
 	}
 
-	h.cfg.Logger.Info("shutting down")
+	slog.Info("shutting down")
 
 	// A second signal during shutdown forces an immediate exit.
 	go func() {
 		<-sigCh
-		h.cfg.Logger.Warn("forced exit")
+		slog.Warn("forced exit")
 		os.Exit(1)
 	}()
 
@@ -102,13 +103,13 @@ func (h *Handler[S]) serve(srv *http.Server, start func() error, url string) err
 	defer cancel()
 
 	if err := h.Drain(ctx); err != nil {
-		h.cfg.Logger.Warn("drain timed out, forcing shutdown")
+		slog.Warn("drain timed out, forcing shutdown")
 	}
 
 	srv.Shutdown(ctx)
 	h.Shutdown(ctx)
 
-	h.cfg.Logger.Info("shutdown complete")
+	slog.Info("shutdown complete")
 	signal.Stop(sigCh)
 	return nil
 }

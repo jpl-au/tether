@@ -2,7 +2,6 @@ package poly
 
 import (
 	"context"
-	"log/slog"
 	"testing"
 	"testing/synctest"
 
@@ -168,7 +167,6 @@ func TestSessionStructuralChange(t *testing.T) {
 			handle:    handle,
 			differ:    differ,
 			transport: mt,
-			logger:    slog.Default(),
 			events:    make(chan Event),
 			cmds:      make(chan func(), defaultCmdBufferSize),
 			fxCh:      make(chan func(*effects), defaultCmdBufferSize),

@@ -2,6 +2,7 @@ package poly
 
 import (
 	"context"
+	"log/slog"
 	"maps"
 	"sync"
 	"sync/atomic"
@@ -105,6 +106,8 @@ func (b *Bus[E]) subscribe(ctx context.Context, fn func(E), sessionID string) fu
 	b.subs.Store(subs)
 	b.wmu.Unlock()
 
+	slog.Debug("bus.subscribe", "session", sessionID, "subscribers", len(subs))
+
 	unsub := func() { b.remove(id) }
 	context.AfterFunc(ctx, unsub)
 	return unsub
@@ -133,6 +136,7 @@ func (b *Bus[E]) remove(id uint64) {
 // returns a consistent snapshot. Subscribers whose sessionID matches
 // senderID are skipped.
 func (b *Bus[E]) publish(event E, senderID string) {
+	slog.Debug("bus.publish", "sender", senderID, "subscribers", b.Len())
 	for _, s := range b.loadSubs() {
 		if s.ctx.Err() != nil {
 			continue // dead subscriber, skip

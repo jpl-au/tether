@@ -1,5 +1,7 @@
 package poly
 
+import "log/slog"
+
 // Observe subscribes a session to a shared [Value]. The callback
 // receives the shared value and the session's current state, and
 // returns the new state — same shape as [On].
@@ -19,6 +21,7 @@ package poly
 //	    return state
 //	})
 func Observe[V any, S any](val *Value[V], s *Session[S], fn func(V, S) S) {
+	slog.Debug("observe.subscribe", "session", s.ID())
 	// Subscribe and read the current value under the Value's lock so
 	// a concurrent Store cannot interleave and deliver the same value
 	// via both the subscriber callback and the initial Update below.

@@ -2,7 +2,6 @@ package poly
 
 import (
 	"context"
-	"log/slog"
 	"net/url"
 	"testing"
 	"testing/synctest"
@@ -67,7 +66,6 @@ func TestSessionNavigateEvent(t *testing.T) {
 			handle:    handle,
 			differ:    differ,
 			transport: mt,
-			logger:    slog.Default(),
 			events:    make(chan Event),
 			cmds:      make(chan func(), defaultCmdBufferSize),
 			fxCh:      make(chan func(*effects), defaultCmdBufferSize),
@@ -132,7 +130,6 @@ func TestSessionNavigateEventWithQuery(t *testing.T) {
 			handle:    handle,
 			differ:    differ,
 			transport: mt,
-			logger:    slog.Default(),
 			events:    make(chan Event),
 			cmds:      make(chan func(), defaultCmdBufferSize),
 			fxCh:      make(chan func(*effects), defaultCmdBufferSize),

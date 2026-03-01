@@ -2,6 +2,7 @@ package poly
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -26,12 +27,12 @@ func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 
 	defer func() {
 		if v := recover(); v != nil {
-			h.cfg.Logger.Error("panic in initial render", "panic", v)
+			slog.Error("panic in initial render", "panic", v)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		}
 	}()
 
-	h.cfg.Logger.Info("serving initial page")
+	slog.Info("serving initial page")
 
 	h.mu.Lock()
 	if h.cfg.Limits.MaxSessions > 0 && len(h.pending)+len(h.active)+len(h.disconnected) >= h.cfg.Limits.MaxSessions {
@@ -126,7 +127,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		h.active[id] = sess
 		h.mu.Unlock()
 
-		sess.logger.Debug("session reattached")
+		slog.Debug("session reattached", "session", id)
 		started = true
 		h.reattach(sess, transport)
 		return
@@ -187,7 +188,6 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		handle:           h.cfg.Handle,
 		differ:           differ,
 		transport:        transport,
-		logger:           h.cfg.Logger.WithGroup("session").With("id", id),
 		events:           make(chan Event),
 		cmds:             make(chan func(), h.cfg.Limits.CmdBufferSize),
 		fxCh:             make(chan func(*effects), h.cfg.Limits.CmdBufferSize),
@@ -199,7 +199,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		reconnectTimeout: h.cfg.Timeouts.Reconnect,
 	}
 	sess.lastActivity.Store(now.UnixNano())
-	sess.logger.Debug("session created")
+	slog.Debug("session created", "session", id)
 
 	if h.cfg.Push != nil && h.cfg.Push.Sender != nil {
 		sess.pushSender = h.cfg.Push.Sender
@@ -232,7 +232,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 	go sess.run()
 
 	if h.cfg.OnConnect != nil {
-		sess.logger.Debug("calling OnConnect")
+		slog.Debug("calling OnConnect", "session", sess.id)
 		h.cfg.OnConnect(sess)
 	}
 
@@ -240,7 +240,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		g.Add(sess)
 	}
 	if len(h.cfg.Groups) > 0 {
-		sess.logger.Debug("joined groups", "count", len(h.cfg.Groups))
+		slog.Debug("joined groups", "session", sess.id, "count", len(h.cfg.Groups))
 	}
 
 	// Start keep-alive writes for transports that need them (SSE).
@@ -250,5 +250,5 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 	}
 
 	go sess.readTransport(sess.events)
-	sess.logger.Debug("session ready")
+	slog.Debug("session ready", "session", sess.id)
 }

@@ -2,7 +2,6 @@ package poly
 
 import (
 	"context"
-	"log/slog"
 	"testing"
 	"testing/synctest"
 
@@ -95,7 +94,6 @@ func TestObserveCrossHandler(t *testing.T) {
 			handle:    func(_ PreSession, s dashState, _ Event) dashState { return s },
 			differ:    differB,
 			transport: &mockTransport{events: []Event{}},
-			logger:    slog.Default(),
 			events:    make(chan Event),
 			cmds:      make(chan func(), defaultCmdBufferSize),
 			fxCh:      make(chan func(*effects), defaultCmdBufferSize),
@@ -187,7 +185,6 @@ func TestObserveMultipleValues(t *testing.T) {
 			handle:    func(_ PreSession, s state, _ Event) state { return s },
 			differ:    differ,
 			transport: mt,
-			logger:    slog.Default(),
 			events:    make(chan Event),
 			cmds:      make(chan func(), defaultCmdBufferSize),
 			fxCh:      make(chan func(*effects), defaultCmdBufferSize),

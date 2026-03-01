@@ -3,6 +3,7 @@ package poly
 import (
 	"errors"
 	"io"
+	"log/slog"
 	"time"
 
 	jit "github.com/jpl-au/fluent-jit"
@@ -19,7 +20,7 @@ import (
 // continues processing commands and shutdown signals. This keeps the
 // session alive for reconnection.
 func (s *Session[S]) run() {
-	s.logger.Debug("run loop started")
+	slog.Debug("run loop started", "session", s.id)
 	s.loopRunning.Store(true)
 	defer close(s.loopDone)
 	defer s.cleanup()
@@ -56,7 +57,7 @@ func (s *Session[S]) run() {
 func (s *Session[S]) runCmd(cmd func()) {
 	defer func() {
 		if r := recover(); r != nil {
-			s.logger.Error("panic in command", "panic", r)
+			slog.Error("panic in command", "session", s.id, "panic", r)
 		}
 	}()
 	cmd()
@@ -66,13 +67,13 @@ func (s *Session[S]) runCmd(cmd func()) {
 // events channel. Its only job is to read and forward — it closes
 // the output channel on exit so the loop knows the transport is gone.
 func (s *Session[S]) readTransport(out chan<- Event) {
-	s.logger.Debug("readTransport started")
+	slog.Debug("readTransport started", "session", s.id)
 	defer close(out)
 	for {
 		ev, err := s.transport.ReceiveEvent()
 		if err != nil {
 			if !errors.Is(err, io.EOF) {
-				s.logger.Error("receive error", "err", err)
+				slog.Error("receive error", "session", s.id, "err", err)
 			}
 			return
 		}
@@ -100,7 +101,8 @@ func (s *Session[S]) exec(ev Event) {
 	fx := &effects{}
 	defer func() {
 		if r := recover(); r != nil {
-			s.logger.Error("panic in handler",
+			slog.Error("panic in handler",
+				"session", s.id,
 				"action", ev.Action,
 				"panic", r,
 			)
@@ -110,7 +112,7 @@ func (s *Session[S]) exec(ev Event) {
 		s.handling.Store(false)
 	}()
 
-	s.logger.Debug("event received", "action", ev.Action, "type", ev.Type)
+	slog.Debug("event received", "session", s.id, "action", ev.Action, "type", ev.Type)
 
 	// Phase 1: Handle — produce new state. Navigate events are
 	// dispatched to OnNavigate inside the composed Handle function
@@ -122,7 +124,7 @@ func (s *Session[S]) exec(ev Event) {
 
 	// Phase 3: State check — skip render if unchanged.
 	if s.equal != nil && s.equal(s.state, newState) {
-		s.logger.Debug("state unchanged, skipping render", "action", ev.Action)
+		slog.Debug("state unchanged, skipping render", "session", s.id, "action", ev.Action)
 		if fx.any() || ev.EventID != "" {
 			u := update{EventID: ev.EventID}
 			fx.merge(&u)
@@ -135,7 +137,7 @@ func (s *Session[S]) exec(ev Event) {
 	// Phase 4: Render + Diff.
 	tree := s.render(s.state)
 	patches, change := s.differ.Diff(tree)
-	s.logger.Debug("render complete", "patches", len(patches), "structural", change != nil)
+	slog.Debug("render complete", "session", s.id, "patches", len(patches), "structural", change != nil)
 
 	// Phase 5: Build and send update.
 	s.sendDiff(ev.EventID, patches, change, tree, fx)
@@ -145,11 +147,11 @@ func (s *Session[S]) exec(ev Event) {
 // closed, a disconnect timer is started (if reconnection is enabled),
 // and the onDisconnect callback fires for pool transitions.
 func (s *Session[S]) onTransportClose() {
-	s.logger.Debug("transport closed")
+	slog.Debug("transport closed", "session", s.id)
 	s.transport.Close()
 
 	if s.reconnectTimeout > 0 {
-		s.logger.Debug("disconnect timer started", "timeout", s.reconnectTimeout)
+		slog.Debug("disconnect timer started", "session", s.id, "timeout", s.reconnectTimeout)
 		s.disconnectTimer = time.AfterFunc(s.reconnectTimeout, func() {
 			s.stop()
 		})
@@ -179,7 +181,8 @@ func (s *Session[S]) cleanup() {
 func (s *Session[S]) sendDiff(eventID string, patches []jit.Patch, change *jit.StructuralChange, tree node.Node, fx *effects) {
 	if change != nil {
 		html := s.differ.Render(tree)
-		s.logger.Warn("structural change, sending root morph",
+		slog.Warn("structural change, sending root morph",
+			"session", s.id,
 			"change", change.String(),
 			"bytes", len(html),
 			"tip", "wrap conditional elements in a keyed container to scope this morph",
@@ -236,11 +239,11 @@ func (s *Session[S]) send(u update) {
 	}
 	data, err := marshalUpdate(u)
 	if err != nil {
-		s.logger.Error("encode update error", "err", err)
+		slog.Error("encode update error", "session", s.id, "err", err)
 		return
 	}
 	if err := s.transport.Send(data); err != nil {
-		s.logger.Error("send update error", "err", err)
+		slog.Error("send update error", "session", s.id, "err", err)
 	}
 }
 
