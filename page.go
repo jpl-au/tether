@@ -5,6 +5,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 
@@ -159,7 +160,7 @@ func (p *pageHandler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (p *pageHandler[S]) serveGET(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		if v := recover(); v != nil {
-			slog.Error("panic in page render", "panic", v)
+			slog.Error("panic in page render", "panic", v, "path", r.URL.Path, "remote", r.RemoteAddr)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		}
 	}()
@@ -203,7 +204,7 @@ func (p *pageHandler[S]) servePOST(w http.ResponseWriter, r *http.Request) {
 
 	defer func() {
 		if v := recover(); v != nil {
-			slog.Error("panic in page handler", "panic", v)
+			slog.Error("panic in page handler", "panic", v, "path", r.URL.Path, "remote", r.RemoteAddr)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		}
 	}()
@@ -226,9 +227,14 @@ func (p *pageHandler[S]) servePOST(w http.ResponseWriter, r *http.Request) {
 	fx := &effects{}
 	cs := &captureSession{id: "", fx: fx}
 	if ev.Type == event.Navigate && p.cfg.OnNavigate != nil {
-		// Navigate events are routed to OnNavigate only, matching
-		// the live session behaviour in Session.exec().
-		params := Params{Path: r.URL.Path, Query: r.URL.Query()}
+		// Navigate events carry the target path in event data, not
+		// in the request URL (the client always POSTs to its
+		// endpoint). Read path and search from ev.Data to match
+		// the live handler in handler.go.
+		params := Params{Path: ev.Data["path"]}
+		if search := ev.Data["search"]; search != "" {
+			params.Query, _ = url.ParseQuery(strings.TrimPrefix(search, "?"))
+		}
 		state = p.cfg.OnNavigate(cs, state, params)
 	} else {
 		// For all other events, derive state from the URL first
@@ -252,7 +258,7 @@ func (p *pageHandler[S]) servePOST(w http.ResponseWriter, r *http.Request) {
 
 	data, err := marshalUpdate(u)
 	if err != nil {
-		slog.Error("encode response error", "err", err)
+		slog.Error("encode response error", "err", err, "path", r.URL.Path, "remote", r.RemoteAddr)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}

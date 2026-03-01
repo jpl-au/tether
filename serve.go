@@ -27,12 +27,12 @@ func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 
 	defer func() {
 		if v := recover(); v != nil {
-			slog.Error("panic in initial render", "panic", v)
+			slog.Error("panic in initial render", "panic", v, "path", r.URL.Path, "remote", r.RemoteAddr)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		}
 	}()
 
-	slog.Info("serving initial page")
+	slog.Info("serving initial page", "path", r.URL.Path, "remote", r.RemoteAddr)
 
 	h.mu.Lock()
 	if h.cfg.Limits.MaxSessions > 0 && len(h.pending)+len(h.active)+len(h.disconnected) >= h.cfg.Limits.MaxSessions {

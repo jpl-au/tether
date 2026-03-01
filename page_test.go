@@ -426,8 +426,8 @@ func TestPagePOSTNavigateSkipsHandle(t *testing.T) {
 		},
 	})
 
-	body := `{"type":"navigate","action":"","data":{"path":"/app","search":"?count=5"},"event_id":"1"}`
-	req := httptest.NewRequest("POST", "/app?count=5", strings.NewReader(body))
+	body := `{"type":"navigate","action":"","data":{"path":"/app","search":"count=5"},"event_id":"1"}`
+	req := httptest.NewRequest("POST", "/app", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
