@@ -1,6 +1,7 @@
 package poly
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -105,12 +106,26 @@ func New[S any](cfg Config[S]) *Handler[S] {
 		cfg.Handle = chain(cfg.Handle, cfg.Middleware)
 	}
 
-	if cfg.Logger == nil {
-		cfg.Logger = slog.Default()
-	}
 	if !cfg.DevMode && os.Getenv("POLY_DEV") != "" {
 		cfg.DevMode = true
-		cfg.Logger.Info("poly: dev mode enabled via POLY_DEV environment variable")
+	}
+	if cfg.Logger == nil {
+		level := slog.LevelInfo
+		if cfg.DevMode {
+			level = slog.LevelDebug
+		}
+		cfg.Logger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+			Level: level,
+		}))
+	} else if cfg.DevMode && !cfg.Logger.Enabled(context.Background(), slog.LevelDebug) {
+		// DevMode requires debug-level logging. The provided logger
+		// filters debug messages, so replace it with one that doesn't.
+		cfg.Logger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+			Level: slog.LevelDebug,
+		}))
+	}
+	if cfg.DevMode {
+		cfg.Logger.Info("poly: dev mode enabled")
 	}
 	if cfg.Timeouts.Reconnect == 0 {
 		cfg.Timeouts.Reconnect = defaultReconnectTimeout
@@ -148,6 +163,13 @@ func New[S any](cfg Config[S]) *Handler[S] {
 	if cfg.Limits.CmdBufferSize == 0 {
 		cfg.Limits.CmdBufferSize = defaultCmdBufferSize
 	}
+	if cfg.OnNavigate != nil {
+		cfg.Logger.Debug("OnNavigate composed into Handle")
+	}
+	if len(cfg.Middleware) > 0 {
+		cfg.Logger.Debug("middleware chain applied", "count", len(cfg.Middleware))
+	}
+
 	mounts := buildAssetMounts(cfg.Assets, cfg.DevMode)
 
 	h := &Handler[S]{

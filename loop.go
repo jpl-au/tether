@@ -19,6 +19,7 @@ import (
 // continues processing commands and shutdown signals. This keeps the
 // session alive for reconnection.
 func (s *Session[S]) run() {
+	s.logger.Debug("run loop started")
 	defer close(s.loopDone)
 	defer s.cleanup()
 
@@ -64,6 +65,7 @@ func (s *Session[S]) runCmd(cmd func()) {
 // events channel. Its only job is to read and forward — it closes
 // the output channel on exit so the loop knows the transport is gone.
 func (s *Session[S]) readTransport(out chan<- Event) {
+	s.logger.Debug("readTransport started")
 	defer close(out)
 	for {
 		ev, err := s.transport.ReceiveEvent()
@@ -107,6 +109,8 @@ func (s *Session[S]) exec(ev Event) {
 		s.handling.Store(false)
 	}()
 
+	s.logger.Debug("event received", "action", ev.Action, "type", ev.Type)
+
 	// Phase 1: Handle — produce new state. Navigate events are
 	// dispatched to OnNavigate inside the composed Handle function
 	// (see handler.go), so middleware applies to all event types.
@@ -117,6 +121,7 @@ func (s *Session[S]) exec(ev Event) {
 
 	// Phase 3: State check — skip render if unchanged.
 	if s.equal != nil && s.equal(s.state, newState) {
+		s.logger.Debug("state unchanged, skipping render", "action", ev.Action)
 		if fx.any() || ev.EventID != "" {
 			u := update{EventID: ev.EventID}
 			fx.merge(&u)
@@ -129,6 +134,7 @@ func (s *Session[S]) exec(ev Event) {
 	// Phase 4: Render + Diff.
 	tree := s.render(s.state)
 	patches, change := s.differ.Diff(tree)
+	s.logger.Debug("render complete", "patches", len(patches), "structural", change != nil)
 
 	// Phase 5: Build and send update.
 	s.sendDiff(ev.EventID, patches, change, tree, fx)
@@ -138,9 +144,11 @@ func (s *Session[S]) exec(ev Event) {
 // closed, a disconnect timer is started (if reconnection is enabled),
 // and the onDisconnect callback fires for pool transitions.
 func (s *Session[S]) onTransportClose() {
+	s.logger.Debug("transport closed")
 	s.transport.Close()
 
 	if s.reconnectTimeout > 0 {
+		s.logger.Debug("disconnect timer started", "timeout", s.reconnectTimeout)
 		s.disconnectTimer = time.AfterFunc(s.reconnectTimeout, func() {
 			s.stop()
 		})

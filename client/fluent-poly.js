@@ -1304,8 +1304,16 @@ window.Poly.signals = window.Poly.signals || {};
       return id;
     }
 
-    if (!ws || ws.readyState !== WebSocket.OPEN) return null;
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      if (devMode) {
+        console.warn("fluent-poly: ws not open", "readyState", ws ? ws.readyState : "null", "connectionMode", connectionMode);
+      }
+      return null;
+    }
     ws.send(payload);
+    if (devMode) {
+      console.log("fluent-poly: ws.send", action);
+    }
     return id;
   }
 
