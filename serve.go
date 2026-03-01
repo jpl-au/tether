@@ -126,6 +126,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		h.active[id] = sess
 		h.mu.Unlock()
 
+		sess.logger.Debug("reattaching to disconnected session")
 		started = true
 		h.reattach(sess, transport)
 		return
@@ -198,6 +199,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		reconnectTimeout: h.cfg.Timeouts.Reconnect,
 	}
 	sess.lastActivity.Store(now.UnixNano())
+	sess.logger.Debug("session created")
 
 	if h.cfg.Push != nil && h.cfg.Push.Sender != nil {
 		sess.pushSender = h.cfg.Push.Sender
@@ -221,12 +223,24 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 
 	h.wireDisconnect(sess)
 
+	// Start the command loop before OnConnect so that State(),
+	// Update(), Signal(), and other methods that route through the
+	// cmds channel work inside the callback. Transport reading is
+	// deferred until after OnConnect to guarantee that no client
+	// events are processed before subscriptions are set up.
+	started = true
+	go sess.run()
+
 	if h.cfg.OnConnect != nil {
+		sess.logger.Debug("calling OnConnect")
 		h.cfg.OnConnect(sess)
 	}
 
 	for _, g := range h.cfg.Groups {
 		g.Add(sess)
+	}
+	if len(h.cfg.Groups) > 0 {
+		sess.logger.Debug("joined groups", "count", len(h.cfg.Groups))
 	}
 
 	// Start keep-alive writes for transports that need them (SSE).
@@ -235,7 +249,5 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		hb.StartHeartbeat(h.cfg.Timeouts.Heartbeat)
 	}
 
-	started = true
 	go sess.readTransport(sess.events)
-	go sess.run()
 }
