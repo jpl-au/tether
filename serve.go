@@ -251,4 +251,11 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 
 	go sess.readTransport(sess.events)
 	slog.Debug("session ready", "session", sess.id)
+
+	// Block until the session loop exits. The HTTP handler goroutine
+	// must stay alive to keep r.Context() valid — both the WebSocket
+	// and SSE transports use it for reads and writes. If we returned
+	// here, net/http would cancel the context and kill the connection
+	// immediately.
+	<-sess.loopDone
 }
