@@ -126,7 +126,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		h.active[id] = sess
 		h.mu.Unlock()
 
-		sess.logger.Info("session reattached")
+		sess.logger.Debug("session reattached")
 		started = true
 		h.reattach(sess, transport)
 		return
@@ -250,5 +250,5 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 	}
 
 	go sess.readTransport(sess.events)
-	sess.logger.Info("session ready")
+	sess.logger.Debug("session ready")
 }
