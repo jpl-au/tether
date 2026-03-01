@@ -13,9 +13,18 @@ import (
 // When called from outside Handle, it performs a synchronous read
 // through the command channel so the value reflects any prior queued
 // updates.
+//
+// If the command loop has not started yet (e.g. during OnConnect),
+// the state is returned directly. This is safe because no concurrent
+// mutations can occur before the loop is running.
 func (s *Session[S]) State() S {
 	if s.handling.Load() {
 		return s.stateSnap.Load().(S)
+	}
+	if !s.loopRunning.Load() {
+		// Loop not started — return state directly to avoid
+		// deadlocking on a channel nobody is draining.
+		return s.state
 	}
 	ch := make(chan S, 1)
 	select {

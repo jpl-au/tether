@@ -72,6 +72,10 @@ type Session[S any] struct {
 	lastActivity atomic.Int64 // UnixNano
 	createdAt    time.Time
 
+	// loopRunning is set to true when run() enters its select loop.
+	// State() checks this to avoid deadlocking when called before
+	// the loop has started (e.g. during OnConnect).
+	loopRunning atomic.Bool
 	// handling is true while the loop goroutine is inside exec() or
 	// Update. Used by State() to choose the fast path (return the
 	// atomic snapshot) instead of routing through the command channel,

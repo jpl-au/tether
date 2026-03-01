@@ -20,6 +20,7 @@ import (
 // session alive for reconnection.
 func (s *Session[S]) run() {
 	s.logger.Debug("run loop started")
+	s.loopRunning.Store(true)
 	defer close(s.loopDone)
 	defer s.cleanup()
 
