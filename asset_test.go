@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 	"testing/fstest"
+
+	"github.com/jpl-au/fluent-poly/mode"
 )
 
 func testAssetFS() *Asset {
@@ -152,6 +154,7 @@ func TestAssetAutoMount(t *testing.T) {
 	}
 
 	handler := New(Config[counterState]{
+		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
@@ -207,6 +210,7 @@ func TestAssetCacheHeadersProduction(t *testing.T) {
 	}
 
 	handler := New(Config[counterState]{
+		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
@@ -238,6 +242,7 @@ func TestAssetCacheHeadersDevMode(t *testing.T) {
 	}
 
 	handler := New(Config[counterState]{
+		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
@@ -273,6 +278,7 @@ func TestMultipleAssets(t *testing.T) {
 	}
 
 	handler := New(Config[counterState]{
+		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,

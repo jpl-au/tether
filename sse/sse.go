@@ -9,7 +9,8 @@
 // by the poly handler.
 //
 // Wire up by passing sse.Upgrade() as the Fallback (or Upgrade) field
-// in [poly.Config] and setting Mode to [mode.SSE] or [mode.Auto].
+// in [poly.Config] and setting Mode to [mode.ServerSentEvents] or
+// [mode.Both].
 package sse
 
 import (
@@ -27,7 +28,7 @@ import (
 var heartbeatMsg = []byte(": heartbeat\n\n")
 
 // Upgrade returns an upgrade function for use in [poly.Config].Fallback
-// (or Upgrade when Mode is mode.SSE). When the poly handler receives a
+// (or Upgrade when Mode is mode.ServerSentEvents). When the poly handler receives a
 // GET with Accept: text/event-stream, it calls this function to
 // establish the SSE stream. The stream stays open for the lifetime of
 // the session; server updates are written as SSE "data" lines.

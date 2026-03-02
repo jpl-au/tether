@@ -74,7 +74,7 @@ func (g *Group[S]) Add(s *Session[S]) {
 	g.wmu.Unlock()
 
 	if !exists {
-		slog.Debug("group.Add", "session", s.id, "members", len(g.loadSessions()))
+		slog.Debug("group.Add", "session", s.id, "endpoint", s.endpoint, "members", len(g.loadSessions()))
 		if onJoin != nil {
 			onJoin(s)
 		}
@@ -102,7 +102,7 @@ func (g *Group[S]) Remove(s *Session[S]) {
 	g.wmu.Unlock()
 
 	if exists {
-		slog.Debug("group.Remove", "session", s.id, "members", len(g.loadSessions()))
+		slog.Debug("group.Remove", "session", s.id, "endpoint", s.endpoint, "members", len(g.loadSessions()))
 		if onLeave != nil {
 			onLeave(s)
 		}

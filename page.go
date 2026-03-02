@@ -71,12 +71,18 @@ type PageConfig[S any] struct {
 	// [Config].Assets for details. Optional.
 	Assets []*Asset
 
-	// DevMode sets Cache-Control: no-store and emits the
-	// data-poly-dev attribute. Enable via this field or the POLY_DEV
-	// environment variable.
+	// DevMode enables development conveniences: debug logging by
+	// default and Cache-Control: no-store on all responses. Enable
+	// via this field or the POLY_DEV environment variable.
 	DevMode bool
 
-	// Logger is used for handler errors. Defaults to slog.Default().
+	// LogJSON selects JSON output for the default logger instead of
+	// text. Only applies when Logger is nil.
+	LogJSON bool
+
+	// Logger is set as the slog default via slog.SetDefault. When
+	// nil, the framework creates a text (or JSON, see LogJSON)
+	// handler at INFO level (DEBUG in DevMode).
 	Logger *slog.Logger
 }
 
@@ -105,9 +111,12 @@ func Page[S any](cfg PageConfig[S]) http.Handler {
 		if cfg.DevMode {
 			level = slog.LevelDebug
 		}
-		cfg.Logger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
-			Level: level,
-		}))
+		opts := &slog.HandlerOptions{Level: level}
+		if cfg.LogJSON {
+			cfg.Logger = slog.New(slog.NewJSONHandler(os.Stderr, opts))
+		} else {
+			cfg.Logger = slog.New(slog.NewTextHandler(os.Stderr, opts))
+		}
 	}
 	slog.SetDefault(cfg.Logger)
 	if cfg.Limits.MaxEventBytes == 0 {
@@ -178,7 +187,7 @@ func (p *pageHandler[S]) serveGET(w http.ResponseWriter, r *http.Request) {
 	content := &polyBody{
 		html:              html,
 		endpoint:          r.URL.Path,
-		transport:         mode.Fetch,
+		transport:         mode.HTTP,
 		defaultDebounce:   p.cfg.Client.DefaultDebounce,
 		transitionTimeout: p.cfg.Client.TransitionTimeout,
 		devMode:           p.cfg.DevMode,

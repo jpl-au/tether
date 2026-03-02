@@ -38,7 +38,7 @@ func (h *Handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// header. Handle them before the mode switch so they work with
 	// all transport modes.
 	if r.Method == "POST" && r.Header.Get("X-Poly-Upload") != "" {
-		slog.Debug("upload received", "session", r.Header.Get("X-Poly-Session"))
+		slog.Debug("upload received", "session", r.Header.Get("X-Poly-Session"), "path", r.URL.Path, "remote", r.RemoteAddr)
 		h.handleUpload(w, r)
 		return
 	}
@@ -53,7 +53,7 @@ func (h *Handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	switch h.cfg.Mode {
-	case mode.SSE:
+	case mode.ServerSentEvents:
 		if strings.Contains(r.Header.Get("Accept"), "text/event-stream") {
 			if !h.originAllowed(r) {
 				http.Error(w, "origin not allowed", http.StatusForbidden)
@@ -67,7 +67,7 @@ func (h *Handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-	case mode.Auto:
+	case mode.Both:
 		if r.Header.Get("Upgrade") == "websocket" {
 			if !h.originAllowed(r) {
 				http.Error(w, "origin not allowed", http.StatusForbidden)
@@ -193,7 +193,7 @@ func (h *Handler[S]) handlePostEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	slog.Debug("POST event", "session", id, "action", ev.Action, "type", ev.Type)
+	slog.Debug("POST event", "session", id, "action", ev.Action, "type", ev.Type, "path", r.URL.Path, "remote", r.RemoteAddr)
 
 	// Non-blocking send: if the buffer has room the event is accepted
 	// immediately. If not, check whether the session is closing (410)

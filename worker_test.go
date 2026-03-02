@@ -10,6 +10,7 @@ import (
 	"testing/fstest"
 	"time"
 
+	"github.com/jpl-au/fluent-poly/mode"
 	"github.com/jpl-au/fluent-poly/push"
 )
 
@@ -65,6 +66,7 @@ func TestClientPrecache(t *testing.T) {
 	}
 
 	handler := New(Config[counterState]{
+		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
@@ -272,6 +274,7 @@ func TestHandlePushSubscribe(t *testing.T) {
 	ch := make(chan result, 1)
 
 	handler := New(Config[counterState]{
+		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
@@ -332,6 +335,7 @@ func TestHandlePushSubscribe(t *testing.T) {
 
 func TestHandlePushSubscribeNoPush(t *testing.T) {
 	handler := New(Config[counterState]{
+		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
@@ -352,6 +356,7 @@ func TestHandlePushSubscribeNoPush(t *testing.T) {
 
 func TestHandlePushSubscribeMissingSession(t *testing.T) {
 	handler := New(Config[counterState]{
+		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
@@ -376,6 +381,7 @@ func TestHandlePushSubscribeMissingSession(t *testing.T) {
 
 func TestHandlePushSubscribeUnknownSession(t *testing.T) {
 	handler := New(Config[counterState]{
+		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
@@ -436,6 +442,7 @@ func TestDevModeEnvVar(t *testing.T) {
 	t.Setenv("POLY_DEV", "1")
 
 	handler := New(Config[counterState]{
+		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
@@ -451,6 +458,7 @@ func TestDevModeBoolOverridesEnv(t *testing.T) {
 	t.Setenv("POLY_DEV", "")
 
 	handler := New(Config[counterState]{
+		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
@@ -465,6 +473,7 @@ func TestDevModeBoolOverridesEnv(t *testing.T) {
 
 func TestDevModeCacheControl(t *testing.T) {
 	handler := New(Config[counterState]{
+		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
@@ -483,6 +492,7 @@ func TestDevModeCacheControl(t *testing.T) {
 
 func TestDevModeNoCacheControlInProduction(t *testing.T) {
 	handler := New(Config[counterState]{
+		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
@@ -500,6 +510,7 @@ func TestDevModeNoCacheControlInProduction(t *testing.T) {
 
 func TestDevModeInitialPageHasAttribute(t *testing.T) {
 	handler := New(Config[counterState]{
+		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
@@ -519,6 +530,7 @@ func TestDevModeInitialPageHasAttribute(t *testing.T) {
 // newTestHandler creates a Handler with default test configuration.
 func newTestHandler() *Handler[counterState] {
 	return New(Config[counterState]{
+		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,

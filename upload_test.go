@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/jpl-au/fluent-poly/mode"
 )
 
 func TestHandleUploadNotConfigured(t *testing.T) {
@@ -26,6 +28,7 @@ func TestHandleUploadNotConfigured(t *testing.T) {
 
 func TestHandleUploadMissingSession(t *testing.T) {
 	handler := New(Config[counterState]{
+		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
@@ -48,6 +51,7 @@ func TestHandleUploadMissingSession(t *testing.T) {
 
 func TestHandleUploadUnknownSession(t *testing.T) {
 	handler := New(Config[counterState]{
+		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
@@ -74,6 +78,7 @@ func TestHandleUploadSuccess(t *testing.T) {
 	done := make(chan struct{})
 
 	handler := New(Config[counterState]{
+		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
@@ -127,6 +132,7 @@ func TestHandleUploadSuccess(t *testing.T) {
 
 func TestHandleUploadMIMEReject(t *testing.T) {
 	handler := New(Config[counterState]{
+		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
@@ -163,6 +169,7 @@ func TestHandleUploadMIMEAcceptWildcard(t *testing.T) {
 	done := make(chan struct{})
 
 	handler := New(Config[counterState]{
+		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,

@@ -20,7 +20,7 @@ import (
 // continues processing commands and shutdown signals. This keeps the
 // session alive for reconnection.
 func (s *Session[S]) run() {
-	slog.Debug("run loop started", "session", s.id)
+	slog.Debug("run loop started", "session", s.id, "endpoint", s.endpoint)
 	s.loopRunning.Store(true)
 	defer close(s.loopDone)
 	defer s.cleanup()
@@ -57,7 +57,12 @@ func (s *Session[S]) run() {
 func (s *Session[S]) runCmd(cmd func()) {
 	defer func() {
 		if r := recover(); r != nil {
-			slog.Error("panic in command", "session", s.id, "panic", r)
+			slog.Error("panic in command",
+				"session", s.id,
+				"endpoint", s.endpoint,
+				"url", s.lastURL,
+				"panic", r,
+			)
 		}
 	}()
 	cmd()
@@ -67,13 +72,18 @@ func (s *Session[S]) runCmd(cmd func()) {
 // events channel. Its only job is to read and forward — it closes
 // the output channel on exit so the loop knows the transport is gone.
 func (s *Session[S]) readTransport(out chan<- Event) {
-	slog.Debug("readTransport started", "session", s.id)
+	slog.Debug("readTransport started", "session", s.id, "endpoint", s.endpoint)
 	defer close(out)
 	for {
 		ev, err := s.transport.ReceiveEvent()
 		if err != nil {
 			if !errors.Is(err, io.EOF) {
-				slog.Error("receive error", "session", s.id, "err", err)
+				slog.Error("transport receive failed",
+					"session", s.id,
+					"endpoint", s.endpoint,
+					"url", s.lastURL,
+					"err", err,
+				)
 			}
 			return
 		}
@@ -103,7 +113,10 @@ func (s *Session[S]) exec(ev Event) {
 		if r := recover(); r != nil {
 			slog.Error("panic in handler",
 				"session", s.id,
+				"endpoint", s.endpoint,
+				"url", s.lastURL,
 				"action", ev.Action,
+				"type", ev.Type,
 				"panic", r,
 			)
 			// Discard any effects enqueued during the panicked handler.
@@ -112,7 +125,12 @@ func (s *Session[S]) exec(ev Event) {
 		s.handling.Store(false)
 	}()
 
-	slog.Debug("event received", "session", s.id, "action", ev.Action, "type", ev.Type)
+	slog.Debug("event received",
+		"session", s.id,
+		"endpoint", s.endpoint,
+		"action", ev.Action,
+		"type", ev.Type,
+	)
 
 	// Phase 1: Handle — produce new state. Navigate events are
 	// dispatched to OnNavigate inside the composed Handle function
@@ -124,7 +142,10 @@ func (s *Session[S]) exec(ev Event) {
 
 	// Phase 3: State check — skip render if unchanged.
 	if s.equal != nil && s.equal(s.state, newState) {
-		slog.Debug("state unchanged, skipping render", "session", s.id, "action", ev.Action)
+		slog.Debug("state unchanged, skipping render",
+			"session", s.id,
+			"action", ev.Action,
+		)
 		if fx.any() || ev.EventID != "" {
 			u := update{EventID: ev.EventID}
 			fx.merge(&u)
@@ -137,21 +158,35 @@ func (s *Session[S]) exec(ev Event) {
 	// Phase 4: Render + Diff.
 	tree := s.render(s.state)
 	patches, change := s.differ.Diff(tree)
-	slog.Debug("render complete", "session", s.id, "patches", len(patches), "structural", change != nil)
+	slog.Debug("render complete",
+		"session", s.id,
+		"patches", len(patches),
+		"structural", change != nil,
+	)
 
 	// Phase 5: Build and send update.
 	s.sendDiff(ev.EventID, patches, change, tree, fx)
 }
 
 // onTransportClose handles transport disconnection. The transport is
-// closed, a disconnect timer is started (if reconnection is enabled),
-// and the onDisconnect callback fires for pool transitions.
+// closed and nilled so send() silently drops updates during the
+// reconnect window. A disconnect timer is started (if reconnection is
+// enabled) and the onDisconnect callback fires for pool transitions.
 func (s *Session[S]) onTransportClose() {
-	slog.Debug("transport closed", "session", s.id)
+	slog.Info("transport closed",
+		"session", s.id,
+		"endpoint", s.endpoint,
+		"url", s.lastURL,
+	)
 	s.transport.Close()
+	s.transport = nil
 
 	if s.reconnectTimeout > 0 {
-		slog.Debug("disconnect timer started", "session", s.id, "timeout", s.reconnectTimeout)
+		slog.Debug("disconnect timer started",
+			"session", s.id,
+			"endpoint", s.endpoint,
+			"timeout", s.reconnectTimeout,
+		)
 		s.disconnectTimer = time.AfterFunc(s.reconnectTimeout, func() {
 			s.stop()
 		})
@@ -171,7 +206,9 @@ func (s *Session[S]) cleanup() {
 	if s.disconnectTimer != nil {
 		s.disconnectTimer.Stop()
 	}
-	s.transport.Close()
+	if s.transport != nil {
+		s.transport.Close()
+	}
 }
 
 // sendDiff is the render-diff-send pipeline extracted from exec and
@@ -183,6 +220,8 @@ func (s *Session[S]) sendDiff(eventID string, patches []jit.Patch, change *jit.S
 		html := s.differ.Render(tree)
 		slog.Warn("structural change, sending root morph",
 			"session", s.id,
+			"endpoint", s.endpoint,
+			"url", s.lastURL,
 			"change", change.String(),
 			"bytes", len(html),
 			"tip", "wrap conditional elements in a keyed container to scope this morph",
@@ -239,11 +278,22 @@ func (s *Session[S]) send(u update) {
 	}
 	data, err := marshalUpdate(u)
 	if err != nil {
-		slog.Error("encode update error", "session", s.id, "err", err)
+		slog.Error("failed to encode update",
+			"session", s.id,
+			"endpoint", s.endpoint,
+			"url", s.lastURL,
+			"err", err,
+		)
 		return
 	}
 	if err := s.transport.Send(data); err != nil {
-		slog.Error("send update error", "session", s.id, "err", err)
+		slog.Error("failed to send update to transport",
+			"session", s.id,
+			"endpoint", s.endpoint,
+			"url", s.lastURL,
+			"bytes", len(data),
+			"err", err,
+		)
 	}
 }
 

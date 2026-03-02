@@ -7,6 +7,7 @@ import (
 	"testing/synctest"
 
 	"github.com/jpl-au/fluent-poly/event"
+	"github.com/jpl-au/fluent-poly/mode"
 )
 
 func TestSessionHandlePanicDoesNotKillSession(t *testing.T) {
@@ -73,6 +74,7 @@ func TestSessionUpdatePanicDoesNotCrashCaller(t *testing.T) {
 
 func TestServeInitialPagePanicDoesNotCrashProcess(t *testing.T) {
 	handler := New(Config[counterState]{
+		Mode:    mode.WebSocket,
 		Upgrade: stubUpgrade,
 		InitialState: func(r *http.Request) counterState {
 			panic("boom in InitialState")

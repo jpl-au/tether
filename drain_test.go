@@ -7,10 +7,13 @@ import (
 	"testing"
 	"testing/synctest"
 	"time"
+
+	"github.com/jpl-au/fluent-poly/mode"
 )
 
 func TestDrainRejectsNewPages(t *testing.T) {
 	handler := New(Config[counterState]{
+		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
@@ -30,6 +33,7 @@ func TestDrainRejectsNewPages(t *testing.T) {
 
 func TestDrainAllowsReconnect(t *testing.T) {
 	handler := New(Config[counterState]{
+		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,

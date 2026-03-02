@@ -2,26 +2,27 @@
 
 ## Transport mode
 
-Control which transports the handler accepts with the `Mode` field:
+Control which transports the handler accepts with the `Mode` field.
+When `Mode` is not set, it defaults to `mode.Both`.
 
 ```go
-// WebSocket only (default — Mode can be omitted)
+// Default (mode.Both) — WebSocket with SSE fallback
 poly.New(poly.Config[State]{
+    Upgrade:  ws.Upgrade(),
+    Fallback: sse.Upgrade(),
+    // ...
+})
+
+// WebSocket only
+poly.New(poly.Config[State]{
+    Mode:    mode.WebSocket,
     Upgrade: ws.Upgrade(),
     // ...
 })
 
 // SSE only
 poly.New(poly.Config[State]{
-    Mode:     poly.SSEOnly,
-    Fallback: sse.Upgrade(),
-    // ...
-})
-
-// WebSocket with SSE fallback
-poly.New(poly.Config[State]{
-    Mode:     poly.WebSocketWithFallback,
-    Upgrade:  ws.Upgrade(),
+    Mode:     mode.ServerSentEvents,
     Fallback: sse.Upgrade(),
     // ...
 })
@@ -29,7 +30,7 @@ poly.New(poly.Config[State]{
 
 Same wire format, same API regardless of transport.
 
-SSE connections send keep-alive comments at `HeartbeatInterval` (default 20s) to prevent proxies from closing idle connections.
+SSE connections send keep-alive comments at `Timeouts.Heartbeat` (default 20s) to prevent proxies from closing idle connections.
 
 ## Service worker
 

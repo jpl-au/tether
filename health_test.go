@@ -3,10 +3,13 @@ package poly
 import (
 	"net/http"
 	"testing"
+
+	"github.com/jpl-au/fluent-poly/mode"
 )
 
 func TestHealthEmpty(t *testing.T) {
 	handler := New(Config[counterState]{
+		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
@@ -22,6 +25,7 @@ func TestHealthEmpty(t *testing.T) {
 
 func TestHealthCountsPending(t *testing.T) {
 	handler := New(Config[counterState]{
+		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
@@ -41,6 +45,7 @@ func TestHealthCountsPending(t *testing.T) {
 
 func TestHealthCountsActive(t *testing.T) {
 	handler := New(Config[counterState]{
+		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
@@ -60,6 +65,7 @@ func TestHealthCountsActive(t *testing.T) {
 
 func TestHealthCountsDisconnected(t *testing.T) {
 	handler := New(Config[counterState]{
+		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,

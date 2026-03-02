@@ -73,7 +73,7 @@ trapping, and graceful shutdown:
 h := poly.New(poly.Config[State]{
     Upgrade:      ws.Upgrade(),
     Fallback:     sse.Upgrade(),
-    Mode:         mode.Auto,
+    Mode:         mode.Both,
     InitialState: func(r *http.Request) State { return State{} },
     Render:       render,
     Handle:       handle,

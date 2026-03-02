@@ -66,13 +66,27 @@ Or set the `POLY_DEV` environment variable without changing code:
 POLY_DEV=1 go run .
 ```
 
-Dev mode does three things:
+Dev mode does the following:
 
 1. **No service worker** — unregisters any existing worker and skips registration, so you always get fresh assets
-2. **Page reload on disconnect** — when the server restarts, the page reloads automatically instead of attempting to reconnect to a stale session
-3. **No caching** — sets `Cache-Control: no-store` on the initial page response
+2. **Graceful reconnect + reload** — when the server goes away, the page stays visible with a "Reconnecting…" bar. Once the server comes back, the page reloads to pick up fresh code
+3. **No caching** — sets `Cache-Control: no-store` on all responses
+4. **Debug logging** — the default logger uses DEBUG level (when no Logger is provided)
+5. **Visual flash** — morphed DOM elements flash with a blue outline
+6. **Console logging** — events, patches, and morphs are logged to the browser console
 
 The `DevMode` bool takes precedence. When it's false (the default), the `POLY_DEV` environment variable is checked as a fallback.
+
+### Logger format
+
+By default the framework creates a text logger. Set `LogJSON: true` for structured JSON output:
+
+```go
+poly.New(poly.Config[State]{
+    LogJSON: true,
+    // ...
+})
+```
 
 ## Error reporting
 

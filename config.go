@@ -23,16 +23,16 @@ import (
 type Config[S any] struct {
 	// Upgrade converts an HTTP request into a Transport connection.
 	// Use ws.Upgrade for WebSocket connections. Required unless Mode
-	// is [mode.SSE].
+	// is [mode.ServerSentEvents].
 	Upgrade func(w http.ResponseWriter, r *http.Request) (Transport, error)
 
 	// Fallback converts an HTTP request into a Transport connection
-	// using SSE+POST. Required when Mode is [mode.SSE] or
-	// [mode.Auto]. Use sse.Upgrade() for SSE+POST.
+	// using SSE+POST. Required when Mode is [mode.ServerSentEvents]
+	// or [mode.Both]. Use sse.Upgrade() for SSE+POST.
 	Fallback func(w http.ResponseWriter, r *http.Request) (Transport, error)
 
 	// Mode selects which transports the handler accepts. Defaults to
-	// [mode.WebSocket]. See [mode] package for options.
+	// [mode.Both] when not set. See [mode] package for options.
 	Mode mode.Transport
 
 	// InitialState returns the starting state for a new session.
@@ -119,7 +119,9 @@ type Config[S any] struct {
 	// div and scripts only), which puts the browser in quirks mode.
 	Layout func(state S, content node.Node) node.Node
 
-	// Logger is used for session errors. Defaults to slog.Default().
+	// Logger is set as the slog default via slog.SetDefault. When nil,
+	// the framework creates a text (or JSON, see LogJSON) handler at
+	// INFO level (DEBUG in DevMode).
 	Logger *slog.Logger
 
 	// Worker enables the full service worker for asset caching, offline
@@ -131,14 +133,18 @@ type Config[S any] struct {
 	// false.
 	Worker bool
 
-	// DevMode disables service worker registration and reloads the page
-	// on disconnect instead of reconnecting. This ensures fresh assets
-	// and state during development. Also sets Cache-Control: no-store
-	// on the initial page response. Enable via this field or set the
-	// POLY_DEV environment variable to any non-empty value. When the
-	// env var enables dev mode, an INFO log is emitted so the override
-	// is visible.
+	// DevMode enables development conveniences: service workers are
+	// unregistered (so assets are always fresh), the page reloads
+	// automatically when the server comes back after a restart, debug
+	// logging is enabled by default, and Cache-Control: no-store is
+	// set on all responses. Enable via this field or set the POLY_DEV
+	// environment variable to any non-empty value.
 	DevMode bool
+
+	// LogJSON selects JSON output for the default logger instead of
+	// text. Only applies when Logger is nil — if you provide your own
+	// Logger, this field is ignored.
+	LogJSON bool
 
 	// Assets lists embedded asset collections to auto-serve. Each
 	// [Asset] provides content-hashed

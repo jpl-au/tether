@@ -94,6 +94,11 @@ type Session[S any] struct {
 	disconnectTimer  *time.Timer
 	reconnectTimeout time.Duration
 
+	// endpoint is the URL path the session was created on (from the
+	// initial GET or direct transport connect). Used in log messages
+	// so errors can be traced back to a page.
+	endpoint string
+
 	// Last URL and title sent to the client. Captured in send() so
 	// reattach can replay them — the browser's address bar and title
 	// are separate from the DOM and would otherwise desync.
@@ -307,7 +312,7 @@ func (s *Session[S]) enqueue(fn func()) {
 		// Command buffer full — overflow to a goroutine to prevent
 		// deadlock. This is expected during broadcast storms but
 		// sustained overflow suggests the buffer is too small.
-		slog.Warn("command buffer full, overflow to goroutine", "session", s.id)
+		slog.Warn("command buffer full, overflow to goroutine", "session", s.id, "endpoint", s.endpoint, "url", s.lastURL)
 		go func() {
 			select {
 			case s.cmds <- fn:

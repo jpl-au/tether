@@ -62,7 +62,12 @@ func (s *Session[S]) Update(fn func(S) S) {
 		fx := &effects{}
 		defer func() {
 			if r := recover(); r != nil {
-				slog.Error("panic in Update", "session", s.id, "panic", r)
+				slog.Error("panic in Update",
+					"session", s.id,
+					"endpoint", s.endpoint,
+					"url", s.lastURL,
+					"panic", r,
+				)
 				s.drainFx(nil)
 			}
 			s.handling.Store(false)

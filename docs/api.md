@@ -31,9 +31,9 @@ poly.New(poly.Config[State]{
 |-------|------|---------|-------------|
 | `Upgrade` | `func(w, r) (Transport, error)` | — | Primary transport (typically `ws.Upgrade()`) |
 | `Fallback` | `func(w, r) (Transport, error)` | — | Secondary transport (typically `sse.Upgrade()`) |
-| `Mode` | `mode.Transport` | `mode.WebSocket` | Which transports to accept |
+| `Mode` | `mode.Transport` | `mode.Both` | Which transports to accept |
 
-Mode constants: `mode.WebSocket`, `mode.SSE`, `mode.Auto`, `mode.Fetch`.
+Mode constants: `mode.HTTP`, `mode.WebSocket`, `mode.ServerSentEvents`, `mode.Both`.
 
 ### Lifecycle
 

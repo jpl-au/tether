@@ -24,7 +24,7 @@ import "log/slog"
 //	    return state
 //	})
 func On[E any, S any](bus *Bus[E], s *Session[S], fn func(E, S) S) {
-	slog.Debug("bus.on", "session", s.ID())
+	slog.Debug("bus.on", "session", s.ID(), "endpoint", s.endpoint)
 	bus.subscribe(s.Context(), func(ev E) {
 		s.Update(func(state S) S {
 			return fn(ev, state)

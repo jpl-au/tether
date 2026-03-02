@@ -135,8 +135,10 @@ func (h *Handler[S]) handleUpload(w http.ResponseWriter, r *http.Request) {
 			if err := handler(sess, u); err != nil {
 				slog.Error("upload handler failed",
 					"session", sessionID,
+					"endpoint", sess.endpoint,
 					"action", u.Action,
 					"file", u.Name,
+					"size", u.Size,
 					"err", err,
 				)
 			}

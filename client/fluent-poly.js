@@ -175,6 +175,10 @@ window.Poly.signals = window.Poly.signals || {};
       if (root) root.classList.remove("poly-disconnected");
       hideReconnectBar();
       if (isReconnect) {
+        // Dev mode: reload to pick up fresh server code now that
+        // the server is back. The page stayed visible during the
+        // outage instead of showing a browser error.
+        if (devMode) { location.reload(); return; }
         sendNavigate(location.pathname + location.search);
       } else {
         mountExistingHooks();
@@ -195,10 +199,6 @@ window.Poly.signals = window.Poly.signals || {};
     ws.onclose = function () {
       if (root) root.classList.add("poly-disconnected");
       showReconnectBar();
-      if (devMode) {
-        setTimeout(function () { location.reload(); }, retryDelay);
-        return;
-      }
       // If the WebSocket never connected and the server allows SSE
       // fallback (transportMode "auto"), switch to SSE+POST permanently.
       if (!wsOpened && transportMode === "auto") {
@@ -229,6 +229,7 @@ window.Poly.signals = window.Poly.signals || {};
       if (root) root.classList.remove("poly-disconnected");
       hideReconnectBar();
       if (isReconnect) {
+        if (devMode) { location.reload(); return; }
         if (backgroundSync) replayQueuedEvents();
         sendNavigate(location.pathname + location.search);
       } else {
@@ -250,11 +251,6 @@ window.Poly.signals = window.Poly.signals || {};
     eventSource.onerror = function () {
       if (root) root.classList.add("poly-disconnected");
       showReconnectBar();
-      if (devMode) {
-        eventSource.close();
-        setTimeout(function () { location.reload(); }, retryDelay);
-        return;
-      }
       // EventSource reconnects automatically — no manual retry needed.
     };
   }
@@ -301,7 +297,7 @@ window.Poly.signals = window.Poly.signals || {};
 
   function showReconnectBar() {
     if (!reconnectBar) reconnectBar = createReconnectBar();
-    reconnectBar.textContent = devMode ? "Reloading\u2026" : "Reconnecting\u2026";
+    reconnectBar.textContent = "Reconnecting\u2026";
     // Force reflow before changing the transform so the browser
     // registers the initial off-screen position.
     reconnectBar.offsetHeight;

@@ -75,11 +75,11 @@ func (p *polyBody) RenderBuilder(buf *bytes.Buffer) {
 		buf.WriteString(`"`)
 	}
 	switch p.transport {
-	case mode.SSE:
+	case mode.ServerSentEvents:
 		buf.WriteString(` data-poly-transport="sse"`)
-	case mode.Auto:
+	case mode.Both:
 		buf.WriteString(` data-poly-transport="auto"`)
-	case mode.Fetch:
+	case mode.HTTP:
 		buf.WriteString(` data-poly-transport="fetch"`)
 	default:
 		buf.WriteString(` data-poly-transport="ws"`)
@@ -88,7 +88,7 @@ func (p *polyBody) RenderBuilder(buf *bytes.Buffer) {
 	// reads them instead of using hardcoded values. Retry-delay and
 	// max-retry-delay are omitted for fetch mode — there is no
 	// persistent connection to reconnect.
-	if p.transport != mode.Fetch {
+	if p.transport != mode.HTTP {
 		buf.WriteString(` data-poly-retry-delay="`)
 		buf.WriteString(strconv.FormatInt(p.retryDelay.Milliseconds(), 10))
 		buf.WriteString(`" data-poly-max-retry-delay="`)

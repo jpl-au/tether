@@ -34,7 +34,7 @@ poly/client/    Embedded JS files (fluent-poly.js, idiomorph.min.js, poly-worker
 Source files in the root package, split by concern:
 
 ```
-config.go       Config, TransportMode, PushConfig, defaults
+config.go       Config, PushConfig, defaults
 handler.go      Package doc, Handler, New(), ServeHTTP, origin checking, POST handlers
 lifecycle.go    serveInitialPage, serveSession, reattach, wireDisconnect
 pending.go      reapPending — periodic cleanup for pre-warmed sessions
@@ -550,32 +550,33 @@ See [signals docs](docs/signals.md) for the full guide. For the complete public 
 
 ## Transport mode
 
-The `Mode` field on `Config` controls which transports the handler accepts. It is an enum (`TransportMode`) with three values:
+The `Mode` field on `Config` controls which transports the handler accepts. It uses constants from the `mode` package. When `Mode` is not set (zero value), it defaults to `mode.Both`.
 
 | Mode | Constant | Behaviour |
 |------|----------|-----------|
-| WebSocket only | `poly.WebSocketOnly` | Default. Only WebSocket upgrades are accepted. `Fallback` is ignored. |
-| SSE only | `poly.SSEOnly` | Only SSE+POST. `Upgrade` is ignored; `Fallback` must be set. |
-| Auto fallback | `poly.WebSocketWithFallback` | Tries WebSocket first; falls back to SSE+POST if the initial connection fails. Both `Upgrade` and `Fallback` must be set. |
+| Both | `mode.Both` | Default. Tries WebSocket first; falls back to SSE+POST if the initial connection fails. Both `Upgrade` and `Fallback` must be set. |
+| WebSocket only | `mode.WebSocket` | Only WebSocket upgrades are accepted. `Fallback` is ignored. |
+| SSE only | `mode.ServerSentEvents` | Only SSE+POST. `Upgrade` is ignored; `Fallback` must be set. |
+| HTTP | `mode.HTTP` | Plain request/response. Used internally by `poly.Page` — not valid for `poly.New`. |
 
 ```go
-// WebSocket only (default — Mode can be omitted)
+// Default (mode.Both) — WebSocket with SSE fallback
 poly.New(poly.Config[State]{
+    Upgrade:  ws.Upgrade(),
+    Fallback: sse.Upgrade(),
+    // ...
+})
+
+// WebSocket only
+poly.New(poly.Config[State]{
+    Mode:    mode.WebSocket,
     Upgrade: ws.Upgrade(),
     // ...
 })
 
 // SSE only
 poly.New(poly.Config[State]{
-    Mode:     poly.SSEOnly,
-    Fallback: sse.Upgrade(),
-    // ...
-})
-
-// WebSocket with SSE fallback
-poly.New(poly.Config[State]{
-    Mode:     poly.WebSocketWithFallback,
-    Upgrade:  ws.Upgrade(),
+    Mode:     mode.ServerSentEvents,
     Fallback: sse.Upgrade(),
     // ...
 })
@@ -828,10 +829,17 @@ To trigger re-announcement of identical text, the JS clears the region first the
 `Config.DevMode` (or `POLY_DEV` env var) optimises the development experience:
 
 - **No service worker** — the client unregisters any existing worker and skips registration, ensuring fresh assets on every reload.
-- **Page reload on disconnect** — instead of reconnecting with exponential backoff, the page does `location.reload()` after a brief delay. When the Go server restarts, the browser reloads with fresh state automatically.
+- **Graceful reconnect + reload** — when the server goes away, the page stays visible with a "Reconnecting…" bar and exponential backoff. Once the server comes back, the page reloads to pick up fresh code.
 - **Cache-Control: no-store** — prevents the browser from serving a cached initial page with a stale session ID.
+- **Debug logging** — when no Logger is provided, the default logger uses DEBUG level.
+- **Visual flash** — morphed DOM elements flash with a blue outline so you can see what changed.
+- **Console logging** — events, patches, and morphs are logged to the browser console.
 
-The `DevMode` bool takes precedence over the environment variable. When `DevMode` is false (the default), `os.Getenv("POLY_DEV")` is checked as a fallback. The reconnect bar shows "Reloading…" instead of "Reconnecting…" in dev mode.
+The `DevMode` bool takes precedence over the environment variable. When `DevMode` is false (the default), `os.Getenv("POLY_DEV")` is checked as a fallback.
+
+### Logger
+
+When `Config.Logger` is nil, the framework creates a default logger (text format at INFO, or DEBUG in DevMode). Set `Config.LogJSON` for JSON output instead of text.
 
 ## Error reporting
 

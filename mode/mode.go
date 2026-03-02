@@ -2,41 +2,39 @@
 // Pass one of the constants to [poly.Config].Mode.
 //
 //	poly.Config[State]{
-//	    Mode: mode.Auto,
+//	    Mode: mode.Both,
 //	    // ...
 //	}
 package mode
 
 // Transport selects the wire protocol between server and browser.
-// WebSocket gives bidirectional communication over a single connection.
-// SSE+POST splits the channel: server→client updates flow over a
-// long-lived EventSource stream, and client→server events arrive as
-// individual HTTP POSTs. SSE+POST works through HTTP/2 reverse proxies
-// and load balancers that may not support WebSocket, at the cost of
-// slightly higher latency on client events.
+// [WebSocket] gives bidirectional communication over a single
+// connection. [ServerSentEvents] splits the channel: server→client
+// updates flow over a long-lived EventSource stream, and client→server
+// events arrive as individual HTTP POSTs. [Both] tries WebSocket first
+// and falls back to SSE+POST automatically. [HTTP] is plain
+// request/response with no persistent connection, used by [poly.Page].
 type Transport int
 
 const (
-	// WebSocket accepts only WebSocket connections. This is the
-	// default when Mode is not set. The Fallback field is ignored.
-	WebSocket Transport = iota
+	// HTTP uses plain request/response — no persistent connection.
+	// Client events are sent as individual POST requests and the
+	// response carries the update. Used internally by [poly.Page].
+	HTTP Transport = iota + 1
 
-	// SSE accepts only SSE+POST connections. Use this when the
-	// deployment environment does not support WebSocket (e.g.
-	// certain PaaS providers or corporate proxies). The Upgrade
-	// field is ignored; Fallback must be set.
-	SSE
+	// WebSocket accepts only WebSocket connections. The Fallback
+	// field is ignored; Upgrade must be set.
+	WebSocket
 
-	// Auto tries WebSocket first. If the client cannot establish a
+	// ServerSentEvents accepts only SSE+POST connections. Use this
+	// when the deployment environment does not support WebSocket
+	// (e.g. certain PaaS providers or corporate proxies). The
+	// Upgrade field is ignored; Fallback must be set.
+	ServerSentEvents
+
+	// Both tries WebSocket first. If the client cannot establish a
 	// WebSocket connection (e.g. the proxy strips the Upgrade
 	// header), it falls back to SSE+POST automatically. Both
 	// Upgrade and Fallback must be set.
-	Auto
-
-	// Fetch uses plain HTTP request/response — no persistent
-	// connection. Client events are sent via individual POST
-	// requests and the response carries the update. Used by
-	// [poly.Page] for stateless pages that don't need a live
-	// transport.
-	Fetch
+	Both
 )

@@ -21,7 +21,7 @@ import "log/slog"
 //	    return state
 //	})
 func Observe[V any, S any](val *Value[V], s *Session[S], fn func(V, S) S) {
-	slog.Debug("observe.subscribe", "session", s.ID())
+	slog.Debug("observe.subscribe", "session", s.ID(), "endpoint", s.endpoint)
 	// Subscribe and read the current value under the Value's lock so
 	// a concurrent Store cannot interleave and deliver the same value
 	// via both the subscriber callback and the initial Update below.

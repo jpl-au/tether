@@ -1,7 +1,6 @@
 package poly
 
 import (
-	"context"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -77,8 +76,14 @@ func New[S any](cfg Config[S]) *Handler[S] {
 	if cfg.Handle == nil {
 		panic("poly: Config.Handle is required")
 	}
-	if cfg.Mode != mode.SSE && cfg.Upgrade == nil {
-		panic("poly: Config.Upgrade is required — use ws.Upgrade() or set Mode to mode.SSE")
+	if cfg.Mode == mode.HTTP {
+		panic("poly: mode.HTTP is for poly.Page — use mode.WebSocket, mode.ServerSentEvents, or mode.Both")
+	}
+	if cfg.Mode == 0 {
+		cfg.Mode = mode.Both
+	}
+	if cfg.Mode != mode.ServerSentEvents && cfg.Upgrade == nil {
+		panic("poly: Config.Upgrade is required — use ws.Upgrade() or set Mode to mode.ServerSentEvents")
 	}
 	if cfg.Mode != mode.WebSocket && cfg.Fallback == nil {
 		panic("poly: Config.Fallback is required — use sse.Upgrade() or set Mode to mode.WebSocket")
@@ -114,15 +119,12 @@ func New[S any](cfg Config[S]) *Handler[S] {
 		if cfg.DevMode {
 			level = slog.LevelDebug
 		}
-		cfg.Logger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
-			Level: level,
-		}))
-	} else if cfg.DevMode && !cfg.Logger.Enabled(context.Background(), slog.LevelDebug) {
-		// DevMode requires debug-level logging. The provided logger
-		// filters debug messages, so replace it with one that doesn't.
-		cfg.Logger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
-			Level: slog.LevelDebug,
-		}))
+		opts := &slog.HandlerOptions{Level: level}
+		if cfg.LogJSON {
+			cfg.Logger = slog.New(slog.NewJSONHandler(os.Stderr, opts))
+		} else {
+			cfg.Logger = slog.New(slog.NewTextHandler(os.Stderr, opts))
+		}
 	}
 	slog.SetDefault(cfg.Logger)
 	if cfg.DevMode {
