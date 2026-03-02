@@ -7,7 +7,7 @@ fluent-poly gives you three ways to update the UI. Use whichever fits your situa
 The server renders HTML, diffs it against the previous tree, and sends patches or morphs to the client. This is the core model and works for everything:
 
 ```go
-Handle: func(sess *poly.Session[State], s State, ev poly.Event) State {
+Handle: func(_ poly.PreSession, s State, ev poly.Event) State {
     s.Count++
     return s // the framework renders, diffs, and sends the update
 },

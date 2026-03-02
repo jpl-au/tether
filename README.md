@@ -24,7 +24,7 @@ mux.Handle("/counter", poly.New(poly.Config[CounterState]{
             bind.Click(button.Text("+1"), "increment"),
         )
     },
-    Handle: func(_ *poly.Session[CounterState], state CounterState, event poly.Event) CounterState {
+    Handle: func(_ poly.PreSession, state CounterState, event poly.Event) CounterState {
         if event.Action == "increment" {
             state.Count++
         }
@@ -96,6 +96,7 @@ poly.New(poly.Config[State]{
 |-------|-------------|
 | [API reference](docs/api.md) | Config, Session, Event, Middleware, polytest, bind helpers |
 | [Getting started](docs/getting-started.md) | Setup, how updates reach the browser |
+| [Stateless pages](docs/stateless.md) | poly.Page for request/response pages without persistent connections |
 | [Events](docs/events.md) | Event binding, timing, loading states, forms |
 | [Signals](docs/signals.md) | Reactive signals, client directives, optimistic updates |
 | [Server updates](docs/server-updates.md) | Update, Navigate, SetTitle, Flash, Announce, Dynamic keys |

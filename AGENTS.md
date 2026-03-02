@@ -134,7 +134,7 @@ The helpers (`Click`, `Submit`, `Input`, `Change`, `KeyDown`, `Focus`, `Blur`, `
 Keydown events include modifier key state in `Event.Data`: `ctrl`, `shift`, `alt`, `meta` are set to `"true"` when held. This enables keyboard shortcut handling:
 
 ```go
-func handle(_ *poly.Session[state], s state, ev poly.Event) state {
+func handle(_ poly.PreSession, s state, ev poly.Event) state {
     if ev.Action == "shortcut" && ev.Data["ctrl"] == "true" && ev.Data["key"] == "s" {
         // Ctrl+S pressed
     }
@@ -286,7 +286,7 @@ if err := ev.Bind(&form); err != nil { ... }
 type Middleware[S any] func(HandleFunc[S]) HandleFunc[S]
 
 func withLogging[S any](next poly.HandleFunc[S]) poly.HandleFunc[S] {
-    return func(sess *poly.Session[S], s S, ev poly.Event) S {
+    return func(sess poly.PreSession, s S, ev poly.Event) S {
         slog.Info("event", "action", ev.Action)
         return next(sess, s, ev)
     }
@@ -349,7 +349,7 @@ type state struct {
 }
 
 // Handle validates on submit and clears errors on success.
-func handle(sess *poly.Session[state], s state, ev poly.Event) state {
+func handle(sess poly.PreSession, s state, ev poly.Event) state {
     switch {
     case ev.Action == "add":
         text := strings.TrimSpace(ev.Data["text"])
@@ -466,10 +466,11 @@ group.Broadcast(func(target *poly.Session[State], s State) State {
 `BroadcastOthers` excludes a session from the broadcast. This is the typical pattern when broadcasting from inside Handle — the sender's state is already updated via the return value, so BroadcastOthers pushes the change to everyone else without double-applying to the sender:
 
 ```go
-Handle: func(sess *poly.Session[State], s State, ev poly.Event) State {
+Handle: func(sess poly.PreSession, s State, ev poly.Event) State {
     if ev.Action == "send-message" {
         s.Messages = append(s.Messages, ev.Data["text"])
-        group.BroadcastOthers(sess, func(target *poly.Session[State], s State) State {
+        live := sess.(*poly.Session[State])
+        group.BroadcastOthers(live, func(target *poly.Session[State], s State) State {
             s.Messages = append(s.Messages, ev.Data["text"])
             return s
         })
@@ -599,6 +600,27 @@ When SSE is active, client events are sent as HTTP POST requests to the same end
 
 **Wire format:** Identical JSON regardless of transport.
 
+## Stateless pages (poly.Page)
+
+`poly.Page` creates an `http.Handler` for traditional request/response pages — no WebSocket, no SSE. Each request is independent: the server reconstructs state, renders HTML, and returns the response. Despite being stateless, pages get the same client-side features as live handlers: event binding, debounce, throttle, loading states, client directives, signals, transitions, and the morph engine.
+
+```go
+mux.Handle("/", poly.Page(poly.PageConfig[State]{
+    State:   func(r *http.Request) State { ... },   // reconstruct from request
+    Render:  func(s State) node.Node { ... },        // build node tree
+    Handle:  func(sess poly.PreSession, s State, ev poly.Event) State { ... },
+    Layout:  func(s State, content node.Node) node.Node { ... },
+}))
+```
+
+- **GET** — `State(r)` → `OnNavigate` → `Render` → `Layout` → HTML response
+- **POST** — `State(r)` → `Handle(event)` → `Render` → JSON update (root morph + side effects)
+- **State accumulation** — use `bind.EventData` to attach current values to elements so they travel with POST events
+- **Handle parameter** — receives `PreSession` (not `*Session`). Side effects (`Toast`, `Navigate`, `Signal`) travel in the POST response.
+- **No server push** — no `Update`, `Go`, `Close`, broadcasting, Bus/Value, file uploads, or push notifications
+
+See [stateless pages docs](docs/stateless.md) for the full guide.
+
 ## Complete helper reference
 
 All helpers are in the `bind` package. They accept any Fluent element type via a generic `Settable` constraint.
@@ -615,6 +637,7 @@ All helpers are in the `bind` package. They accept any Fluent element type via a
 | `bind.FilterKey` | `poly-key` | Only fire keydown for a specific key |
 | `bind.Focus` | `poly-focus` | Server event on focus |
 | `bind.Blur` | `poly-blur` | Server event on blur |
+| `bind.On` | `poly-{eventType}` | Server event on any DOM event (escape hatch) |
 | `bind.Viewport` | `poly-viewport` | Server event on viewport enter/exit |
 | `bind.EventData` | `poly-data-{key}` | Attach extra key-value data to events |
 | `bind.Debounce` | `poly-debounce` | Override input debounce delay |

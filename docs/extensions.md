@@ -32,6 +32,19 @@ poly.New(poly.Config[State]{
 
 The `Handle` callback runs in its own goroutine, so I/O operations (disk writes, S3 uploads) are safe and won't block the session loop.
 
+### Upload struct
+
+The `poly.Upload` passed to the Handle callback contains file metadata and a method to read the contents:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `Action` | `string` | The name from `bind.Upload` (e.g. `"avatar"`) |
+| `Name` | `string` | Original filename from the browser |
+| `Size` | `int64` | File size in bytes |
+| `ContentType` | `string` | MIME type from the multipart header |
+
+Call `upload.Open()` to get a `multipart.File` for reading. The caller must close the returned file.
+
 ### Triggering uploads from the client
 
 Mark an element as an upload trigger:

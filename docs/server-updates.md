@@ -5,7 +5,7 @@
 Side effects are called directly on the session parameter during `Handle`. They are buffered and merged into the same update message as the state diff, so the client receives everything atomically:
 
 ```go
-Handle: func(sess *poly.Session[State], s State, ev poly.Event) State {
+Handle: func(sess poly.PreSession, s State, ev poly.Event) State {
     if ev.Action == "add-todo" {
         s.Todos = append(s.Todos, todo)
         sess.Announce("Todo added")
@@ -163,6 +163,41 @@ session.Signal("count", 42)            // push a reactive value
 ```
 
 Each sends a standalone update message. For side effects during event handling, call them on the session parameter inside `Handle` — they merge into the same message as the state diff.
+
+## Scope — component state isolation
+
+`poly.Scope` focuses a session's state onto a smaller component type. The component handler only sees its own sub-state — never the full application state:
+
+```go
+var todos = poly.Scope[AppState, TodoState]{
+    View:   func(s AppState) TodoState { return s.Todos },
+    Update: func(s AppState, t TodoState) AppState { s.Todos = t; return s },
+}
+```
+
+Use `Handle` in the event handler to dispatch to the component:
+
+```go
+Handle: func(sess poly.PreSession, s AppState, ev poly.Event) AppState {
+    if ev.Action == "add-todo" || ev.Action == "remove-todo" {
+        return todos.Handle(sess, s, ev, todoHandle)
+    }
+    return s
+},
+```
+
+Use `With` inside `Session.Update` for server-initiated changes:
+
+```go
+sess.Update(func(s AppState) AppState {
+    return todos.With(s, func(t TodoState) TodoState {
+        t.Valid = true
+        return t
+    })
+})
+```
+
+Scope keeps component handlers reusable — they work with `TodoState` and never import the parent `AppState` type.
 
 ## URL routing
 

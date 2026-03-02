@@ -14,7 +14,17 @@ bind.Focus(el, "focus-name")                   // data-poly-focus="focus-name"
 bind.Blur(el, "blur-name")                     // data-poly-blur="blur-name"
 ```
 
-These return the same element type, so chaining continues:
+For any DOM event not covered by the built-in helpers, use `bind.On`:
+
+```go
+bind.On(el, "dblclick", "open-editor")         // data-poly-dblclick="open-editor"
+bind.On(el, "mouseover", "preview")            // data-poly-mouseover="preview"
+bind.On(el, "contextmenu", "show-menu")        // data-poly-contextmenu="show-menu"
+```
+
+The first argument is the element, the second is the DOM event name (appended to the `poly-` prefix), and the third is the action string delivered in `Event.Action`. Any DOM event the browser supports can be bound this way — `dblclick`, `mouseover`, `mouseout`, `touchstart`, `wheel`, `copy`, `paste`, etc.
+
+All helpers return the same element type, so chaining continues:
 
 ```go
 bind.Click(button.Text("+"), "increment").Style("cursor: pointer").Class("btn")
@@ -24,6 +34,39 @@ Keydown events include modifier keys (`ctrl`, `shift`, `alt`, `meta`) in `Event.
 
 ```go
 bind.FilterKey(bind.KeyDown(input.Text("cmd", ""), "exec"), "Enter")
+```
+
+## Event types
+
+Each event carries a `Type` field identifying how it was triggered. The `event` package provides constants for the built-in types:
+
+```go
+event.Click       // bind.Click
+event.Input       // bind.Input
+event.Submit      // bind.Submit
+event.Change      // bind.Change
+event.KeyDown     // bind.KeyDown
+event.Focus       // bind.Focus
+event.Blur        // bind.Blur
+event.Navigate    // client-side navigation / OnNavigate
+```
+
+For events bound with `bind.On`, create a custom type:
+
+```go
+event.Custom("dblclick")    // matches bind.On(el, "dblclick", "action")
+event.Custom("mouseover")   // matches bind.On(el, "mouseover", "action")
+```
+
+Use `Event.Type` in Handle to distinguish event sources when multiple bindings share the same action name, or to apply type-specific logic:
+
+```go
+Handle: func(_ poly.PreSession, s State, ev poly.Event) State {
+    if ev.Type == event.Submit {
+        // form data available in ev.Data
+    }
+    return s
+},
 ```
 
 ## Timing control
@@ -89,6 +132,29 @@ Fire a server event when an element scrolls into view (useful for infinite scrol
 ```go
 bind.Viewport(div.New(), "load-more")
 ```
+
+## Struct binding
+
+When a form submit sends several named fields, use `Event.Bind` to decode them into a struct instead of extracting values individually:
+
+```go
+Handle: func(_ poly.PreSession, s State, ev poly.Event) State {
+    if ev.Action == "create-user" {
+        var form struct {
+            Email string `poly:"email"`
+            Age   int    `poly:"age"`
+        }
+        if err := ev.Bind(&form); err != nil {
+            s.Error = err.Error()
+            return s
+        }
+        // form.Email and form.Age are populated from the event data
+    }
+    return s
+},
+```
+
+Fields are matched by the `poly` struct tag; untagged exported fields use their lowercased name. Supported field types: `string`, `int`, `int64`, `float64`, `bool`.
 
 ## Form validation
 

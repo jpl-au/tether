@@ -74,6 +74,10 @@ Dev mode does the following:
 4. **Debug logging** — the default logger uses DEBUG level (when no Logger is provided)
 5. **Visual flash** — morphed DOM elements flash with a blue outline
 6. **Console logging** — events, patches, and morphs are logged to the browser console
+7. **Missing Dynamic key warnings** — logs a warning when any event or `Update` call produces no patches, catching missing `.Dynamic()` keys early
+8. **Discarded effect warnings** — logs a warning when a handler panic discards buffered side effects (Toast, Signal, Navigate, etc.)
+
+Diagnostics are centralised in the `dev` package — call sites use `dev.Warn()` which silently no-ops outside dev mode.
 
 The `DevMode` bool takes precedence. When it's false (the default), the `POLY_DEV` environment variable is checked as a fallback.
 

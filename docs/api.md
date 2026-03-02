@@ -41,8 +41,17 @@ Mode constants: `mode.HTTP`, `mode.WebSocket`, `mode.ServerSentEvents`, `mode.Bo
 |-------|------|-------------|
 | `OnConnect` | `func(*Session[S])` | Called when a session connects |
 | `OnDisconnect` | `func(*Session[S])` | Called when a session is permanently destroyed |
-| `OnStructuralChange` | `func(*Session[S], StructuralChange)` | Called when DOM keys change (telemetry) |
+| `OnStructuralChange` | `func(*Session[S], StructuralChange)` | Called when Dynamic keys change between renders |
 | `Groups` | `[]*Group[S]` | Groups the session auto-joins on connect |
+
+`StructuralChange` reports what changed when the diff engine falls back to a root morph:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `Added` | `[]string` | Keys in the new tree but not the old |
+| `Removed` | `[]string` | Keys in the old tree but not the new |
+| `Reordered` | `bool` | Same keys but different order |
+| `Bytes` | `int` | Size of the re-rendered HTML sent as a root morph |
 
 ### Timeouts
 
@@ -57,6 +66,7 @@ Mode constants: `mode.HTTP`, `mode.WebSocket`, `mode.ServerSentEvents`, `mode.Bo
 | `Pending` | `time.Duration` | 30s | Wait for browser to claim pre-warmed session |
 | `Heartbeat` | `time.Duration` | 20s | SSE keep-alive interval |
 | `DisableHeartbeat` | `bool` | false | Stop SSE keep-alive comments |
+| `ShutdownGrace` | `time.Duration` | 10s | Grace period for `ListenAndServe` shutdown |
 | `Retry` | `time.Duration` | 1s | Initial client reconnection delay |
 | `MaxRetry` | `time.Duration` | 30s | Maximum exponential backoff |
 
@@ -78,6 +88,9 @@ Mode constants: `mode.HTTP`, `mode.WebSocket`, `mode.ServerSentEvents`, `mode.Bo
 |-------|------|---------|-------------|
 | `DefaultDebounce` | `time.Duration` | 300ms | Default input event debounce |
 | `TransitionTimeout` | `time.Duration` | 5s | Fallback for CSS `transitionend` |
+| `FlashDuration` | `time.Duration` | 5s | Flash message auto-clear duration |
+| `ToastDuration` | `time.Duration` | 5s | Toast notification auto-dismiss duration |
+| `BackgroundSync` | `bool` | false | Queue failed SSE events in IndexedDB for replay |
 
 ### Extensions
 
@@ -136,6 +149,7 @@ s.ReplaceURL("/current?saved=1")       // replaceState
 s.SetTitle("Settings — My App")        // document.title
 s.Signal("count", 42)                  // push reactive value
 s.Signals(map[string]any{"a": 1})      // push multiple values
+s.SignalBatch("count", 42, "status", "online")  // flat key-value pairs
 s.Push(push.Notification{...})         // Web Push notification
 ```
 
@@ -218,6 +232,19 @@ h.Drain(ctx)        // stop new sessions, wait for existing
 h.Shutdown(ctx)     // close all sessions
 ```
 
+### ListenAndServe
+
+For full-page apps, `ListenAndServe` handles signal trapping, graceful shutdown, and sensible defaults:
+
+```go
+h.ListenAndServe("")                      // checks PORT env, defaults to :8080
+h.ListenAndServe(":3000")                 // explicit address
+h.ListenAndServe("", existingMux)         // mount on an existing mux
+h.ListenAndServeTLS("", "cert.pem", "key.pem")  // HTTPS, defaults to :443
+```
+
+On `SIGINT` or `SIGTERM`, sessions are drained gracefully (up to `Timeouts.ShutdownGrace`, default 10s) before the process exits. When an existing `http.Handler` is passed, the handler is mounted on it alongside the client JS runtime and any configured assets.
+
 ---
 
 ## Group
@@ -282,7 +309,8 @@ bind.KeyDown(el, "action")         // keydown (modifiers in Data)
 bind.FilterKey(el, "Enter")        // restrict keydown to specific key
 bind.Focus(el, "action")           // focus
 bind.Blur(el, "action")            // blur
-bind.Viewport(el, "action")        // viewport enter (infinite scroll)
+bind.On(el, "dblclick", "action")  // arbitrary DOM event
+bind.Viewport(el, "action")       // viewport enter (infinite scroll)
 bind.EventData(el, "key", "val")   // attach extra data to events
 bind.Debounce(el, 150*time.Millisecond) // override debounce
 bind.Throttle(el, time.Second)          // minimum event interval
@@ -359,6 +387,7 @@ bind.OnClick("act")         bind.OnSubmit("act")
 bind.OnInput("act")         bind.OnChange("act")
 bind.OnKeyDown("act")       bind.OnFocus("act")
 bind.OnBlur("act")          bind.OnViewport("act")
+bind.WithEvent("dblclick", "act")
 ```
 
 Control:
@@ -497,6 +526,15 @@ h.Flash()       // last flash messages (map[string]string)
 h.Signals()     // last signal values (map[string]any)
 ```
 
+### Lifecycle
+
+```go
+h.Connect()     // trigger OnConnect callback
+h.Disconnect()  // trigger OnDisconnect callback
+```
+
+Test session registration, presence tracking, and cleanup logic without a real transport.
+
 ### Assertion helpers
 
 ```go
@@ -520,29 +558,111 @@ type Middleware[S any] func(next HandleFunc[S]) HandleFunc[S]
 
 ## Bus
 
-Typed pub/sub for cross-session communication:
+Typed pub/sub for cross-session communication. Create one per event type at program startup and share it across handlers:
 
 ```go
-bus := poly.NewBus[ChatMessage]()
-bus.Publish(msg)                              // to all subscribers
-bus.Emit(sess, msg)                           // to all except sender
-cancel := bus.Subscribe(ctx, func(msg ChatMessage) { ... })
-poly.On(bus, sess, func(msg ChatMessage, s State) State { ... })
+var messages = poly.NewBus[MessageSent]()
 ```
+
+### Publishing
+
+```go
+bus.Publish(msg)         // to all subscribers — use for external sources (DB, queues, cron)
+bus.Emit(sess, msg)      // to all except sender — use inside Handle
+bus.Len()                // active subscriber count
+```
+
+`Emit` enqueues publication on the sender's command loop, so the sender's diff is sent to the client before other subscribers react. Subscriptions registered via `poly.On` whose session ID matches the emitting session are automatically skipped — preventing double-apply since Handle already updated the sender's state.
+
+### Subscribing
+
+Raw subscription for non-session consumers (external services, monitoring):
+
+```go
+cancel := bus.Subscribe(ctx, func(msg ChatMessage) { ... })
+```
+
+Session-aware subscription via `poly.On` — the primary way to connect a Bus to a session:
+
+```go
+poly.On(messages, sess, func(msg MessageSent, state ChatState) ChatState {
+    state.Messages = append(state.Messages, msg.Text)
+    return state
+})
+```
+
+`poly.On` subscribes the session to the bus. When an event arrives, the callback runs inside the session's command loop (via `Session.Update`) with the event and the current state. The callback returns the new state — same pattern as Update.
+
+Key behaviours:
+- **Sender filtering** — if the event was emitted by this session (via `Bus.Emit`), the callback is skipped automatically
+- **Auto-cleanup** — the subscription is removed when the session is destroyed (context cancelled)
+- **Thread-safe** — the callback runs on the session's command loop, never concurrently with Handle or other Updates
+
+Typical usage is in `OnConnect`:
+
+```go
+OnConnect: func(sess *poly.Session[State]) {
+    poly.On(activityBus, sess, func(item ActivityItem, s State) State {
+        s.Activity = append(s.Activity, item)
+        return s
+    })
+},
+```
+
+### Bus vs Group
+
+Bus is parameterised on the **event type** — any session can subscribe regardless of its state type. Group requires all sessions to share the same state type. Use Bus for cross-handler communication; use Group for same-handler broadcasting.
 
 ---
 
 ## Value
 
-Shared observable state:
+Shared observable state that notifies sessions when it changes. Built on top of Bus internally:
 
 ```go
-v := poly.NewValue(initial)
-v.Load()                     // lock-free read
-v.Store(val)                 // set and notify observers
-v.Update(func(V) V)          // atomic read-modify-write
-poly.Observe(v, sess, func(val V, s State) State { ... })
+var onlineCount = poly.NewValue(0)
 ```
+
+### Reading and writing
+
+```go
+v.Load()              // lock-free read — safe from any goroutine
+v.Store(val)          // set and notify all observers
+v.Update(func(V) V)   // atomic read-modify-write (counters, accumulators)
+v.Len()               // active observer count
+```
+
+### Observing
+
+`poly.Observe` subscribes a session to a Value. The current value is delivered immediately so the session's state is up to date from the moment of subscription. Future changes via Store or Update are delivered automatically:
+
+```go
+poly.Observe(onlineCount, sess, func(count int, s State) State {
+    s.OnlineUsers = count
+    return s
+})
+```
+
+Key behaviours:
+- **Immediate sync** — the callback fires once with the current value at subscription time
+- **Atomic subscribe+read** — a concurrent Store cannot slip between the subscription and the initial delivery, preventing duplicate values
+- **Auto-cleanup** — removed when the session is destroyed
+- **Thread-safe** — runs on the session's command loop
+
+Typical usage is in `OnConnect`:
+
+```go
+OnConnect: func(sess *poly.Session[State]) {
+    poly.Observe(onlineCount, sess, func(count int, s State) State {
+        s.OnlineCount = count
+        return s
+    })
+},
+```
+
+### Value vs Bus
+
+Use Value for state that multiple sessions need to stay in sync with (online counts, shared configuration, room membership). Use Bus for discrete domain events (chat messages, notifications, activity feeds).
 
 ---
 

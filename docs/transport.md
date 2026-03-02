@@ -30,6 +30,20 @@ poly.New(poly.Config[State]{
 
 Same wire format, same API regardless of transport.
 
+### WebSocket options
+
+Pass `ws.Options` to configure the WebSocket transport:
+
+```go
+ws.Upgrade(ws.Options{
+    ReadLimit: 128 << 10,  // max message size (default 32 KB)
+})
+```
+
+Set `ReadLimit` to match `Config.Limits.MaxEventBytes` for consistent limits across transport modes. Messages exceeding the limit cause the connection to be closed with a protocol error.
+
+### SSE keep-alive
+
 SSE connections send keep-alive comments at `Timeouts.Heartbeat` (default 20s) to prevent proxies from closing idle connections.
 
 ## Service worker
