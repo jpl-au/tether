@@ -5,16 +5,16 @@
 Push updates to multiple sessions at once:
 
 ```go
-group := poly.NewGroup[State]()
+group := tether.NewGroup[State]()
 
-poly.New(poly.Config[State]{
-    OnConnect:    func(s *poly.Session[State]) { group.Add(s) },
-    OnDisconnect: func(s *poly.Session[State]) { group.Remove(s) },
+tether.New(tether.Config[State]{
+    OnConnect:    func(s *tether.Session[State]) { group.Add(s) },
+    OnDisconnect: func(s *tether.Session[State]) { group.Remove(s) },
     // ...
 })
 
 // Send a message to every connected client
-group.Broadcast(func(target *poly.Session[State], s State) State {
+group.Broadcast(func(target *tether.Session[State], s State) State {
     s.Notification = "System update complete"
     target.Announce("System update complete")
     return s
@@ -26,10 +26,10 @@ Each session is updated concurrently so a slow render in one session does not bl
 For convenience, use `Config.Groups` to auto-register sessions without `OnConnect`/`OnDisconnect` boilerplate:
 
 ```go
-group := poly.NewGroup[State]()
+group := tether.NewGroup[State]()
 
-poly.New(poly.Config[State]{
-    Groups: []*poly.Group[State]{group},
+tether.New(tether.Config[State]{
+    Groups: []*tether.Group[State]{group},
     // ...
 })
 ```
@@ -41,13 +41,13 @@ Sessions are automatically added when the transport connects and removed when th
 When broadcasting from inside `Handle`, use `BroadcastOthers` to exclude the sender. Handle already updates the sender's state via the return value — broadcasting to everyone would double-apply the change on the sender:
 
 ```go
-Handle: func(sess poly.PreSession, s State, ev poly.Event) State {
+Handle: func(sess tether.PreSession, s State, ev tether.Event) State {
     if ev.Action == "send-message" {
         s.Messages = append(s.Messages, ev.Data["text"])
         // In live mode, sess is a *Session — type-assert to access
         // Broadcast, Update, and other session-specific methods.
-        live := sess.(*poly.Session[State])
-        group.BroadcastOthers(live, func(target *poly.Session[State], s State) State {
+        live := sess.(*tether.Session[State])
+        group.BroadcastOthers(live, func(target *tether.Session[State], s State) State {
             s.Messages = append(s.Messages, ev.Data["text"])
             return s
         })
@@ -61,11 +61,11 @@ Handle: func(sess poly.PreSession, s State, ev poly.Event) State {
 Track who is online with callbacks and iteration:
 
 ```go
-group := poly.NewGroup[State]()
-group.OnJoin = func(s *poly.Session[State]) {
+group := tether.NewGroup[State]()
+group.OnJoin = func(s *tether.Session[State]) {
     log.Printf("user joined: %s", s.ID())
 }
-group.OnLeave = func(s *poly.Session[State]) {
+group.OnLeave = func(s *tether.Session[State]) {
     log.Printf("user left: %s", s.ID())
 }
 
@@ -82,17 +82,17 @@ log.Printf("online: %d", group.Len())
 
 ## Bus — typed cross-session events
 
-`poly.Bus` routes typed domain events to subscribers. Unlike Group, Bus is parameterised on the **event type** rather than the state type, so sessions from different handlers can communicate:
+`tether.Bus` routes typed domain events to subscribers. Unlike Group, Bus is parameterised on the **event type** rather than the state type, so sessions from different handlers can communicate:
 
 ```go
-var messages = poly.NewBus[MessageSent]()
+var messages = tether.NewBus[MessageSent]()
 ```
 
 Subscribe a session in `OnConnect`:
 
 ```go
-OnConnect: func(sess *poly.Session[State]) {
-    poly.On(messages, sess, func(msg MessageSent, s State) State {
+OnConnect: func(sess *tether.Session[State]) {
+    tether.On(messages, sess, func(msg MessageSent, s State) State {
         s.Messages = append(s.Messages, msg.Text)
         return s
     })
@@ -102,12 +102,12 @@ OnConnect: func(sess *poly.Session[State]) {
 Publish from Handle with sender filtering:
 
 ```go
-Handle: func(sess poly.PreSession, s State, ev poly.Event) State {
+Handle: func(sess tether.PreSession, s State, ev tether.Event) State {
     if ev.Action == "send" {
         msg := MessageSent{Text: ev.Value()}
         s.Messages = append(s.Messages, msg.Text)
         // Emit skips the sender — Handle already updated their state
-        messages.Emit(sess.(*poly.Session[State]), msg)
+        messages.Emit(sess.(*tether.Session[State]), msg)
     }
     return s
 },
@@ -123,17 +123,17 @@ Subscriptions are cleaned up automatically when the session is destroyed. No man
 
 ## Value — shared observable state
 
-`poly.Value` holds a single value that sessions can observe. When the value changes, all observers are notified automatically. Built on Bus internally:
+`tether.Value` holds a single value that sessions can observe. When the value changes, all observers are notified automatically. Built on Bus internally:
 
 ```go
-var onlineCount = poly.NewValue(0)
+var onlineCount = tether.NewValue(0)
 ```
 
 Observe in `OnConnect` — the current value is delivered immediately:
 
 ```go
-OnConnect: func(sess *poly.Session[State]) {
-    poly.Observe(onlineCount, sess, func(count int, s State) State {
+OnConnect: func(sess *tether.Session[State]) {
+    tether.Observe(onlineCount, sess, func(count int, s State) State {
         s.OnlineCount = count
         return s
     })

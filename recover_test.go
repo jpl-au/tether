@@ -1,4 +1,4 @@
-package poly
+package tether
 
 import (
 	"net/http"
@@ -6,8 +6,8 @@ import (
 	"testing"
 	"testing/synctest"
 
-	"github.com/jpl-au/fluent-poly/event"
-	"github.com/jpl-au/fluent-poly/mode"
+	"github.com/jpl-au/fluent-tether/event"
+	"github.com/jpl-au/fluent-tether/mode"
 )
 
 func TestSessionHandlePanicDoesNotKillSession(t *testing.T) {

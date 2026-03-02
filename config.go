@@ -1,17 +1,17 @@
-package poly
+package tether
 
 import (
 	"log/slog"
 	"net/http"
 	"time"
 
-	"github.com/jpl-au/fluent-poly/mode"
-	"github.com/jpl-au/fluent-poly/push"
-	"github.com/jpl-au/fluent-poly/wire"
+	"github.com/jpl-au/fluent-tether/mode"
+	"github.com/jpl-au/fluent-tether/push"
+	"github.com/jpl-au/fluent-tether/wire"
 	"github.com/jpl-au/fluent/node"
 )
 
-// Config wires together all the pieces of a poly page: how to create
+// Config wires together all the pieces of a tether page: how to create
 // initial state, how to render it, and how to handle events. The type
 // parameter S is the session state — typically a struct, but it can be
 // any type. Each connected browser tab gets its own independent copy
@@ -116,23 +116,23 @@ type Config[S any] struct {
 	// fast and offload any expensive work to a goroutine. Optional.
 	OnNoPatch func(session *Session[S], info NoPatch)
 
-	// Layout wraps the poly content in a full HTML document. The state
+	// Layout wraps the tether content in a full HTML document. The state
 	// parameter is the session's initial state, which can be used to set
 	// the page title or other document-level elements. The content
-	// parameter is a node that renders the poly root div and client
+	// parameter is a node that renders the tether root div and client
 	// scripts. Return a complete document tree (e.g.
 	// html.New(head.New(...), body.New(content))).
 	//
 	// Layout runs once on the initial GET request. After that, only the
-	// poly root div is morphed — the outer shell is not re-rendered.
+	// tether root div is morphed — the outer shell is not re-rendered.
 	// To update shell elements during navigation or event handling, use
 	// [Session.SetTitle] for the page title, and signal bindings
 	// ([bind.BindText], [bind.BindClass], [bind.BindShow], etc.) for
 	// everything else. Signal bindings work document-wide, so elements
 	// in the Layout shell react to [Session.Signal] calls just like
-	// elements inside the poly root.
+	// elements inside the tether root.
 	//
-	// When nil, the handler outputs a bare HTML fragment (the poly root
+	// When nil, the handler outputs a bare HTML fragment (the tether root
 	// div and scripts only), which puts the browser in quirks mode.
 	Layout func(state S, content node.Node) node.Node
 
@@ -143,7 +143,7 @@ type Config[S any] struct {
 
 	// Worker enables the full service worker for asset caching, offline
 	// page shells, and background sync. When true, the client JS
-	// registers /_poly/fluent-poly-worker.js as a service worker with
+	// registers /_tether/fluent-tether-worker.js as a service worker with
 	// scope "/". When false and Push is configured, a lightweight
 	// push-only service worker is registered instead — it handles push
 	// events without intercepting fetch requests or caching. Default
@@ -154,7 +154,7 @@ type Config[S any] struct {
 	// unregistered (so assets are always fresh), the page reloads
 	// automatically when the server comes back after a restart, debug
 	// logging is enabled by default, and Cache-Control: no-store is
-	// set on all responses. Enable via this field or set the POLY_DEV
+	// set on all responses. Enable via this field or set the TETHER_DEV
 	// environment variable to any non-empty value.
 	DevMode bool
 
@@ -198,7 +198,7 @@ type Config[S any] struct {
 	Limits Limits
 
 	// Client groups settings that are passed to the browser as data
-	// attributes on the poly root element.
+	// attributes on the tether root element.
 	Client Client
 
 	// WireFormat selects the encoding for server-to-client updates.
@@ -286,11 +286,11 @@ type Limits struct {
 }
 
 // Client groups settings that control the browser-side JS runtime.
-// These are passed to the browser as data attributes on the poly
+// These are passed to the browser as data attributes on the tether
 // root element.
 type Client struct {
 	// DefaultDebounce is the debounce interval applied to input events
-	// when the element does not specify data-poly-debounce. Zero
+	// when the element does not specify data-tether-debounce. Zero
 	// defaults to 300 milliseconds.
 	DefaultDebounce time.Duration
 
@@ -359,7 +359,7 @@ const defaultMaxEventBytes = 64 << 10 // 64 KB
 const defaultHeartbeatInterval = 20 * time.Second
 
 // Defaults for the client-side JS runtime. These are passed to the
-// browser as data attributes on the poly root element.
+// browser as data attributes on the tether root element.
 const defaultShutdownGrace = 10 * time.Second
 
 const (

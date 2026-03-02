@@ -1,20 +1,20 @@
-package poly
+package tether
 
 import (
 	"net/url"
 	"strconv"
 
-	"github.com/jpl-au/fluent-poly/event"
+	"github.com/jpl-au/fluent-tether/event"
 )
 
 // Event is the message the client sends to the server when the user
 // interacts with the page. The client JS intercepts DOM events on
-// elements annotated with data-poly-* attributes and serialises them
+// elements annotated with data-tether-* attributes and serialises them
 // into this structure.
 //
 // Type is the DOM [event.Type] (e.g. [event.Click], [event.Input],
 // [event.Submit], [event.Navigate]). Action is the value of the
-// data-poly-* attribute — it is the application-defined name that the
+// data-tether-* attribute — it is the application-defined name that the
 // Handle function switches on. Data carries event-specific key-value
 // pairs: for input events this is {"value": "..."}, for submit events
 // it includes all named form fields, and for keydown events it
@@ -75,7 +75,7 @@ func (e Event) Bool(key string) bool {
 // Params carries URL information from a navigation event. The handler
 // passes this to Config.OnNavigate on the initial page load (so the
 // application can derive state from the URL) and whenever the browser
-// navigates via a poly link click or the back/forward buttons.
+// navigates via a tether link click or the back/forward buttons.
 type Params struct {
 	Path  string
 	Query url.Values

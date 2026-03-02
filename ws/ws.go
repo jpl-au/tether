@@ -1,10 +1,10 @@
-// Package ws provides a WebSocket transport for fluent-poly. WebSocket
+// Package ws provides a WebSocket transport for fluent-tether. WebSocket
 // gives full-duplex communication over a single TCP connection, so both
 // server updates and client events travel on the same channel with
 // minimal overhead. This is the default and preferred transport.
 //
-// Pass ws.Upgrade() as the Upgrade field in [poly.Config]. Origin
-// checking is handled by the poly handler via [poly.Config].AllowedOrigins
+// Pass ws.Upgrade() as the Upgrade field in [tether.Config]. Origin
+// checking is handled by the tether handler via [tether.Config].AllowedOrigins
 // rather than by the websocket library directly.
 package ws
 
@@ -15,7 +15,7 @@ import (
 	"net/http"
 
 	"github.com/coder/websocket"
-	poly "github.com/jpl-au/fluent-poly"
+	tether "github.com/jpl-au/fluent-tether"
 )
 
 // Options configures the WebSocket transport.
@@ -24,27 +24,27 @@ type Options struct {
 	// will accept from a client. Messages exceeding this limit cause
 	// the connection to be closed with a protocol error. When zero,
 	// the library default (32 KB) is used. Set this to match
-	// [poly.Config].MaxEventBytes for consistent limits across
+	// [tether.Config].MaxEventBytes for consistent limits across
 	// transport modes.
 	ReadLimit int64
 }
 
-// Upgrade returns an upgrade function for use in [poly.Config].Upgrade.
-// The returned function is called by the poly handler when it receives
+// Upgrade returns an upgrade function for use in [tether.Config].Upgrade.
+// The returned function is called by the tether handler when it receives
 // a WebSocket upgrade request. It negotiates the WebSocket handshake
 // and returns a Transport that the session uses for its entire lifetime.
 //
-// Origin checking is handled by the poly handler via
-// [poly.Config].AllowedOrigins, so Upgrade skips the websocket
+// Origin checking is handled by the tether handler via
+// [tether.Config].AllowedOrigins, so Upgrade skips the websocket
 // library's own origin verification to avoid double-checking.
-func Upgrade(opts ...Options) func(http.ResponseWriter, *http.Request) (poly.Transport, error) {
+func Upgrade(opts ...Options) func(http.ResponseWriter, *http.Request) (tether.Transport, error) {
 	var o Options
 	if len(opts) > 0 {
 		o = opts[0]
 	}
 
-	return func(w http.ResponseWriter, r *http.Request) (poly.Transport, error) {
-		// Origin checking is done by the poly handler before this
+	return func(w http.ResponseWriter, r *http.Request) (tether.Transport, error) {
+		// Origin checking is done by the tether handler before this
 		// function is called, so skip the websocket library's check.
 		acceptOpts := &websocket.AcceptOptions{InsecureSkipVerify: true}
 
@@ -59,7 +59,7 @@ func Upgrade(opts ...Options) func(http.ResponseWriter, *http.Request) (poly.Tra
 	}
 }
 
-// transport implements [poly.Transport] over a single WebSocket
+// transport implements [tether.Transport] over a single WebSocket
 // connection. The connection is owned by the session event loop for
 // reads; writes are serialised by the underlying websocket library.
 type transport struct {
@@ -79,21 +79,21 @@ func (t *transport) Send(data []byte) error {
 // to io.EOF so the session event loop treats them as clean disconnects
 // rather than errors. All other WebSocket errors propagate as-is and
 // will terminate the session.
-func (t *transport) ReceiveEvent() (poly.Event, error) {
+func (t *transport) ReceiveEvent() (tether.Event, error) {
 	_, data, err := t.conn.Read(t.ctx)
 	if err != nil {
 		// Map WebSocket close to io.EOF so the session event loop
 		// treats it as a clean disconnect.
 		status := websocket.CloseStatus(err)
 		if status == websocket.StatusNormalClosure || status == websocket.StatusGoingAway {
-			return poly.Event{}, io.EOF
+			return tether.Event{}, io.EOF
 		}
-		return poly.Event{}, err
+		return tether.Event{}, err
 	}
 
-	var ev poly.Event
+	var ev tether.Event
 	if err := json.Unmarshal(data, &ev); err != nil {
-		return poly.Event{}, err
+		return tether.Event{}, err
 	}
 	return ev, nil
 }

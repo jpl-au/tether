@@ -1,6 +1,6 @@
-package poly
+package tether
 
-import "github.com/jpl-au/fluent-poly/dev"
+import "github.com/jpl-au/fluent-tether/dev"
 
 // On subscribes a session to a typed event bus. When the bus publishes
 // an event, fn is called inside the session's command loop (via
@@ -19,7 +19,7 @@ import "github.com/jpl-au/fluent-poly/dev"
 // two type parameters (E for the event, S for the state). Go methods
 // cannot introduce additional type parameters.
 //
-//	poly.On(messages, s, func(ev MessageSent, state ChatState) ChatState {
+//	tether.On(messages, s, func(ev MessageSent, state ChatState) ChatState {
 //	    state.Messages = append(state.Messages, ev.Text)
 //	    return state
 //	})

@@ -1,4 +1,4 @@
-package poly
+package tether
 
 import (
 	"encoding/json"
@@ -8,21 +8,21 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/jpl-au/fluent-poly/dev"
-	"github.com/jpl-au/fluent-poly/mode"
-	"github.com/jpl-au/fluent-poly/push"
+	"github.com/jpl-au/fluent-tether/dev"
+	"github.com/jpl-au/fluent-tether/mode"
+	"github.com/jpl-au/fluent-tether/push"
 )
 
 // ServeHTTP implements http.Handler. A single endpoint serves the
 // initial HTML page (GET without upgrade headers), the transport
 // connection (WebSocket upgrade or SSE stream), POST events (SSE mode
-// only), and the embedded client JS runtime at /_poly/. The Mode field
+// only), and the embedded client JS runtime at /_tether/. The Mode field
 // in Config determines which transport paths are active. Requests that
 // don't match any transport path fall through to the initial page render.
 func (h *Handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Serve the embedded client runtime (JS, idiomorph, service worker).
-	if strings.HasPrefix(r.URL.Path, "/_poly/") {
-		http.StripPrefix("/_poly", h.clientHandler).ServeHTTP(w, r)
+	if strings.HasPrefix(r.URL.Path, "/_tether/") {
+		http.StripPrefix("/_tether", h.clientHandler).ServeHTTP(w, r)
 		return
 	}
 
@@ -34,11 +34,11 @@ func (h *Handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// File uploads arrive as multipart POST with an X-Poly-Upload
+	// File uploads arrive as multipart POST with an X-Tether-Upload
 	// header. Handle them before the mode switch so they work with
 	// all transport modes.
-	if r.Method == "POST" && r.Header.Get("X-Poly-Upload") != "" {
-		dev.Debug("upload received", "session", r.Header.Get("X-Poly-Session"), "path", r.URL.Path, "remote", r.RemoteAddr)
+	if r.Method == "POST" && r.Header.Get("X-Tether-Upload") != "" {
+		dev.Debug("upload received", "session", r.Header.Get("X-Tether-Session"), "path", r.URL.Path, "remote", r.RemoteAddr)
 		h.handleUpload(w, r)
 		return
 	}
@@ -46,8 +46,8 @@ func (h *Handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Push subscription registrations arrive as POST with a special
 	// header, regardless of transport mode. Handle them before the
 	// mode switch to avoid being mistaken for an SSE event.
-	if r.Method == "POST" && r.Header.Get("X-Poly-Push-Subscribe") == "true" {
-		dev.Debug("push subscription received", "session", r.Header.Get("X-Poly-Session"))
+	if r.Method == "POST" && r.Header.Get("X-Tether-Push-Subscribe") == "true" {
+		dev.Debug("push subscription received", "session", r.Header.Get("X-Tether-Session"))
 		h.handlePushSubscribe(w, r)
 		return
 	}
@@ -119,7 +119,7 @@ func (h *Handler[S]) originAllowed(r *http.Request) bool {
 //
 // Requests without an Origin header are allowed because all
 // state-changing paths (POST events, uploads, push subscriptions)
-// require custom headers (X-Poly-Session, X-Poly-Upload, etc.) that
+// require custom headers (X-Tether-Session, X-Tether-Upload, etc.) that
 // trigger a CORS preflight — browsers never send a cross-origin
 // request with custom headers without a successful preflight first.
 // This means a missing Origin only occurs for same-origin requests
@@ -169,7 +169,7 @@ func (h *Handler[S]) handlePostEvent(w http.ResponseWriter, r *http.Request) {
 
 	// The session ID is sent as a header rather than a query parameter
 	// to keep it out of server access logs and browser history.
-	id := r.Header.Get("X-Poly-Session")
+	id := r.Header.Get("X-Tether-Session")
 	if id == "" {
 		http.Error(w, "missing session", http.StatusBadRequest)
 		return
@@ -224,7 +224,7 @@ func (h *Handler[S]) handlePushSubscribe(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	id := r.Header.Get("X-Poly-Session")
+	id := r.Header.Get("X-Tether-Session")
 	if id == "" {
 		http.Error(w, "missing session", http.StatusBadRequest)
 		return

@@ -1,4 +1,4 @@
-package poly
+package tether
 
 import (
 	"iter"
@@ -6,24 +6,24 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/jpl-au/fluent-poly/dev"
+	"github.com/jpl-au/fluent-tether/dev"
 )
 
 // Group tracks a set of sessions for broadcasting state updates.
 // Add sessions in OnConnect and remove them in OnDisconnect, or use
 // [Config].Groups for automatic membership:
 //
-//	group := poly.NewGroup[State]()
+//	group := tether.NewGroup[State]()
 //
-//	OnConnect: func(s *poly.Session[State]) {
+//	OnConnect: func(s *tether.Session[State]) {
 //	    group.Add(s)
 //	},
-//	OnDisconnect: func(s *poly.Session[State]) {
+//	OnDisconnect: func(s *tether.Session[State]) {
 //	    group.Remove(s)
 //	},
 //
 //	// Later, push an update to every session in the group:
-//	group.Broadcast(func(target *poly.Session[State], state State) State {
+//	group.Broadcast(func(target *tether.Session[State], state State) State {
 //	    state.Message = "Hello everyone"
 //	    return state
 //	})

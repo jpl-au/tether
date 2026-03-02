@@ -1,4 +1,4 @@
-package poly
+package tether
 
 import (
 	"context"
@@ -6,11 +6,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/jpl-au/fluent-poly/dev"
-	"github.com/jpl-au/fluent-poly/wire"
+	"github.com/jpl-au/fluent-tether/dev"
+	"github.com/jpl-au/fluent-tether/wire"
 
 	jit "github.com/jpl-au/fluent-jit"
-	"github.com/jpl-au/fluent-poly/push"
+	"github.com/jpl-au/fluent-tether/push"
 	"github.com/jpl-au/fluent/node"
 )
 
@@ -150,7 +150,7 @@ type PreSession interface {
 	// ID returns the session identifier. In live mode this is the
 	// unique, cryptographically random session ID. In stateless page
 	// mode (PageConfig) this returns an empty string because there is
-	// no persistent session. In polytest it returns "polytest".
+	// no persistent session. In tethertest it returns "tethertest".
 	ID() string
 	Context() context.Context
 	Go(fn func(context.Context))
@@ -220,13 +220,13 @@ func (c *captureSession) SignalBatch(pairs ...any) {
 // into a map. Panics if the count is odd or any key is not a string.
 func pairsToMap(pairs []any) map[string]any {
 	if len(pairs)%2 != 0 {
-		panic("poly: SignalBatch requires an even number of arguments")
+		panic("tether: SignalBatch requires an even number of arguments")
 	}
 	m := make(map[string]any, len(pairs)/2)
 	for i := 0; i < len(pairs); i += 2 {
 		key, ok := pairs[i].(string)
 		if !ok {
-			panic("poly: SignalBatch keys must be strings")
+			panic("tether: SignalBatch keys must be strings")
 		}
 		m[key] = pairs[i+1]
 	}

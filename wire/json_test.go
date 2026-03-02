@@ -8,8 +8,8 @@ import (
 func TestEncodeWithPatches(t *testing.T) {
 	u := Update{
 		Patches: []Patch{
-			{Key: "count", HTML: []byte(`<span data-poly-key="count">42</span>`)},
-			{Key: "name", HTML: []byte(`<span data-poly-key="name">Alice</span>`)},
+			{Key: "count", HTML: []byte(`<span data-tether-key="count">42</span>`)},
+			{Key: "name", HTML: []byte(`<span data-tether-key="name">Alice</span>`)},
 		},
 	}
 
@@ -46,7 +46,7 @@ func TestEncodeWithPatches(t *testing.T) {
 }
 
 func TestEncodeWithMorphs(t *testing.T) {
-	html := []byte(`<div data-poly-root><span>hello</span></div>`)
+	html := []byte(`<div data-tether-root><span>hello</span></div>`)
 	u := Update{
 		Morphs: []Morph{{Key: "", HTML: html}},
 	}

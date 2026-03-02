@@ -1,4 +1,4 @@
-package poly
+package tether
 
 import (
 	"net/http"
@@ -7,8 +7,8 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"github.com/jpl-au/fluent-poly/dev"
-	"github.com/jpl-au/fluent-poly/mode"
+	"github.com/jpl-au/fluent-tether/dev"
+	"github.com/jpl-au/fluent-tether/mode"
 )
 
 func testAssetFS() *Asset {
@@ -312,7 +312,7 @@ func TestMultipleAssets(t *testing.T) {
 func TestAssetChangesWorkerVersion(t *testing.T) {
 	workerBody := func(assets []*Asset) string {
 		h := newClientHandler(assets)
-		req := httptest.NewRequest("GET", "/fluent-poly-worker.js", nil)
+		req := httptest.NewRequest("GET", "/fluent-tether-worker.js", nil)
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, req)
 		return w.Body.String()

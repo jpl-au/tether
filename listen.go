@@ -1,4 +1,4 @@
-package poly
+package tether
 
 import (
 	"context"
@@ -20,9 +20,9 @@ import (
 // and Railway); if that is also empty, ":8080" is used.
 //
 // The optional handler parameter sets which [http.Handler] the HTTP
-// server routes requests through. When omitted, the poly handler
+// server routes requests through. When omitted, the tether handler
 // serves all requests directly. Pass a custom mux to add routes or
-// HTTP-level middleware alongside poly:
+// HTTP-level middleware alongside tether:
 //
 //	mux := http.NewServeMux()
 //	mux.HandleFunc("GET /health", healthCheck)

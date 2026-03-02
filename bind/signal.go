@@ -3,10 +3,10 @@ package bind
 // Signal bindings connect elements to server-pushed reactive values.
 // When the server calls Session.Signal, the client updates all bound
 // elements in the document instantly — no render, no diff, no HTML.
-// Bindings work document-wide, not just inside the poly root. This
+// Bindings work document-wide, not just inside the tether root. This
 // means elements in the [Config.Layout] shell (navigation highlights,
 // status indicators, body classes) react to signal updates alongside
-// elements in the morphed content area. Bindings inside the poly root
+// elements in the morphed content area. Bindings inside the tether root
 // survive morphs: the client reapplies current signal values after
 // idiomorph reconciliation.
 
@@ -15,7 +15,7 @@ package bind
 //
 //	bind.BindText(span.New(), "count")
 func BindText[E Settable[E]](el E, signal string) E {
-	return el.SetData("poly-bind-text", signal)
+	return el.SetData("tether-bind-text", signal)
 }
 
 // BindShow binds an element's visibility to a named signal. The
@@ -24,13 +24,13 @@ func BindText[E Settable[E]](el E, signal string) E {
 //
 //	bind.BindShow(div.New(children...), "isOpen")
 func BindShow[E Settable[E]](el E, signal string) E {
-	return el.SetData("poly-bind-show", signal)
+	return el.SetData("tether-bind-show", signal)
 }
 
 // BindHide is the inverse of [BindShow]. The element is hidden when
 // the value is truthy and shown when falsy.
 func BindHide[E Settable[E]](el E, signal string) E {
-	return el.SetData("poly-bind-hide", signal)
+	return el.SetData("tether-bind-hide", signal)
 }
 
 // BindClass binds a CSS class to a named signal. The class is added
@@ -39,7 +39,7 @@ func BindHide[E Settable[E]](el E, signal string) E {
 //
 //	bind.BindClass(span.New(), "active", "isSelected")
 func BindClass[E Settable[E]](el E, class, signal string) E {
-	return el.SetData("poly-bind-class", class+" "+signal)
+	return el.SetData("tether-bind-class", class+" "+signal)
 }
 
 // BindAttr binds an HTML attribute to a named signal. When the signal
@@ -48,7 +48,7 @@ func BindClass[E Settable[E]](el E, class, signal string) E {
 //
 //	bind.BindAttr(button.New(), "disabled", "isLoading")
 func BindAttr[E Settable[E]](el E, attr, signal string) E {
-	return el.SetData("poly-bind-attr", attr+" "+signal)
+	return el.SetData("tether-bind-attr", attr+" "+signal)
 }
 
 // BindValue binds a form element's value to a named signal. When the
@@ -59,5 +59,5 @@ func BindAttr[E Settable[E]](el E, attr, signal string) E {
 //
 //	bind.BindValue(input.Text("email", ""), "email")
 func BindValue[E Settable[E]](el E, signal string) E {
-	return el.SetData("poly-bind-value", signal)
+	return el.SetData("tether-bind-value", signal)
 }

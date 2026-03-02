@@ -3,7 +3,7 @@
 Reach users even when their tab is closed:
 
 ```go
-import "github.com/jpl-au/fluent-poly/push"
+import "github.com/jpl-au/fluent-tether/push"
 
 // Generate VAPID keys once during setup (store them securely).
 pub, priv, err := push.GenerateVAPIDKeys()
@@ -14,10 +14,10 @@ sender := push.NewSender(push.Config{
     Subject:         "mailto:admin@example.com",
 })
 
-poly.New(poly.Config[State]{
-    Push: &poly.PushConfig[State]{
+tether.New(tether.Config[State]{
+    Push: &tether.PushConfig[State]{
         Sender: sender,
-        OnSubscribe: func(sess *poly.Session[State], sub push.Subscription) {
+        OnSubscribe: func(sess *tether.Session[State], sub push.Subscription) {
             // Store sub.Endpoint and sub.Keys for later use.
         },
     },
@@ -72,9 +72,9 @@ Check with `errors.Is()`:
 
 | Error | Meaning |
 |-------|---------|
-| `poly.ErrPushNotConfigured` | Handler created without `PushConfig` |
-| `poly.ErrPushNoSubscription` | Browser has not registered a push subscription |
-| `poly.ErrPushPreWarm` | Push called during pre-warming (no browser yet) |
+| `tether.ErrPushNotConfigured` | Handler created without `PushConfig` |
+| `tether.ErrPushNoSubscription` | Browser has not registered a push subscription |
+| `tether.ErrPushPreWarm` | Push called during pre-warming (no browser yet) |
 | `push.ErrSubscriptionExpired` | Push service returned HTTP 410 |
 
 The `push` subpackage implements the Web Push protocol (RFC 8291 + RFC 8292) with VAPID JWT signing and aes128gcm payload encryption. It depends on `golang.org/x/crypto` for HKDF key derivation.

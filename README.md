@@ -1,8 +1,8 @@
-# fluent-poly
+# fluent-tether
 
 Reactive server-driven UI for [Fluent](https://github.com/jpl-au/fluent). Write Go, get live updates.
 
-fluent-poly connects Fluent's node trees to the browser via WebSocket (with SSE fallback). When state changes, only the parts that actually changed are sent as targeted patches. The client morphs the DOM in place, preserving input focus, scroll position, and form state.
+fluent-tether connects Fluent's node trees to the browser via WebSocket (with SSE fallback). When state changes, only the parts that actually changed are sent as targeted patches. The client morphs the DOM in place, preserving input focus, scroll position, and form state.
 
 Three update modes give you the right tool for every situation:
 
@@ -13,7 +13,7 @@ Three update modes give you the right tool for every situation:
 ## Quick example
 
 ```go
-mux.Handle("/counter", poly.New(poly.Config[CounterState]{
+mux.Handle("/counter", tether.New(tether.Config[CounterState]{
     Upgrade: ws.Upgrade(),
     InitialState: func(r *http.Request) CounterState {
         return CounterState{Count: 0}
@@ -24,7 +24,7 @@ mux.Handle("/counter", poly.New(poly.Config[CounterState]{
             bind.Click(button.Text("+1"), "increment"),
         )
     },
-    Handle: func(_ poly.PreSession, state CounterState, event poly.Event) CounterState {
+    Handle: func(_ tether.PreSession, state CounterState, event tether.Event) CounterState {
         if event.Action == "increment" {
             state.Count++
         }
@@ -33,13 +33,13 @@ mux.Handle("/counter", poly.New(poly.Config[CounterState]{
 }))
 
 // Serve the client JS runtime.
-mux.Handle("/_poly/", http.StripPrefix("/_poly/", poly.ServeClient()))
+mux.Handle("/_tether/", http.StripPrefix("/_tether/", tether.ServeClient()))
 ```
 
 When the handler is not at root, mount the client JS runtime separately:
 
 ```go
-mux.Handle("/_poly/", http.StripPrefix("/_poly/", poly.ServeClient()))
+mux.Handle("/_tether/", http.StripPrefix("/_tether/", tether.ServeClient()))
 ```
 
 No WebSocket boilerplate. No JavaScript to write. No diff algorithm to understand.
@@ -50,7 +50,7 @@ When the handler owns the entire page, `ListenAndServe` handles signal
 trapping, graceful shutdown, and sensible defaults:
 
 ```go
-h := poly.New(poly.Config[State]{
+h := tether.New(tether.Config[State]{
     Upgrade:      ws.Upgrade(),
     Fallback:     sse.Upgrade(),
     Mode:         mode.Both,
@@ -75,10 +75,10 @@ Serve CSS, JS, and images from an `embed.FS` with automatic content-hashed URLs.
 //go:embed static
 var staticFS embed.FS
 
-var assets = &poly.Asset{FS: staticFS, Prefix: "/static/"}
+var assets = &tether.Asset{FS: staticFS, Prefix: "/static/"}
 
-poly.New(poly.Config[State]{
-    Assets: []*poly.Asset{assets},
+tether.New(tether.Config[State]{
+    Assets: []*tether.Asset{assets},
     Layout: func(state State, content node.Node) node.Node {
         return html.New(
             head.New(assets.Stylesheet("styles.css")),
@@ -94,9 +94,9 @@ poly.New(poly.Config[State]{
 
 | Guide | Description |
 |-------|-------------|
-| [API reference](docs/api.md) | Config, Session, Event, Middleware, polytest, bind helpers |
+| [API reference](docs/api.md) | Config, Session, Event, Middleware, tethertest, bind helpers |
 | [Getting started](docs/getting-started.md) | Setup, how updates reach the browser |
-| [Stateless pages](docs/stateless.md) | poly.Page for request/response pages without persistent connections |
+| [Stateless pages](docs/stateless.md) | tether.Page for request/response pages without persistent connections |
 | [Events](docs/events.md) | Event binding, timing, loading states, forms |
 | [Signals](docs/signals.md) | Reactive signals, client directives, optimistic updates |
 | [Server updates](docs/server-updates.md) | Update, Navigate, SetTitle, Flash, Announce, Dynamic keys |

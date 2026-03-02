@@ -1,10 +1,10 @@
-package poly
+package tether
 
 import (
 	"net/http"
 	"testing"
 
-	"github.com/jpl-au/fluent-poly/mode"
+	"github.com/jpl-au/fluent-tether/mode"
 )
 
 func TestHealthEmpty(t *testing.T) {

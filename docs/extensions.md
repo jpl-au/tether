@@ -7,9 +7,9 @@ Extensions are opt-in features that add capabilities beyond the core render/hand
 Enable uploads by setting `Config.Upload`:
 
 ```go
-poly.New(poly.Config[State]{
-    Upload: &poly.UploadConfig[State]{
-        Handle: func(sess *poly.Session[State], upload poly.Upload) error {
+tether.New(tether.Config[State]{
+    Upload: &tether.UploadConfig[State]{
+        Handle: func(sess *tether.Session[State], upload tether.Upload) error {
             file, err := upload.Open()
             if err != nil {
                 return err
@@ -34,7 +34,7 @@ The `Handle` callback runs in its own goroutine, so I/O operations (disk writes,
 
 ### Upload struct
 
-The `poly.Upload` passed to the Handle callback contains file metadata and a method to read the contents:
+The `tether.Upload` passed to the Handle callback contains file metadata and a method to read the contents:
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -79,27 +79,27 @@ bind.UploadProgress(
 Enable asset caching and offline page shells:
 
 ```go
-poly.New(poly.Config[State]{
+tether.New(tether.Config[State]{
     Worker: true,
     // ...
 })
 ```
 
-The service worker caches the JS runtime (`fluent-poly.js`, `idiomorph.min.js`) using a cache-first strategy. Navigation responses are only cached when the server sends the `X-Poly-Cache: true` header. Cached pages are served as a fallback when offline.
+The service worker caches the JS runtime (`fluent-tether.js`, `idiomorph.min.js`) using a cache-first strategy. Navigation responses are only cached when the server sends the `X-Tether-Cache: true` header. Cached pages are served as a fallback when offline.
 
 ### Precaching additional assets
 
 Use the `Precache` field on `Asset` to cache app-specific assets on service worker install:
 
 ```go
-var assets = &poly.Asset{
+var assets = &tether.Asset{
     FS:       staticFS,
     Prefix:   "/static/",
     Precache: []string{"styles.css", "logo.svg"},
 }
 
-poly.New(poly.Config[State]{
-    Assets: []*poly.Asset{assets},
+tether.New(tether.Config[State]{
+    Assets: []*tether.Asset{assets},
     Worker: true,
     // ...
 })
@@ -109,21 +109,21 @@ The cache version is derived from a content hash of all embedded files and appli
 
 ### Dev mode
 
-In dev mode (`Config.DevMode` or `POLY_DEV=1`), the service worker is not registered to ensure fresh assets during development.
+In dev mode (`Config.DevMode` or `TETHER_DEV=1`), the service worker is not registered to ensure fresh assets during development.
 
 ## Push notifications
 
 Push notifications are covered in detail in [push notifications](push-notifications.md). Brief setup:
 
 ```go
-poly.New(poly.Config[State]{
-    Push: &poly.PushConfig[State]{
+tether.New(tether.Config[State]{
+    Push: &tether.PushConfig[State]{
         Sender: push.NewSender(push.Config{
             VAPIDPublicKey:  publicKey,
             VAPIDPrivateKey: privateKey,
             Subject:         "mailto:admin@example.com",
         }),
-        OnSubscribe: func(sess *poly.Session[State], sub push.Subscription) {
+        OnSubscribe: func(sess *tether.Session[State], sub push.Subscription) {
             // Store subscription in your database
         },
     },

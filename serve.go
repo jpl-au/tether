@@ -1,4 +1,4 @@
-package poly
+package tether
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"time"
 
 	jit "github.com/jpl-au/fluent-jit"
-	"github.com/jpl-au/fluent-poly/dev"
+	"github.com/jpl-au/fluent-tether/dev"
 )
 
 // serveInitialPage handles the initial GET request. It pre-warms the
@@ -68,7 +68,7 @@ func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 		pushKey = h.cfg.Push.Sender.PublicKey()
 	}
 
-	content := &polyBody{
+	content := &tetherBody{
 		html:              html,
 		endpoint:          r.URL.Path,
 		session:           id,

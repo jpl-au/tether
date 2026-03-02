@@ -1,5 +1,5 @@
-// Package bind provides element annotation helpers for fluent-poly.
-// Each function attaches a data-poly-* attribute to a Fluent element,
+// Package bind provides element annotation helpers for fluent-tether.
+// Each function attaches a data-tether-* attribute to a Fluent element,
 // telling the client JS runtime how to handle that element — which
 // events to forward, what client-side behaviour to apply, or which
 // reactive signals to bind.

@@ -1,4 +1,4 @@
-package poly
+package tether
 
 import (
 	"encoding/json"
@@ -9,10 +9,10 @@ import (
 	"os"
 	"strings"
 
-	"github.com/jpl-au/fluent-poly/dev"
-	"github.com/jpl-au/fluent-poly/event"
-	"github.com/jpl-au/fluent-poly/mode"
-	"github.com/jpl-au/fluent-poly/wire"
+	"github.com/jpl-au/fluent-tether/dev"
+	"github.com/jpl-au/fluent-tether/event"
+	"github.com/jpl-au/fluent-tether/mode"
+	"github.com/jpl-au/fluent-tether/wire"
 	"github.com/jpl-au/fluent/node"
 )
 
@@ -75,7 +75,7 @@ type PageConfig[S any] struct {
 
 	// DevMode enables development conveniences: debug logging by
 	// default and Cache-Control: no-store on all responses. Enable
-	// via this field or the POLY_DEV environment variable.
+	// via this field or the TETHER_DEV environment variable.
 	DevMode bool
 
 	// LogJSON selects JSON output for the default logger instead of
@@ -96,16 +96,16 @@ type PageConfig[S any] struct {
 // events via individual fetch POST requests and applies the response.
 func Page[S any](cfg PageConfig[S]) http.Handler {
 	if cfg.State == nil {
-		panic("poly: PageConfig.State is required")
+		panic("tether: PageConfig.State is required")
 	}
 	if cfg.Render == nil {
-		panic("poly: PageConfig.Render is required")
+		panic("tether: PageConfig.Render is required")
 	}
 	if cfg.Handle == nil {
-		panic("poly: PageConfig.Handle is required")
+		panic("tether: PageConfig.Handle is required")
 	}
 
-	if !cfg.DevMode && os.Getenv("POLY_DEV") != "" {
+	if !cfg.DevMode && os.Getenv("TETHER_DEV") != "" {
 		cfg.DevMode = true
 	}
 	if cfg.Logger == nil {
@@ -151,8 +151,8 @@ type pageHandler[S any] struct {
 }
 
 func (p *pageHandler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if strings.HasPrefix(r.URL.Path, "/_poly/") {
-		http.StripPrefix("/_poly", p.clientHandler).ServeHTTP(w, r)
+	if strings.HasPrefix(r.URL.Path, "/_tether/") {
+		http.StripPrefix("/_tether", p.clientHandler).ServeHTTP(w, r)
 		return
 	}
 
@@ -191,7 +191,7 @@ func (p *pageHandler[S]) serveGET(w http.ResponseWriter, r *http.Request) {
 	tree := p.cfg.Render(state)
 	html := tree.Render()
 
-	content := &polyBody{
+	content := &tetherBody{
 		html:              html,
 		endpoint:          r.URL.Path,
 		transport:         mode.HTTP,

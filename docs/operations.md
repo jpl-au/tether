@@ -23,9 +23,9 @@ mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 SIGINT or SIGTERM, then force-closing after the grace period:
 
 ```go
-h := poly.New(poly.Config[State]{
+h := tether.New(tether.Config[State]{
     // ...
-    Timeouts: poly.Timeouts{
+    Timeouts: tether.Timeouts{
         ShutdownGrace: 15 * time.Second, // default: 10s
     },
 })
@@ -54,16 +54,16 @@ handler.Shutdown(ctx) // stops the reaper and releases resources
 During development, enable dev mode for fast iteration:
 
 ```go
-poly.New(poly.Config[State]{
+tether.New(tether.Config[State]{
     DevMode: true,
     // ...
 })
 ```
 
-Or set the `POLY_DEV` environment variable without changing code:
+Or set the `TETHER_DEV` environment variable without changing code:
 
 ```bash
-POLY_DEV=1 go run .
+TETHER_DEV=1 go run .
 ```
 
 Dev mode does the following:
@@ -77,18 +77,18 @@ Dev mode does the following:
 7. **Per-session diagnostics** — all session-level debug logging (events, diffs, reconnections, group membership, etc.) is gated behind dev mode via `dev.Debug`. In production with dev mode off, none of this output fires. For structured observability, use `OnStructuralChange` and `OnNoPatch` callbacks instead
 8. **Discarded effect warnings** — logs a warning when a handler panic discards buffered side effects (Toast, Signal, Navigate, etc.)
 
-Diagnostics are centralised in the `dev` package. During handler construction, `Config.DevMode` (or `POLY_DEV`) calls `dev.Enable()` once. After that, all runtime checks — cache headers, the `data-poly-dev` attribute, diagnostic logging — use `dev.Enabled()`. No code threads the `DevMode` bool downstream; everything goes through the `dev` package.
+Diagnostics are centralised in the `dev` package. During handler construction, `Config.DevMode` (or `TETHER_DEV`) calls `dev.Enable()` once. After that, all runtime checks — cache headers, the `data-tether-dev` attribute, diagnostic logging — use `dev.Enabled()`. No code threads the `DevMode` bool downstream; everything goes through the `dev` package.
 
 Call sites use `dev.Warn()`, `dev.Debug()`, and `dev.Error()` which silently no-op outside dev mode.
 
-The `DevMode` bool takes precedence. When it's false (the default), the `POLY_DEV` environment variable is checked as a fallback.
+The `DevMode` bool takes precedence. When it's false (the default), the `TETHER_DEV` environment variable is checked as a fallback.
 
 ### Logger format
 
 By default the framework creates a text logger. Set `LogJSON: true` for structured JSON output:
 
 ```go
-poly.New(poly.Config[State]{
+tether.New(tether.Config[State]{
     LogJSON: true,
     // ...
 })
@@ -99,7 +99,7 @@ poly.New(poly.Config[State]{
 Track client-side errors without browser dev tools:
 
 ```js
-Poly.onError = function(err) {
+Tether.onError = function(err) {
     // err.type: "parse", "fetch", "worker", "push", "indexeddb", "render"
     // err.message: human-readable description
     fetch("/errors", {
@@ -109,15 +109,15 @@ Poly.onError = function(err) {
 };
 ```
 
-When set, `Poly.onError` is called for every error and warning the JS runtime encounters. When not set, warnings are logged to `console.warn` and silent errors (parse failures, IndexedDB issues) remain silent.
+When set, `Tether.onError` is called for every error and warning the JS runtime encounters. When not set, warnings are logged to `console.warn` and silent errors (parse failures, IndexedDB issues) remain silent.
 
 ## Structural change diagnostics
 
 When the diff engine detects a structural change (Dynamic keys added, removed, or reordered), it falls back to a full root morph. The `OnStructuralChange` callback lets you observe these for logging, metrics, or debugging:
 
 ```go
-poly.New(poly.Config[State]{
-    OnStructuralChange: func(s *poly.Session[State], c poly.StructuralChange) {
+tether.New(tether.Config[State]{
+    OnStructuralChange: func(s *tether.Session[State], c tether.StructuralChange) {
         slog.Warn("structural change",
             "session", s.ID(),
             "added", c.Added,

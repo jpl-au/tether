@@ -1,4 +1,4 @@
-package poly
+package tether
 
 import (
 	"context"
@@ -8,9 +8,9 @@ import (
 	"testing"
 
 	jit "github.com/jpl-au/fluent-jit"
-	"github.com/jpl-au/fluent-poly/bind"
-	"github.com/jpl-au/fluent-poly/event"
-	"github.com/jpl-au/fluent-poly/wire"
+	"github.com/jpl-au/fluent-tether/bind"
+	"github.com/jpl-au/fluent-tether/event"
+	"github.com/jpl-au/fluent-tether/wire"
 	"github.com/jpl-au/fluent/html5/button"
 	"github.com/jpl-au/fluent/html5/div"
 	"github.com/jpl-au/fluent/html5/span"
@@ -18,7 +18,7 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// Generic poly.Click vs raw SetData
+// Generic tether.Click vs raw SetData
 // ---------------------------------------------------------------------------
 
 // BenchmarkBindClick measures Click (generic wrapper) + Render.
@@ -32,7 +32,7 @@ func BenchmarkBindClick(b *testing.B) {
 // BenchmarkSetDataDirect measures raw SetData (no generic) + Render.
 func BenchmarkSetDataDirect(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		el := button.Text("+").SetData("poly-click", "increment")
+		el := button.Text("+").SetData("tether-click", "increment")
 		_ = el.Render()
 	}
 }
@@ -49,7 +49,7 @@ func BenchmarkBindClickRenderOnly(b *testing.B) {
 
 // BenchmarkSetDataDirectRenderOnly is the SetData equivalent.
 func BenchmarkSetDataDirectRenderOnly(b *testing.B) {
-	el := button.Text("+").SetData("poly-click", "increment")
+	el := button.Text("+").SetData("tether-click", "increment")
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = el.Render()
@@ -78,7 +78,7 @@ func benchEncodeUpdatePatches(b *testing.B, n int) {
 		key := fmt.Sprintf("key-%d", i)
 		patches[i] = wire.Patch{
 			Key:  key,
-			HTML: fmt.Appendf(nil, `<span data-poly-key="%s">value %d</span>`, key, i),
+			HTML: fmt.Appendf(nil, `<span data-tether-key="%s">value %d</span>`, key, i),
 		}
 	}
 	u := wire.Update{Patches: patches}
@@ -91,7 +91,7 @@ func benchEncodeUpdatePatches(b *testing.B, n int) {
 }
 
 func BenchmarkEncodeUpdateMorph(b *testing.B) {
-	html := []byte(`<div data-poly-root><span data-poly-key="count">42</span><span data-poly-key="name">Alice</span></div>`)
+	html := []byte(`<div data-tether-root><span data-tether-key="count">42</span><span data-tether-key="name">Alice</span></div>`)
 	u := wire.Update{
 		Morphs: []wire.Morph{{Key: "", HTML: html}},
 	}

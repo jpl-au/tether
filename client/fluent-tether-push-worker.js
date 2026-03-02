@@ -1,4 +1,4 @@
-// fluent-poly-push-worker.js — minimal service worker for push only.
+// fluent-tether-push-worker.js — minimal service worker for push only.
 //
 // Registered when Push is configured but Worker is false. Handles push
 // events and notification clicks without intercepting fetch requests,

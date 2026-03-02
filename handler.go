@@ -1,4 +1,4 @@
-package poly
+package tether
 
 import (
 	"log/slog"
@@ -10,10 +10,10 @@ import (
 	"time"
 
 	jit "github.com/jpl-au/fluent-jit"
-	"github.com/jpl-au/fluent-poly/dev"
-	"github.com/jpl-au/fluent-poly/event"
-	"github.com/jpl-au/fluent-poly/mode"
-	"github.com/jpl-au/fluent-poly/wire"
+	"github.com/jpl-au/fluent-tether/dev"
+	"github.com/jpl-au/fluent-tether/event"
+	"github.com/jpl-au/fluent-tether/mode"
+	"github.com/jpl-au/fluent-tether/wire"
 )
 
 // pendingSession holds a pre-warmed session created during the initial GET
@@ -28,12 +28,12 @@ type pendingSession[S any] struct {
 // defaultPendingTimeout is used when PendingTimeout is zero.
 const defaultPendingTimeout = 30 * time.Second
 
-// Handler manages the lifecycle of poly sessions. Sessions move through
+// Handler manages the lifecycle of tether sessions. Sessions move through
 // three pools — pending, active, and disconnected — so the server can
 // pre-warm state on the initial GET and preserve it across brief network
 // interruptions. Use Shutdown for graceful termination.
 //
-// The handler also serves the embedded client runtime at /_poly/ — there
+// The handler also serves the embedded client runtime at /_tether/ — there
 // is no need to mount a separate file server for the JS assets.
 type Handler[S any] struct {
 	cfg          Config[S]
@@ -45,7 +45,7 @@ type Handler[S any] struct {
 	closeOnce    sync.Once
 	draining     atomic.Bool
 
-	// clientHandler serves the embedded JS runtime at /_poly/*.
+	// clientHandler serves the embedded JS runtime at /_tether/*.
 	clientHandler http.Handler
 
 	// encoder serialises updates for the wire format selected by
@@ -74,25 +74,25 @@ type assetMount struct {
 // exits.
 func New[S any](cfg Config[S]) *Handler[S] {
 	if cfg.InitialState == nil {
-		panic("poly: Config.InitialState is required")
+		panic("tether: Config.InitialState is required")
 	}
 	if cfg.Render == nil {
-		panic("poly: Config.Render is required")
+		panic("tether: Config.Render is required")
 	}
 	if cfg.Handle == nil {
-		panic("poly: Config.Handle is required")
+		panic("tether: Config.Handle is required")
 	}
 	if cfg.Mode == mode.HTTP {
-		panic("poly: mode.HTTP is for poly.Page — use mode.WebSocket, mode.ServerSentEvents, or mode.Both")
+		panic("tether: mode.HTTP is for tether.Page — use mode.WebSocket, mode.ServerSentEvents, or mode.Both")
 	}
 	if cfg.Mode == 0 {
 		cfg.Mode = mode.Both
 	}
 	if cfg.Mode != mode.ServerSentEvents && cfg.Upgrade == nil {
-		panic("poly: Config.Upgrade is required — use ws.Upgrade() or set Mode to mode.ServerSentEvents")
+		panic("tether: Config.Upgrade is required — use ws.Upgrade() or set Mode to mode.ServerSentEvents")
 	}
 	if cfg.Mode != mode.WebSocket && cfg.Fallback == nil {
-		panic("poly: Config.Fallback is required — use sse.Upgrade() or set Mode to mode.WebSocket")
+		panic("tether: Config.Fallback is required — use sse.Upgrade() or set Mode to mode.WebSocket")
 	}
 
 	// Compose OnNavigate into Handle so the middleware chain applies
@@ -117,7 +117,7 @@ func New[S any](cfg Config[S]) *Handler[S] {
 		cfg.Handle = chain(cfg.Handle, cfg.Middleware)
 	}
 
-	if !cfg.DevMode && os.Getenv("POLY_DEV") != "" {
+	if !cfg.DevMode && os.Getenv("TETHER_DEV") != "" {
 		cfg.DevMode = true
 	}
 	if cfg.Logger == nil {
@@ -135,7 +135,7 @@ func New[S any](cfg Config[S]) *Handler[S] {
 	slog.SetDefault(cfg.Logger)
 	if cfg.DevMode {
 		dev.Enable()
-		slog.Info("poly: dev mode enabled")
+		slog.Info("tether: dev mode enabled")
 	}
 	if cfg.Timeouts.Reconnect == 0 {
 		cfg.Timeouts.Reconnect = defaultReconnectTimeout

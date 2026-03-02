@@ -1,10 +1,10 @@
-package polytest_test
+package tethertest_test
 
 import (
 	"testing"
 
-	poly "github.com/jpl-au/fluent-poly"
-	"github.com/jpl-au/fluent-poly/polytest"
+	tether "github.com/jpl-au/fluent-tether"
+	"github.com/jpl-au/fluent-tether/tethertest"
 	"github.com/jpl-au/fluent/html5/div"
 	"github.com/jpl-au/fluent/html5/span"
 	"github.com/jpl-au/fluent/node"
@@ -21,7 +21,7 @@ func render(s state) node.Node {
 	)
 }
 
-func handle(sess poly.PreSession, s state, ev poly.Event) state {
+func handle(sess tether.PreSession, s state, ev tether.Event) state {
 	switch ev.Action {
 	case "increment":
 		s.Count++
@@ -45,8 +45,8 @@ func handle(sess poly.PreSession, s state, ev poly.Event) state {
 	return s
 }
 
-func newHarness() *polytest.Harness[state] {
-	return polytest.New(polytest.Config[state]{
+func newHarness() *tethertest.Harness[state] {
+	return tethertest.New(tethertest.Config[state]{
 		State:  state{Count: 0},
 		Render: render,
 		Handle: handle,
@@ -141,10 +141,10 @@ func TestSendInput(t *testing.T) {
 }
 
 func TestSendSubmit(t *testing.T) {
-	h := polytest.New(polytest.Config[state]{
+	h := tethertest.New(tethertest.Config[state]{
 		State:  state{},
 		Render: render,
-		Handle: func(_ poly.PreSession, s state, ev poly.Event) state {
+		Handle: func(_ tether.PreSession, s state, ev tether.Event) state {
 			s.Name = ev.Data["name"]
 			return s
 		},
@@ -221,10 +221,10 @@ func TestHasFlash(t *testing.T) {
 }
 
 func TestURLWasReplaced(t *testing.T) {
-	h := polytest.New(polytest.Config[state]{
+	h := tethertest.New(tethertest.Config[state]{
 		State:  state{},
 		Render: render,
-		Handle: func(sess poly.PreSession, s state, ev poly.Event) state {
+		Handle: func(sess tether.PreSession, s state, ev tether.Event) state {
 			switch ev.Action {
 			case "nav":
 				sess.Navigate("/new")
@@ -247,16 +247,16 @@ func TestURLWasReplaced(t *testing.T) {
 }
 
 func TestNavigateSkipsHandle(t *testing.T) {
-	h := polytest.New(polytest.Config[state]{
+	h := tethertest.New(tethertest.Config[state]{
 		State:  state{},
 		Render: render,
-		Handle: func(_ poly.PreSession, s state, _ poly.Event) state {
+		Handle: func(_ tether.PreSession, s state, _ tether.Event) state {
 			// Handle should NOT be called for navigate events when
 			// OnNavigate is set — this mirrors live session behaviour.
 			s.Count = 999
 			return s
 		},
-		OnNavigate: func(_ poly.PreSession, s state, params poly.Params) state {
+		OnNavigate: func(_ tether.PreSession, s state, params tether.Params) state {
 			s.Name = params.Path
 			return s
 		},
@@ -272,13 +272,13 @@ func TestNavigateSkipsHandle(t *testing.T) {
 }
 
 func TestNavigateWithPath(t *testing.T) {
-	h := polytest.New(polytest.Config[state]{
+	h := tethertest.New(tethertest.Config[state]{
 		State:  state{},
 		Render: render,
-		Handle: func(_ poly.PreSession, s state, _ poly.Event) state {
+		Handle: func(_ tether.PreSession, s state, _ tether.Event) state {
 			return s
 		},
-		OnNavigate: func(sess poly.PreSession, s state, params poly.Params) state {
+		OnNavigate: func(sess tether.PreSession, s state, params tether.Params) state {
 			s.Name = params.Path
 			if id := params.Query.Get("id"); id != "" {
 				s.Name += ":" + id
@@ -297,8 +297,8 @@ func TestMiddleware(t *testing.T) {
 	// Encode call order into state so we verify the local re-derivation
 	// path rather than capturing closure side effects from both HTTP and
 	// local paths.
-	outer := func(next polytest.HandleFunc[state]) polytest.HandleFunc[state] {
-		return func(sess poly.PreSession, s state, ev poly.Event) state {
+	outer := func(next tethertest.HandleFunc[state]) tethertest.HandleFunc[state] {
+		return func(sess tether.PreSession, s state, ev tether.Event) state {
 			s.Name += "A"
 			s = next(sess, s, ev)
 			s.Name += "E"
@@ -306,8 +306,8 @@ func TestMiddleware(t *testing.T) {
 		}
 	}
 
-	inner := func(next polytest.HandleFunc[state]) polytest.HandleFunc[state] {
-		return func(sess poly.PreSession, s state, ev poly.Event) state {
+	inner := func(next tethertest.HandleFunc[state]) tethertest.HandleFunc[state] {
+		return func(sess tether.PreSession, s state, ev tether.Event) state {
 			s.Name += "B"
 			s = next(sess, s, ev)
 			s.Name += "D"
@@ -315,15 +315,15 @@ func TestMiddleware(t *testing.T) {
 		}
 	}
 
-	h := polytest.New(polytest.Config[state]{
+	h := tethertest.New(tethertest.Config[state]{
 		State:  state{},
 		Render: render,
-		Handle: func(_ poly.PreSession, s state, ev poly.Event) state {
+		Handle: func(_ tether.PreSession, s state, ev tether.Event) state {
 			s.Name += "C"
 			s.Count++
 			return s
 		},
-		Middleware: []polytest.Middleware[state]{outer, inner},
+		Middleware: []tethertest.Middleware[state]{outer, inner},
 	})
 
 	h.Send("anything")
@@ -352,11 +352,11 @@ func TestEffectsResetBetweenSends(t *testing.T) {
 
 func TestConnect(t *testing.T) {
 	called := false
-	h := polytest.New(polytest.Config[state]{
+	h := tethertest.New(tethertest.Config[state]{
 		State:  state{},
 		Render: render,
 		Handle: handle,
-		OnConnect: func(_ poly.PreSession) {
+		OnConnect: func(_ tether.PreSession) {
 			called = true
 		},
 	})
@@ -369,11 +369,11 @@ func TestConnect(t *testing.T) {
 
 func TestDisconnect(t *testing.T) {
 	called := false
-	h := polytest.New(polytest.Config[state]{
+	h := tethertest.New(tethertest.Config[state]{
 		State:  state{},
 		Render: render,
 		Handle: handle,
-		OnDisconnect: func(_ poly.PreSession) {
+		OnDisconnect: func(_ tether.PreSession) {
 			called = true
 		},
 	})

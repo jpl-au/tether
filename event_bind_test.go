@@ -1,4 +1,4 @@
-package poly
+package tether
 
 import "testing"
 
@@ -9,8 +9,8 @@ func TestBindBasicForm(t *testing.T) {
 	}}
 
 	var form struct {
-		Email string `poly:"email"`
-		Age   int    `poly:"age"`
+		Email string `tether:"email"`
+		Age   int    `tether:"age"`
 	}
 	if err := ev.Bind(&form); err != nil {
 		t.Fatalf("Bind() error: %v", err)
@@ -41,8 +41,8 @@ func TestBindMissingFieldsAreSkipped(t *testing.T) {
 	ev := Event{Data: map[string]string{"email": "alice@example.com"}}
 
 	var form struct {
-		Email string `poly:"email"`
-		Age   int    `poly:"age"`
+		Email string `tether:"email"`
+		Age   int    `tether:"age"`
 	}
 	if err := ev.Bind(&form); err != nil {
 		t.Fatalf("Bind() error: %v", err)
@@ -56,7 +56,7 @@ func TestBindBoolField(t *testing.T) {
 	ev := Event{Data: map[string]string{"agree": "true"}}
 
 	var form struct {
-		Agree bool `poly:"agree"`
+		Agree bool `tether:"agree"`
 	}
 	if err := ev.Bind(&form); err != nil {
 		t.Fatalf("Bind() error: %v", err)
@@ -70,7 +70,7 @@ func TestBindFloat64Field(t *testing.T) {
 	ev := Event{Data: map[string]string{"amount": "19.95"}}
 
 	var form struct {
-		Amount float64 `poly:"amount"`
+		Amount float64 `tether:"amount"`
 	}
 	if err := ev.Bind(&form); err != nil {
 		t.Fatalf("Bind() error: %v", err)
@@ -84,7 +84,7 @@ func TestBindInvalidInt(t *testing.T) {
 	ev := Event{Data: map[string]string{"count": "abc"}}
 
 	var form struct {
-		Count int `poly:"count"`
+		Count int `tether:"count"`
 	}
 	if err := ev.Bind(&form); err == nil {
 		t.Error("expected error for non-integer value")
@@ -110,7 +110,7 @@ func TestBindInt64Field(t *testing.T) {
 	ev := Event{Data: map[string]string{"id": "9223372036854775807"}}
 
 	var form struct {
-		ID int64 `poly:"id"`
+		ID int64 `tether:"id"`
 	}
 	if err := ev.Bind(&form); err != nil {
 		t.Fatalf("Bind() error: %v", err)

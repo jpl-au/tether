@@ -1,4 +1,4 @@
-package poly
+package tether
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/jpl-au/fluent-poly/dev"
+	"github.com/jpl-au/fluent-tether/dev"
 )
 
 // Emitter identifies the session that published a domain event. It is
@@ -22,7 +22,7 @@ type Emitter interface {
 // Bus routes typed domain events to subscribers. Create one per event
 // type at program startup and share it across handlers:
 //
-//	var messages = poly.NewBus[MessageSent]()
+//	var messages = tether.NewBus[MessageSent]()
 //
 // Bus enables cross-handler communication that [Group] cannot provide.
 // Group requires all sessions to share the same state type. Bus is
@@ -88,7 +88,7 @@ func (b *Bus[E]) Len() int {
 }
 
 // subscribe is the internal registration method. sessionID is non-empty
-// for subscriptions created via poly.On (sender-filtered) and empty for
+// for subscriptions created via tether.On (sender-filtered) and empty for
 // raw Subscribe calls. Copy-on-write: a new map is built under the
 // write lock and stored atomically.
 func (b *Bus[E]) subscribe(ctx context.Context, fn func(E), sessionID string) func() {

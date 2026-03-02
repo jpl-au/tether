@@ -1,4 +1,4 @@
-package poly
+package tether
 
 // Scope focuses a [Session]'s state onto a smaller component type.
 // View extracts the component state from the full session state;
@@ -8,7 +8,7 @@ package poly
 //
 // Define scopes as package-level variables:
 //
-//	var todos = poly.Scope[AppState, TodoState]{
+//	var todos = tether.Scope[AppState, TodoState]{
 //	    View:   func(s AppState) TodoState { return s.Todos },
 //	    Update: func(s AppState, c TodoState) AppState { s.Todos = c; return s },
 //	}
@@ -24,11 +24,11 @@ type Scope[S, C any] struct {
 //
 // Call this from within the main [HandleFunc]:
 //
-//	func handle(sess *poly.Session[AppState], state AppState, ev poly.Event) AppState {
+//	func handle(sess *tether.Session[AppState], state AppState, ev tether.Event) AppState {
 //	    return todos.Handle(sess, state, ev, todoHandle)
 //	}
 //
-//	func todoHandle(sess poly.PreSession, ts TodoState, ev poly.Event) TodoState {
+//	func todoHandle(sess tether.PreSession, ts TodoState, ev tether.Event) TodoState {
 //	    switch ev.Action {
 //	    case "todo.add":
 //	        ts.Items = append(ts.Items, Todo{Text: ev.Value()})

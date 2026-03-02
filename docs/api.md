@@ -2,10 +2,10 @@
 
 ## Config
 
-`poly.Config[S]` configures a handler. Only `Render` is required — everything else has sensible defaults.
+`tether.Config[S]` configures a handler. Only `Render` is required — everything else has sensible defaults.
 
 ```go
-poly.New(poly.Config[State]{
+tether.New(tether.Config[State]{
     Upgrade:      ws.Upgrade(),
     InitialState: func(r *http.Request) State { return State{} },
     Render:       render,
@@ -22,7 +22,7 @@ poly.New(poly.Config[State]{
 | `Handle` | `func(PreSession, S, Event) S` | Processes events, returns new state |
 | `Middleware` | `[]Middleware[S]` | Wraps Handle with cross-cutting behaviour |
 | `OnNavigate` | `func(PreSession, S, Params) S` | Handles URL navigation and initial load |
-| `Layout` | `func(S, node.Node) node.Node` | Wraps the poly root in a full HTML document |
+| `Layout` | `func(S, node.Node) node.Node` | Wraps the tether root in a full HTML document |
 | `Equal` | `func(a, b S) bool` | Skips render when state is unchanged |
 
 ### Transport
@@ -110,7 +110,7 @@ When either callback is configured, the framework's own logging for that event i
 | `Push` | `*PushConfig[S]` | Web Push notifications (see [push](push-notifications.md)) |
 | `Worker` | `bool` | Enable service worker (auto-enabled by Push) |
 | `Assets` | `[]*Asset` | Embedded asset collections — auto-served with content-hashed URLs |
-| `DevMode` | `bool` | Development mode (or set `POLY_DEV=1`). See [operations](operations.md#dev-mode) |
+| `DevMode` | `bool` | Development mode (or set `TETHER_DEV=1`). See [operations](operations.md#dev-mode) |
 | `WireFormat` | `wire.Format` | Encoding for server-to-client updates (default `wire.JSON`) |
 
 ### Security
@@ -131,7 +131,7 @@ When either callback is configured, the framework's own logging for that event i
 
 ## Session
 
-`*poly.Session[S]` is the handle for an active connection. Methods are safe to call from any goroutine.
+`*tether.Session[S]` is the handle for an active connection. Methods are safe to call from any goroutine.
 
 ### State
 
@@ -166,12 +166,12 @@ s.Push(push.Notification{...})         // Web Push notification
 
 ### PreSession
 
-`poly.PreSession` is a non-generic interface exposing Session's side-effect methods without the state type parameter. It is available in `OnNavigate`, stateless page handlers, and reusable components.
+`tether.PreSession` is a non-generic interface exposing Session's side-effect methods without the state type parameter. It is available in `OnNavigate`, stateless page handlers, and reusable components.
 
 Because PreSession has no generic parameter, component handlers can accept it directly — they don't need to know the application's state type:
 
 ```go
-func todoHandle(sess poly.PreSession, ts TodoState, ev poly.Event) TodoState {
+func todoHandle(sess tether.PreSession, ts TodoState, ev tether.Event) TodoState {
     sess.Toast("Saved")   // works — no generic needed
     sess.Signal("count", len(ts.Items))
     return ts
@@ -213,8 +213,8 @@ count, _ := ev.Int("count")
 if ev.Bool("confirmed") { ... }
 
 var form struct {
-    Email string `poly:"email"`
-    Age   int    `poly:"age"`
+    Email string `tether:"email"`
+    Age   int    `tether:"age"`
 }
 ev.Bind(&form)
 ```
@@ -232,10 +232,10 @@ type Params struct {
 
 ## Handler
 
-`*poly.Handler[S]` implements `http.Handler`.
+`*tether.Handler[S]` implements `http.Handler`.
 
 ```go
-h := poly.New(cfg)
+h := tether.New(cfg)
 mux.Handle("/app", h)
 
 h.Health()          // HealthStatus{Pending, Active, Disconnected}
@@ -263,18 +263,18 @@ On `SIGINT` or `SIGTERM`, sessions are drained gracefully (up to `Timeouts.Shutd
 Broadcast state changes to multiple sessions:
 
 ```go
-group := poly.NewGroup[State]()
+group := tether.NewGroup[State]()
 group.Add(sess)
 group.Remove(sess)
 group.Len()       // member count
 group.All()       // iter.Seq[*Session[S]]
 
-group.Broadcast(func(target *poly.Session[State], s State) State {
+group.Broadcast(func(target *tether.Session[State], s State) State {
     s.Message = "hello"
     return s
 })
 
-group.BroadcastOthers(sender, func(target *poly.Session[State], s State) State {
+group.BroadcastOthers(sender, func(target *tether.Session[State], s State) State {
     s.Message = "hello"
     return s
 })
@@ -296,7 +296,7 @@ r.Route("/", router.Page[State]{Render: homeRender, Handle: homeHandle})
 r.Route("/settings", router.Page[State]{Render: settingsRender})
 r.NotFound(router.Page[State]{Render: notFoundRender})
 
-poly.New(poly.Config[State]{
+tether.New(tether.Config[State]{
     Render:       r.Render,
     Handle:       r.Handle,
     OnNavigate: r.OnNavigate(func(s *State, path string) { s.Page = path }),
@@ -460,7 +460,7 @@ bind.WithHook("chart")      bind.WithTransition("fade")
 Escape hatch for custom attributes:
 
 ```go
-bind.WithData("poly-custom", "value")  // data-poly-custom="value"
+bind.WithData("tether-custom", "value")  // data-tether-custom="value"
 ```
 
 ---
@@ -472,8 +472,8 @@ Wraps `Handle` for cross-cutting concerns. Applied outermost-first:
 ```go
 type Middleware[S any] func(HandleFunc[S]) HandleFunc[S]
 
-poly.New(poly.Config[State]{
-    Middleware: []poly.Middleware[State]{withLogging, withAuth},
+tether.New(tether.Config[State]{
+    Middleware: []tether.Middleware[State]{withLogging, withAuth},
 })
 ```
 
@@ -484,7 +484,7 @@ poly.New(poly.Config[State]{
 Render-level error boundary:
 
 ```go
-poly.Catch(func() node.Node {
+tether.Catch(func() node.Node {
     return riskyWidget(s)
 }, span.Text("Unavailable"))
 ```
@@ -493,16 +493,16 @@ Recovers panics, logs them, and returns the fallback node.
 
 ---
 
-## polytest
+## tethertest
 
 Test harness for Handle functions:
 
 ```go
-h := polytest.New(polytest.Config[State]{
+h := tethertest.New(tethertest.Config[State]{
     State:      State{Count: 0},
     Render:     render,
     Handle:     handle,
-    Middleware: []polytest.Middleware[State]{withAuth},
+    Middleware: []tethertest.Middleware[State]{withAuth},
     OnNavigate: onNavigate,
 })
 ```
@@ -513,7 +513,7 @@ h := polytest.New(polytest.Config[State]{
 h.Send("increment")                              // click event
 h.SendInput("search", "query")                   // input event with value
 h.SendSubmit("save", map[string]string{"n": "v"}) // submit event with form data
-h.SendEvent(poly.Event{...})                      // arbitrary event
+h.SendEvent(tether.Event{...})                      // arbitrary event
 h.Navigate("/users?id=42")                        // navigate event with URL params
 ```
 
@@ -558,10 +558,10 @@ h.URLWasReplaced()               // last URL used ReplaceURL (not Navigate)
 
 ### Middleware
 
-`polytest.Middleware` wraps the `PreSession`-based handler used by polytest and `PageConfig`:
+`tethertest.Middleware` wraps the `PreSession`-based handler used by tethertest and `PageConfig`:
 
 ```go
-type HandleFunc[S any] func(poly.PreSession, S, poly.Event) S
+type HandleFunc[S any] func(tether.PreSession, S, tether.Event) S
 type Middleware[S any] func(next HandleFunc[S]) HandleFunc[S]
 ```
 
@@ -572,7 +572,7 @@ type Middleware[S any] func(next HandleFunc[S]) HandleFunc[S]
 Typed pub/sub for cross-session communication. Create one per event type at program startup and share it across handlers:
 
 ```go
-var messages = poly.NewBus[MessageSent]()
+var messages = tether.NewBus[MessageSent]()
 ```
 
 ### Publishing
@@ -583,7 +583,7 @@ bus.Emit(sess, msg)      // to all except sender — use inside Handle
 bus.Len()                // active subscriber count
 ```
 
-`Emit` enqueues publication on the sender's command loop, so the sender's diff is sent to the client before other subscribers react. Subscriptions registered via `poly.On` whose session ID matches the emitting session are automatically skipped — preventing double-apply since Handle already updated the sender's state.
+`Emit` enqueues publication on the sender's command loop, so the sender's diff is sent to the client before other subscribers react. Subscriptions registered via `tether.On` whose session ID matches the emitting session are automatically skipped — preventing double-apply since Handle already updated the sender's state.
 
 ### Subscribing
 
@@ -593,16 +593,16 @@ Raw subscription for non-session consumers (external services, monitoring):
 cancel := bus.Subscribe(ctx, func(msg ChatMessage) { ... })
 ```
 
-Session-aware subscription via `poly.On` — the primary way to connect a Bus to a session:
+Session-aware subscription via `tether.On` — the primary way to connect a Bus to a session:
 
 ```go
-poly.On(messages, sess, func(msg MessageSent, state ChatState) ChatState {
+tether.On(messages, sess, func(msg MessageSent, state ChatState) ChatState {
     state.Messages = append(state.Messages, msg.Text)
     return state
 })
 ```
 
-`poly.On` subscribes the session to the bus. When an event arrives, the callback runs inside the session's command loop (via `Session.Update`) with the event and the current state. The callback returns the new state — same pattern as Update.
+`tether.On` subscribes the session to the bus. When an event arrives, the callback runs inside the session's command loop (via `Session.Update`) with the event and the current state. The callback returns the new state — same pattern as Update.
 
 Key behaviours:
 - **Sender filtering** — if the event was emitted by this session (via `Bus.Emit`), the callback is skipped automatically
@@ -612,8 +612,8 @@ Key behaviours:
 Typical usage is in `OnConnect`:
 
 ```go
-OnConnect: func(sess *poly.Session[State]) {
-    poly.On(activityBus, sess, func(item ActivityItem, s State) State {
+OnConnect: func(sess *tether.Session[State]) {
+    tether.On(activityBus, sess, func(item ActivityItem, s State) State {
         s.Activity = append(s.Activity, item)
         return s
     })
@@ -631,7 +631,7 @@ Bus is parameterised on the **event type** — any session can subscribe regardl
 Shared observable state that notifies sessions when it changes. Built on top of Bus internally:
 
 ```go
-var onlineCount = poly.NewValue(0)
+var onlineCount = tether.NewValue(0)
 ```
 
 ### Reading and writing
@@ -645,10 +645,10 @@ v.Len()               // active observer count
 
 ### Observing
 
-`poly.Observe` subscribes a session to a Value. The current value is delivered immediately so the session's state is up to date from the moment of subscription. Future changes via Store or Update are delivered automatically:
+`tether.Observe` subscribes a session to a Value. The current value is delivered immediately so the session's state is up to date from the moment of subscription. Future changes via Store or Update are delivered automatically:
 
 ```go
-poly.Observe(onlineCount, sess, func(count int, s State) State {
+tether.Observe(onlineCount, sess, func(count int, s State) State {
     s.OnlineUsers = count
     return s
 })
@@ -663,8 +663,8 @@ Key behaviours:
 Typical usage is in `OnConnect`:
 
 ```go
-OnConnect: func(sess *poly.Session[State]) {
-    poly.Observe(onlineCount, sess, func(count int, s State) State {
+OnConnect: func(sess *tether.Session[State]) {
+    tether.Observe(onlineCount, sess, func(count int, s State) State {
         s.OnlineCount = count
         return s
     })
@@ -682,7 +682,7 @@ Use Value for state that multiple sessions need to stay in sync with (online cou
 Focus session state onto a component:
 
 ```go
-sc := poly.Scope[State, FormState]{
+sc := tether.Scope[State, FormState]{
     View:   func(s State) FormState { return s.Form },
     Update: func(s State, f FormState) State { s.Form = f; return s },
 }
@@ -723,7 +723,7 @@ pub, priv, err := push.GenerateVAPIDKeys()
 
 | Error | Meaning |
 |-------|---------|
-| `poly.ErrPushNotConfigured` | Handler created without `PushConfig` |
-| `poly.ErrPushNoSubscription` | Browser has not registered a push subscription |
-| `poly.ErrPushPreWarm` | Push called during pre-warming (no browser yet) |
+| `tether.ErrPushNotConfigured` | Handler created without `PushConfig` |
+| `tether.ErrPushNoSubscription` | Browser has not registered a push subscription |
+| `tether.ErrPushPreWarm` | Push called during pre-warming (no browser yet) |
 | `push.ErrSubscriptionExpired` | Push service returned HTTP 410 |

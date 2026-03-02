@@ -2,16 +2,16 @@
 
 ## Overview
 
-`poly.Page` creates an `http.Handler` for traditional request/response pages — no WebSocket, no SSE, no persistent connection. Each request is independent: the server reconstructs state, renders HTML, and returns the response.
+`tether.Page` creates an `http.Handler` for traditional request/response pages — no WebSocket, no SSE, no persistent connection. Each request is independent: the server reconstructs state, renders HTML, and returns the response.
 
 Despite being stateless, pages get the same client-side features as live handlers: event binding, debounce, throttle, loading states, client-side directives, signals, transitions, and the morph engine. The only difference is the transport — events travel as individual fetch POST requests instead of a persistent channel.
 
-Use `poly.Page` when you don't need server push, live updates, or broadcasting. It works well for forms, CRUD interfaces, dashboards, and any page where the server only needs to respond to user actions.
+Use `tether.Page` when you don't need server push, live updates, or broadcasting. It works well for forms, CRUD interfaces, dashboards, and any page where the server only needs to respond to user actions.
 
 ## Quick example
 
 ```go
-mux.Handle("/", poly.Page(poly.PageConfig[State]{
+mux.Handle("/", tether.Page(tether.PageConfig[State]{
     State: func(r *http.Request) State {
         return State{User: getUserFromSession(r)}
     },
@@ -33,7 +33,7 @@ The POST response uses the same wire format as live mode, so the client JS handl
 ## PageConfig
 
 ```go
-poly.Page(poly.PageConfig[State]{
+tether.Page(tether.PageConfig[State]{
     // Required: reconstruct state from the HTTP request.
     // Called on every request (GET and POST). Derive state from
     // the URL, cookies, headers, or a database — not from r.Body.
@@ -45,27 +45,27 @@ poly.Page(poly.PageConfig[State]{
     // Required: process a client event and return the new state.
     // The session parameter is a PreSession — call Toast, Navigate,
     // Flash, etc. for side effects.
-    Handle: func(sess poly.PreSession, s State, ev poly.Event) State { ... },
+    Handle: func(sess tether.PreSession, s State, ev tether.Event) State { ... },
 
     // Optional: process URL parameters on every request.
     // Called after State on both GET and POST.
-    OnNavigate: func(sess poly.PreSession, s State, p poly.Params) State { ... },
+    OnNavigate: func(sess tether.PreSession, s State, p tether.Params) State { ... },
 
     // Optional: wrap page content in a full HTML document.
     Layout: func(s State, content node.Node) node.Node { ... },
 
     // Optional configuration.
-    Assets:   []*poly.Asset{assets},
-    Limits:   poly.Limits{MaxEventBytes: 128 << 10},
-    Client:   poly.Client{DefaultDebounce: 200 * time.Millisecond},
-    Security: poly.Security{AllowedOrigins: []string{"https://example.com"}},
+    Assets:   []*tether.Asset{assets},
+    Limits:   tether.Limits{MaxEventBytes: 128 << 10},
+    Client:   tether.Client{DefaultDebounce: 200 * time.Millisecond},
+    Security: tether.Security{AllowedOrigins: []string{"https://example.com"}},
     DevMode:  true,
 })
 ```
 
 ### Fields compared to Config
 
-| Feature | `poly.Page` | `poly.New` |
+| Feature | `tether.Page` | `tether.New` |
 |---------|-------------|------------|
 | State creation | `State(r)` — every request | `InitialState(r)` — once per session |
 | Transport | HTTP POST/response | WebSocket or SSE |
@@ -96,7 +96,7 @@ func render(s State) node.Node {
     ).Dynamic("counter")
 }
 
-func handle(_ poly.PreSession, s State, ev poly.Event) State {
+func handle(_ tether.PreSession, s State, ev tether.Event) State {
     if ev.Action == "increment" {
         count, _ := ev.Int("count")
         s.Count = count + 1
@@ -117,7 +117,7 @@ r.Route("/", router.Page[State]{Render: homeRender, Handle: homeHandle})
 r.Route("/settings", router.Page[State]{Render: settingsRender, Handle: settingsHandle})
 r.NotFound(router.Page[State]{Render: notFoundRender})
 
-poly.Page(poly.PageConfig[State]{
+tether.Page(tether.PageConfig[State]{
     State:      func(r *http.Request) State { return State{} },
     Render:     r.Render,
     Handle:     r.Handle,
@@ -133,7 +133,7 @@ poly.Page(poly.PageConfig[State]{
 Side effects work the same as in live mode, but they travel in the POST response instead of over a persistent channel:
 
 ```go
-func handle(sess poly.PreSession, s State, ev poly.Event) State {
+func handle(sess tether.PreSession, s State, ev tether.Event) State {
     if ev.Action == "save" {
         // ... save to database
         sess.Toast("Settings saved")
@@ -149,7 +149,7 @@ Note: `PreSession.ID()` returns an empty string in stateless mode — there is n
 
 ## When to upgrade to live mode
 
-Start with `poly.Page` and upgrade to `poly.New` when you need:
+Start with `tether.Page` and upgrade to `tether.New` when you need:
 
 - **Server push** — the server initiating updates without a client event (timers, database changes, external webhooks)
 - **Broadcasting** — pushing updates to multiple users simultaneously
@@ -157,4 +157,4 @@ Start with `poly.Page` and upgrade to `poly.New` when you need:
 - **File uploads** — streaming files via the upload extension
 - **Push notifications** — Web Push via the service worker
 
-The `Render` function, `HandleFunc` signature, `OnNavigate`, `Layout`, event bindings, and the `router` package all work identically in both modes. Upgrading typically means changing `poly.Page(PageConfig{...})` to `poly.New(Config{...})` and adding transport configuration.
+The `Render` function, `HandleFunc` signature, `OnNavigate`, `Layout`, event bindings, and the `router` package all work identically in both modes. Upgrading typically means changing `tether.Page(PageConfig{...})` to `tether.New(Config{...})` and adding transport configuration.

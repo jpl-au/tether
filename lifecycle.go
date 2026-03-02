@@ -1,6 +1,6 @@
-package poly
+package tether
 
-import "github.com/jpl-au/fluent-poly/wire"
+import "github.com/jpl-au/fluent-tether/wire"
 
 // reattach reconnects a disconnected session with a new transport.
 // A command is sent to the session's loop to swap in the new transport

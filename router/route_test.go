@@ -4,7 +4,7 @@ import (
 	"sync"
 	"testing"
 
-	poly "github.com/jpl-au/fluent-poly"
+	tether "github.com/jpl-au/fluent-tether"
 	"github.com/jpl-au/fluent/html5/div"
 	"github.com/jpl-au/fluent/html5/span"
 	"github.com/jpl-au/fluent/node"
@@ -12,16 +12,16 @@ import (
 
 func TestRouteOverwritesExistingPage(t *testing.T) {
 	r := New(selector)
-	r.Route("/", Page[state]{Handle: func(_ poly.PreSession, s state, _ poly.Event) state {
+	r.Route("/", Page[state]{Handle: func(_ tether.PreSession, s state, _ tether.Event) state {
 		s.Count = 1
 		return s
 	}})
-	r.Route("/", Page[state]{Handle: func(_ poly.PreSession, s state, _ poly.Event) state {
+	r.Route("/", Page[state]{Handle: func(_ tether.PreSession, s state, _ tether.Event) state {
 		s.Count = 2
 		return s
 	}})
 
-	got := r.Handle(nil, state{Page: "/"}, poly.Event{})
+	got := r.Handle(nil, state{Page: "/"}, tether.Event{})
 	if got.Count != 2 {
 		t.Fatalf("expected Count=2, got %d", got.Count)
 	}
@@ -31,7 +31,7 @@ func TestOnNavigate(t *testing.T) {
 	r := New(selector)
 	hp := r.OnNavigate(func(s *state, path string) { s.Page = path })
 
-	got := hp(nil, state{}, poly.Params{Path: "/settings"})
+	got := hp(nil, state{}, tether.Params{Path: "/settings"})
 	if got.Page != "/settings" {
 		t.Fatalf("expected Page=/settings, got %q", got.Page)
 	}

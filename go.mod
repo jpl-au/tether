@@ -1,4 +1,4 @@
-module github.com/jpl-au/fluent-poly
+module github.com/jpl-au/fluent-tether
 
 go 1.25.0
 

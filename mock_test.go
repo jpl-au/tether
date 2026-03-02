@@ -1,4 +1,4 @@
-package poly
+package tether
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"sync"
 
 	jit "github.com/jpl-au/fluent-jit"
-	"github.com/jpl-au/fluent-poly/wire"
+	"github.com/jpl-au/fluent-tether/wire"
 	"github.com/jpl-au/fluent/html5/div"
 	"github.com/jpl-au/fluent/html5/span"
 	"github.com/jpl-au/fluent/node"

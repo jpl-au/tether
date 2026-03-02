@@ -5,7 +5,7 @@
 Side effects are called directly on the session parameter during `Handle`. They are buffered and merged into the same update message as the state diff, so the client receives everything atomically:
 
 ```go
-Handle: func(sess poly.PreSession, s State, ev poly.Event) State {
+Handle: func(sess tether.PreSession, s State, ev tether.Event) State {
     if ev.Action == "add-todo" {
         s.Todos = append(s.Todos, todo)
         sess.Announce("Todo added")
@@ -103,8 +103,8 @@ Without this key, navigating between pages changes the rendered HTML but the dif
 When the diff engine detects a structural change, it falls back to a full root morph. The `Config.OnStructuralChange` callback lets you observe these occurrences for telemetry, metrics, or debugging:
 
 ```go
-poly.New(poly.Config[State]{
-    OnStructuralChange: func(sess *poly.Session[State], change poly.StructuralChange) {
+tether.New(tether.Config[State]{
+    OnStructuralChange: func(sess *tether.Session[State], change tether.StructuralChange) {
         slog.Warn("structural change",
             "session", sess.ID(),
             "added", change.Added,
@@ -125,8 +125,8 @@ When `OnStructuralChange` is nil and DevMode is active, the framework logs a deb
 When a render cycle produces no patches and no structural change, the framework calls `Config.OnNoPatch` if set. This lets you decide how to handle it — log, count, or ignore:
 
 ```go
-poly.New(poly.Config[State]{
-    OnNoPatch: func(sess *poly.Session[State], info poly.NoPatch) {
+tether.New(tether.Config[State]{
+    OnNoPatch: func(sess *tether.Session[State], info tether.NoPatch) {
         // Signal-only updates (e.g. a ticker) intentionally produce
         // no patches — log at debug. Navigate and event sources that
         // produce nothing are likely missing Dynamic keys — warn.
@@ -166,7 +166,7 @@ Signals (`sess.Signal`, `bind.BindText`, `bind.BindShow`, etc.) update bound ele
 Use `Session.Go` to launch background work tied to a session's lifetime. The context is cancelled when the session is permanently destroyed (reaped or shutdown), but survives temporary disconnects:
 
 ```go
-OnConnect: func(s *poly.Session[State]) {
+OnConnect: func(s *tether.Session[State]) {
     s.Go(func(ctx context.Context) {
         ticker := time.NewTicker(time.Second)
         defer ticker.Stop()
@@ -207,10 +207,10 @@ Each sends a standalone update message. For side effects during event handling, 
 
 ## Scope — component state isolation
 
-`poly.Scope` focuses a session's state onto a smaller component type. The component handler only sees its own sub-state — never the full application state:
+`tether.Scope` focuses a session's state onto a smaller component type. The component handler only sees its own sub-state — never the full application state:
 
 ```go
-var todos = poly.Scope[AppState, TodoState]{
+var todos = tether.Scope[AppState, TodoState]{
     View:   func(s AppState) TodoState { return s.Todos },
     Update: func(s AppState, t TodoState) AppState { s.Todos = t; return s },
 }
@@ -219,7 +219,7 @@ var todos = poly.Scope[AppState, TodoState]{
 Use `Handle` in the event handler to dispatch to the component:
 
 ```go
-Handle: func(sess poly.PreSession, s AppState, ev poly.Event) AppState {
+Handle: func(sess tether.PreSession, s AppState, ev tether.Event) AppState {
     if ev.Action == "add-todo" || ev.Action == "remove-todo" {
         return todos.Handle(sess, s, ev, todoHandle)
     }
@@ -245,8 +245,8 @@ Scope keeps component handlers reusable — they work with `TodoState` and never
 Bidirectional sync between Go state and the browser URL:
 
 ```go
-poly.New(poly.Config[State]{
-    OnNavigate: func(_ poly.PreSession, s State, p poly.Params) State {
+tether.New(tether.Config[State]{
+    OnNavigate: func(_ tether.PreSession, s State, p tether.Params) State {
         s.Page = p.Path
         return s
     },
@@ -265,7 +265,7 @@ r.Route("/", router.Page[State]{Render: homeRender, Handle: homeHandle})
 r.Route("/settings", router.Page[State]{Render: settingsRender})
 r.NotFound(router.Page[State]{Render: notFoundRender})
 
-poly.New(poly.Config[State]{
+tether.New(tether.Config[State]{
     Render:       r.Render,
     Handle:       r.Handle,
     OnNavigate: r.OnNavigate(func(s *State, path string) { s.Page = path }),

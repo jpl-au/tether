@@ -1,12 +1,12 @@
-package poly
+package tether
 
 // Middleware wraps a [HandleFunc] to add cross-cutting behaviour.
 // Each middleware receives the next handler in the chain and returns
 // a new handler that may inspect or modify the event, state, or
 // session before and after calling next:
 //
-//	func withLogging[S any](next poly.HandleFunc[S]) poly.HandleFunc[S] {
-//	    return func(sess poly.PreSession, s S, ev poly.Event) S {
+//	func withLogging[S any](next tether.HandleFunc[S]) tether.HandleFunc[S] {
+//	    return func(sess tether.PreSession, s S, ev tether.Event) S {
 //	        slog.Info("event", "action", ev.Action)
 //	        return next(sess, s, ev)
 //	    }

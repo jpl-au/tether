@@ -1,4 +1,4 @@
-package poly
+package tether
 
 // HealthStatus reports the number of sessions in each pool. Use
 // [Handler.Health] to retrieve it.

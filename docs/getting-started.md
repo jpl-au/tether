@@ -11,16 +11,16 @@
 import (
     "net/http"
 
-    poly "github.com/jpl-au/fluent-poly"
-    "github.com/jpl-au/fluent-poly/bind"
-    "github.com/jpl-au/fluent-poly/ws"
+    "github.com/jpl-au/fluent-tether"
+    "github.com/jpl-au/fluent-tether/bind"
+    "github.com/jpl-au/fluent-tether/ws"
     "github.com/jpl-au/fluent/html5/button"
     "github.com/jpl-au/fluent/html5/div"
     "github.com/jpl-au/fluent/html5/span"
     "github.com/jpl-au/fluent/node"
 )
 
-mux.Handle("/counter", poly.New(poly.Config[CounterState]{
+mux.Handle("/counter", tether.New(tether.Config[CounterState]{
     Upgrade: ws.Upgrade(),
     InitialState: func(r *http.Request) CounterState {
         return CounterState{Count: 0}
@@ -31,7 +31,7 @@ mux.Handle("/counter", poly.New(poly.Config[CounterState]{
             bind.Click(button.Text("+1"), "increment"),
         )
     },
-    Handle: func(_ poly.PreSession, s CounterState, ev poly.Event) CounterState {
+    Handle: func(_ tether.PreSession, s CounterState, ev tether.Event) CounterState {
         if ev.Action == "increment" {
             s.Count++
         }
@@ -40,7 +40,7 @@ mux.Handle("/counter", poly.New(poly.Config[CounterState]{
 }))
 
 // Serve the client JS runtime (only needed when the handler is not at "/").
-mux.Handle("/_poly/", http.StripPrefix("/_poly/", poly.ServeClient()))
+mux.Handle("/_tether/", http.StripPrefix("/_tether/", tether.ServeClient()))
 ```
 
 No WebSocket boilerplate. No JavaScript to write. No diff algorithm to understand.
@@ -55,7 +55,7 @@ sess.Announce("Item added to cart")
 
 ## How updates reach the browser
 
-fluent-poly uses a unified update protocol. Every message sent to the client is a single `"update"` type containing either **patches** (targeted content updates) or **morphs** (structural DOM changes). The default wire format is JSON (`wire.JSON`):
+fluent-tether uses a unified update protocol. Every message sent to the client is a single `"update"` type containing either **patches** (targeted content updates) or **morphs** (structural DOM changes). The default wire format is JSON (`wire.JSON`):
 
 ```json
 {"type":"update","patches":[{"key":"count","html":"<span>43</span>"}]}
@@ -72,7 +72,7 @@ For a full-page application, `ListenAndServe` handles startup, signal
 trapping, and graceful shutdown:
 
 ```go
-h := poly.New(poly.Config[State]{
+h := tether.New(tether.Config[State]{
     Upgrade:      ws.Upgrade(),
     Fallback:     sse.Upgrade(),
     Mode:         mode.Both,
@@ -96,12 +96,12 @@ The grace period defaults to 10 seconds and is configurable via
 `Timeouts.ShutdownGrace`:
 
 ```go
-Timeouts: poly.Timeouts{
+Timeouts: tether.Timeouts{
     ShutdownGrace: 15 * time.Second,
 },
 ```
 
-To add routes or HTTP-level middleware alongside poly, pass a custom
+To add routes or HTTP-level middleware alongside tether, pass a custom
 mux as the second argument:
 
 ```go
@@ -113,10 +113,10 @@ h.ListenAndServe("", mux)
 ```
 
 Signal handling, drain, and shutdown still work exactly the same. For
-sub-path mounting, use `poly.ServeClient()` to serve the client JS
+sub-path mounting, use `tether.ServeClient()` to serve the client JS
 runtime separately:
 
 ```go
 mux.Handle("/app", h)
-mux.Handle("/_poly/", http.StripPrefix("/_poly/", poly.ServeClient()))
+mux.Handle("/_tether/", http.StripPrefix("/_tether/", tether.ServeClient()))
 ```

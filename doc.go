@@ -1,4 +1,4 @@
-// Package poly is a reactive UI layer for Go. The server owns
+// Package tether is a reactive UI layer for Go. The server owns
 // application state and renders HTML; the client owns ephemeral UI
 // state — toggling drawers, binding text to signals, showing and hiding
 // elements — without a round-trip. A persistent transport (WebSocket or
@@ -30,8 +30,8 @@
 // manages the full session lifecycle.
 //
 // Event binding helpers ([bind.Click], [bind.Submit], [bind.Input],
-// etc.) attach data-poly-* attributes to Fluent elements so the client
+// etc.) attach data-tether-* attributes to Fluent elements so the client
 // JS knows which DOM events to forward. Signal bindings and client-side
 // directives handle interactions that stay in the browser. See the bind
 // sub-package for the full set.
-package poly
+package tether

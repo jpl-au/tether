@@ -1,4 +1,4 @@
-package poly
+package tether
 
 import (
 	"errors"
@@ -7,8 +7,8 @@ import (
 	"time"
 
 	jit "github.com/jpl-au/fluent-jit"
-	"github.com/jpl-au/fluent-poly/dev"
-	"github.com/jpl-au/fluent-poly/wire"
+	"github.com/jpl-au/fluent-tether/dev"
+	"github.com/jpl-au/fluent-tether/wire"
 	"github.com/jpl-au/fluent/node"
 )
 

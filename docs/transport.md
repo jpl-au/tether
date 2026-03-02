@@ -7,21 +7,21 @@ When `Mode` is not set, it defaults to `mode.Both`.
 
 ```go
 // Default (mode.Both) — WebSocket with SSE fallback
-poly.New(poly.Config[State]{
+tether.New(tether.Config[State]{
     Upgrade:  ws.Upgrade(),
     Fallback: sse.Upgrade(),
     // ...
 })
 
 // WebSocket only
-poly.New(poly.Config[State]{
+tether.New(tether.Config[State]{
     Mode:    mode.WebSocket,
     Upgrade: ws.Upgrade(),
     // ...
 })
 
 // SSE only
-poly.New(poly.Config[State]{
+tether.New(tether.Config[State]{
     Mode:     mode.ServerSentEvents,
     Fallback: sse.Upgrade(),
     // ...
@@ -52,25 +52,25 @@ SSE connections send keep-alive comments at `Timeouts.Heartbeat` (default 20s) t
 Enable the service worker for asset caching and offline page shells:
 
 ```go
-poly.New(poly.Config[State]{
+tether.New(tether.Config[State]{
     Worker: true,
     // ...
 })
 ```
 
-The service worker caches the JS runtime (`fluent-poly.js`, `idiomorph.min.js`) using a cache-first strategy. Navigation responses are only cached when the server sends the `X-Poly-Cache: true` header — this prevents caching sensitive or session-specific pages without explicit intent. Cached pages are served as a fallback when offline.
+The service worker caches the JS runtime (`fluent-tether.js`, `idiomorph.min.js`) using a cache-first strategy. Navigation responses are only cached when the server sends the `X-Tether-Cache: true` header — this prevents caching sensitive or session-specific pages without explicit intent. Cached pages are served as a fallback when offline.
 
 To precache application assets (CSS, icons, fonts), use the `Precache` field on `Asset`:
 
 ```go
-var assets = &poly.Asset{
+var assets = &tether.Asset{
     FS:       staticFS,
     Prefix:   "/static/",
     Precache: []string{"styles.css", "logo.svg"},
 }
 
-poly.New(poly.Config[State]{
-    Assets: []*poly.Asset{assets},
+tether.New(tether.Config[State]{
+    Assets: []*tether.Asset{assets},
     Worker: true,
     // ...
 })
@@ -84,9 +84,9 @@ Server-to-client updates are encoded by a `wire.Encoder`. The encoder
 is selected at handler construction time via `Config.WireFormat`:
 
 ```go
-import "github.com/jpl-au/fluent-poly/wire"
+import "github.com/jpl-au/fluent-tether/wire"
 
-poly.New(poly.Config[State]{
+tether.New(tether.Config[State]{
     WireFormat: wire.JSON, // default — currently the only format
     // ...
 })
@@ -115,7 +115,7 @@ state change and hands it to the encoder.
 Set `Client.BackgroundSync` to true to enable event queuing. When enabled, SSE events that fail to send (due to network interruptions) are queued in IndexedDB and replayed when the connection is restored.
 
 ```go
-Client: poly.Client{
+Client: tether.Client{
     BackgroundSync: true,
 },
 ```

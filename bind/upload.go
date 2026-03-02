@@ -7,7 +7,7 @@ package bind
 //
 //	bind.Upload(button.Text("Upload"), "avatar")
 func Upload[E Settable[E]](el E, action string) E {
-	return el.SetData("poly-upload", action)
+	return el.SetData("tether-upload", action)
 }
 
 // UploadInput sets a CSS selector for finding file inputs when the
@@ -16,7 +16,7 @@ func Upload[E Settable[E]](el E, action string) E {
 //
 //	bind.UploadInput(button.Text("Upload"), "#avatar-input")
 func UploadInput[E Settable[E]](el E, selector string) E {
-	return el.SetData("poly-upload-input", selector)
+	return el.SetData("tether-upload-input", selector)
 }
 
 // UploadProgress binds an element's value attribute to the upload

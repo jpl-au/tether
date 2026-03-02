@@ -1,6 +1,6 @@
-package poly
+package tether
 
-import "github.com/jpl-au/fluent-poly/dev"
+import "github.com/jpl-au/fluent-tether/dev"
 
 // Observe subscribes a session to a shared [Value]. The callback
 // receives the shared value and the session's current state, and
@@ -16,7 +16,7 @@ import "github.com/jpl-au/fluent-poly/dev"
 //
 // The subscription is cleaned up when the session is destroyed.
 //
-//	poly.Observe(onlineCount, s, func(count int, state State) State {
+//	tether.Observe(onlineCount, s, func(count int, state State) State {
 //	    state.OnlineUsers = count
 //	    return state
 //	})

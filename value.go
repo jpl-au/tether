@@ -1,4 +1,4 @@
-package poly
+package tether
 
 import (
 	"context"
@@ -19,13 +19,13 @@ import (
 // (online counts, shared configuration, room membership). For discrete
 // domain events, use [Bus] directly.
 //
-//	var onlineCount = poly.NewValue(0)
+//	var onlineCount = tether.NewValue(0)
 //
 //	// From any goroutine:
 //	onlineCount.Update(func(n int) int { return n + 1 })
 //
 //	// In OnConnect:
-//	poly.Observe(onlineCount, s, func(count int, state State) State {
+//	tether.Observe(onlineCount, s, func(count int, state State) State {
 //	    state.OnlineUsers = count
 //	    return state
 //	})

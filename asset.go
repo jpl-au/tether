@@ -1,4 +1,4 @@
-package poly
+package tether
 
 import (
 	"crypto/sha256"
@@ -9,7 +9,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/jpl-au/fluent-poly/dev"
+	"github.com/jpl-au/fluent-tether/dev"
 	"github.com/jpl-au/fluent/html5/attr/rel"
 	"github.com/jpl-au/fluent/html5/link"
 	"github.com/jpl-au/fluent/html5/script"
@@ -24,7 +24,7 @@ import (
 //	//go:embed static
 //	var staticFS embed.FS
 //
-//	var assets = &poly.Asset{
+//	var assets = &tether.Asset{
 //	    FS:     staticFS,
 //	    Prefix: "/static/",
 //	}
@@ -58,7 +58,7 @@ type Asset struct {
 func (a *Asset) init() {
 	a.once.Do(func() {
 		if a.FS == nil {
-			panic("poly: Asset.FS is required")
+			panic("tether: Asset.FS is required")
 		}
 
 		a.prefix = a.Prefix
@@ -66,7 +66,7 @@ func (a *Asset) init() {
 			a.prefix = "/assets/"
 		}
 		if !strings.HasSuffix(a.prefix, "/") {
-			panic("poly: Asset.Prefix must end with \"/\"")
+			panic("tether: Asset.Prefix must end with \"/\"")
 		}
 
 		a.hashes = make(map[string]string)
@@ -95,7 +95,7 @@ func (a *Asset) URL(path string) string {
 	a.init()
 	h, ok := a.hashes[path]
 	if !ok {
-		panic(fmt.Sprintf("poly: asset %q not found in filesystem", path))
+		panic(fmt.Sprintf("tether: asset %q not found in filesystem", path))
 	}
 	return a.prefix + path + "?v=" + h
 }

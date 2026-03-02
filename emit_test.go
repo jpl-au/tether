@@ -1,10 +1,10 @@
-package poly
+package tether
 
 import (
 	"testing"
 	"testing/synctest"
 
-	"github.com/jpl-au/fluent-poly/event"
+	"github.com/jpl-au/fluent-tether/event"
 )
 
 func TestOnSubscribesSessionToBus(t *testing.T) {

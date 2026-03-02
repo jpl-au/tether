@@ -1,11 +1,11 @@
-package poly
+package tether
 
 import (
 	"testing"
 	"testing/synctest"
 
-	"github.com/jpl-au/fluent-poly/event"
-	"github.com/jpl-au/fluent-poly/wire"
+	"github.com/jpl-au/fluent-tether/event"
+	"github.com/jpl-au/fluent-tether/wire"
 )
 
 func TestSignalOutsideHandle(t *testing.T) {

@@ -1,4 +1,4 @@
-package poly
+package tether
 
 import (
 	"encoding/json"
@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jpl-au/fluent-poly/dev"
-	"github.com/jpl-au/fluent-poly/event"
+	"github.com/jpl-au/fluent-tether/dev"
+	"github.com/jpl-au/fluent-tether/event"
 )
 
 // pageHandleCounter is a stateless handle function for testing.
@@ -49,11 +49,11 @@ func TestPageGETRendersHTML(t *testing.T) {
 		t.Fatalf("status = %d, want %d", w.Code, http.StatusOK)
 	}
 	body := w.Body.String()
-	if !strings.Contains(body, "data-poly-root") {
-		t.Error("expected data-poly-root attribute")
+	if !strings.Contains(body, "data-tether-root") {
+		t.Error("expected data-tether-root attribute")
 	}
-	if !strings.Contains(body, `data-poly-transport="fetch"`) {
-		t.Error("expected data-poly-transport=fetch")
+	if !strings.Contains(body, `data-tether-transport="fetch"`) {
+		t.Error("expected data-tether-transport=fetch")
 	}
 	if !strings.Contains(body, "Count: 0") {
 		t.Error("expected rendered content")
@@ -67,8 +67,8 @@ func TestPageGETNoSessionAttribute(t *testing.T) {
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 
-	if strings.Contains(w.Body.String(), "data-poly-session") {
-		t.Error("stateless page should not have data-poly-session attribute")
+	if strings.Contains(w.Body.String(), "data-tether-session") {
+		t.Error("stateless page should not have data-tether-session attribute")
 	}
 }
 
@@ -80,10 +80,10 @@ func TestPageGETNoRetryDelayAttributes(t *testing.T) {
 	handler.ServeHTTP(w, req)
 
 	body := w.Body.String()
-	if strings.Contains(body, "data-poly-retry-delay") {
+	if strings.Contains(body, "data-tether-retry-delay") {
 		t.Error("stateless page should not have retry-delay attributes")
 	}
-	if strings.Contains(body, "data-poly-max-retry-delay") {
+	if strings.Contains(body, "data-tether-max-retry-delay") {
 		t.Error("stateless page should not have max-retry-delay attributes")
 	}
 }
@@ -127,8 +127,8 @@ func TestPageGETDevMode(t *testing.T) {
 	if w.Header().Get("Cache-Control") != "no-store" {
 		t.Errorf("Cache-Control = %q, want %q", w.Header().Get("Cache-Control"), "no-store")
 	}
-	if !strings.Contains(w.Body.String(), "data-poly-dev") {
-		t.Error("expected data-poly-dev attribute")
+	if !strings.Contains(w.Body.String(), "data-tether-dev") {
+		t.Error("expected data-tether-dev attribute")
 	}
 }
 
@@ -315,15 +315,15 @@ func TestPageGETPanicRecovery(t *testing.T) {
 func TestPageServesClientJS(t *testing.T) {
 	handler := newTestPageHandler()
 
-	req := httptest.NewRequest("GET", "/_poly/fluent-poly.js", nil)
+	req := httptest.NewRequest("GET", "/_tether/fluent-tether.js", nil)
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
 		t.Errorf("status = %d, want %d", w.Code, http.StatusOK)
 	}
-	if !strings.Contains(w.Body.String(), "fluent-poly") {
-		t.Error("expected fluent-poly.js content")
+	if !strings.Contains(w.Body.String(), "fluent-tether") {
+		t.Error("expected fluent-tether.js content")
 	}
 }
 
@@ -394,7 +394,7 @@ func TestPagePOSTWithOnNavigate(t *testing.T) {
 }
 
 func TestPageDevModeFromEnv(t *testing.T) {
-	t.Setenv("POLY_DEV", "1")
+	t.Setenv("TETHER_DEV", "1")
 	t.Cleanup(dev.Reset)
 
 	handler := Page(PageConfig[counterState]{
@@ -407,8 +407,8 @@ func TestPageDevModeFromEnv(t *testing.T) {
 	w := httptest.NewRecorder()
 	handler.(*pageHandler[counterState]).ServeHTTP(w, req)
 
-	if !strings.Contains(w.Body.String(), "data-poly-dev") {
-		t.Error("expected data-poly-dev from POLY_DEV env var")
+	if !strings.Contains(w.Body.String(), "data-tether-dev") {
+		t.Error("expected data-tether-dev from TETHER_DEV env var")
 	}
 }
 

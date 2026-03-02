@@ -3,7 +3,7 @@ package router
 import (
 	"testing"
 
-	poly "github.com/jpl-au/fluent-poly"
+	tether "github.com/jpl-au/fluent-tether"
 	"github.com/jpl-au/fluent/html5/div"
 	"github.com/jpl-au/fluent/html5/span"
 	"github.com/jpl-au/fluent/node"
@@ -50,12 +50,12 @@ func TestRenderReturnsNilWithoutNotFound(t *testing.T) {
 
 func TestHandleDispatchesToMatchingPage(t *testing.T) {
 	r := New(selector)
-	r.Route("/", Page[state]{Handle: func(_ poly.PreSession, s state, _ poly.Event) state {
+	r.Route("/", Page[state]{Handle: func(_ tether.PreSession, s state, _ tether.Event) state {
 		s.Count = 42
 		return s
 	}})
 
-	got := r.Handle(nil, state{Page: "/"}, poly.Event{})
+	got := r.Handle(nil, state{Page: "/"}, tether.Event{})
 	if got.Count != 42 {
 		t.Fatalf("expected Count=42, got %d", got.Count)
 	}
@@ -63,12 +63,12 @@ func TestHandleDispatchesToMatchingPage(t *testing.T) {
 
 func TestHandleFallsBackToNotFound(t *testing.T) {
 	r := New(selector)
-	r.NotFound(Page[state]{Handle: func(_ poly.PreSession, s state, _ poly.Event) state {
+	r.NotFound(Page[state]{Handle: func(_ tether.PreSession, s state, _ tether.Event) state {
 		s.Count = -1
 		return s
 	}})
 
-	got := r.Handle(nil, state{Page: "/missing"}, poly.Event{})
+	got := r.Handle(nil, state{Page: "/missing"}, tether.Event{})
 	if got.Count != -1 {
 		t.Fatalf("expected Count=-1, got %d", got.Count)
 	}
@@ -78,7 +78,7 @@ func TestHandleReturnsStateWhenNoMatch(t *testing.T) {
 	r := New(selector)
 
 	s := state{Page: "/missing", Count: 7}
-	got := r.Handle(nil, s, poly.Event{})
+	got := r.Handle(nil, s, tether.Event{})
 	if got.Count != 7 {
 		t.Fatalf("expected Count=7, got %d", got.Count)
 	}
@@ -91,7 +91,7 @@ func TestHandleReturnsStateWhenHandlerNil(t *testing.T) {
 	}})
 
 	s := state{Page: "/", Count: 5}
-	got := r.Handle(nil, s, poly.Event{})
+	got := r.Handle(nil, s, tether.Event{})
 	if got.Count != 5 {
 		t.Fatalf("expected Count=5, got %d", got.Count)
 	}

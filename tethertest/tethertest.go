@@ -1,9 +1,9 @@
-// Package polytest provides a test harness for poly Handle functions.
-// It wraps [poly.Page] internally so developers can test event
+// Package tethertest provides a test harness for tether Handle functions.
+// It wraps [tether.Page] internally so developers can test event
 // handling without setting up channels, transports, or goroutines.
 //
 //	func TestIncrement(t *testing.T) {
-//	    h := polytest.New(polytest.Config[State]{
+//	    h := tethertest.New(tethertest.Config[State]{
 //	        State:  State{Count: 0},
 //	        Render: render,
 //	        Handle: handle,
@@ -15,7 +15,7 @@
 //	        t.Errorf("got %d, want 1", h.State().Count)
 //	    }
 //	}
-package polytest
+package tethertest
 
 import (
 	"context"
@@ -26,20 +26,20 @@ import (
 	"net/url"
 	"strings"
 
-	poly "github.com/jpl-au/fluent-poly"
-	"github.com/jpl-au/fluent-poly/event"
-	"github.com/jpl-au/fluent-poly/push"
+	tether "github.com/jpl-au/fluent-tether"
+	"github.com/jpl-au/fluent-tether/event"
+	"github.com/jpl-au/fluent-tether/push"
 	"github.com/jpl-au/fluent/node"
 )
 
-// HandleFunc is the handler signature for polytest. It is identical
-// to [poly.HandleFunc] — both take [poly.PreSession] — so handler
+// HandleFunc is the handler signature for tethertest. It is identical
+// to [tether.HandleFunc] — both take [tether.PreSession] — so handler
 // functions can be shared across live mode, page mode, and tests
 // without changing their signature.
-type HandleFunc[S any] func(session poly.PreSession, state S, event poly.Event) S
+type HandleFunc[S any] func(session tether.PreSession, state S, event tether.Event) S
 
 // Middleware wraps a [HandleFunc] to add cross-cutting behaviour.
-// Identical to [poly.Middleware] so middleware can be shared across
+// Identical to [tether.Middleware] so middleware can be shared across
 // live mode and tests.
 type Middleware[S any] func(next HandleFunc[S]) HandleFunc[S]
 
@@ -49,10 +49,10 @@ type Config[S any] struct {
 	State S
 
 	// Render builds a node tree from the current state.
-	Render poly.RenderFunc[S]
+	Render tether.RenderFunc[S]
 
 	// Handle processes a client event and returns the new state.
-	Handle func(session poly.PreSession, state S, event poly.Event) S
+	Handle func(session tether.PreSession, state S, event tether.Event) S
 
 	// Middleware wraps the Handle function with cross-cutting
 	// behaviour. Applied outermost-first: the first entry in the
@@ -60,32 +60,32 @@ type Config[S any] struct {
 	Middleware []Middleware[S]
 
 	// OnNavigate processes URL parameters. Optional.
-	OnNavigate func(session poly.PreSession, state S, params poly.Params) S
+	OnNavigate func(session tether.PreSession, state S, params tether.Params) S
 
 	// OnConnect is called when [Harness.Connect] is called. Use this
-	// to test session registration logic (e.g. joining a [poly.Group]
+	// to test session registration logic (e.g. joining a [tether.Group]
 	// or starting background tasks). Optional.
-	OnConnect func(session poly.PreSession)
+	OnConnect func(session tether.PreSession)
 
 	// OnDisconnect is called when [Harness.Disconnect] is called. Use
-	// this to test cleanup logic (e.g. removing from a [poly.Group]
+	// this to test cleanup logic (e.g. removing from a [tether.Group]
 	// or decrementing counters). Optional.
-	OnDisconnect func(session poly.PreSession)
+	OnDisconnect func(session tether.PreSession)
 }
 
-// Harness drives a poly page handler for testing. Create one with
+// Harness drives a tether page handler for testing. Create one with
 // [New], send events with [Harness.Send] or [Harness.SendEvent], and
 // inspect the result with the accessor methods.
 type Harness[S any] struct {
 	state      S
-	render     poly.RenderFunc[S]
-	handle     func(poly.PreSession, S, poly.Event) S
-	onNavigate func(poly.PreSession, S, poly.Params) S
+	render     tether.RenderFunc[S]
+	handle     func(tether.PreSession, S, tether.Event) S
+	onNavigate func(tether.PreSession, S, tether.Params) S
 	handler    http.Handler
 
 	// Lifecycle callbacks stored from Config.
-	onConnect    func(poly.PreSession)
-	onDisconnect func(poly.PreSession)
+	onConnect    func(tether.PreSession)
+	onDisconnect func(tether.PreSession)
 
 	// Last response fields.
 	last response
@@ -103,7 +103,7 @@ type response struct {
 	announce string
 }
 
-// wireMessage mirrors the JSON update format from the poly wire
+// wireMessage mirrors the JSON update format from the tether wire
 // protocol. Only the fields needed for test assertions are included.
 type wireMessage struct {
 	Morphs   []wireEntry       `json:"morphs,omitempty"`
@@ -121,7 +121,7 @@ type wireEntry struct {
 	HTML string `json:"html"`
 }
 
-// testSession implements [poly.PreSession] for local state tracking.
+// testSession implements [tether.PreSession] for local state tracking.
 // It captures side effects so the harness can report them.
 type testSession struct {
 	toast    string
@@ -133,7 +133,7 @@ type testSession struct {
 	signals  map[string]any
 }
 
-func (s *testSession) ID() string                  { return "polytest" }
+func (s *testSession) ID() string                  { return "tethertest" }
 func (s *testSession) Context() context.Context    { return context.Background() }
 func (s *testSession) Go(fn func(context.Context)) { go fn(context.Background()) }
 func (s *testSession) Toast(text string)           { s.toast = text }
@@ -148,13 +148,13 @@ func (s *testSession) Signals(m map[string]any) {
 }
 func (s *testSession) SignalBatch(pairs ...any) {
 	if len(pairs)%2 != 0 {
-		panic("polytest: SignalBatch requires an even number of arguments")
+		panic("tethertest: SignalBatch requires an even number of arguments")
 	}
 	s.ensureSignals()
 	for i := 0; i < len(pairs); i += 2 {
 		key, ok := pairs[i].(string)
 		if !ok {
-			panic("polytest: SignalBatch keys must be strings")
+			panic("tethertest: SignalBatch keys must be strings")
 		}
 		s.signals[key] = pairs[i+1]
 	}
@@ -175,7 +175,7 @@ func (s *testSession) ensureFlash() {
 }
 
 // chainMiddleware applies middleware outermost-first, mirroring the
-// order used by [poly.Config].Middleware.
+// order used by [tether.Config].Middleware.
 func chainMiddleware[S any](h HandleFunc[S], mw []Middleware[S]) HandleFunc[S] {
 	for i := len(mw) - 1; i >= 0; i-- {
 		h = mw[i](h)
@@ -183,7 +183,7 @@ func chainMiddleware[S any](h HandleFunc[S], mw []Middleware[S]) HandleFunc[S] {
 	return h
 }
 
-// New creates a test harness. The harness uses [poly.Page] internally
+// New creates a test harness. The harness uses [tether.Page] internally
 // so each Send call is a stateless HTTP round-trip — no goroutines,
 // no channels, no transport plumbing.
 func New[S any](cfg Config[S]) *Harness[S] {
@@ -206,7 +206,7 @@ func New[S any](cfg Config[S]) *Harness[S] {
 // rebuildHandler constructs a fresh Page handler from the current state.
 func (h *Harness[S]) rebuildHandler() {
 	state := h.state
-	h.handler = poly.Page(poly.PageConfig[S]{
+	h.handler = tether.Page(tether.PageConfig[S]{
 		State:      func(r *http.Request) S { return state },
 		Render:     h.render,
 		Handle:     h.handle,
@@ -217,7 +217,7 @@ func (h *Harness[S]) rebuildHandler() {
 // Send fires a click event with the given action name. This is the
 // most common case — use [Harness.SendEvent] for other event types.
 func (h *Harness[S]) Send(action string) {
-	h.SendEvent(poly.Event{
+	h.SendEvent(tether.Event{
 		Type:   event.Click,
 		Action: action,
 		Data:   map[string]string{},
@@ -226,7 +226,7 @@ func (h *Harness[S]) Send(action string) {
 
 // SendInput fires an input event with the given action and value.
 func (h *Harness[S]) SendInput(action, value string) {
-	h.SendEvent(poly.Event{
+	h.SendEvent(tether.Event{
 		Type:   event.Input,
 		Action: action,
 		Data:   map[string]string{"value": value},
@@ -235,7 +235,7 @@ func (h *Harness[S]) SendInput(action, value string) {
 
 // SendSubmit fires a submit event with the given action and form data.
 func (h *Harness[S]) SendSubmit(action string, data map[string]string) {
-	h.SendEvent(poly.Event{
+	h.SendEvent(tether.Event{
 		Type:   event.Submit,
 		Action: action,
 		Data:   data,
@@ -245,7 +245,7 @@ func (h *Harness[S]) SendSubmit(action string, data map[string]string) {
 // SendEvent fires an arbitrary event and captures the response. After
 // this call, [Harness.State], [Harness.HTML], [Harness.Toast], etc.
 // reflect the result of handling this event.
-func (h *Harness[S]) SendEvent(ev poly.Event) {
+func (h *Harness[S]) SendEvent(ev tether.Event) {
 	// Use the navigate path as the request URL so the Page handler's
 	// OnNavigate receives the correct Params.
 	target := "/"
@@ -290,7 +290,7 @@ func (h *Harness[S]) SendEvent(ev poly.Event) {
 		// Navigate events are routed to OnNavigate, not Handle. This
 		// mirrors the live session behaviour where navigation bypasses
 		// the event handler entirely.
-		params := poly.Params{
+		params := tether.Params{
 			Path:  ev.Data["path"],
 			Query: parseQuery(ev.Data["search"]),
 		}
@@ -381,7 +381,7 @@ func (h *Harness[S]) Navigate(path string) {
 		data["path"] = path[:i]
 		data["search"] = path[i:]
 	}
-	h.SendEvent(poly.Event{
+	h.SendEvent(tether.Event{
 		Type:   event.Navigate,
 		Action: "",
 		Data:   data,
@@ -411,7 +411,7 @@ func (h *Harness[S]) HasFlash(selector, text string) bool {
 // connecting to the server. Panics if OnConnect was not configured.
 func (h *Harness[S]) Connect() {
 	if h.onConnect == nil {
-		panic("polytest: Connect called but OnConnect is not configured")
+		panic("tethertest: Connect called but OnConnect is not configured")
 	}
 	h.onConnect(&testSession{})
 }
@@ -420,7 +420,7 @@ func (h *Harness[S]) Connect() {
 // disconnecting from the server. Panics if OnDisconnect was not configured.
 func (h *Harness[S]) Disconnect() {
 	if h.onDisconnect == nil {
-		panic("polytest: Disconnect called but OnDisconnect is not configured")
+		panic("tethertest: Disconnect called but OnDisconnect is not configured")
 	}
 	h.onDisconnect(&testSession{})
 }

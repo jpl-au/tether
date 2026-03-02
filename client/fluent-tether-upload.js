@@ -1,6 +1,6 @@
-// fluent-poly-upload.js — file upload extension for Fluent Poly.
+// fluent-tether-upload.js — file upload extension for Fluent Tether.
 //
-// Loaded automatically when any element uses data-poly-upload. Handles
+// Loaded automatically when any element uses data-tether-upload. Handles
 // file selection, multipart POST to the server, and progress tracking
 // via signals. Uses XMLHttpRequest for upload progress events.
 
@@ -12,11 +12,11 @@
   var sessionID = "";
 
   function init() {
-    root = document.querySelector("[data-poly-root]");
+    root = document.querySelector("[data-tether-root]");
     if (!root) return;
 
-    endpoint = root.getAttribute("data-poly-endpoint") || "";
-    sessionID = root.getAttribute("data-poly-session") || "";
+    endpoint = root.getAttribute("data-tether-endpoint") || "";
+    sessionID = root.getAttribute("data-tether-session") || "";
 
     bindUploads(root);
   }
@@ -24,7 +24,7 @@
   // bindUploads attaches listeners to all upload triggers within a
   // subtree. Called on init and after each morph to pick up new elements.
   function bindUploads(container) {
-    var els = container.querySelectorAll("[data-poly-upload]");
+    var els = container.querySelectorAll("[data-tether-upload]");
     for (var i = 0; i < els.length; i++) {
       setupUpload(els[i]);
     }
@@ -35,10 +35,10 @@
   // file input in the closest form or parent.
   function setupUpload(el) {
     // Guard against double-binding after morphs.
-    if (el.hasAttribute("data-poly-upload-bound")) return;
-    el.setAttribute("data-poly-upload-bound", "");
+    if (el.hasAttribute("data-tether-upload-bound")) return;
+    el.setAttribute("data-tether-upload-bound", "");
 
-    var action = el.getAttribute("data-poly-upload");
+    var action = el.getAttribute("data-tether-upload");
     var isFileInput = el.tagName === "INPUT" && el.type === "file";
 
     if (isFileInput) {
@@ -49,11 +49,11 @@
       });
     } else {
       el.addEventListener("click", function (e) {
-        // If data-poly-upload-input is set, use it as a CSS selector
+        // If data-tether-upload-input is set, use it as a CSS selector
         // to find file inputs anywhere in the document. This supports
         // layouts where the trigger button is distant from the file
         // input (e.g. in a different part of a modal).
-        var selector = el.getAttribute("data-poly-upload-input");
+        var selector = el.getAttribute("data-tether-upload-input");
         var inputs;
         if (selector) {
           inputs = document.querySelectorAll(selector);
@@ -90,7 +90,7 @@
   }
 
   // uploadFiles sends files to the server via multipart POST and
-  // tracks progress through poly signals.
+  // tracks progress through tether signals.
   function uploadFiles(action, files, triggerEl) {
     var formData = new FormData();
     for (var i = 0; i < files.length; i++) {
@@ -100,45 +100,45 @@
     var xhr = new XMLHttpRequest();
 
     // Progress signal: 0–100.
-    Poly.setSignal("upload:" + action + ":progress", "0");
-    Poly.setSignal("upload:" + action + ":state", "uploading");
+    Tether.setSignal("upload:" + action + ":progress", "0");
+    Tether.setSignal("upload:" + action + ":state", "uploading");
 
     xhr.upload.addEventListener("progress", function (e) {
       if (e.lengthComputable) {
         var pct = Math.round((e.loaded / e.total) * 100);
-        Poly.setSignal("upload:" + action + ":progress", String(pct));
+        Tether.setSignal("upload:" + action + ":progress", String(pct));
       }
     });
 
     xhr.addEventListener("load", function () {
       if (xhr.status >= 200 && xhr.status < 300) {
-        Poly.setSignal("upload:" + action + ":progress", "100");
-        Poly.setSignal("upload:" + action + ":state", "done");
+        Tether.setSignal("upload:" + action + ":progress", "100");
+        Tether.setSignal("upload:" + action + ":state", "done");
       } else {
-        Poly.setSignal("upload:" + action + ":state", "error");
+        Tether.setSignal("upload:" + action + ":state", "error");
       }
     });
 
     xhr.addEventListener("error", function () {
-      Poly.setSignal("upload:" + action + ":state", "error");
+      Tether.setSignal("upload:" + action + ":state", "error");
     });
 
     xhr.addEventListener("abort", function () {
-      Poly.setSignal("upload:" + action + ":state", "idle");
+      Tether.setSignal("upload:" + action + ":state", "idle");
     });
 
     // Read the session ID fresh from the root element each time.
     // After reconnection the ID may have changed.
-    var sid = root ? root.getAttribute("data-poly-session") : sessionID;
+    var sid = root ? root.getAttribute("data-tether-session") : sessionID;
     xhr.open("POST", endpoint);
-    xhr.setRequestHeader("X-Poly-Session", sid);
-    xhr.setRequestHeader("X-Poly-Upload", action);
+    xhr.setRequestHeader("X-Tether-Session", sid);
+    xhr.setRequestHeader("X-Tether-Upload", action);
     xhr.send(formData);
   }
 
-  // Re-bind after server updates. The core runtime fires poly:update
+  // Re-bind after server updates. The core runtime fires tether:update
   // when it finishes applying patches and morphs.
-  document.addEventListener("poly:update", function (e) {
+  document.addEventListener("tether:update", function (e) {
     var target = e.detail && e.detail.root ? e.detail.root : root;
     if (target) bindUploads(target);
   });

@@ -36,163 +36,163 @@ func Apply[E Settable[E]](el E, opts ...Option) E {
 
 // Server event options.
 
-// OnClick binds a poly-click event.
-func OnClick(action string) Option { return Option{"poly-click", action} }
+// OnClick binds a tether-click event.
+func OnClick(action string) Option { return Option{"tether-click", action} }
 
-// OnSubmit binds a poly-submit event.
-func OnSubmit(action string) Option { return Option{"poly-submit", action} }
+// OnSubmit binds a tether-submit event.
+func OnSubmit(action string) Option { return Option{"tether-submit", action} }
 
-// OnInput binds a poly-input event (debounced).
-func OnInput(action string) Option { return Option{"poly-input", action} }
+// OnInput binds a tether-input event (debounced).
+func OnInput(action string) Option { return Option{"tether-input", action} }
 
-// OnChange binds a poly-change event.
-func OnChange(action string) Option { return Option{"poly-change", action} }
+// OnChange binds a tether-change event.
+func OnChange(action string) Option { return Option{"tether-change", action} }
 
-// OnKeyDown binds a poly-keydown event.
-func OnKeyDown(action string) Option { return Option{"poly-keydown", action} }
+// OnKeyDown binds a tether-keydown event.
+func OnKeyDown(action string) Option { return Option{"tether-keydown", action} }
 
-// OnFocus binds a poly-focus event.
-func OnFocus(action string) Option { return Option{"poly-focus", action} }
+// OnFocus binds a tether-focus event.
+func OnFocus(action string) Option { return Option{"tether-focus", action} }
 
-// OnBlur binds a poly-blur event.
-func OnBlur(action string) Option { return Option{"poly-blur", action} }
+// OnBlur binds a tether-blur event.
+func OnBlur(action string) Option { return Option{"tether-blur", action} }
 
-// OnViewport binds a poly-viewport event.
-func OnViewport(action string) Option { return Option{"poly-viewport", action} }
+// OnViewport binds a tether-viewport event.
+func OnViewport(action string) Option { return Option{"tether-viewport", action} }
 
 // WithEvent binds an arbitrary DOM event. Use this for events not
 // covered by the built-in options (OnClick, OnSubmit, etc.).
 //
 //	bind.Apply(el, bind.WithEvent("dblclick", "open-editor"))
 func WithEvent(eventType, action string) Option {
-	return Option{"poly-" + eventType, action}
+	return Option{"tether-" + eventType, action}
 }
 
 // Control options.
 
 // WithDisable disables the element while an event is in flight.
-func WithDisable(text string) Option { return Option{"poly-disable", text} }
+func WithDisable(text string) Option { return Option{"tether-disable", text} }
 
 // WithConfirm shows a confirmation prompt before sending the event.
-func WithConfirm(message string) Option { return Option{"poly-confirm", message} }
+func WithConfirm(message string) Option { return Option{"tether-confirm", message} }
 
 // WithReset resets form fields after submit.
-func WithReset() Option { return Option{"poly-reset", ""} }
+func WithReset() Option { return Option{"tether-reset", ""} }
 
 // WithAutoFocus gives the element focus after the next server update.
-func WithAutoFocus() Option { return Option{"poly-autofocus", ""} }
+func WithAutoFocus() Option { return Option{"tether-autofocus", ""} }
 
 // WithIndicator shows a loading indicator at the given selector.
-func WithIndicator(selector string) Option { return Option{"poly-indicator", selector} }
+func WithIndicator(selector string) Option { return Option{"tether-indicator", selector} }
 
 // WithFocusTrap traps keyboard focus within the element.
-func WithFocusTrap() Option { return Option{"poly-focus-trap", ""} }
+func WithFocusTrap() Option { return Option{"tether-focus-trap", ""} }
 
 // Timing options.
 
 // WithDebounce overrides the default input debounce delay.
 func WithDebounce(d time.Duration) Option {
-	return Option{"poly-debounce", strconv.Itoa(int(d.Milliseconds()))}
+	return Option{"tether-debounce", strconv.Itoa(int(d.Milliseconds()))}
 }
 
 // WithThrottle sets a minimum interval between events.
 func WithThrottle(d time.Duration) Option {
-	return Option{"poly-throttle", strconv.Itoa(int(d.Milliseconds()))}
+	return Option{"tether-throttle", strconv.Itoa(int(d.Milliseconds()))}
 }
 
 // WithFilterKey restricts a keydown event to a specific key.
-func WithFilterKey(key string) Option { return Option{"poly-key", key} }
+func WithFilterKey(key string) Option { return Option{"tether-key", key} }
 
-// WithData sets a custom data-poly-* attribute. Use this for
+// WithData sets a custom data-tether-* attribute. Use this for
 // attributes that don't have a dedicated With* helper.
 func WithData(key, value string) Option { return Option{key, value} }
 
 // WithEventData attaches an extra key-value pair to events.
-func WithEventData(key, value string) Option { return Option{"poly-data-" + key, value} }
+func WithEventData(key, value string) Option { return Option{"tether-data-" + key, value} }
 
 // Directive options.
 
 // WithLink marks the element for client-side navigation.
-func WithLink() Option { return Option{"poly-link", ""} }
+func WithLink() Option { return Option{"tether-link", ""} }
 
 // WithToggleClass toggles a CSS class on click.
-func WithToggleClass(class string) Option { return Option{"poly-toggle-class", class} }
+func WithToggleClass(class string) Option { return Option{"tether-toggle-class", class} }
 
 // WithToggleTarget directs the toggle at a different element.
-func WithToggleTarget(selector string) Option { return Option{"poly-toggle-target", selector} }
+func WithToggleTarget(selector string) Option { return Option{"tether-toggle-target", selector} }
 
 // WithToggleAttr toggles a boolean attribute on click.
-func WithToggleAttr(attr string) Option { return Option{"poly-toggle-attr", attr} }
+func WithToggleAttr(attr string) Option { return Option{"tether-toggle-attr", attr} }
 
 // WithCloak hides the element until the runtime initialises.
-func WithCloak() Option { return Option{"poly-cloak", ""} }
+func WithCloak() Option { return Option{"tether-cloak", ""} }
 
 // WithPermanent excludes the element from morphing.
-func WithPermanent() Option { return Option{"poly-permanent", ""} }
+func WithPermanent() Option { return Option{"tether-permanent", ""} }
 
 // Signal binding options.
 
 // WithBindText binds an element's text content to a named signal.
-func WithBindText(signal string) Option { return Option{"poly-bind-text", signal} }
+func WithBindText(signal string) Option { return Option{"tether-bind-text", signal} }
 
 // WithBindShow shows an element when the named signal is truthy.
-func WithBindShow(signal string) Option { return Option{"poly-bind-show", signal} }
+func WithBindShow(signal string) Option { return Option{"tether-bind-show", signal} }
 
 // WithBindHide hides an element when the named signal is truthy.
-func WithBindHide(signal string) Option { return Option{"poly-bind-hide", signal} }
+func WithBindHide(signal string) Option { return Option{"tether-bind-hide", signal} }
 
 // WithBindClass binds a CSS class to a named signal. The class is
 // added when truthy and removed when falsy.
 func WithBindClass(class, signal string) Option {
-	return Option{"poly-bind-class", class + " " + signal}
+	return Option{"tether-bind-class", class + " " + signal}
 }
 
 // WithBindAttr binds an HTML attribute to a named signal.
 func WithBindAttr(attr, signal string) Option {
-	return Option{"poly-bind-attr", attr + " " + signal}
+	return Option{"tether-bind-attr", attr + " " + signal}
 }
 
 // WithBindValue binds a form element's value property to a named signal.
-func WithBindValue(signal string) Option { return Option{"poly-bind-value", signal} }
+func WithBindValue(signal string) Option { return Option{"tether-bind-value", signal} }
 
 // Signal directive options.
 
 // WithToggleSignal flips a boolean signal on click without a server round-trip.
-func WithToggleSignal(signal string) Option { return Option{"poly-toggle-signal", signal} }
+func WithToggleSignal(signal string) Option { return Option{"tether-toggle-signal", signal} }
 
 // WithSetSignal sets a signal to a specific value on click without a server round-trip.
 func WithSetSignal(signal, value string) Option {
-	return Option{"poly-set-signal", signal + " " + value}
+	return Option{"tether-set-signal", signal + " " + value}
 }
 
 // WithOptimistic sets a signal immediately on click, before the event
 // is sent to the server.
 func WithOptimistic(signal, value string) Option {
-	return Option{"poly-optimistic", signal + " " + value}
+	return Option{"tether-optimistic", signal + " " + value}
 }
 
 // WithOptimisticToggle flips a boolean signal immediately on click,
 // before the event is sent to the server.
-func WithOptimisticToggle(signal string) Option { return Option{"poly-optimistic-toggle", signal} }
+func WithOptimisticToggle(signal string) Option { return Option{"tether-optimistic-toggle", signal} }
 
 // Upload options.
 
 // WithUpload marks the element as an upload trigger.
-func WithUpload(action string) Option { return Option{"poly-upload", action} }
+func WithUpload(action string) Option { return Option{"tether-upload", action} }
 
 // WithUploadInput sets a CSS selector for finding file inputs when the
 // upload trigger is not adjacent to them in the DOM.
-func WithUploadInput(selector string) Option { return Option{"poly-upload-input", selector} }
+func WithUploadInput(selector string) Option { return Option{"tether-upload-input", selector} }
 
 // WithUploadProgress binds an element's value attribute to upload progress.
 func WithUploadProgress(action string) Option {
-	return Option{"poly-bind-attr", "value upload:" + action + ":progress"}
+	return Option{"tether-bind-attr", "value upload:" + action + ":progress"}
 }
 
 // Lifecycle options.
 
 // WithHook attaches a JS lifecycle hook.
-func WithHook(name string) Option { return Option{"poly-hook", name} }
+func WithHook(name string) Option { return Option{"tether-hook", name} }
 
 // WithTransition enables CSS enter/leave transitions.
-func WithTransition(name string) Option { return Option{"poly-transition", name} }
+func WithTransition(name string) Option { return Option{"tether-transition", name} }

@@ -1,7 +1,7 @@
 // Package mode selects the wire protocol between server and browser.
-// Pass one of the constants to [poly.Config].Mode.
+// Pass one of the constants to [tether.Config].Mode.
 //
-//	poly.Config[State]{
+//	tether.Config[State]{
 //	    Mode: mode.Both,
 //	    // ...
 //	}
@@ -13,13 +13,13 @@ package mode
 // updates flow over a long-lived EventSource stream, and client→server
 // events arrive as individual HTTP POSTs. [Both] tries WebSocket first
 // and falls back to SSE+POST automatically. [HTTP] is plain
-// request/response with no persistent connection, used by [poly.Page].
+// request/response with no persistent connection, used by [tether.Page].
 type Transport int
 
 const (
 	// HTTP uses plain request/response — no persistent connection.
 	// Client events are sent as individual POST requests and the
-	// response carries the update. Used internally by [poly.Page].
+	// response carries the update. Used internally by [tether.Page].
 	HTTP Transport = iota + 1
 
 	// WebSocket accepts only WebSocket connections. The Fallback

@@ -23,7 +23,7 @@ Prevent the morph engine from touching an element entirely (useful for video pla
 bind.Permanent(div.New(children...))
 ```
 
-Hide an element until the poly runtime initialises (prevents flash of unstyled content):
+Hide an element until the tether runtime initialises (prevents flash of unstyled content):
 
 ```go
 bind.Cloak(div.New(children...))
@@ -39,11 +39,11 @@ bind.Transition(div.New(children...), "fade")
 
 ```css
 .item { opacity: 1; transition: opacity 0.3s; }
-.poly-fade-enter { opacity: 0; }
-.poly-fade-leave { opacity: 0; }
+.tether-fade-enter { opacity: 0; }
+.tether-fade-leave { opacity: 0; }
 ```
 
-Enter: `poly-{name}-enter` is added before insertion and removed next frame. Leave: `poly-{name}-leave` is added and the node waits for `transitionend` before removal (`TransitionTimeout` fallback, default 5s).
+Enter: `tether-{name}-enter` is added before insertion and removed next frame. Leave: `tether-{name}-leave` is added and the node waits for `transitionend` before removal (`TransitionTimeout` fallback, default 5s).
 
 ## JS hooks
 
@@ -54,7 +54,7 @@ bind.Hook(div.New(), "chart")
 ```
 
 ```js
-Poly.hooks.chart = {
+Tether.hooks.chart = {
     mounted: function(el) { /* initialise chart library */ },
     updated: function(el) { /* refresh with new data */ },
     destroyed: function(el) { /* teardown */ }

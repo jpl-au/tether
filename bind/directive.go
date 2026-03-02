@@ -11,36 +11,36 @@ package bind
 // URL via pushState, and sends a navigate event to the server instead
 // of performing a full page load.
 func Link[E Settable[E]](el E) E {
-	return el.SetData("poly-link", "")
+	return el.SetData("tether-link", "")
 }
 
 // ToggleClass binds a client-side class toggle. On click, the JS
 // runtime toggles the named CSS class without a server round-trip.
 // Multiple classes can be space-separated.
 func ToggleClass[E Settable[E]](el E, class string) E {
-	return el.SetData("poly-toggle-class", class)
+	return el.SetData("tether-toggle-class", class)
 }
 
 // ToggleTarget directs a toggle at a different element. The value is
 // a CSS selector. Without this, toggles apply to the element itself.
 func ToggleTarget[E Settable[E]](el E, selector string) E {
-	return el.SetData("poly-toggle-target", selector)
+	return el.SetData("tether-toggle-target", selector)
 }
 
 // ToggleAttr binds a client-side boolean attribute toggle. On click,
 // the JS runtime adds or removes the named attribute (e.g. "hidden",
 // "aria-expanded") without a server round-trip.
 func ToggleAttr[E Settable[E]](el E, attr string) E {
-	return el.SetData("poly-toggle-attr", attr)
+	return el.SetData("tether-toggle-attr", attr)
 }
 
-// Cloak hides an element until the poly runtime initialises. The JS
+// Cloak hides an element until the tether runtime initialises. The JS
 // removes the attribute on DOMContentLoaded, revealing the element.
 // A built-in style rule ensures zero flash without any extra CSS.
 //
 //	bind.Cloak(div.New(children...))
 func Cloak[E Settable[E]](el E) E {
-	return el.SetData("poly-cloak", "")
+	return el.SetData("tether-cloak", "")
 }
 
 // Permanent prevents the morph engine from updating this element.
@@ -50,7 +50,7 @@ func Cloak[E Settable[E]](el E) E {
 //
 //	bind.Permanent(div.New(bind.Hook(canvas.New(), "chart")))
 func Permanent[E Settable[E]](el E) E {
-	return el.SetData("poly-permanent", "")
+	return el.SetData("tether-permanent", "")
 }
 
 // ToggleSignal flips a boolean signal on click without a server
@@ -60,7 +60,7 @@ func Permanent[E Settable[E]](el E) E {
 //
 //	bind.ToggleSignal(button.Text("Menu"), "menuOpen")
 func ToggleSignal[E Settable[E]](el E, signal string) E {
-	return el.SetData("poly-toggle-signal", signal)
+	return el.SetData("tether-toggle-signal", signal)
 }
 
 // SetSignal sets a signal to a specific value on click without a
@@ -69,7 +69,7 @@ func ToggleSignal[E Settable[E]](el E, signal string) E {
 //
 //	bind.SetSignal(button.Text("Settings"), "tab", "settings")
 func SetSignal[E Settable[E]](el E, signal, value string) E {
-	return el.SetData("poly-set-signal", signal+" "+value)
+	return el.SetData("tether-set-signal", signal+" "+value)
 }
 
 // Optimistic sets a signal to a value immediately on click, before
@@ -80,7 +80,7 @@ func SetSignal[E Settable[E]](el E, signal, value string) E {
 //
 //	bind.Click(bind.Optimistic(button.Text("Like"), "liked", "true"), "like")
 func Optimistic[E Settable[E]](el E, signal, value string) E {
-	return el.SetData("poly-optimistic", signal+" "+value)
+	return el.SetData("tether-optimistic", signal+" "+value)
 }
 
 // PushSubscribe marks an element as the trigger for push notification
@@ -91,7 +91,7 @@ func Optimistic[E Settable[E]](el E, signal, value string) E {
 //
 //	bind.PushSubscribe(button.Text("Enable notifications"))
 func PushSubscribe[E Settable[E]](el E) E {
-	return el.SetData("poly-push-subscribe", "")
+	return el.SetData("tether-push-subscribe", "")
 }
 
 // OptimisticToggle flips a boolean signal immediately on click,
@@ -101,5 +101,5 @@ func PushSubscribe[E Settable[E]](el E) E {
 //
 //	bind.Click(bind.OptimisticToggle(button.Text("Like"), "liked"), "like")
 func OptimisticToggle[E Settable[E]](el E, signal string) E {
-	return el.SetData("poly-optimistic-toggle", signal)
+	return el.SetData("tether-optimistic-toggle", signal)
 }

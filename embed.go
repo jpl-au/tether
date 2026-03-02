@@ -1,4 +1,4 @@
-package poly
+package tether
 
 import (
 	"bytes"
@@ -13,20 +13,20 @@ import (
 )
 
 // clientFS embeds the client-side JS runtime and the idiomorph library.
-// These files are served at the /_poly/ path by the Handler.
+// These files are served at the /_tether/ path by the Handler.
 //
-//go:embed client/fluent-poly.js client/idiomorph.min.js client/fluent-poly-worker.js client/fluent-poly-push-worker.js client/fluent-poly-upload.js
+//go:embed client/fluent-tether.js client/idiomorph.min.js client/fluent-tether-worker.js client/fluent-tether-push-worker.js client/fluent-tether-upload.js
 var clientFS embed.FS
 
 // clientFiles returns an fs.FS rooted at the client/ directory so that
 // file paths served by http.FileServer match the expected URL paths
-// (e.g. /fluent-poly.js rather than /client/fluent-poly.js).
+// (e.g. /fluent-tether.js rather than /client/fluent-tether.js).
 func clientFiles() fs.FS {
 	sub, err := fs.Sub(clientFS, "client")
 	if err != nil {
 		// The embed directive guarantees the "client" directory exists.
 		// If this fails, the binary is corrupted.
-		panic("poly: embedded client files missing: " + err.Error())
+		panic("tether: embedded client files missing: " + err.Error())
 	}
 	return sub
 }
@@ -74,10 +74,10 @@ func buildWorkerJS(assets []*Asset) []byte {
 	}
 	version := hex.EncodeToString(h.Sum(nil))[:12]
 
-	raw, _ := fs.ReadFile(clientFiles(), "fluent-poly-worker.js")
+	raw, _ := fs.ReadFile(clientFiles(), "fluent-tether-worker.js")
 	body := bytes.Replace(raw,
-		[]byte(`"poly-v1"`),
-		[]byte(`"poly-`+version+`"`), 1)
+		[]byte(`"tether-v1"`),
+		[]byte(`"tether-`+version+`"`), 1)
 
 	if len(precache) > 0 {
 		extra, _ := json.Marshal(precache)
@@ -90,24 +90,24 @@ func buildWorkerJS(assets []*Asset) []byte {
 }
 
 // ServeClient returns an http.Handler that serves the embedded client
-// JS runtime (fluent-poly.js, idiomorph, service worker). Mount it at
-// /_poly/ when the poly handler is not at the root path:
+// JS runtime (fluent-tether.js, idiomorph, service worker). Mount it at
+// /_tether/ when the tether handler is not at the root path:
 //
-//	mux.Handle("/_poly/", http.StripPrefix("/_poly/", poly.ServeClient()))
+//	mux.Handle("/_tether/", http.StripPrefix("/_tether/", tether.ServeClient()))
 //
-// When the poly handler IS mounted at "/" the client runtime is
+// When the tether handler IS mounted at "/" the client runtime is
 // served automatically and this function is not needed.
 func ServeClient() http.Handler {
 	return newClientHandler(nil)
 }
 
 // newClientHandler builds an http.Handler that serves the embedded
-// client runtime. The Handler mounts this at /_poly/ so the HTML page
-// can load fluent-poly.js and idiomorph. The service worker script
+// client runtime. The Handler mounts this at /_tether/ so the HTML page
+// can load fluent-tether.js and idiomorph. The service worker script
 // gets special treatment: its CACHE_VERSION is set to a content hash
 // of the embedded files, and a Service-Worker-Allowed header permits
 // the client to register the worker at any scope (the client scopes
-// to the handler's endpoint via data-poly-endpoint).
+// to the handler's endpoint via data-tether-endpoint).
 func newClientHandler(assets []*Asset) http.Handler {
 	fileServer := http.FileServer(http.FS(clientFiles()))
 
@@ -118,7 +118,7 @@ func newClientHandler(assets []*Asset) http.Handler {
 		// The service worker needs the content-hash cache version
 		// injected and the scope header set, so it is served directly
 		// rather than through the static file server.
-		if r.URL.Path == "/fluent-poly-worker.js" || r.URL.Path == "fluent-poly-worker.js" {
+		if r.URL.Path == "/fluent-tether-worker.js" || r.URL.Path == "fluent-tether-worker.js" {
 			// Defence-in-depth: reject cross-origin requests for the
 			// worker script. The browser already prevents cross-origin
 			// registration, but this guards against misconfigured proxies.

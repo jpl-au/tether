@@ -1,4 +1,4 @@
-package poly
+package tether
 
 // HandleFunc processes a client event and returns the new state. Side
 // effects (toast, navigate, announce, flash, title, URL) are expressed
@@ -7,7 +7,7 @@ package poly
 // with the state diff, so the client receives everything in one frame.
 //
 // The session parameter is a [PreSession] so that the same handler
-// can be used in live mode, stateless page mode, and polytest without
+// can be used in live mode, stateless page mode, and tethertest without
 // changing its signature. In live mode the underlying value is a
 // [*Session] which provides additional methods (Update, Go, Context,
 // Close) via type assertion when needed.

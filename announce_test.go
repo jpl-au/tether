@@ -1,11 +1,11 @@
-package poly
+package tether
 
 import (
 	"encoding/json"
 	"testing"
 	"testing/synctest"
 
-	"github.com/jpl-au/fluent-poly/wire"
+	"github.com/jpl-au/fluent-tether/wire"
 )
 
 func TestSessionAnnounceSendsUpdate(t *testing.T) {

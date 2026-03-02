@@ -1,4 +1,4 @@
-// Package router provides multi-page routing for fluent-poly. It
+// Package router provides multi-page routing for fluent-tether. It
 // dispatches render and handle calls to the active page based on a
 // field in the session state, enabling single-binary applications
 // with multiple views.
@@ -11,9 +11,9 @@
 //	r.Route("/settings", router.Page[State]{Render: settingsRender, Handle: settingsHandle})
 //	r.NotFound(router.Page[State]{Render: notFoundRender})
 //
-// Pass r.Render and r.Handle to [poly.Config]:
+// Pass r.Render and r.Handle to [tether.Config]:
 //
-//	poly.New(poly.Config[State]{
+//	tether.New(tether.Config[State]{
 //	    Render: r.Render,
 //	    Handle: r.Handle,
 //	    OnNavigate: r.OnNavigate(func(s *State, path string) { s.Page = path }),
@@ -25,18 +25,18 @@ import (
 	"sync"
 	"sync/atomic"
 
-	poly "github.com/jpl-au/fluent-poly"
+	tether "github.com/jpl-au/fluent-tether"
 	"github.com/jpl-au/fluent/node"
 )
 
 // Page defines the render and handle logic for a single route.
 type Page[S any] struct {
-	Render poly.RenderFunc[S]
-	Handle poly.HandleFunc[S]
+	Render tether.RenderFunc[S]
+	Handle tether.HandleFunc[S]
 }
 
 // Router manages a set of pages keyed by URL path. It provides
-// [poly.HandleFunc] and [poly.RenderFunc] implementations that
+// [tether.HandleFunc] and [tether.RenderFunc] implementations that
 // dispatch to the active page based on a field in the session state.
 //
 // To use Router, your state must have a field that tracks the current
@@ -83,7 +83,7 @@ func (r *Router[S]) NotFound(page Page[S]) {
 	r.notFound.Store(page)
 }
 
-// Render implements [poly.RenderFunc]. It dispatches to the active
+// Render implements [tether.RenderFunc]. It dispatches to the active
 // page's Render function. Lock-free.
 func (r *Router[S]) Render(s S) node.Node {
 	path := r.selector(s)
@@ -98,9 +98,9 @@ func (r *Router[S]) Render(s S) node.Node {
 	return nil
 }
 
-// Handle implements [poly.HandleFunc]. It dispatches to the active
+// Handle implements [tether.HandleFunc]. It dispatches to the active
 // page's Handle function. Lock-free.
-func (r *Router[S]) Handle(sess poly.PreSession, s S, ev poly.Event) S {
+func (r *Router[S]) Handle(sess tether.PreSession, s S, ev tether.Event) S {
 	path := r.selector(s)
 	pages := r.loadPages()
 	if p, ok := pages[path]; ok && p.Handle != nil {
@@ -121,10 +121,10 @@ func (r *Router[S]) loadNotFound() Page[S] {
 	return r.notFound.Load().(Page[S])
 }
 
-// OnNavigate is a helper for [poly.Config].OnNavigate that simply
+// OnNavigate is a helper for [tether.Config].OnNavigate that simply
 // updates the page field in the state.
-func (r *Router[S]) OnNavigate(setter func(*S, string)) func(poly.PreSession, S, poly.Params) S {
-	return func(_ poly.PreSession, s S, p poly.Params) S {
+func (r *Router[S]) OnNavigate(setter func(*S, string)) func(tether.PreSession, S, tether.Params) S {
+	return func(_ tether.PreSession, s S, p tether.Params) S {
 		setter(&s, p.Path)
 		return s
 	}

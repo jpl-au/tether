@@ -1,4 +1,4 @@
-package poly
+package tether
 
 import (
 	"context"
@@ -90,7 +90,7 @@ func TestBusSenderFiltering(t *testing.T) {
 		defer func() { sessB.stop(); synctest.Wait() }()
 
 		var gotA, gotB string
-		// Subscribe both via the internal subscribe (simulating poly.On).
+		// Subscribe both via the internal subscribe (simulating tether.On).
 		bus.subscribe(sessA.ctx, func(ev string) { gotA = ev }, "A")
 		bus.subscribe(sessB.ctx, func(ev string) { gotB = ev }, "B")
 
@@ -146,7 +146,7 @@ func TestBusPublishNoSenderFilter(t *testing.T) {
 		defer func() { sess.stop(); synctest.Wait() }()
 
 		var got string
-		// Subscribe with session ID (as poly.On would).
+		// Subscribe with session ID (as tether.On would).
 		bus.subscribe(sess.ctx, func(ev string) { got = ev }, sess.id)
 
 		// Publish (no sender) — should deliver to everyone.

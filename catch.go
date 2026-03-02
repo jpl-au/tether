@@ -1,4 +1,4 @@
-package poly
+package tether
 
 import (
 	"log/slog"
@@ -14,7 +14,7 @@ import (
 //	func render(s State) node.Node {
 //	    return div.New(
 //	        header(s),
-//	        poly.Catch(func() node.Node {
+//	        tether.Catch(func() node.Node {
 //	            return riskyWidget(s)
 //	        }, span.Text("Widget unavailable")),
 //	        footer(s),
@@ -23,7 +23,7 @@ import (
 func Catch(render func() node.Node, fallback node.Node) (result node.Node) {
 	defer func() {
 		if v := recover(); v != nil {
-			slog.Error("poly.Catch recovered panic", "panic", v)
+			slog.Error("tether.Catch recovered panic", "panic", v)
 			result = fallback
 		}
 	}()

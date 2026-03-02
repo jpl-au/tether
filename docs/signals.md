@@ -1,13 +1,13 @@
 # Signals and reactivity
 
-fluent-poly gives you three ways to update the UI. Use whichever fits your situation — or mix them freely.
+fluent-tether gives you three ways to update the UI. Use whichever fits your situation — or mix them freely.
 
 ## Server-driven rendering (the default)
 
 The server renders HTML, diffs it against the previous tree, and sends patches or morphs to the client. This is the core model and works for everything:
 
 ```go
-Handle: func(_ poly.PreSession, s State, ev poly.Event) State {
+Handle: func(_ tether.PreSession, s State, ev tether.Event) State {
     s.Count++
     return s // the framework renders, diffs, and sends the update
 },
@@ -41,7 +41,7 @@ bind.BindAttr(button.New(), "disabled", "isLoading")   // sets/removes attribute
 bind.BindValue(input.Text("email", ""), "email")       // sets form field value
 ```
 
-Signal bindings work **document-wide**, not just inside the poly root. This means navigation highlights, status indicators, and layout shell elements react instantly to signal pushes without triggering a full render.
+Signal bindings work **document-wide**, not just inside the tether root. This means navigation highlights, status indicators, and layout shell elements react instantly to signal pushes without triggering a full render.
 
 After a morph replaces part of the DOM, the client reapplies current signal values to newly added elements automatically.
 

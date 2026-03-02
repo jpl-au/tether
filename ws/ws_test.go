@@ -10,8 +10,8 @@ import (
 	"testing"
 
 	"github.com/coder/websocket"
-	poly "github.com/jpl-au/fluent-poly"
-	"github.com/jpl-au/fluent-poly/event"
+	tether "github.com/jpl-au/fluent-tether"
+	"github.com/jpl-au/fluent-tether/event"
 )
 
 // dial starts an httptest server that upgrades to WebSocket via ws.Upgrade,
@@ -103,7 +103,7 @@ func TestSendPreservesAngleBrackets(t *testing.T) {
 func TestReceiveEventReadsClientJSON(t *testing.T) {
 	tp, client := dial(t)
 
-	want := poly.Event{Type: event.Click, Action: "increment"}
+	want := tether.Event{Type: event.Click, Action: "increment"}
 	data, _ := json.Marshal(want)
 	if err := client.Write(context.Background(), websocket.MessageText, data); err != nil {
 		t.Fatalf("client write: %v", err)

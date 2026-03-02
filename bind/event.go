@@ -5,50 +5,50 @@ import (
 	"time"
 )
 
-// Click binds a poly-click event. When the element is clicked, the
+// Click binds a tether-click event. When the element is clicked, the
 // server receives an Event with the given action.
 func Click[E Settable[E]](el E, action string) E {
-	return el.SetData("poly-click", action)
+	return el.SetData("tether-click", action)
 }
 
-// Submit binds a poly-submit event. When the form is submitted, the
+// Submit binds a tether-submit event. When the form is submitted, the
 // server receives an Event with form field values in Data.
 func Submit[E Settable[E]](el E, action string) E {
-	return el.SetData("poly-submit", action)
+	return el.SetData("tether-submit", action)
 }
 
-// Input binds a poly-input event. Fires as the user types, debounced
+// Input binds a tether-input event. Fires as the user types, debounced
 // at 300ms by default (configurable via [Debounce] on the element).
 func Input[E Settable[E]](el E, action string) E {
-	return el.SetData("poly-input", action)
+	return el.SetData("tether-input", action)
 }
 
-// Change binds a poly-change event. Fires when a form control's value
+// Change binds a tether-change event. Fires when a form control's value
 // is committed (e.g. select change, checkbox toggle).
 func Change[E Settable[E]](el E, action string) E {
-	return el.SetData("poly-change", action)
+	return el.SetData("tether-change", action)
 }
 
-// KeyDown binds a poly-keydown event. The key name is sent in
+// KeyDown binds a tether-keydown event. The key name is sent in
 // Event.Data["key"].
 func KeyDown[E Settable[E]](el E, action string) E {
-	return el.SetData("poly-keydown", action)
+	return el.SetData("tether-keydown", action)
 }
 
 // FilterKey restricts a KeyDown event to a specific key (e.g. "Enter").
 // The event is only sent to the server if the key name matches.
 func FilterKey[E Settable[E]](el E, key string) E {
-	return el.SetData("poly-key", key)
+	return el.SetData("tether-key", key)
 }
 
-// Focus binds a poly-focus event.
+// Focus binds a tether-focus event.
 func Focus[E Settable[E]](el E, action string) E {
-	return el.SetData("poly-focus", action)
+	return el.SetData("tether-focus", action)
 }
 
-// Blur binds a poly-blur event.
+// Blur binds a tether-blur event.
 func Blur[E Settable[E]](el E, action string) E {
-	return el.SetData("poly-blur", action)
+	return el.SetData("tether-blur", action)
 }
 
 // EventData attaches an arbitrary data value to an element. When an
@@ -58,29 +58,29 @@ func Blur[E Settable[E]](el E, action string) E {
 //
 //	bind.EventData(bind.Click(el, "delete"), "id", "123")
 func EventData[E Settable[E]](el E, key, value string) E {
-	return el.SetData("poly-data-"+key, value)
+	return el.SetData("tether-data-"+key, value)
 }
 
 // Debounce overrides the default 300ms debounce delay on input events.
 // Only meaningful on elements that also have an [Input] binding.
 func Debounce[E Settable[E]](el E, d time.Duration) E {
-	return el.SetData("poly-debounce", strconv.Itoa(int(d.Milliseconds())))
+	return el.SetData("tether-debounce", strconv.Itoa(int(d.Milliseconds())))
 }
 
 // Throttle sets a minimum interval between repeated events. The JS
 // runtime drops events that arrive within the throttle window.
 func Throttle[E Settable[E]](el E, d time.Duration) E {
-	return el.SetData("poly-throttle", strconv.Itoa(int(d.Milliseconds())))
+	return el.SetData("tether-throttle", strconv.Itoa(int(d.Milliseconds())))
 }
 
 // On binds an arbitrary DOM event. Use this for events not covered by
 // the built-in helpers (Click, Submit, Input, etc.). The eventType is
-// appended to the "poly-" prefix, so On(el, "mouseover", "hover")
-// sets data-poly-mouseover="hover".
+// appended to the "tether-" prefix, so On(el, "mouseover", "hover")
+// sets data-tether-mouseover="hover".
 //
 //	bind.On(div.New(), "dblclick", "open-editor")
 func On[E Settable[E]](el E, eventType, action string) E {
-	return el.SetData("poly-"+eventType, action)
+	return el.SetData("tether-"+eventType, action)
 }
 
 // Viewport fires a server event when the element enters the viewport.
@@ -91,5 +91,5 @@ func On[E Settable[E]](el E, eventType, action string) E {
 //
 //	bind.Viewport(div.New(), "load-more")
 func Viewport[E Settable[E]](el E, action string) E {
-	return el.SetData("poly-viewport", action)
+	return el.SetData("tether-viewport", action)
 }

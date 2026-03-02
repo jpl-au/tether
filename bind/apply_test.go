@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jpl-au/fluent-poly/bind"
+	"github.com/jpl-au/fluent-tether/bind"
 	"github.com/jpl-au/fluent/html5/button"
 	"github.com/jpl-au/fluent/html5/div"
 	"github.com/jpl-au/fluent/html5/input"
@@ -20,9 +20,9 @@ func TestApplyMultipleOptions(t *testing.T) {
 	html := string(el.Render())
 
 	for _, want := range []string{
-		`data-poly-click="delete"`,
-		`data-poly-confirm="Are you sure?"`,
-		`data-poly-disable="Deleting..."`,
+		`data-tether-click="delete"`,
+		`data-tether-confirm="Are you sure?"`,
+		`data-tether-disable="Deleting..."`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Errorf("missing %s in:\n%s", want, html)
@@ -36,14 +36,14 @@ func TestApplyEventOptions(t *testing.T) {
 		opt  bind.Option
 		attr string
 	}{
-		{"OnClick", bind.OnClick("act"), `data-poly-click="act"`},
-		{"OnSubmit", bind.OnSubmit("act"), `data-poly-submit="act"`},
-		{"OnInput", bind.OnInput("act"), `data-poly-input="act"`},
-		{"OnChange", bind.OnChange("act"), `data-poly-change="act"`},
-		{"OnKeyDown", bind.OnKeyDown("act"), `data-poly-keydown="act"`},
-		{"OnFocus", bind.OnFocus("act"), `data-poly-focus="act"`},
-		{"OnBlur", bind.OnBlur("act"), `data-poly-blur="act"`},
-		{"OnViewport", bind.OnViewport("act"), `data-poly-viewport="act"`},
+		{"OnClick", bind.OnClick("act"), `data-tether-click="act"`},
+		{"OnSubmit", bind.OnSubmit("act"), `data-tether-submit="act"`},
+		{"OnInput", bind.OnInput("act"), `data-tether-input="act"`},
+		{"OnChange", bind.OnChange("act"), `data-tether-change="act"`},
+		{"OnKeyDown", bind.OnKeyDown("act"), `data-tether-keydown="act"`},
+		{"OnFocus", bind.OnFocus("act"), `data-tether-focus="act"`},
+		{"OnBlur", bind.OnBlur("act"), `data-tether-blur="act"`},
+		{"OnViewport", bind.OnViewport("act"), `data-tether-viewport="act"`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -65,10 +65,10 @@ func TestApplyControlOptions(t *testing.T) {
 	html := string(el.Render())
 
 	for _, want := range []string{
-		`data-poly-autofocus`,
-		`data-poly-reset`,
-		`data-poly-focus-trap`,
-		`data-poly-indicator="#spin"`,
+		`data-tether-autofocus`,
+		`data-tether-reset`,
+		`data-tether-focus-trap`,
+		`data-tether-indicator="#spin"`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Errorf("missing %s in:\n%s", want, html)
@@ -82,7 +82,7 @@ func TestApplyTimingOptions(t *testing.T) {
 		bind.WithDebounce(150*time.Millisecond),
 	)
 	html := string(el.Render())
-	if !strings.Contains(html, `data-poly-debounce="150"`) {
+	if !strings.Contains(html, `data-tether-debounce="150"`) {
 		t.Errorf("missing debounce in:\n%s", html)
 	}
 }
@@ -91,7 +91,7 @@ func TestWithFilterKeyMatchesFilterKey(t *testing.T) {
 	// WithFilterKey must produce the same attribute as bind.FilterKey.
 	nested := string(bind.FilterKey(input.Text("q", ""), "Enter").Render())
 	applied := string(bind.Apply(input.Text("q", ""), bind.WithFilterKey("Enter")).Render())
-	want := `data-poly-key="Enter"`
+	want := `data-tether-key="Enter"`
 	if !strings.Contains(nested, want) {
 		t.Errorf("FilterKey missing %s in:\n%s", want, nested)
 	}
@@ -101,9 +101,9 @@ func TestWithFilterKeyMatchesFilterKey(t *testing.T) {
 }
 
 func TestWithData(t *testing.T) {
-	el := bind.Apply(div.New(), bind.WithData("poly-custom", "value"))
+	el := bind.Apply(div.New(), bind.WithData("tether-custom", "value"))
 	html := string(el.Render())
-	if !strings.Contains(html, `data-poly-custom="value"`) {
+	if !strings.Contains(html, `data-tether-custom="value"`) {
 		t.Errorf("missing custom attribute in:\n%s", html)
 	}
 }
@@ -118,10 +118,10 @@ func TestApplyDirectiveOptions(t *testing.T) {
 	html := string(el.Render())
 
 	for _, want := range []string{
-		`data-poly-cloak`,
-		`data-poly-permanent`,
-		`data-poly-hook="chart"`,
-		`data-poly-transition="fade"`,
+		`data-tether-cloak`,
+		`data-tether-permanent`,
+		`data-tether-hook="chart"`,
+		`data-tether-transition="fade"`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Errorf("missing %s in:\n%s", want, html)
@@ -135,12 +135,12 @@ func TestApplySignalBindingOptions(t *testing.T) {
 		opt  bind.Option
 		attr string
 	}{
-		{"WithBindText", bind.WithBindText("count"), `data-poly-bind-text="count"`},
-		{"WithBindShow", bind.WithBindShow("isOpen"), `data-poly-bind-show="isOpen"`},
-		{"WithBindHide", bind.WithBindHide("isHidden"), `data-poly-bind-hide="isHidden"`},
-		{"WithBindClass", bind.WithBindClass("active", "isSelected"), `data-poly-bind-class="active isSelected"`},
-		{"WithBindAttr", bind.WithBindAttr("disabled", "isLoading"), `data-poly-bind-attr="disabled isLoading"`},
-		{"WithBindValue", bind.WithBindValue("email"), `data-poly-bind-value="email"`},
+		{"WithBindText", bind.WithBindText("count"), `data-tether-bind-text="count"`},
+		{"WithBindShow", bind.WithBindShow("isOpen"), `data-tether-bind-show="isOpen"`},
+		{"WithBindHide", bind.WithBindHide("isHidden"), `data-tether-bind-hide="isHidden"`},
+		{"WithBindClass", bind.WithBindClass("active", "isSelected"), `data-tether-bind-class="active isSelected"`},
+		{"WithBindAttr", bind.WithBindAttr("disabled", "isLoading"), `data-tether-bind-attr="disabled isLoading"`},
+		{"WithBindValue", bind.WithBindValue("email"), `data-tether-bind-value="email"`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -158,10 +158,10 @@ func TestApplySignalDirectiveOptions(t *testing.T) {
 		opt  bind.Option
 		attr string
 	}{
-		{"WithToggleSignal", bind.WithToggleSignal("menuOpen"), `data-poly-toggle-signal="menuOpen"`},
-		{"WithSetSignal", bind.WithSetSignal("tab", "settings"), `data-poly-set-signal="tab settings"`},
-		{"WithOptimistic", bind.WithOptimistic("liked", "true"), `data-poly-optimistic="liked true"`},
-		{"WithOptimisticToggle", bind.WithOptimisticToggle("liked"), `data-poly-optimistic-toggle="liked"`},
+		{"WithToggleSignal", bind.WithToggleSignal("menuOpen"), `data-tether-toggle-signal="menuOpen"`},
+		{"WithSetSignal", bind.WithSetSignal("tab", "settings"), `data-tether-set-signal="tab settings"`},
+		{"WithOptimistic", bind.WithOptimistic("liked", "true"), `data-tether-optimistic="liked true"`},
+		{"WithOptimisticToggle", bind.WithOptimisticToggle("liked"), `data-tether-optimistic-toggle="liked"`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -178,7 +178,7 @@ func TestApplyUploadOptions(t *testing.T) {
 		bind.WithUpload("avatar"),
 	)
 	html := string(el.Render())
-	if !strings.Contains(html, `data-poly-upload="avatar"`) {
+	if !strings.Contains(html, `data-tether-upload="avatar"`) {
 		t.Errorf("missing upload attribute in:\n%s", html)
 	}
 }
@@ -188,7 +188,7 @@ func TestApplyUploadProgressOption(t *testing.T) {
 		bind.WithUploadProgress("avatar"),
 	)
 	html := string(el.Render())
-	if !strings.Contains(html, `data-poly-bind-attr="value upload:avatar:progress"`) {
+	if !strings.Contains(html, `data-tether-bind-attr="value upload:avatar:progress"`) {
 		t.Errorf("missing upload progress attribute in:\n%s", html)
 	}
 }
@@ -203,10 +203,10 @@ func TestApplyCompositionWithSignalBindings(t *testing.T) {
 	html := string(el.Render())
 
 	for _, want := range []string{
-		`data-poly-click="like"`,
-		`data-poly-disable="Liking..."`,
-		`data-poly-bind-show="isLiked"`,
-		`data-poly-optimistic-toggle="liked"`,
+		`data-tether-click="like"`,
+		`data-tether-disable="Liking..."`,
+		`data-tether-bind-show="isLiked"`,
+		`data-tether-optimistic-toggle="liked"`,
 	} {
 		if !strings.Contains(html, want) {
 			t.Errorf("missing %s in:\n%s", want, html)
@@ -217,15 +217,15 @@ func TestApplyCompositionWithSignalBindings(t *testing.T) {
 func TestApplyNoOptions(t *testing.T) {
 	el := bind.Apply(button.Text("plain"))
 	html := string(el.Render())
-	if strings.Contains(html, "data-poly") {
-		t.Errorf("expected no poly attributes in:\n%s", html)
+	if strings.Contains(html, "data-tether") {
+		t.Errorf("expected no tether attributes in:\n%s", html)
 	}
 }
 
 func TestOnArbitraryEvent(t *testing.T) {
 	el := bind.On(div.New(), "dblclick", "open-editor")
 	html := string(el.Render())
-	if !strings.Contains(html, `data-poly-dblclick="open-editor"`) {
+	if !strings.Contains(html, `data-tether-dblclick="open-editor"`) {
 		t.Errorf("missing dblclick attribute in:\n%s", html)
 	}
 }
@@ -233,7 +233,7 @@ func TestOnArbitraryEvent(t *testing.T) {
 func TestWithEventOption(t *testing.T) {
 	el := bind.Apply(div.New(), bind.WithEvent("mouseover", "hover"))
 	html := string(el.Render())
-	if !strings.Contains(html, `data-poly-mouseover="hover"`) {
+	if !strings.Contains(html, `data-tether-mouseover="hover"`) {
 		t.Errorf("missing mouseover attribute in:\n%s", html)
 	}
 }

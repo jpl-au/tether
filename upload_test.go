@@ -1,4 +1,4 @@
-package poly
+package tether
 
 import (
 	"bytes"
@@ -9,14 +9,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jpl-au/fluent-poly/mode"
+	"github.com/jpl-au/fluent-tether/mode"
 )
 
 func TestHandleUploadNotConfigured(t *testing.T) {
 	handler := newTestHandler()
 
 	req := httptest.NewRequest("POST", "/app", nil)
-	req.Header.Set("X-Poly-Upload", "avatar")
+	req.Header.Set("X-Tether-Upload", "avatar")
 	w := httptest.NewRecorder()
 
 	handler.ServeHTTP(w, req)
@@ -39,7 +39,7 @@ func TestHandleUploadMissingSession(t *testing.T) {
 	})
 
 	req := httptest.NewRequest("POST", "/app", nil)
-	req.Header.Set("X-Poly-Upload", "avatar")
+	req.Header.Set("X-Tether-Upload", "avatar")
 	w := httptest.NewRecorder()
 
 	handler.ServeHTTP(w, req)
@@ -62,8 +62,8 @@ func TestHandleUploadUnknownSession(t *testing.T) {
 	})
 
 	req := httptest.NewRequest("POST", "/app", nil)
-	req.Header.Set("X-Poly-Upload", "avatar")
-	req.Header.Set("X-Poly-Session", "nonexistent")
+	req.Header.Set("X-Tether-Upload", "avatar")
+	req.Header.Set("X-Tether-Session", "nonexistent")
 	w := httptest.NewRecorder()
 
 	handler.ServeHTTP(w, req)
@@ -103,8 +103,8 @@ func TestHandleUploadSuccess(t *testing.T) {
 
 	req := httptest.NewRequest("POST", "/app", body)
 	req.Header.Set("Content-Type", contentType)
-	req.Header.Set("X-Poly-Upload", "avatar")
-	req.Header.Set("X-Poly-Session", "upload-session")
+	req.Header.Set("X-Tether-Upload", "avatar")
+	req.Header.Set("X-Tether-Session", "upload-session")
 	w := httptest.NewRecorder()
 
 	handler.ServeHTTP(w, req)
@@ -154,8 +154,8 @@ func TestHandleUploadMIMEReject(t *testing.T) {
 
 	req := httptest.NewRequest("POST", "/app", body)
 	req.Header.Set("Content-Type", contentType)
-	req.Header.Set("X-Poly-Upload", "avatar")
-	req.Header.Set("X-Poly-Session", "upload-session")
+	req.Header.Set("X-Tether-Upload", "avatar")
+	req.Header.Set("X-Tether-Session", "upload-session")
 	w := httptest.NewRecorder()
 
 	handler.ServeHTTP(w, req)
@@ -194,8 +194,8 @@ func TestHandleUploadMIMEAcceptWildcard(t *testing.T) {
 
 	req := httptest.NewRequest("POST", "/app", body)
 	req.Header.Set("Content-Type", contentType)
-	req.Header.Set("X-Poly-Upload", "avatar")
-	req.Header.Set("X-Poly-Session", "upload-session")
+	req.Header.Set("X-Tether-Upload", "avatar")
+	req.Header.Set("X-Tether-Session", "upload-session")
 	w := httptest.NewRecorder()
 
 	handler.ServeHTTP(w, req)
@@ -237,8 +237,8 @@ func TestMimeAllowed(t *testing.T) {
 }
 
 func TestExtensionScriptIncluded(t *testing.T) {
-	body := &polyBody{
-		html:     []byte(`<input type="file" data-poly-upload="avatar">`),
+	body := &tetherBody{
+		html:     []byte(`<input type="file" data-tether-upload="avatar">`),
 		endpoint: "/app",
 		session:  "abc",
 	}
@@ -246,13 +246,13 @@ func TestExtensionScriptIncluded(t *testing.T) {
 	body.RenderBuilder(&buf)
 	html := buf.String()
 
-	if !strings.Contains(html, "fluent-poly-upload.js") {
-		t.Error("expected fluent-poly-upload.js script tag when data-poly-upload is present")
+	if !strings.Contains(html, "fluent-tether-upload.js") {
+		t.Error("expected fluent-tether-upload.js script tag when data-tether-upload is present")
 	}
 }
 
 func TestExtensionScriptOmitted(t *testing.T) {
-	body := &polyBody{
+	body := &tetherBody{
 		html:     []byte(`<button>No uploads here</button>`),
 		endpoint: "/app",
 		session:  "abc",
@@ -261,8 +261,8 @@ func TestExtensionScriptOmitted(t *testing.T) {
 	body.RenderBuilder(&buf)
 	html := buf.String()
 
-	if strings.Contains(html, "fluent-poly-upload.js") {
-		t.Error("fluent-poly-upload.js should not appear when no upload elements exist")
+	if strings.Contains(html, "fluent-tether-upload.js") {
+		t.Error("fluent-tether-upload.js should not appear when no upload elements exist")
 	}
 }
 

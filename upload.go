@@ -1,4 +1,4 @@
-package poly
+package tether
 
 import (
 	"log/slog"
@@ -70,7 +70,7 @@ func (h *Handler[S]) handleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := r.Header.Get("X-Poly-Session")
+	id := r.Header.Get("X-Tether-Session")
 	if id == "" {
 		http.Error(w, "missing session", http.StatusBadRequest)
 		return
@@ -99,7 +99,7 @@ func (h *Handler[S]) handleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	action := r.Header.Get("X-Poly-Upload")
+	action := r.Header.Get("X-Tether-Upload")
 
 	// Validate MIME types and collect uploads before spawning the
 	// background goroutine. On validation failure, clean up

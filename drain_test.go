@@ -1,4 +1,4 @@
-package poly
+package tether
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/jpl-au/fluent-poly/mode"
+	"github.com/jpl-au/fluent-tether/mode"
 )
 
 func TestDrainRejectsNewPages(t *testing.T) {

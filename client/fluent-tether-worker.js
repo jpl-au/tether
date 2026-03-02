@@ -1,14 +1,14 @@
-// fluent-poly-worker.js — service worker for Fluent Poly.
+// fluent-tether-worker.js — service worker for Fluent Tether.
 //
 // Provides asset caching for faster loads, offline page shells for
 // graceful disconnects, push notification handling, and background
-// sync for SSE event resilience. Registered by fluent-poly.js when
+// sync for SSE event resilience. Registered by fluent-tether.js when
 // the server enables Worker mode.
 
-var CACHE_VERSION = "poly-v1";
+var CACHE_VERSION = "tether-v1";
 var PRECACHE_URLS = [
-  "/_poly/fluent-poly.js",
-  "/_poly/idiomorph.min.js"
+  "/_tether/fluent-tether.js",
+  "/_tether/idiomorph.min.js"
 ];
 var PRECACHE_EXTRA = [];
 
@@ -43,9 +43,9 @@ self.addEventListener("activate", function (e) {
 self.addEventListener("fetch", function (e) {
   var url = new URL(e.request.url);
 
-  // Static assets (/_poly/*): cache-first. Serve from cache when
+  // Static assets (/_tether/*): cache-first. Serve from cache when
   // available, fall back to network and cache the response.
-  if (url.pathname.startsWith("/_poly/") && e.request.method === "GET") {
+  if (url.pathname.startsWith("/_tether/") && e.request.method === "GET") {
     e.respondWith(
       caches.match(e.request).then(function (cached) {
         if (cached) return cached;
@@ -63,13 +63,13 @@ self.addEventListener("fetch", function (e) {
 
   // Navigation requests: pass through to the network by default.
   // Only cache the response when the server opts in with the
-  // X-Poly-Cache header — this prevents caching sensitive or
+  // X-Tether-Cache header — this prevents caching sensitive or
   // session-specific pages without explicit intent.
   if (e.request.mode === "navigate") {
     e.respondWith(
       fetch(e.request)
         .then(function (resp) {
-          if (resp.headers.get("X-Poly-Cache") === "true") {
+          if (resp.headers.get("X-Tether-Cache") === "true") {
             var clone = resp.clone();
             caches.open(CACHE_VERSION).then(function (c) {
               c.put(e.request, clone);
@@ -136,7 +136,7 @@ self.addEventListener("notificationclick", function (e) {
 
 // --- Background sync: replay queued SSE events ---
 
-var EVENT_DB_NAME = "poly-events";
+var EVENT_DB_NAME = "tether-events";
 var EVENT_DB_VERSION = 1;
 var EVENT_STORE = "queue";
 // Discard events older than this to avoid replaying stale actions.
@@ -195,7 +195,7 @@ function replayEvent(db, key, ev) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-Poly-Session": ev.sessionID
+      "X-Tether-Session": ev.sessionID
     },
     body: ev.payload
   }).then(function (resp) {
@@ -211,6 +211,6 @@ function deleteFromEventDB(db, key) {
 }
 
 self.addEventListener("sync", function (e) {
-  if (e.tag !== "poly-event-sync") return;
+  if (e.tag !== "tether-event-sync") return;
   e.waitUntil(drainAndReplay());
 });

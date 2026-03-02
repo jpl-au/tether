@@ -1,12 +1,12 @@
-package poly
+package tether
 
 import (
 	"log/slog"
 	"maps"
 	"time"
 
-	"github.com/jpl-au/fluent-poly/dev"
-	"github.com/jpl-au/fluent-poly/push"
+	"github.com/jpl-au/fluent-tether/dev"
+	"github.com/jpl-au/fluent-tether/push"
 )
 
 // State returns the current session state. When called from inside

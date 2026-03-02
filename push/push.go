@@ -5,7 +5,7 @@
 //
 // Use [GenerateVAPIDKeys] once during initial setup to create a key
 // pair. Create a [Sender] with [NewSender] and pass it to
-// [poly.PushConfig]. When a subscription arrives, call
+// [tether.PushConfig]. When a subscription arrives, call
 // [Sender.Send] to deliver notifications.
 package push
 
@@ -88,7 +88,7 @@ func NewSender(cfg Config) *Sender {
 }
 
 // PublicKey returns the VAPID public key for client-side push
-// subscription. Pass this to [poly.PushConfig] so the browser can
+// subscription. Pass this to [tether.PushConfig] so the browser can
 // subscribe to notifications.
 func (s *Sender) PublicKey() string {
 	return s.cfg.VAPIDPublicKey

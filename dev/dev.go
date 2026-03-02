@@ -10,7 +10,7 @@ import "log/slog"
 var mode bool
 
 // Enable activates dev-mode diagnostics. Called once during handler
-// initialisation when Config.DevMode is true or POLY_DEV is set.
+// initialisation when Config.DevMode is true or TETHER_DEV is set.
 func Enable() { mode = true }
 
 // Enabled reports whether dev mode is active.
