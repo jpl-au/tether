@@ -874,6 +874,17 @@ To trigger re-announcement of identical text, the JS clears the region first the
 
 The `DevMode` bool takes precedence over the environment variable. When `DevMode` is false (the default), `os.Getenv("POLY_DEV")` is checked as a fallback.
 
+### Runtime gate
+
+During handler construction, `Config.DevMode` (or `POLY_DEV`) calls `dev.Enable()` once. After that, all runtime checks use `dev.Enabled()` — no code threads the `DevMode` bool downstream. This means:
+
+- `asset.go` — `cacheHandler` checks `dev.Enabled()` per request to decide between `no-store` and immutable cache headers
+- `serve.go` — initial page `Cache-Control` header uses `dev.Enabled()`
+- `page.go` — same for stateless pages
+- `render.go` — `data-poly-dev` attribute on the root element uses `dev.Enabled()`
+
+The `dev` package (`dev.Warn`, `dev.Debug`, `dev.Error`) silently no-ops when dev mode is inactive, so call sites stay clean.
+
 ### Logger
 
 When `Config.Logger` is nil, the framework creates a default logger (text format at INFO, or DEBUG in DevMode). Set `Config.LogJSON` for JSON output instead of text.
@@ -922,7 +933,7 @@ All hashes are computed eagerly at construction time. The hash is a 12-character
 
 **Auto-mounting:** When `Config.Assets` is set, the handler intercepts requests matching each asset's prefix and serves files directly — no extra mux setup needed. Multiple `Asset` entries with different prefixes are supported.
 
-**Cache headers:** In production, requests with `?v=` get `Cache-Control: public, max-age=31536000, immutable`. In DevMode, all asset responses get `Cache-Control: no-store`.
+**Cache headers:** `cacheHandler` checks `dev.Enabled()` per request. In production, requests with `?v=` get `Cache-Control: public, max-age=31536000, immutable`. When dev mode is active, all asset responses get `Cache-Control: no-store`.
 
 **Service worker integration:** Precache entries from all assets are automatically injected into the service worker with their hashed URLs. Changing an asset file changes its hash, which changes the worker's `CACHE_VERSION`, triggering a browser re-cache.
 

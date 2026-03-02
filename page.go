@@ -138,7 +138,7 @@ func Page[S any](cfg PageConfig[S]) http.Handler {
 		cfg:           cfg,
 		encoder:       wire.JSONEncoder{},
 		clientHandler: newClientHandler(cfg.Assets),
-		assetMounts:   buildAssetMounts(cfg.Assets, cfg.DevMode),
+		assetMounts:   buildAssetMounts(cfg.Assets),
 	}
 }
 
@@ -201,7 +201,7 @@ func (p *pageHandler[S]) serveGET(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Referrer-Policy", "same-origin")
-	if p.cfg.DevMode {
+	if dev.Enabled() {
 		w.Header().Set("Cache-Control", "no-store")
 	}
 	if p.cfg.Layout != nil {

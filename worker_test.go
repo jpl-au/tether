@@ -446,7 +446,7 @@ func TestDevModeEnvVar(t *testing.T) {
 	t.Setenv("POLY_DEV", "1")
 	t.Cleanup(dev.Reset)
 
-	handler := New(Config[counterState]{
+	New(Config[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -454,8 +454,8 @@ func TestDevModeEnvVar(t *testing.T) {
 		Handle:       handleCounter,
 	})
 
-	if !handler.cfg.DevMode {
-		t.Error("expected DevMode to be true when POLY_DEV is set")
+	if !dev.Enabled() {
+		t.Error("expected dev mode to be active when POLY_DEV is set")
 	}
 }
 
@@ -463,7 +463,7 @@ func TestDevModeBoolOverridesEnv(t *testing.T) {
 	t.Setenv("POLY_DEV", "")
 	t.Cleanup(dev.Reset)
 
-	handler := New(Config[counterState]{
+	New(Config[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -472,8 +472,8 @@ func TestDevModeBoolOverridesEnv(t *testing.T) {
 		DevMode:      true,
 	})
 
-	if !handler.cfg.DevMode {
-		t.Error("expected DevMode to remain true even without POLY_DEV")
+	if !dev.Enabled() {
+		t.Error("expected dev mode to remain active when DevMode is true")
 	}
 }
 

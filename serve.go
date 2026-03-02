@@ -87,7 +87,7 @@ func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	// Prevent session ID leakage via Referer header on external links.
 	w.Header().Set("Referrer-Policy", "same-origin")
-	if h.cfg.DevMode {
+	if dev.Enabled() {
 		w.Header().Set("Cache-Control", "no-store")
 	}
 	if h.cfg.Layout != nil {

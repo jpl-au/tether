@@ -77,7 +77,9 @@ Dev mode does the following:
 7. **Per-session diagnostics** — all session-level debug logging (events, diffs, reconnections, group membership, etc.) is gated behind dev mode via `dev.Debug`. In production with dev mode off, none of this output fires. For structured observability, use `OnStructuralChange` and `OnNoPatch` callbacks instead
 8. **Discarded effect warnings** — logs a warning when a handler panic discards buffered side effects (Toast, Signal, Navigate, etc.)
 
-Diagnostics are centralised in the `dev` package — call sites use `dev.Warn()` which silently no-ops outside dev mode.
+Diagnostics are centralised in the `dev` package. During handler construction, `Config.DevMode` (or `POLY_DEV`) calls `dev.Enable()` once. After that, all runtime checks — cache headers, the `data-poly-dev` attribute, diagnostic logging — use `dev.Enabled()`. No code threads the `DevMode` bool downstream; everything goes through the `dev` package.
+
+Call sites use `dev.Warn()`, `dev.Debug()`, and `dev.Error()` which silently no-op outside dev mode.
 
 The `DevMode` bool takes precedence. When it's false (the default), the `POLY_DEV` environment variable is checked as a fallback.
 

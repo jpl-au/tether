@@ -180,7 +180,7 @@ func New[S any](cfg Config[S]) *Handler[S] {
 		dev.Debug("middleware chain applied", "count", len(cfg.Middleware))
 	}
 
-	mounts := buildAssetMounts(cfg.Assets, cfg.DevMode)
+	mounts := buildAssetMounts(cfg.Assets)
 
 	h := &Handler[S]{
 		cfg:           cfg,

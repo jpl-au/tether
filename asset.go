@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/jpl-au/fluent-poly/dev"
 	"github.com/jpl-au/fluent/html5/attr/rel"
 	"github.com/jpl-au/fluent/html5/link"
 	"github.com/jpl-au/fluent/html5/script"
@@ -140,35 +141,28 @@ func (a *Asset) precacheURLs() []string {
 }
 
 // buildAssetMounts creates an [assetMount] for each [Asset], wrapping
-// the file server with DevMode-aware cache headers.
-func buildAssetMounts(assets []*Asset, devMode bool) []assetMount {
+// the file server with cache headers that respect [dev.Enabled] at
+// request time.
+func buildAssetMounts(assets []*Asset) []assetMount {
 	mounts := make([]assetMount, len(assets))
 	for i, a := range assets {
 		a.init()
 		handler := http.StripPrefix(a.prefix, a.handler)
-		if devMode {
-			handler = noCacheHandler(handler)
-		} else {
-			handler = immutableCacheHandler(handler)
-		}
+		handler = cacheHandler(handler)
 		mounts[i] = assetMount{prefix: a.prefix, handler: handler}
 	}
 	return mounts
 }
 
-// noCacheHandler wraps h with Cache-Control: no-store for DevMode.
-func noCacheHandler(h http.Handler) http.Handler {
+// cacheHandler sets Cache-Control headers based on dev mode. In dev
+// mode, assets are served with no-store so the browser always fetches
+// fresh copies. In production, versioned assets (?v=…) get immutable
+// cache headers.
+func cacheHandler(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "no-store")
-		h.ServeHTTP(w, r)
-	})
-}
-
-// immutableCacheHandler sets long-lived cache headers on responses
-// when the request URL contains a ?v= content hash.
-func immutableCacheHandler(h http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Query().Get("v") != "" {
+		if dev.Enabled() {
+			w.Header().Set("Cache-Control", "no-store")
+		} else if r.URL.Query().Get("v") != "" {
 			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 		}
 		h.ServeHTTP(w, r)
