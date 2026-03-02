@@ -100,12 +100,21 @@ Without this key, navigating between pages changes the rendered HTML but the dif
 
 ### DevMode warnings
 
-With `DevMode: true`, the framework logs a warning when `Update` or a navigate event produces no patches. This catches missing Dynamic keys early:
+With `DevMode: true`, the framework logs a warning when any event or `Update` call produces no patches. This catches missing Dynamic keys early:
 
 ```
 level=WARN msg="Update produced no patches — state-dependent elements may be missing .Dynamic() keys"
 level=WARN msg="navigate produced no patches — page content may be missing .Dynamic() keys"
+level=WARN msg="event produced no patches — state-dependent elements may be missing .Dynamic() keys"
 ```
+
+If a handler or Update callback panics after calling `Toast()`, `Signal()`, or `Navigate()`, those buffered effects are discarded. In DevMode, a warning explains what was dropped:
+
+```
+level=WARN msg="side effects discarded due to handler panic — any Toast, Signal, or Navigate calls before the panic were dropped"
+```
+
+These warnings are centralised in the `dev` package — call sites use `dev.Warn()` which silently no-ops outside DevMode.
 
 ### Signals bypass the diff engine
 

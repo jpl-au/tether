@@ -27,6 +27,7 @@ poly/router/    URL router — dispatches Render/Handle by path
 poly/ws/        WebSocket transport (only package importing coder/websocket)
 poly/sse/       SSE+POST transport (no external dependencies)
 poly/push/      Web Push notification sending (RFC 8291 + RFC 8292)
+poly/dev/       Development-mode diagnostics (Enable, Warn, Debug, Error)
 poly/polytest/  Test harness for Handle functions (no channels, no transports)
 poly/client/    Embedded JS files (fluent-poly.js, idiomorph.min.js, poly-worker.js)
 ```
