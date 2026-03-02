@@ -28,7 +28,8 @@ poly.New(poly.Config[State]{
 })
 ```
 
-Same wire format, same API regardless of transport.
+Same wire format, same API regardless of transport. The encoding is
+selected via `Config.WireFormat` (default `wire.JSON`).
 
 ### WebSocket options
 
@@ -76,6 +77,38 @@ poly.New(poly.Config[State]{
 ```
 
 A reconnecting indicator bar appears automatically when the connection drops and disappears when it reconnects. This works with all transport modes, regardless of the `Worker` setting.
+
+## Wire format
+
+Server-to-client updates are encoded by a `wire.Encoder`. The encoder
+is selected at handler construction time via `Config.WireFormat`:
+
+```go
+import "github.com/jpl-au/fluent-poly/wire"
+
+poly.New(poly.Config[State]{
+    WireFormat: wire.JSON, // default — currently the only format
+    // ...
+})
+```
+
+`wire.JSON` encodes updates as JSON objects. Additional formats (e.g.
+HTML fragments) will be added in future. The wire format is an internal
+concern — transports receive pre-encoded bytes and the client JS
+handles decoding, so changing the format requires no application code
+changes.
+
+The `wire.Encoder` interface:
+
+```go
+type Encoder interface {
+    Encode(u Update) ([]byte, error)
+}
+```
+
+`wire.Update` carries patches, morphs, signals, and side effects in a
+format-agnostic struct. The session builds a `wire.Update` after each
+state change and hands it to the encoder.
 
 ## Event resilience (SSE)
 

@@ -111,6 +111,7 @@ When either callback is configured, the framework's own logging for that event i
 | `Worker` | `bool` | Enable service worker (auto-enabled by Push) |
 | `Assets` | `[]*Asset` | Embedded asset collections — auto-served with content-hashed URLs |
 | `DevMode` | `bool` | Development mode (or set `POLY_DEV=1`) |
+| `WireFormat` | `wire.Format` | Encoding for server-to-client updates (default `wire.JSON`) |
 
 ### Security
 

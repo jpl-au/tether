@@ -55,7 +55,7 @@ sess.Announce("Item added to cart")
 
 ## How updates reach the browser
 
-fluent-poly uses a unified update protocol. Every message sent to the client is a single `"update"` type containing either **patches** (targeted content updates) or **morphs** (structural DOM changes):
+fluent-poly uses a unified update protocol. Every message sent to the client is a single `"update"` type containing either **patches** (targeted content updates) or **morphs** (structural DOM changes). The default wire format is JSON (`wire.JSON`):
 
 ```json
 {"type":"update","patches":[{"key":"count","html":"<span>43</span>"}]}
@@ -63,6 +63,8 @@ fluent-poly uses a unified update protocol. Every message sent to the client is 
 ```
 
 When only content changes (the common case), patches target specific keyed elements. When the structure changes — keys added, removed, or reordered — the server sends a root morph and the client uses [idiomorph](https://github.com/bigskysoftware/idiomorph) to update the entire root while preserving focus, scroll position, and form state.
+
+The wire format is configurable via `Config.WireFormat`. See the [transport docs](transport.md#wire-format) for details.
 
 ## Running the server
 
