@@ -1,6 +1,6 @@
 package poly
 
-import "log/slog"
+import "github.com/jpl-au/fluent-poly/dev"
 
 // On subscribes a session to a typed event bus. When the bus publishes
 // an event, fn is called inside the session's command loop (via
@@ -24,7 +24,7 @@ import "log/slog"
 //	    return state
 //	})
 func On[E any, S any](bus *Bus[E], s *Session[S], fn func(E, S) S) {
-	slog.Debug("bus.on", "session", s.ID(), "endpoint", s.endpoint)
+	dev.Debug("bus.on", "session", s.ID(), "endpoint", s.endpoint)
 	bus.subscribe(s.Context(), func(ev E) {
 		s.Update(func(state S) S {
 			return fn(ev, state)

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	jit "github.com/jpl-au/fluent-jit"
+	"github.com/jpl-au/fluent-poly/dev"
 )
 
 // serveInitialPage handles the initial GET request. It pre-warms the
@@ -32,7 +33,7 @@ func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	slog.Debug("serving initial page", "path", r.URL.Path, "remote", r.RemoteAddr)
+	dev.Debug("serving initial page", "path", r.URL.Path, "remote", r.RemoteAddr)
 
 	h.mu.Lock()
 	if h.cfg.Limits.MaxSessions > 0 && len(h.pending)+len(h.active)+len(h.disconnected) >= h.cfg.Limits.MaxSessions {
@@ -126,7 +127,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		h.active[id] = sess
 		h.mu.Unlock()
 
-		slog.Debug("session reattached", "session", id, "endpoint", sess.endpoint, "remote", r.RemoteAddr)
+		dev.Debug("session reattached", "session", id, "endpoint", sess.endpoint, "remote", r.RemoteAddr)
 		started = true
 		h.reattach(sess, transport)
 		return
@@ -199,7 +200,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		reconnectTimeout: h.cfg.Timeouts.Reconnect,
 	}
 	sess.lastActivity.Store(now.UnixNano())
-	slog.Debug("session created", "session", id, "endpoint", r.URL.Path, "remote", r.RemoteAddr)
+	dev.Debug("session created", "session", id, "endpoint", r.URL.Path, "remote", r.RemoteAddr)
 
 	if h.cfg.Push != nil && h.cfg.Push.Sender != nil {
 		sess.pushSender = h.cfg.Push.Sender
@@ -209,6 +210,9 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 	}
 	if h.cfg.OnStructuralChange != nil {
 		sess.onStructuralChange = h.cfg.OnStructuralChange
+	}
+	if h.cfg.OnNoPatch != nil {
+		sess.onNoPatch = h.cfg.OnNoPatch
 	}
 	if h.cfg.Timeouts.MaxLifetime > 0 {
 		time.AfterFunc(h.cfg.Timeouts.MaxLifetime, func() {
@@ -232,7 +236,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 	go sess.run()
 
 	if h.cfg.OnConnect != nil {
-		slog.Debug("calling OnConnect", "session", sess.id, "endpoint", sess.endpoint)
+		dev.Debug("calling OnConnect", "session", sess.id, "endpoint", sess.endpoint)
 		h.cfg.OnConnect(sess)
 	}
 
@@ -240,7 +244,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		g.Add(sess)
 	}
 	if len(h.cfg.Groups) > 0 {
-		slog.Debug("joined groups", "session", sess.id, "endpoint", sess.endpoint, "count", len(h.cfg.Groups))
+		dev.Debug("joined groups", "session", sess.id, "endpoint", sess.endpoint, "count", len(h.cfg.Groups))
 	}
 
 	// Start keep-alive writes for transports that need them (SSE).
@@ -250,7 +254,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 	}
 
 	go sess.readTransport(sess.events)
-	slog.Debug("session ready", "session", sess.id, "endpoint", sess.endpoint)
+	dev.Debug("session ready", "session", sess.id, "endpoint", sess.endpoint)
 
 	// Block until the session loop exits. The HTTP handler goroutine
 	// must stay alive to keep r.Context() valid — both the WebSocket

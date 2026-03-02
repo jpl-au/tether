@@ -74,7 +74,7 @@ Dev mode does the following:
 4. **Debug logging** — the default logger uses DEBUG level (when no Logger is provided)
 5. **Visual flash** — morphed DOM elements flash with a blue outline
 6. **Console logging** — events, patches, and morphs are logged to the browser console
-7. **Missing Dynamic key warnings** — logs a warning when any event or `Update` call produces no patches, catching missing `.Dynamic()` keys early
+7. **Per-session diagnostics** — all session-level debug logging (events, diffs, reconnections, group membership, etc.) is gated behind dev mode via `dev.Debug`. In production with dev mode off, none of this output fires. For structured observability, use `OnStructuralChange` and `OnNoPatch` callbacks instead
 8. **Discarded effect warnings** — logs a warning when a handler panic discards buffered side effects (Toast, Signal, Navigate, etc.)
 
 Diagnostics are centralised in the `dev` package — call sites use `dev.Warn()` which silently no-ops outside dev mode.
@@ -111,22 +111,22 @@ When set, `Poly.onError` is called for every error and warning the JS runtime en
 
 ## Structural change diagnostics
 
-When a structural change triggers a root morph, the server logs a warning with details:
-
-```
-WARN structural change, sending root morph session=abc change="key 'help' added" bytes=15234
-     tip="wrap conditional elements in a keyed container to scope this morph"
-```
-
-This tells you exactly what changed and how to avoid the cost. Wrapping conditional elements in a stable keyed container keeps morphs scoped instead of full-page.
-
-For production telemetry, use the `OnStructuralChange` callback:
+When the diff engine detects a structural change (Dynamic keys added, removed, or reordered), it falls back to a full root morph. The `OnStructuralChange` callback lets you observe these for logging, metrics, or debugging:
 
 ```go
 poly.New(poly.Config[State]{
     OnStructuralChange: func(s *poly.Session[State], c poly.StructuralChange) {
-        metrics.Counter("structural_changes").Inc()
+        slog.Warn("structural change",
+            "session", s.ID(),
+            "added", c.Added,
+            "removed", c.Removed,
+            "bytes", c.Bytes,
+        )
     },
     // ...
 })
 ```
+
+When `OnStructuralChange` is nil and DevMode is active, the framework logs a debug message. When DevMode is off and no callback is set, nothing happens — the framework never pushes diagnostic output at developers who haven't opted in.
+
+Wrapping conditional elements in a stable keyed container keeps morphs scoped instead of full-page. See the [Dynamic keys](server-updates.md#stable-key-sets) section for patterns.

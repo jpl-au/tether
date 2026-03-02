@@ -1,6 +1,6 @@
 package poly
 
-import "log/slog"
+import "github.com/jpl-au/fluent-poly/dev"
 
 // Observe subscribes a session to a shared [Value]. The callback
 // receives the shared value and the session's current state, and
@@ -21,7 +21,7 @@ import "log/slog"
 //	    return state
 //	})
 func Observe[V any, S any](val *Value[V], s *Session[S], fn func(V, S) S) {
-	slog.Debug("observe.subscribe", "session", s.ID(), "endpoint", s.endpoint)
+	dev.Debug("observe.subscribe", "session", s.ID(), "endpoint", s.endpoint)
 	// Subscribe and read the current value under the Value's lock so
 	// a concurrent Store cannot interleave and deliver the same value
 	// via both the subscriber callback and the initial Update below.

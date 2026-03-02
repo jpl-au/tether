@@ -2,10 +2,11 @@ package poly
 
 import (
 	"context"
-	"log/slog"
 	"maps"
 	"sync/atomic"
 	"time"
+
+	"github.com/jpl-au/fluent-poly/dev"
 
 	jit "github.com/jpl-au/fluent-jit"
 	"github.com/jpl-au/fluent-poly/push"
@@ -22,6 +23,14 @@ type StructuralChange struct {
 	Removed   []string // keys present in the old tree but not the new
 	Reordered bool     // same keys, different order
 	Bytes     int      // size of the re-rendered HTML sent as a root morph
+}
+
+// NoPatch describes a render cycle that produced no DOM changes.
+// Passed to [Config.OnNoPatch] so the developer can log, count, or
+// ignore it as appropriate.
+type NoPatch struct {
+	Source string // "update", "navigate", or "event"
+	Action string // event action; empty for "update" source
 }
 
 // RenderFunc builds a Fluent node tree from the current state. It is
@@ -121,6 +130,9 @@ type Session[S any] struct {
 
 	// Optional telemetry hook for structural diff changes.
 	onStructuralChange func(*Session[S], StructuralChange)
+
+	// Optional hook for render cycles that produce no patches.
+	onNoPatch func(*Session[S], NoPatch)
 }
 
 // PreSession is the subset of Session methods available in
@@ -312,7 +324,7 @@ func (s *Session[S]) enqueue(fn func()) {
 		// Command buffer full — overflow to a goroutine to prevent
 		// deadlock. This is expected during broadcast storms but
 		// sustained overflow suggests the buffer is too small.
-		slog.Warn("command buffer full, overflow to goroutine", "session", s.id, "endpoint", s.endpoint, "url", s.lastURL)
+		dev.Debug("command buffer full, overflow to goroutine", "session", s.id, "endpoint", s.endpoint, "url", s.lastURL)
 		go func() {
 			select {
 			case s.cmds <- fn:

@@ -98,12 +98,15 @@ func (s *Session[S]) Update(fn func(S) S) {
 		tree := s.render(s.state)
 		patches, change := s.differ.Diff(tree)
 		if len(patches) == 0 && change == nil {
-			dev.Warn("Update produced no patches — state-dependent elements may be missing .Dynamic() keys",
-				"session", s.id,
-				"endpoint", s.endpoint,
-				"url", s.lastURL,
-				"tip", "wrap state-dependent content in a container with .Dynamic(\"key\") so the diff engine can track changes",
-			)
+			if s.onNoPatch != nil {
+				s.onNoPatch(s, NoPatch{Source: "update"})
+			} else {
+				dev.Debug("Update produced no patches",
+					"session", s.id,
+					"endpoint", s.endpoint,
+					"url", s.lastURL,
+				)
+			}
 		}
 		s.sendDiff("", patches, change, tree, fx)
 	})

@@ -169,10 +169,10 @@ func New[S any](cfg Config[S]) *Handler[S] {
 		cfg.Limits.CmdBufferSize = defaultCmdBufferSize
 	}
 	if cfg.OnNavigate != nil {
-		slog.Debug("OnNavigate composed into Handle")
+		dev.Debug("OnNavigate composed into Handle")
 	}
 	if len(cfg.Middleware) > 0 {
-		slog.Debug("middleware chain applied", "count", len(cfg.Middleware))
+		dev.Debug("middleware chain applied", "count", len(cfg.Middleware))
 	}
 
 	mounts := buildAssetMounts(cfg.Assets, cfg.DevMode)

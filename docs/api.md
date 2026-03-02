@@ -42,6 +42,7 @@ Mode constants: `mode.HTTP`, `mode.WebSocket`, `mode.ServerSentEvents`, `mode.Bo
 | `OnConnect` | `func(*Session[S])` | Called when a session connects |
 | `OnDisconnect` | `func(*Session[S])` | Called when a session is permanently destroyed |
 | `OnStructuralChange` | `func(*Session[S], StructuralChange)` | Called when Dynamic keys change between renders |
+| `OnNoPatch` | `func(*Session[S], NoPatch)` | Called when a render cycle produces no patches |
 | `Groups` | `[]*Group[S]` | Groups the session auto-joins on connect |
 
 `StructuralChange` reports what changed when the diff engine falls back to a root morph:
@@ -52,6 +53,15 @@ Mode constants: `mode.HTTP`, `mode.WebSocket`, `mode.ServerSentEvents`, `mode.Bo
 | `Removed` | `[]string` | Keys in the old tree but not the new |
 | `Reordered` | `bool` | Same keys but different order |
 | `Bytes` | `int` | Size of the re-rendered HTML sent as a root morph |
+
+`NoPatch` describes a render cycle that produced no DOM changes:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `Source` | `string` | `"update"`, `"navigate"`, or `"event"` |
+| `Action` | `string` | Event action; empty for `"update"` source |
+
+When either callback is configured, the framework's own logging for that event is suppressed — the callback controls the output. When nil and DevMode is active, a debug message is logged instead.
 
 ### Timeouts
 

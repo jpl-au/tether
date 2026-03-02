@@ -21,7 +21,7 @@ import (
 // continues processing commands and shutdown signals. This keeps the
 // session alive for reconnection.
 func (s *Session[S]) run() {
-	slog.Debug("run loop started", "session", s.id, "endpoint", s.endpoint)
+	dev.Debug("run loop started", "session", s.id, "endpoint", s.endpoint)
 	s.loopRunning.Store(true)
 	defer close(s.loopDone)
 	defer s.cleanup()
@@ -73,7 +73,7 @@ func (s *Session[S]) runCmd(cmd func()) {
 // events channel. Its only job is to read and forward — it closes
 // the output channel on exit so the loop knows the transport is gone.
 func (s *Session[S]) readTransport(out chan<- Event) {
-	slog.Debug("readTransport started", "session", s.id, "endpoint", s.endpoint)
+	dev.Debug("readTransport started", "session", s.id, "endpoint", s.endpoint)
 	defer close(out)
 	for {
 		ev, err := s.transport.ReceiveEvent()
@@ -132,7 +132,7 @@ func (s *Session[S]) exec(ev Event) {
 		s.handling.Store(false)
 	}()
 
-	slog.Debug("event received",
+	dev.Debug("event received",
 		"session", s.id,
 		"endpoint", s.endpoint,
 		"action", ev.Action,
@@ -149,7 +149,7 @@ func (s *Session[S]) exec(ev Event) {
 
 	// Phase 3: State check — skip render if unchanged.
 	if s.equal != nil && s.equal(s.state, newState) {
-		slog.Debug("state unchanged, skipping render",
+		dev.Debug("state unchanged, skipping render",
 			"session", s.id,
 			"action", ev.Action,
 		)
@@ -165,27 +165,29 @@ func (s *Session[S]) exec(ev Event) {
 	// Phase 4: Render + Diff.
 	tree := s.render(s.state)
 	patches, change := s.differ.Diff(tree)
-	slog.Debug("render complete",
+	dev.Debug("render complete",
 		"session", s.id,
 		"patches", len(patches),
 		"structural", change != nil,
 	)
 	if len(patches) == 0 && change == nil {
-		if ev.Type == "navigate" {
-			dev.Warn("navigate produced no patches — page content may be missing .Dynamic() keys",
+		if s.onNoPatch != nil {
+			source := "event"
+			if ev.Type == "navigate" {
+				source = "navigate"
+			}
+			s.onNoPatch(s, NoPatch{Source: source, Action: ev.Action})
+		} else if ev.Type == "navigate" {
+			dev.Debug("navigate produced no patches",
 				"session", s.id,
 				"endpoint", s.endpoint,
 				"url", s.lastURL,
-				"tip", "add .Dynamic(\"content\") to the element wrapping page content so the diff engine can detect page changes",
 			)
 		} else {
-			dev.Warn("event produced no patches — state-dependent elements may be missing .Dynamic() keys",
+			dev.Debug("event produced no patches",
 				"session", s.id,
 				"endpoint", s.endpoint,
-				"url", s.lastURL,
 				"action", ev.Action,
-				"type", ev.Type,
-				"tip", "wrap state-dependent content in a container with .Dynamic(\"key\") so the diff engine can track changes",
 			)
 		}
 	}
@@ -199,7 +201,7 @@ func (s *Session[S]) exec(ev Event) {
 // reconnect window. A disconnect timer is started (if reconnection is
 // enabled) and the onDisconnect callback fires for pool transitions.
 func (s *Session[S]) onTransportClose() {
-	slog.Info("transport closed",
+	dev.Debug("transport closed",
 		"session", s.id,
 		"endpoint", s.endpoint,
 		"url", s.lastURL,
@@ -208,7 +210,7 @@ func (s *Session[S]) onTransportClose() {
 	s.transport = nil
 
 	if s.reconnectTimeout > 0 {
-		slog.Debug("disconnect timer started",
+		dev.Debug("disconnect timer started",
 			"session", s.id,
 			"endpoint", s.endpoint,
 			"timeout", s.reconnectTimeout,
@@ -244,22 +246,21 @@ func (s *Session[S]) cleanup() {
 func (s *Session[S]) sendDiff(eventID string, patches []jit.Patch, change *jit.StructuralChange, tree node.Node, fx *effects) {
 	if change != nil {
 		html := s.differ.Render(tree)
-		slog.Warn("structural change, sending root morph",
-			"session", s.id,
-			"endpoint", s.endpoint,
-			"url", s.lastURL,
-			"change", change.String(),
-			"bytes", len(html),
-			"tip", "wrap conditional elements in a keyed container to scope this morph",
-		)
-
+		sc := StructuralChange{
+			Added:     change.Added,
+			Removed:   change.Removed,
+			Reordered: change.Reordered,
+			Bytes:     len(html),
+		}
 		if s.onStructuralChange != nil {
-			s.onStructuralChange(s, StructuralChange{
-				Added:     change.Added,
-				Removed:   change.Removed,
-				Reordered: change.Reordered,
-				Bytes:     len(html),
-			})
+			s.onStructuralChange(s, sc)
+		} else {
+			dev.Debug("structural change, sending root morph",
+				"session", s.id,
+				"endpoint", s.endpoint,
+				"change", change.String(),
+				"bytes", len(html),
+			)
 		}
 
 		u := update{

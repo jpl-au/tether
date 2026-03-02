@@ -98,15 +98,56 @@ Render: func(s State) node.Node {
 
 Without this key, navigating between pages changes the rendered HTML but the diff engine produces no patches — the new page never appears.
 
+### OnStructuralChange — observing structural changes
+
+When the diff engine detects a structural change, it falls back to a full root morph. The `Config.OnStructuralChange` callback lets you observe these occurrences for telemetry, metrics, or debugging:
+
+```go
+poly.New(poly.Config[State]{
+    OnStructuralChange: func(sess *poly.Session[State], change poly.StructuralChange) {
+        slog.Warn("structural change",
+            "session", sess.ID(),
+            "added", change.Added,
+            "removed", change.Removed,
+            "reordered", change.Reordered,
+            "bytes", change.Bytes,
+        )
+    },
+})
+```
+
+`StructuralChange.Added` and `Removed` list the Dynamic keys that appeared or disappeared. `Reordered` is true when the same keys exist in both renders but in a different order. `Bytes` is the size of the full HTML sent as a root morph.
+
+When `OnStructuralChange` is nil and DevMode is active, the framework logs a debug message for each occurrence. When DevMode is off and no callback is set, nothing happens.
+
+### OnNoPatch — observing empty render cycles
+
+When a render cycle produces no patches and no structural change, the framework calls `Config.OnNoPatch` if set. This lets you decide how to handle it — log, count, or ignore:
+
+```go
+poly.New(poly.Config[State]{
+    OnNoPatch: func(sess *poly.Session[State], info poly.NoPatch) {
+        // Signal-only updates (e.g. a ticker) intentionally produce
+        // no patches — log at debug. Navigate and event sources that
+        // produce nothing are likely missing Dynamic keys — warn.
+        if info.Source == "update" {
+            slog.Debug("no-patch update", "session", sess.ID())
+            return
+        }
+        slog.Warn("no patches produced",
+            "session", sess.ID(),
+            "source", info.Source,
+            "action", info.Action,
+        )
+    },
+})
+```
+
+`NoPatch.Source` is `"update"` (from `Session.Update`), `"navigate"` (from a navigation event), or `"event"` (from a click/submit/etc). `NoPatch.Action` carries the event action for event and navigate sources.
+
+When `OnNoPatch` is nil and DevMode is active, the framework logs a debug message for each occurrence. When DevMode is off and no callback is set, nothing happens.
+
 ### DevMode warnings
-
-With `DevMode: true`, the framework logs a warning when any event or `Update` call produces no patches. This catches missing Dynamic keys early:
-
-```
-level=WARN msg="Update produced no patches — state-dependent elements may be missing .Dynamic() keys"
-level=WARN msg="navigate produced no patches — page content may be missing .Dynamic() keys"
-level=WARN msg="event produced no patches — state-dependent elements may be missing .Dynamic() keys"
-```
 
 If a handler or Update callback panics after calling `Toast()`, `Signal()`, or `Navigate()`, those buffered effects are discarded. In DevMode, a warning explains what was dropped:
 

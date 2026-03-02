@@ -94,10 +94,26 @@ type Config[S any] struct {
 	// Use this callback to track these occurrences in production via
 	// telemetry or metrics. The change parameter describes exactly what
 	// shifted so you can pinpoint which state transitions need keyed
-	// containers. The callback runs inside the session's command loop,
-	// so keep it fast — offload any expensive work to a goroutine.
-	// Optional.
+	// containers. When nil and DevMode is active, the framework logs a
+	// debug message for each occurrence.
+	//
+	// The callback runs inside the session's command loop — keep it
+	// fast and offload any expensive work to a goroutine. Optional.
 	OnStructuralChange func(session *Session[S], change StructuralChange)
+
+	// OnNoPatch is called when a render cycle produces no patches and
+	// no structural change. This usually indicates a missing .Dynamic()
+	// key, or an intentional signal-only update where the render tree
+	// is unaffected.
+	//
+	// Use this to detect missing Dynamic keys during development, or
+	// wire it into telemetry for production monitoring. When nil and
+	// DevMode is active, the framework logs a debug message for each
+	// occurrence.
+	//
+	// The callback runs inside the session's command loop — keep it
+	// fast and offload any expensive work to a goroutine. Optional.
+	OnNoPatch func(session *Session[S], info NoPatch)
 
 	// Layout wraps the poly content in a full HTML document. The state
 	// parameter is the session's initial state, which can be used to set

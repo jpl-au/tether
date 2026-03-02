@@ -2,10 +2,11 @@ package poly
 
 import (
 	"iter"
-	"log/slog"
 	"maps"
 	"sync"
 	"sync/atomic"
+
+	"github.com/jpl-au/fluent-poly/dev"
 )
 
 // Group tracks a set of sessions for broadcasting state updates.
@@ -74,7 +75,7 @@ func (g *Group[S]) Add(s *Session[S]) {
 	g.wmu.Unlock()
 
 	if !exists {
-		slog.Debug("group.Add", "session", s.id, "endpoint", s.endpoint, "members", len(g.loadSessions()))
+		dev.Debug("group.Add", "session", s.id, "endpoint", s.endpoint, "members", len(g.loadSessions()))
 		if onJoin != nil {
 			onJoin(s)
 		}
@@ -102,7 +103,7 @@ func (g *Group[S]) Remove(s *Session[S]) {
 	g.wmu.Unlock()
 
 	if exists {
-		slog.Debug("group.Remove", "session", s.id, "endpoint", s.endpoint, "members", len(g.loadSessions()))
+		dev.Debug("group.Remove", "session", s.id, "endpoint", s.endpoint, "members", len(g.loadSessions()))
 		if onLeave != nil {
 			onLeave(s)
 		}

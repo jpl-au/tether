@@ -90,30 +90,41 @@ All updates use a single `"update"` message type:
 
 An empty `key` in morphs targets the root element. A non-empty key targets a specific keyed container (for scoped morphs). The `title` field updates `document.title`. The `url` and `replace` fields control browser URL changes.
 
-### Structural change diagnostics
+### Observer callbacks
 
-When a structural change is detected (keys added, removed, or reordered), the session logs a warning with actionable details:
+The framework exposes per-session diagnostics via opt-in callbacks rather than hardcoded logging. Developers choose what to observe and how to handle it.
 
-```
-WARN structural change, sending root morph session=abc change="key 'help' added" bytes=15234 tip="wrap conditional elements in a keyed container to scope this morph"
-```
-
-The `change` field reports exactly which keys were added, removed, or if they were reordered. The `tip` guides the developer toward wrapping conditional elements in a stable keyed container to avoid full-page morphs.
-
-For production telemetry, use the `OnStructuralChange` callback on `Config`:
+**`OnStructuralChange`** — called when the diff engine detects a structural change (Dynamic keys added, removed, or reordered), forcing a full root morph:
 
 ```go
 poly.New(poly.Config[State]{
     OnStructuralChange: func(s *poly.Session[State], c poly.StructuralChange) {
-        metrics.Counter("structural_changes").Inc()
-        log.Printf("keys added=%v removed=%v reordered=%v bytes=%d",
-            c.Added, c.Removed, c.Reordered, c.Bytes)
+        slog.Warn("structural change",
+            "session", s.ID(),
+            "added", c.Added,
+            "removed", c.Removed,
+            "bytes", c.Bytes,
+        )
     },
-    // ...
 })
 ```
 
-The callback runs inside the session's command loop, so keep it fast — offload expensive work to a goroutine. The `StructuralChange` struct has `Added`, `Removed` (key slices), `Reordered` (bool), and `Bytes` (re-rendered HTML size).
+**`OnNoPatch`** — called when a render cycle produces no patches and no structural change. Usually indicates a missing `.Dynamic()` key, or an intentional signal-only update:
+
+```go
+poly.New(poly.Config[State]{
+    OnNoPatch: func(s *poly.Session[State], info poly.NoPatch) {
+        if info.Source == "update" {
+            return // signal-only updates intentionally produce no patches
+        }
+        slog.Warn("no patches", "source", info.Source, "action", info.Action)
+    },
+})
+```
+
+When either callback is nil and DevMode is active, the framework logs a debug message via `dev.Debug`. When DevMode is off and no callback is set, nothing happens — the framework never pushes diagnostic output at developers who haven't opted in.
+
+All other per-session debug logging (`slog.Debug` calls for events, diffs, reconnections, group membership, etc.) has been replaced with `dev.Debug` and only fires when DevMode is true.
 
 ## Event binding
 
