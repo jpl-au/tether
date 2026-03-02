@@ -163,6 +163,14 @@ func (s *Session[S]) exec(ev Event) {
 		"patches", len(patches),
 		"structural", change != nil,
 	)
+	if s.devMode && ev.Type == "navigate" && len(patches) == 0 && change == nil {
+		slog.Warn("navigate produced no patches — page content may be missing .Dynamic() keys",
+			"session", s.id,
+			"endpoint", s.endpoint,
+			"url", s.lastURL,
+			"tip", "add .Dynamic(\"content\") to the element wrapping page content so the diff engine can detect page changes",
+		)
+	}
 
 	// Phase 5: Build and send update.
 	s.sendDiff(ev.EventID, patches, change, tree, fx)

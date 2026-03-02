@@ -41,6 +41,76 @@ session.Update(func(s State) State {
 })
 ```
 
+## Dynamic keys
+
+The diff engine only tracks elements marked with `.Dynamic("key")`. When state changes and the framework re-renders, it compares the HTML of each keyed element with the previous render. Elements without a Dynamic key are invisible to the diff engine — their changes produce no patches and the client never updates.
+
+**This is the most common source of "my state changed but the UI didn't update" bugs.**
+
+### When you need Dynamic keys
+
+Any element whose rendered HTML depends on state needs a Dynamic key, either directly or via a parent container. The rule: if the output changes when state changes, it must be tracked.
+
+```go
+// This list changes when state.Files changes, so it needs a key
+func fileList(files []FileEntry) node.Node {
+    if len(files) == 0 {
+        return div.New(
+            p.Text("No files yet."),
+        ).Dynamic("files")
+    }
+    return div.New(
+        ul.New(renderItems(files)...),
+    ).Dynamic("files")
+}
+```
+
+### Stable key sets
+
+Both branches of a conditional must produce the same key. If a key appears or disappears between renders, the diff engine treats it as a structural change and falls back to a full root morph — correct but expensive. Keep the key set stable by wrapping conditionals in a keyed container:
+
+```go
+// Wrong — key only exists when items are present
+if len(items) > 0 {
+    return ul.New(nodes...).Dynamic("list")
+}
+return p.Text("Empty")  // no key — structural change on first item
+
+// Right — key is always present
+if len(items) == 0 {
+    return div.New(p.Text("Empty")).Dynamic("list")
+}
+return div.New(ul.New(nodes...)).Dynamic("list")
+```
+
+### Page content and navigation
+
+In multi-page apps using the `router` package, the page content area should have a Dynamic key so page changes are detected on navigation:
+
+```go
+Render: func(s State) node.Node {
+    return div.New(
+        sidebar(s.Page),
+        div.New(r.Render(s)).Dynamic("content"),
+    )
+},
+```
+
+Without this key, navigating between pages changes the rendered HTML but the diff engine produces no patches — the new page never appears.
+
+### DevMode warnings
+
+With `DevMode: true`, the framework logs a warning when `Update` or a navigate event produces no patches. This catches missing Dynamic keys early:
+
+```
+level=WARN msg="Update produced no patches — state-dependent elements may be missing .Dynamic() keys"
+level=WARN msg="navigate produced no patches — page content may be missing .Dynamic() keys"
+```
+
+### Signals bypass the diff engine
+
+Signals (`sess.Signal`, `bind.BindText`, `bind.BindShow`, etc.) update bound elements directly on the client without rendering or diffing. Elements that are updated exclusively via signals do not need Dynamic keys.
+
 ## Background goroutines
 
 Use `Session.Go` to launch background work tied to a session's lifetime. The context is cancelled when the session is permanently destroyed (reaped or shutdown), but survives temporary disconnects:

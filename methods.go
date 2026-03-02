@@ -50,6 +50,15 @@ func (s *Session[S]) State() S {
 // authoritative for the triggering event. Non-blocking — returns
 // immediately after queuing.
 //
+// The diff engine only tracks elements marked with .Dynamic("key").
+// If the state change affects elements that lack a Dynamic key, the
+// diff will produce no patches and the client will not update. Wrap
+// state-dependent content in a container with a stable Dynamic key:
+//
+//	div.New(uploadList(s.Files)).Dynamic("uploads")
+//
+// In DevMode, a warning is logged when Update produces no patches.
+//
 // Inside Handle, prefer returning the new state directly rather than
 // calling Update. Update is designed for side-effects like broadcasts
 // where the caller does not control Handle's return value.
@@ -84,6 +93,14 @@ func (s *Session[S]) Update(fn func(S) S) {
 
 		tree := s.render(s.state)
 		patches, change := s.differ.Diff(tree)
+		if s.devMode && len(patches) == 0 && change == nil {
+			slog.Warn("Update produced no patches — state-dependent elements may be missing .Dynamic() keys",
+				"session", s.id,
+				"endpoint", s.endpoint,
+				"url", s.lastURL,
+				"tip", "wrap state-dependent content in a container with .Dynamic(\"key\") so the diff engine can track changes",
+			)
+		}
 		s.sendDiff("", patches, change, tree, fx)
 	})
 }

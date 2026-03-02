@@ -198,6 +198,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		endpoint:         r.URL.Path,
 		idleTimeout:      h.cfg.Timeouts.Idle,
 		reconnectTimeout: h.cfg.Timeouts.Reconnect,
+		devMode:          h.cfg.DevMode,
 	}
 	sess.lastActivity.Store(now.UnixNano())
 	slog.Debug("session created", "session", id, "endpoint", r.URL.Path, "remote", r.RemoteAddr)

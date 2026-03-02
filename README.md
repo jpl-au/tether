@@ -98,7 +98,7 @@ poly.New(poly.Config[State]{
 | [Getting started](docs/getting-started.md) | Setup, how updates reach the browser |
 | [Events](docs/events.md) | Event binding, timing, loading states, forms |
 | [Signals](docs/signals.md) | Reactive signals, client directives, optimistic updates |
-| [Server updates](docs/server-updates.md) | Update, Navigate, SetTitle, Flash, Announce |
+| [Server updates](docs/server-updates.md) | Update, Navigate, SetTitle, Flash, Announce, Dynamic keys |
 | [Client-side](docs/client-side.md) | Directives, transitions, JS hooks |
 | [Broadcasting](docs/broadcasting.md) | Groups, broadcast, presence |
 | [Extensions](docs/extensions.md) | File uploads, service worker, push notifications |
