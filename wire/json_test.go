@@ -1,22 +1,19 @@
-package poly
+package wire
 
 import (
 	"encoding/json"
 	"testing"
-
-	jit "github.com/jpl-au/fluent-jit"
-	"github.com/jpl-au/fluent-poly/event"
 )
 
-func TestEncodeUpdateWithPatches(t *testing.T) {
-	update := update{
-		Patches: []jit.Patch{
+func TestEncodeWithPatches(t *testing.T) {
+	u := Update{
+		Patches: []Patch{
 			{Key: "count", HTML: []byte(`<span data-poly-key="count">42</span>`)},
 			{Key: "name", HTML: []byte(`<span data-poly-key="name">Alice</span>`)},
 		},
 	}
 
-	msg := encodeUpdate(update)
+	msg := encodeMessage(u)
 
 	if msg.Type != "update" {
 		t.Errorf("type should be %q, got %q", "update", msg.Type)
@@ -34,7 +31,6 @@ func TestEncodeUpdateWithPatches(t *testing.T) {
 		t.Error("patches-only update should have nil morphs")
 	}
 
-	// Verify it serialises to valid JSON
 	data, err := json.Marshal(msg)
 	if err != nil {
 		t.Fatalf("failed to marshal: %v", err)
@@ -49,13 +45,13 @@ func TestEncodeUpdateWithPatches(t *testing.T) {
 	}
 }
 
-func TestEncodeUpdateWithMorphs(t *testing.T) {
+func TestEncodeWithMorphs(t *testing.T) {
 	html := []byte(`<div data-poly-root><span>hello</span></div>`)
-	update := update{
-		Morphs: []morph{{Key: "", HTML: html}},
+	u := Update{
+		Morphs: []Morph{{Key: "", HTML: html}},
 	}
 
-	msg := encodeUpdate(update)
+	msg := encodeMessage(u)
 
 	if msg.Type != "update" {
 		t.Errorf("type should be %q, got %q", "update", msg.Type)
@@ -87,13 +83,10 @@ func TestEncodeUpdateWithMorphs(t *testing.T) {
 	}
 }
 
-func TestEncodeUpdateWithURL(t *testing.T) {
-	update := update{
-		URL:     "/profile",
-		Replace: false,
-	}
+func TestEncodeWithURL(t *testing.T) {
+	u := Update{URL: "/profile"}
 
-	msg := encodeUpdate(update)
+	msg := encodeMessage(u)
 
 	if msg.URL != "/profile" {
 		t.Errorf("URL should be %q, got %q", "/profile", msg.URL)
@@ -116,13 +109,10 @@ func TestEncodeUpdateWithURL(t *testing.T) {
 	}
 }
 
-func TestEncodeUpdateWithURLReplace(t *testing.T) {
-	update := update{
-		URL:     "/current",
-		Replace: true,
-	}
+func TestEncodeWithURLReplace(t *testing.T) {
+	u := Update{URL: "/current", Replace: true}
 
-	msg := encodeUpdate(update)
+	msg := encodeMessage(u)
 
 	if msg.URL != "/current" {
 		t.Errorf("URL should be %q, got %q", "/current", msg.URL)
@@ -145,15 +135,15 @@ func TestEncodeUpdateWithURLReplace(t *testing.T) {
 	}
 }
 
-func TestEncodeUpdateWithSignals(t *testing.T) {
-	update := update{
+func TestEncodeWithSignals(t *testing.T) {
+	u := Update{
 		Signals: map[string]any{
 			"count":  42,
 			"status": "online",
 		},
 	}
 
-	msg := encodeUpdate(update)
+	msg := encodeMessage(u)
 
 	if msg.Type != "update" {
 		t.Errorf("type should be %q, got %q", "update", msg.Type)
@@ -191,12 +181,10 @@ func TestEncodeUpdateWithSignals(t *testing.T) {
 	}
 }
 
-func TestEncodeUpdateOmitsEmptySignals(t *testing.T) {
-	update := update{
-		Toast: "hello",
-	}
+func TestEncodeOmitsEmptySignals(t *testing.T) {
+	u := Update{Toast: "hello"}
 
-	msg := encodeUpdate(update)
+	msg := encodeMessage(u)
 
 	data, err := json.Marshal(msg)
 	if err != nil {
@@ -213,37 +201,39 @@ func TestEncodeUpdateOmitsEmptySignals(t *testing.T) {
 	}
 }
 
-func TestEventUnmarshal(t *testing.T) {
-	raw := `{"type":"click","action":"increment","data":{"value":"42"}}`
+func TestJSONEncoderRoundTrip(t *testing.T) {
+	u := Update{
+		Patches: []Patch{
+			{Key: "count", HTML: []byte(`<span>42</span>`)},
+		},
+		Signals: map[string]any{"count": 42},
+		Toast:   "saved",
+		EventID: "ev-1",
+	}
 
-	var ev Event
-	if err := json.Unmarshal([]byte(raw), &ev); err != nil {
+	enc := JSONEncoder{}
+	data, err := enc.Encode(u)
+	if err != nil {
+		t.Fatalf("Encode failed: %v", err)
+	}
+
+	var decoded map[string]any
+	if err := json.Unmarshal(data, &decoded); err != nil {
 		t.Fatalf("failed to unmarshal: %v", err)
 	}
 
-	if ev.Type != event.Click {
-		t.Errorf("type should be %q, got %q", event.Click, ev.Type)
+	if decoded["type"] != "update" {
+		t.Errorf("type = %v, want update", decoded["type"])
 	}
-	if ev.Action != "increment" {
-		t.Errorf("action should be %q, got %q", "increment", ev.Action)
+	if decoded["toast"] != "saved" {
+		t.Errorf("toast = %v, want saved", decoded["toast"])
 	}
-	if ev.Data["value"] != "42" {
-		t.Errorf("data.value should be %q, got %q", "42", ev.Data["value"])
-	}
-}
-
-func TestEventUnmarshalNoData(t *testing.T) {
-	raw := `{"type":"click","action":"toggle"}`
-
-	var ev Event
-	if err := json.Unmarshal([]byte(raw), &ev); err != nil {
-		t.Fatalf("failed to unmarshal: %v", err)
+	if decoded["event_id"] != "ev-1" {
+		t.Errorf("event_id = %v, want ev-1", decoded["event_id"])
 	}
 
-	if ev.Action != "toggle" {
-		t.Errorf("action should be %q, got %q", "toggle", ev.Action)
-	}
-	if ev.Data != nil {
-		t.Error("data should be nil when omitted")
+	patches, ok := decoded["patches"].([]any)
+	if !ok || len(patches) != 1 {
+		t.Fatalf("expected 1 patch, got %v", decoded["patches"])
 	}
 }

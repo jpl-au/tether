@@ -148,7 +148,7 @@ func TestPagePOSTReturnsJSON(t *testing.T) {
 		t.Fatalf("Content-Type = %q, want application/json", ct)
 	}
 
-	var msg updateMessage
+	var msg testMessage
 	if err := json.Unmarshal(w.Body.Bytes(), &msg); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
@@ -175,7 +175,7 @@ func TestPagePOSTEventID(t *testing.T) {
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 
-	var msg updateMessage
+	var msg testMessage
 	json.Unmarshal(w.Body.Bytes(), &msg)
 	if msg.EventID != "42" {
 		t.Errorf("event_id = %q, want %q", msg.EventID, "42")
@@ -192,7 +192,7 @@ func TestPagePOSTWithEffects(t *testing.T) {
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, req)
 
-		var msg updateMessage
+		var msg testMessage
 		json.Unmarshal(w.Body.Bytes(), &msg)
 		if msg.Toast != "hello" {
 			t.Errorf("toast = %q, want %q", msg.Toast, "hello")
@@ -206,7 +206,7 @@ func TestPagePOSTWithEffects(t *testing.T) {
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, req)
 
-		var msg updateMessage
+		var msg testMessage
 		json.Unmarshal(w.Body.Bytes(), &msg)
 		if msg.URL != "/other" {
 			t.Errorf("url = %q, want %q", msg.URL, "/other")
@@ -220,7 +220,7 @@ func TestPagePOSTWithEffects(t *testing.T) {
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, req)
 
-		var msg updateMessage
+		var msg testMessage
 		json.Unmarshal(w.Body.Bytes(), &msg)
 		if msg.Title != "New Title" {
 			t.Errorf("title = %q, want %q", msg.Title, "New Title")
@@ -383,7 +383,7 @@ func TestPagePOSTWithOnNavigate(t *testing.T) {
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 
-	var msg updateMessage
+	var msg testMessage
 	json.Unmarshal(w.Body.Bytes(), &msg)
 	if len(msg.Morphs) != 1 {
 		t.Fatalf("morphs = %d, want 1", len(msg.Morphs))
@@ -436,7 +436,7 @@ func TestPagePOSTNavigateSkipsHandle(t *testing.T) {
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 
-	var msg updateMessage
+	var msg testMessage
 	json.Unmarshal(w.Body.Bytes(), &msg)
 	if len(msg.Morphs) != 1 {
 		t.Fatalf("morphs = %d, want 1", len(msg.Morphs))

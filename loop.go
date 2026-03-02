@@ -8,6 +8,7 @@ import (
 
 	jit "github.com/jpl-au/fluent-jit"
 	"github.com/jpl-au/fluent-poly/dev"
+	"github.com/jpl-au/fluent-poly/wire"
 	"github.com/jpl-au/fluent/node"
 )
 
@@ -154,7 +155,7 @@ func (s *Session[S]) exec(ev Event) {
 			"action", ev.Action,
 		)
 		if fx.any() || ev.EventID != "" {
-			u := update{EventID: ev.EventID}
+			u := wire.Update{EventID: ev.EventID}
 			fx.merge(&u)
 			s.send(u)
 		}
@@ -263,8 +264,8 @@ func (s *Session[S]) sendDiff(eventID string, patches []jit.Patch, change *jit.S
 			)
 		}
 
-		u := update{
-			Morphs:  []morph{{Key: "", HTML: html}},
+		u := wire.Update{
+			Morphs:  []wire.Morph{{Key: "", HTML: html}},
 			EventID: eventID,
 		}
 		if fx != nil {
@@ -275,7 +276,11 @@ func (s *Session[S]) sendDiff(eventID string, patches []jit.Patch, change *jit.S
 	}
 
 	if len(patches) > 0 || (fx != nil && fx.any()) {
-		u := update{Patches: patches, EventID: eventID}
+		wp := make([]wire.Patch, len(patches))
+		for i, p := range patches {
+			wp[i] = wire.Patch{Key: p.Key, HTML: p.HTML}
+		}
+		u := wire.Update{Patches: wp, EventID: eventID}
 		if fx != nil {
 			fx.merge(&u)
 		}
@@ -286,14 +291,14 @@ func (s *Session[S]) sendDiff(eventID string, patches []jit.Patch, change *jit.S
 	// No patches and no structural change. Still echo the eventID
 	// so the client can restore any loading state.
 	if eventID != "" {
-		s.send(update{EventID: eventID})
+		s.send(wire.Update{EventID: eventID})
 	}
 }
 
-// send encodes an update as JSON and writes the bytes to the
-// transport. URL and title are captured before the nil-transport
-// guard so reattach can replay them after a disconnect.
-func (s *Session[S]) send(u update) {
+// send encodes an update and writes the bytes to the transport. URL
+// and title are captured before the nil-transport guard so reattach
+// can replay them after a disconnect.
+func (s *Session[S]) send(u wire.Update) {
 	if u.URL != "" {
 		s.lastURL = u.URL
 	}
@@ -303,7 +308,7 @@ func (s *Session[S]) send(u update) {
 	if s.transport == nil {
 		return
 	}
-	data, err := marshalUpdate(u)
+	data, err := s.encoder.Encode(u)
 	if err != nil {
 		slog.Error("failed to encode update",
 			"session", s.id,

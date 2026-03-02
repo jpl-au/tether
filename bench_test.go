@@ -10,6 +10,7 @@ import (
 	jit "github.com/jpl-au/fluent-jit"
 	"github.com/jpl-au/fluent-poly/bind"
 	"github.com/jpl-au/fluent-poly/event"
+	"github.com/jpl-au/fluent-poly/wire"
 	"github.com/jpl-au/fluent/html5/button"
 	"github.com/jpl-au/fluent/html5/div"
 	"github.com/jpl-au/fluent/html5/span"
@@ -72,30 +73,32 @@ func BenchmarkEncodeUpdatePatches100(b *testing.B) {
 }
 
 func benchEncodeUpdatePatches(b *testing.B, n int) {
-	patches := make([]jit.Patch, n)
+	patches := make([]wire.Patch, n)
 	for i := range patches {
 		key := fmt.Sprintf("key-%d", i)
-		patches[i] = jit.Patch{
+		patches[i] = wire.Patch{
 			Key:  key,
 			HTML: fmt.Appendf(nil, `<span data-poly-key="%s">value %d</span>`, key, i),
 		}
 	}
-	u := update{Patches: patches}
+	u := wire.Update{Patches: patches}
+	enc := wire.JSONEncoder{}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		data, _ := marshalUpdate(u)
+		data, _ := enc.Encode(u)
 		_ = data
 	}
 }
 
 func BenchmarkEncodeUpdateMorph(b *testing.B) {
 	html := []byte(`<div data-poly-root><span data-poly-key="count">42</span><span data-poly-key="name">Alice</span></div>`)
-	u := update{
-		Morphs: []morph{{Key: "", HTML: html}},
+	u := wire.Update{
+		Morphs: []wire.Morph{{Key: "", HTML: html}},
 	}
+	enc := wire.JSONEncoder{}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		data, _ := marshalUpdate(u)
+		data, _ := enc.Encode(u)
 		_ = data
 	}
 }
@@ -159,6 +162,7 @@ func BenchmarkEventCycle(b *testing.B) {
 		render:    benchRender,
 		handle:    benchHandle,
 		differ:    differ,
+		encoder:   wire.JSONEncoder{},
 		transport: dt,
 		events:    make(chan Event),
 		cmds:      make(chan func(), defaultCmdBufferSize),

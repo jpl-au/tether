@@ -13,6 +13,7 @@ import (
 	"github.com/jpl-au/fluent-poly/dev"
 	"github.com/jpl-au/fluent-poly/event"
 	"github.com/jpl-au/fluent-poly/mode"
+	"github.com/jpl-au/fluent-poly/wire"
 )
 
 // pendingSession holds a pre-warmed session created during the initial GET
@@ -46,6 +47,10 @@ type Handler[S any] struct {
 
 	// clientHandler serves the embedded JS runtime at /_poly/*.
 	clientHandler http.Handler
+
+	// encoder serialises updates for the wire format selected by
+	// Config.WireFormat. All sessions inherit this encoder.
+	encoder wire.Encoder
 
 	// assetMounts serves embedded application assets at their
 	// configured URL prefixes, one per [Asset] in Config.Assets.
@@ -183,6 +188,7 @@ func New[S any](cfg Config[S]) *Handler[S] {
 		active:        make(map[string]*Session[S]),
 		disconnected:  make(map[string]*Session[S]),
 		done:          make(chan struct{}),
+		encoder:       resolveEncoder(cfg.WireFormat),
 		clientHandler: newClientHandler(cfg.Assets),
 		assetMounts:   mounts,
 	}
@@ -190,6 +196,15 @@ func New[S any](cfg Config[S]) *Handler[S] {
 	go h.reapPending()
 
 	return h
+}
+
+// resolveEncoder returns an Encoder for the given wire format. JSON is
+// the default and currently the only supported format.
+func resolveEncoder(f wire.Format) wire.Encoder {
+	switch f {
+	default:
+		return wire.JSONEncoder{}
+	}
 }
 
 // destroySession performs permanent cleanup for a session that is no

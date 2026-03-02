@@ -7,16 +7,43 @@ import (
 	"sync"
 
 	jit "github.com/jpl-au/fluent-jit"
+	"github.com/jpl-au/fluent-poly/wire"
 	"github.com/jpl-au/fluent/html5/div"
 	"github.com/jpl-au/fluent/html5/span"
 	"github.com/jpl-au/fluent/node"
 )
 
+// testMessage mirrors the JSON wire format for test assertions. Tests
+// unmarshal transport bytes into this to inspect what the session sent.
+type testMessage struct {
+	Type     string            `json:"type"`
+	Patches  []testPatch       `json:"patches,omitempty"`
+	Morphs   []testMorph       `json:"morphs,omitempty"`
+	URL      string            `json:"url,omitempty"`
+	Replace  bool              `json:"replace,omitempty"`
+	Title    string            `json:"title,omitempty"`
+	Flash    map[string]string `json:"flash,omitempty"`
+	Signals  map[string]any    `json:"signals,omitempty"`
+	Announce string            `json:"announce,omitempty"`
+	Toast    string            `json:"toast,omitempty"`
+	EventID  string            `json:"event_id,omitempty"`
+}
+
+type testPatch struct {
+	Key  string `json:"key"`
+	HTML string `json:"html"`
+}
+
+type testMorph struct {
+	Key  string `json:"key"`
+	HTML string `json:"html"`
+}
+
 // patchMessages returns all decoded messages that contained patches (no morphs).
-func patchMessages(sent [][]byte) []updateMessage {
-	var result []updateMessage
+func patchMessages(sent [][]byte) []testMessage {
+	var result []testMessage
 	for _, data := range sent {
-		var msg updateMessage
+		var msg testMessage
 		if err := json.Unmarshal(data, &msg); err != nil {
 			continue
 		}
@@ -28,10 +55,10 @@ func patchMessages(sent [][]byte) []updateMessage {
 }
 
 // morphMessages returns all decoded messages that contained morphs.
-func morphMessages(sent [][]byte) []updateMessage {
-	var result []updateMessage
+func morphMessages(sent [][]byte) []testMessage {
+	var result []testMessage
 	for _, data := range sent {
-		var msg updateMessage
+		var msg testMessage
 		if err := json.Unmarshal(data, &msg); err != nil {
 			continue
 		}
@@ -43,8 +70,8 @@ func morphMessages(sent [][]byte) []updateMessage {
 }
 
 // decodeMessage unmarshals a single raw JSON message.
-func decodeMessage(data []byte) updateMessage {
-	var msg updateMessage
+func decodeMessage(data []byte) testMessage {
+	var msg testMessage
 	json.Unmarshal(data, &msg)
 	return msg
 }
@@ -121,6 +148,7 @@ func newTestSession(state counterState, mt *mockTransport) *Session[counterState
 		render:    renderCounter,
 		handle:    handleCounter,
 		differ:    differ,
+		encoder:   wire.JSONEncoder{},
 		transport: mt,
 		events:    make(chan Event),
 		cmds:      make(chan func(), defaultCmdBufferSize),

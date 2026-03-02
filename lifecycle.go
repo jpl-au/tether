@@ -1,5 +1,7 @@
 package poly
 
+import "github.com/jpl-au/fluent-poly/wire"
+
 // reattach reconnects a disconnected session with a new transport.
 // A command is sent to the session's loop to swap in the new transport
 // and re-render. This avoids any locking — only the loop touches
@@ -29,8 +31,8 @@ func (h *Handler[S]) reattach(sess *Session[S], transport Transport) {
 		// and would otherwise be stale after reconnection.
 		tree := sess.render(sess.state)
 		html := sess.differ.Render(tree)
-		u := update{
-			Morphs: []morph{{Key: "", HTML: html}},
+		u := wire.Update{
+			Morphs: []wire.Morph{{Key: "", HTML: html}},
 		}
 		if sess.lastURL != "" {
 			u.URL = sess.lastURL

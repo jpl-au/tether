@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/jpl-au/fluent-poly/dev"
+	"github.com/jpl-au/fluent-poly/wire"
 
 	jit "github.com/jpl-au/fluent-jit"
 	"github.com/jpl-au/fluent-poly/push"
@@ -58,6 +59,7 @@ type Session[S any] struct {
 	render    RenderFunc[S]
 	handle    HandleFunc[S]
 	differ    *jit.Differ
+	encoder   wire.Encoder
 	transport Transport
 
 	// Channel pair: events from transport, commands from everything else.
@@ -303,7 +305,7 @@ func (s *Session[S]) sendFx(fx *effects) {
 	if !fx.any() {
 		return
 	}
-	u := update{}
+	var u wire.Update
 	fx.merge(&u)
 	s.send(u)
 }

@@ -6,6 +6,7 @@ import (
 	"testing/synctest"
 
 	jit "github.com/jpl-au/fluent-jit"
+	"github.com/jpl-au/fluent-poly/wire"
 	"github.com/jpl-au/fluent/html5/div"
 	"github.com/jpl-au/fluent/html5/span"
 	"github.com/jpl-au/fluent/node"
@@ -93,6 +94,7 @@ func TestObserveCrossHandler(t *testing.T) {
 			render:    renderDash,
 			handle:    func(_ PreSession, s dashState, _ Event) dashState { return s },
 			differ:    differB,
+			encoder:   wire.JSONEncoder{},
 			transport: &mockTransport{events: []Event{}},
 			events:    make(chan Event),
 			cmds:      make(chan func(), defaultCmdBufferSize),
@@ -184,6 +186,7 @@ func TestObserveMultipleValues(t *testing.T) {
 			render:    render,
 			handle:    func(_ PreSession, s state, _ Event) state { return s },
 			differ:    differ,
+			encoder:   wire.JSONEncoder{},
 			transport: mt,
 			events:    make(chan Event),
 			cmds:      make(chan func(), defaultCmdBufferSize),

@@ -187,6 +187,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		render:           h.cfg.Render,
 		handle:           h.cfg.Handle,
 		differ:           differ,
+		encoder:          h.encoder,
 		transport:        transport,
 		events:           make(chan Event),
 		cmds:             make(chan func(), h.cfg.Limits.CmdBufferSize),

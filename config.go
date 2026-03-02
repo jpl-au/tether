@@ -7,6 +7,7 @@ import (
 
 	"github.com/jpl-au/fluent-poly/mode"
 	"github.com/jpl-au/fluent-poly/push"
+	"github.com/jpl-au/fluent-poly/wire"
 	"github.com/jpl-au/fluent/node"
 )
 
@@ -199,6 +200,11 @@ type Config[S any] struct {
 	// Client groups settings that are passed to the browser as data
 	// attributes on the poly root element.
 	Client Client
+
+	// WireFormat selects the encoding for server-to-client updates.
+	// Defaults to [wire.JSON]. Currently the only supported format;
+	// additional formats (e.g. HTML fragments) will be added in future.
+	WireFormat wire.Format
 
 	// Security groups origin-checking and CSRF protection settings.
 	Security Security

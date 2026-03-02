@@ -9,15 +9,15 @@ import "time"
 // (via [Session.Update]), while ReceiveEvent is only called from the
 // event loop goroutine.
 //
-// Send receives pre-encoded JSON bytes — the session handles all
-// encoding so transports only deal with raw bytes.
+// Send receives pre-encoded bytes — the session handles all encoding
+// (via [wire.Encoder]) so transports only deal with raw bytes.
 //
 // See the ws sub-package for WebSocket and the sse sub-package for
 // Server-Sent Events.
 type Transport interface {
-	// Send writes pre-encoded JSON bytes to the client. The session
-	// encodes updates before calling Send, so implementations only
-	// need to frame and transmit the data.
+	// Send writes pre-encoded bytes to the client. The session
+	// encodes updates via [wire.Encoder] before calling Send, so
+	// implementations only need to frame and transmit the data.
 	Send(data []byte) error
 
 	// ReceiveEvent blocks until the next client event arrives. Returns

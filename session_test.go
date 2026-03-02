@@ -7,6 +7,7 @@ import (
 
 	jit "github.com/jpl-au/fluent-jit"
 	"github.com/jpl-au/fluent-poly/event"
+	"github.com/jpl-au/fluent-poly/wire"
 	"github.com/jpl-au/fluent/html5/div"
 	"github.com/jpl-au/fluent/html5/span"
 	"github.com/jpl-au/fluent/node"
@@ -166,6 +167,7 @@ func TestSessionStructuralChange(t *testing.T) {
 			render:    render,
 			handle:    handle,
 			differ:    differ,
+			encoder:   wire.JSONEncoder{},
 			transport: mt,
 			events:    make(chan Event),
 			cmds:      make(chan func(), defaultCmdBufferSize),

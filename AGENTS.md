@@ -50,7 +50,7 @@ errors.go       Sentinel errors — ErrPushNotConfigured, ErrPushNoSubscription,
 handle.go       HandleFunc type definition
 effects.go      Internal effects accumulator (replaces HandleResult)
 group.go        Broadcasting — Group, Broadcast, BroadcastOthers, All()
-protocol.go     Wire format types and encoding
+wire/           Wire format abstraction — Encoder interface, Update/Patch/Morph types, JSONEncoder
 transport.go    Transport interface
 event.go        Event and Params types, convenience helpers (Key, Int, Bool, Get, Float64)
 event_bind.go   Event.Bind — reflection-based form field decoding
@@ -80,7 +80,9 @@ If `Handle` or `Render` panics during event processing, the panic is recovered, 
 
 ### Wire format
 
-All updates use a single `"update"` message type:
+The encoding is abstracted via `wire.Encoder`. `Config.WireFormat` selects the encoder (default `wire.JSON`). The `wire` package defines format-agnostic types (`wire.Update`, `wire.Patch`, `wire.Morph`) and the `Encoder` interface. `wire.JSONEncoder` is the default implementation.
+
+All updates use a single `"update"` message type (JSON format):
 
 ```json
 {"type":"update","patches":[{"key":"count","html":"<span>43</span>"}]}
@@ -737,7 +739,7 @@ drain_test.go       Graceful drain (rejects new, allows reconnect, context cance
 origin_test.go      Origin checking and CSRF protection
 worker_test.go      Service worker header, polyBody attributes, push subscribe handler
 bind_test.go        Event binding helpers (package poly_test, black-box)
-protocol_test.go    Wire format encoding
+wire/json_test.go   Wire format encoding (JSONEncoder)
 bench_test.go       Performance benchmarks
 announce_test.go    Live region announcements (Session.Announce, wire format)
 presence_test.go    Group presence (OnJoin, OnLeave, All)
@@ -855,7 +857,7 @@ The `draining` flag is an `atomic.Bool` on `Handler`. It is checked at the top o
 
 ## Live region announcements
 
-`Session.Announce(text)` sends text to a screen-reader-accessible `aria-live="polite"` region on the client. The JS runtime lazily creates a visually hidden `<div role="status" aria-live="polite" aria-atomic="true">` and sets its `textContent`. The `announce` field is part of the `Update`/`UpdateMessage` wire format (`"announce"` JSON key, `omitempty`).
+`Session.Announce(text)` sends text to a screen-reader-accessible `aria-live="polite"` region on the client. The JS runtime lazily creates a visually hidden `<div role="status" aria-live="polite" aria-atomic="true">` and sets its `textContent`. The `announce` field is part of the `wire.Update` type (`"announce"` JSON key, `omitempty` in the JSON encoder).
 
 To trigger re-announcement of identical text, the JS clears the region first then sets the text in the next animation frame.
 

@@ -1,5 +1,7 @@
 package poly
 
+import "github.com/jpl-au/fluent-poly/wire"
+
 // effects accumulates side effects during an exec cycle. Session
 // methods (Toast, Navigate, Signal, etc.) populate these fields when
 // called inside Handle. After Handle returns, the effects are flushed
@@ -22,7 +24,7 @@ func (fx *effects) any() bool {
 }
 
 // merge copies buffered effects into an update message.
-func (fx *effects) merge(u *update) {
+func (fx *effects) merge(u *wire.Update) {
 	if fx.announce != "" {
 		u.Announce = fx.announce
 	}

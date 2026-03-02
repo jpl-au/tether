@@ -12,6 +12,7 @@ import (
 	"github.com/jpl-au/fluent-poly/dev"
 	"github.com/jpl-au/fluent-poly/event"
 	"github.com/jpl-au/fluent-poly/mode"
+	"github.com/jpl-au/fluent-poly/wire"
 	"github.com/jpl-au/fluent/node"
 )
 
@@ -135,6 +136,7 @@ func Page[S any](cfg PageConfig[S]) http.Handler {
 
 	return &pageHandler[S]{
 		cfg:           cfg,
+		encoder:       wire.JSONEncoder{},
 		clientHandler: newClientHandler(cfg.Assets),
 		assetMounts:   buildAssetMounts(cfg.Assets, cfg.DevMode),
 	}
@@ -143,6 +145,7 @@ func Page[S any](cfg PageConfig[S]) http.Handler {
 // pageHandler serves stateless pages via plain HTTP request/response.
 type pageHandler[S any] struct {
 	cfg           PageConfig[S]
+	encoder       wire.Encoder
 	clientHandler http.Handler
 	assetMounts   []assetMount
 }
@@ -262,13 +265,13 @@ func (p *pageHandler[S]) servePOST(w http.ResponseWriter, r *http.Request) {
 	tree := p.cfg.Render(state)
 	html := tree.Render()
 
-	u := update{
-		Morphs:  []morph{{Key: "", HTML: html}},
+	u := wire.Update{
+		Morphs:  []wire.Morph{{Key: "", HTML: html}},
 		EventID: ev.EventID,
 	}
 	fx.merge(&u)
 
-	data, err := marshalUpdate(u)
+	data, err := p.encoder.Encode(u)
 	if err != nil {
 		slog.Error("encode response error", "err", err, "path", r.URL.Path, "remote", r.RemoteAddr)
 		http.Error(w, "internal error", http.StatusInternalServerError)

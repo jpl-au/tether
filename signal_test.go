@@ -5,6 +5,7 @@ import (
 	"testing/synctest"
 
 	"github.com/jpl-au/fluent-poly/event"
+	"github.com/jpl-au/fluent-poly/wire"
 )
 
 func TestSignalOutsideHandle(t *testing.T) {
@@ -182,11 +183,11 @@ func TestSignalMergedIntoEffects(t *testing.T) {
 		t.Error("effects.any() should be true when signals are set")
 	}
 
-	u := &update{}
+	u := &wire.Update{}
 	fx.merge(u)
 
 	if u.Signals == nil {
-		t.Fatal("update.Signals is nil after merge")
+		t.Fatal("wire.Update.Signals is nil after merge")
 	}
 	if u.Signals["count"] != 5 {
 		t.Errorf("Signals[count] = %v, want 5", u.Signals["count"])

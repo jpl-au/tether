@@ -1,8 +1,11 @@
 package poly
 
 import (
+	"encoding/json"
 	"testing"
 	"testing/synctest"
+
+	"github.com/jpl-au/fluent-poly/wire"
 )
 
 func TestSessionAnnounceSendsUpdate(t *testing.T) {
@@ -31,10 +34,17 @@ func TestSessionAnnounceSendsUpdate(t *testing.T) {
 }
 
 func TestEncodeUpdateIncludesAnnounce(t *testing.T) {
-	u := update{Announce: "Screen reader text"}
-	msg := encodeUpdate(u)
+	u := wire.Update{Announce: "Screen reader text"}
+	data, err := wire.JSONEncoder{}.Encode(u)
+	if err != nil {
+		t.Fatalf("Encode failed: %v", err)
+	}
 
-	if msg.Announce != "Screen reader text" {
-		t.Errorf("expected announce in encoded message, got %q", msg.Announce)
+	var decoded map[string]any
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+	if decoded["announce"] != "Screen reader text" {
+		t.Errorf("expected announce in encoded message, got %v", decoded["announce"])
 	}
 }
