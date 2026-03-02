@@ -10,6 +10,7 @@ import (
 	"time"
 
 	jit "github.com/jpl-au/fluent-jit"
+	"github.com/jpl-au/fluent-poly/dev"
 	"github.com/jpl-au/fluent-poly/event"
 	"github.com/jpl-au/fluent-poly/mode"
 )
@@ -128,6 +129,7 @@ func New[S any](cfg Config[S]) *Handler[S] {
 	}
 	slog.SetDefault(cfg.Logger)
 	if cfg.DevMode {
+		dev.Enable()
 		slog.Info("poly: dev mode enabled")
 	}
 	if cfg.Timeouts.Reconnect == 0 {

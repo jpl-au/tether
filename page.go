@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/jpl-au/fluent-poly/dev"
 	"github.com/jpl-au/fluent-poly/event"
 	"github.com/jpl-au/fluent-poly/mode"
 	"github.com/jpl-au/fluent/node"
@@ -119,6 +120,9 @@ func Page[S any](cfg PageConfig[S]) http.Handler {
 		}
 	}
 	slog.SetDefault(cfg.Logger)
+	if cfg.DevMode {
+		dev.Enable()
+	}
 	if cfg.Limits.MaxEventBytes == 0 {
 		cfg.Limits.MaxEventBytes = defaultMaxEventBytes
 	}
@@ -190,7 +194,6 @@ func (p *pageHandler[S]) serveGET(w http.ResponseWriter, r *http.Request) {
 		transport:         mode.HTTP,
 		defaultDebounce:   p.cfg.Client.DefaultDebounce,
 		transitionTimeout: p.cfg.Client.TransitionTimeout,
-		devMode:           p.cfg.DevMode,
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

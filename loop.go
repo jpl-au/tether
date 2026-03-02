@@ -7,6 +7,7 @@ import (
 	"time"
 
 	jit "github.com/jpl-au/fluent-jit"
+	"github.com/jpl-au/fluent-poly/dev"
 	"github.com/jpl-au/fluent/node"
 )
 
@@ -119,8 +120,14 @@ func (s *Session[S]) exec(ev Event) {
 				"type", ev.Type,
 				"panic", r,
 			)
-			// Discard any effects enqueued during the panicked handler.
+			// Discard any effects (Toast, Signal, Navigate, etc.)
+			// enqueued before the panic — they may reference
+			// inconsistent state.
 			s.drainFx(nil)
+			dev.Warn("side effects discarded due to handler panic — any Toast, Signal, or Navigate calls before the panic were dropped",
+				"session", s.id,
+				"action", ev.Action,
+			)
 		}
 		s.handling.Store(false)
 	}()
@@ -163,13 +170,24 @@ func (s *Session[S]) exec(ev Event) {
 		"patches", len(patches),
 		"structural", change != nil,
 	)
-	if s.devMode && ev.Type == "navigate" && len(patches) == 0 && change == nil {
-		slog.Warn("navigate produced no patches — page content may be missing .Dynamic() keys",
-			"session", s.id,
-			"endpoint", s.endpoint,
-			"url", s.lastURL,
-			"tip", "add .Dynamic(\"content\") to the element wrapping page content so the diff engine can detect page changes",
-		)
+	if len(patches) == 0 && change == nil {
+		if ev.Type == "navigate" {
+			dev.Warn("navigate produced no patches — page content may be missing .Dynamic() keys",
+				"session", s.id,
+				"endpoint", s.endpoint,
+				"url", s.lastURL,
+				"tip", "add .Dynamic(\"content\") to the element wrapping page content so the diff engine can detect page changes",
+			)
+		} else {
+			dev.Warn("event produced no patches — state-dependent elements may be missing .Dynamic() keys",
+				"session", s.id,
+				"endpoint", s.endpoint,
+				"url", s.lastURL,
+				"action", ev.Action,
+				"type", ev.Type,
+				"tip", "wrap state-dependent content in a container with .Dynamic(\"key\") so the diff engine can track changes",
+			)
+		}
 	}
 
 	// Phase 5: Build and send update.

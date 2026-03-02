@@ -95,7 +95,7 @@ func (h *Handler[S]) serve(srv *http.Server, start func() error, url string) err
 	// A second signal during shutdown forces an immediate exit.
 	go func() {
 		<-sigCh
-		slog.Warn("forced exit")
+		slog.Warn("forced exit", "reason", "second signal during shutdown")
 		os.Exit(1)
 	}()
 
@@ -103,7 +103,7 @@ func (h *Handler[S]) serve(srv *http.Server, start func() error, url string) err
 	defer cancel()
 
 	if err := h.Drain(ctx); err != nil {
-		slog.Warn("drain timed out, forcing shutdown")
+		slog.Warn("drain timed out, forcing shutdown", "timeout", h.cfg.Timeouts.ShutdownGrace)
 	}
 
 	srv.Shutdown(ctx)

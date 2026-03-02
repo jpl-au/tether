@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/jpl-au/fluent-poly/dev"
 	"github.com/jpl-au/fluent-poly/mode"
 	"github.com/jpl-au/fluent/node"
 )
@@ -44,7 +45,6 @@ type polyBody struct {
 	worker            bool
 	pushKey           string
 	backgroundSync    bool
-	devMode           bool
 }
 
 func (p *polyBody) Render(w ...io.Writer) []byte {
@@ -115,7 +115,7 @@ func (p *polyBody) RenderBuilder(buf *bytes.Buffer) {
 	if p.backgroundSync {
 		buf.WriteString(` data-poly-background-sync`)
 	}
-	if p.devMode {
+	if dev.Enabled() {
 		buf.WriteString(` data-poly-dev`)
 	}
 	buf.WriteString(`>`)

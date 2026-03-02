@@ -121,11 +121,6 @@ type Session[S any] struct {
 
 	// Optional telemetry hook for structural diff changes.
 	onStructuralChange func(*Session[S], StructuralChange)
-
-	// devMode enables development-time diagnostics such as warnings
-	// when a state change produces no diff patches (likely missing
-	// Dynamic keys on state-dependent elements).
-	devMode bool
 }
 
 // PreSession is the subset of Session methods available in

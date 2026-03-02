@@ -5,6 +5,7 @@ import (
 	"maps"
 	"time"
 
+	"github.com/jpl-au/fluent-poly/dev"
 	"github.com/jpl-au/fluent-poly/push"
 )
 
@@ -78,6 +79,9 @@ func (s *Session[S]) Update(fn func(S) S) {
 					"panic", r,
 				)
 				s.drainFx(nil)
+				dev.Warn("side effects discarded due to Update panic — any Toast, Signal, or Navigate calls before the panic were dropped",
+					"session", s.id,
+				)
 			}
 			s.handling.Store(false)
 		}()
@@ -93,8 +97,8 @@ func (s *Session[S]) Update(fn func(S) S) {
 
 		tree := s.render(s.state)
 		patches, change := s.differ.Diff(tree)
-		if s.devMode && len(patches) == 0 && change == nil {
-			slog.Warn("Update produced no patches — state-dependent elements may be missing .Dynamic() keys",
+		if len(patches) == 0 && change == nil {
+			dev.Warn("Update produced no patches — state-dependent elements may be missing .Dynamic() keys",
 				"session", s.id,
 				"endpoint", s.endpoint,
 				"url", s.lastURL,

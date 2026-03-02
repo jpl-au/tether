@@ -7,6 +7,7 @@ import (
 	"testing"
 	"testing/fstest"
 
+	"github.com/jpl-au/fluent-poly/dev"
 	"github.com/jpl-au/fluent-poly/mode"
 )
 
@@ -234,6 +235,7 @@ func TestAssetCacheHeadersProduction(t *testing.T) {
 }
 
 func TestAssetCacheHeadersDevMode(t *testing.T) {
+	t.Cleanup(dev.Reset)
 	assets := &Asset{
 		FS: fstest.MapFS{
 			"styles.css": &fstest.MapFile{Data: []byte("body{}")},

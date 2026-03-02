@@ -10,6 +10,7 @@ import (
 	"testing/fstest"
 	"time"
 
+	"github.com/jpl-au/fluent-poly/dev"
 	"github.com/jpl-au/fluent-poly/mode"
 	"github.com/jpl-au/fluent-poly/push"
 )
@@ -406,11 +407,13 @@ func TestHandlePushSubscribeUnknownSession(t *testing.T) {
 
 func TestPolyBodyDevModeAttribute(t *testing.T) {
 	t.Run("devMode true emits data-poly-dev", func(t *testing.T) {
+		dev.Enable()
+		t.Cleanup(dev.Reset)
+
 		body := &polyBody{
 			html:     []byte("<p>hello</p>"),
 			endpoint: "/app",
 			session:  "abc",
-			devMode:  true,
 		}
 		var buf bytes.Buffer
 		body.RenderBuilder(&buf)
@@ -422,11 +425,12 @@ func TestPolyBodyDevModeAttribute(t *testing.T) {
 	})
 
 	t.Run("devMode false omits data-poly-dev", func(t *testing.T) {
+		dev.Reset()
+
 		body := &polyBody{
 			html:     []byte("<p>hello</p>"),
 			endpoint: "/app",
 			session:  "abc",
-			devMode:  false,
 		}
 		var buf bytes.Buffer
 		body.RenderBuilder(&buf)
@@ -440,6 +444,7 @@ func TestPolyBodyDevModeAttribute(t *testing.T) {
 
 func TestDevModeEnvVar(t *testing.T) {
 	t.Setenv("POLY_DEV", "1")
+	t.Cleanup(dev.Reset)
 
 	handler := New(Config[counterState]{
 		Mode:         mode.WebSocket,
@@ -456,6 +461,7 @@ func TestDevModeEnvVar(t *testing.T) {
 
 func TestDevModeBoolOverridesEnv(t *testing.T) {
 	t.Setenv("POLY_DEV", "")
+	t.Cleanup(dev.Reset)
 
 	handler := New(Config[counterState]{
 		Mode:         mode.WebSocket,
@@ -472,6 +478,8 @@ func TestDevModeBoolOverridesEnv(t *testing.T) {
 }
 
 func TestDevModeCacheControl(t *testing.T) {
+	t.Cleanup(dev.Reset)
+
 	handler := New(Config[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
@@ -509,6 +517,8 @@ func TestDevModeNoCacheControlInProduction(t *testing.T) {
 }
 
 func TestDevModeInitialPageHasAttribute(t *testing.T) {
+	t.Cleanup(dev.Reset)
+
 	handler := New(Config[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,

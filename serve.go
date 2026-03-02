@@ -32,7 +32,7 @@ func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	slog.Info("serving initial page", "path", r.URL.Path, "remote", r.RemoteAddr)
+	slog.Debug("serving initial page", "path", r.URL.Path, "remote", r.RemoteAddr)
 
 	h.mu.Lock()
 	if h.cfg.Limits.MaxSessions > 0 && len(h.pending)+len(h.active)+len(h.disconnected) >= h.cfg.Limits.MaxSessions {
@@ -81,7 +81,6 @@ func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 		worker:            h.cfg.Worker,
 		pushKey:           pushKey,
 		backgroundSync:    h.cfg.Client.BackgroundSync,
-		devMode:           h.cfg.DevMode,
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -198,7 +197,6 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		endpoint:         r.URL.Path,
 		idleTimeout:      h.cfg.Timeouts.Idle,
 		reconnectTimeout: h.cfg.Timeouts.Reconnect,
-		devMode:          h.cfg.DevMode,
 	}
 	sess.lastActivity.Store(now.UnixNano())
 	slog.Debug("session created", "session", id, "endpoint", r.URL.Path, "remote", r.RemoteAddr)

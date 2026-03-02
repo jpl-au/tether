@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jpl-au/fluent-poly/dev"
 	"github.com/jpl-au/fluent-poly/event"
 )
 
@@ -110,6 +111,8 @@ func TestPageGETWithOnNavigate(t *testing.T) {
 }
 
 func TestPageGETDevMode(t *testing.T) {
+	t.Cleanup(dev.Reset)
+
 	handler := Page(PageConfig[counterState]{
 		State:   func(r *http.Request) counterState { return counterState{} },
 		Render:  renderCounter,
@@ -392,6 +395,7 @@ func TestPagePOSTWithOnNavigate(t *testing.T) {
 
 func TestPageDevModeFromEnv(t *testing.T) {
 	t.Setenv("POLY_DEV", "1")
+	t.Cleanup(dev.Reset)
 
 	handler := Page(PageConfig[counterState]{
 		State:  func(r *http.Request) counterState { return counterState{} },
