@@ -51,8 +51,8 @@ func TestSessionHandlePanicDoesNotKillSession(t *testing.T) {
 
 func TestSessionUpdatePanicDoesNotCrashCaller(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		mt := &mockTransport{events: []Event{}}
-		sess := newTestSession(counterState{Count: 0}, mt)
+		ct := newConnectedTransport()
+		sess := newTestSession(counterState{Count: 0}, ct)
 
 		go sess.readTransport(sess.events)
 		go sess.run()

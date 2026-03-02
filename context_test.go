@@ -8,9 +8,9 @@ import (
 
 func TestSessionContextCancelledAfterDestroy(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		mt := &mockTransport{events: []Event{}}
+		ct := newConnectedTransport()
 
-		sess := newTestSession(counterState{Count: 0}, mt)
+		sess := newTestSession(counterState{Count: 0}, ct)
 
 		// Context should not be cancelled before destruction.
 		select {

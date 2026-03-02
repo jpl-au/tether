@@ -10,8 +10,8 @@ import (
 func TestOnSubscribesSessionToBus(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		bus := NewBus[string]()
-		mt := &mockTransport{events: []Event{}}
-		sess := newTestSession(counterState{Count: 0}, mt)
+		ct := newConnectedTransport()
+		sess := newTestSession(counterState{Count: 0}, ct)
 
 		go sess.readTransport(sess.events)
 		go sess.run()
@@ -35,8 +35,8 @@ func TestOnSubscribesSessionToBus(t *testing.T) {
 func TestOnAutoCleanupOnSessionDestroy(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		bus := NewBus[string]()
-		mt := &mockTransport{events: []Event{}}
-		sess := newTestSession(counterState{Count: 0}, mt)
+		ct := newConnectedTransport()
+		sess := newTestSession(counterState{Count: 0}, ct)
 
 		go sess.readTransport(sess.events)
 		go sess.run()
@@ -82,8 +82,8 @@ func TestEmitAndOnEndToEnd(t *testing.T) {
 		}
 
 		// Session B: the receiver.
-		mtB := &mockTransport{events: []Event{}}
-		sessB := newTestSession(counterState{Count: 0}, mtB)
+		ctB := newConnectedTransport()
+		sessB := newTestSession(counterState{Count: 0}, ctB)
 		sessB.id = "receiver"
 
 		go sessA.readTransport(sessA.events)
@@ -124,8 +124,8 @@ func TestEmitAndOnEndToEnd(t *testing.T) {
 func TestEmitInsideUpdateCallback(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		bus := NewBus[int]()
-		mt := &mockTransport{events: []Event{}}
-		sess := newTestSession(counterState{Count: 0}, mt)
+		ct := newConnectedTransport()
+		sess := newTestSession(counterState{Count: 0}, ct)
 
 		go sess.readTransport(sess.events)
 		go sess.run()

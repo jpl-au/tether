@@ -10,8 +10,8 @@ import (
 
 func TestSignalOutsideHandle(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		mt := &mockTransport{events: []Event{}}
-		sess := newTestSession(counterState{Count: 0}, mt)
+		ct := newConnectedTransport()
+		sess := newTestSession(counterState{Count: 0}, ct)
 
 		go sess.readTransport(sess.events)
 		go sess.run()
@@ -20,13 +20,13 @@ func TestSignalOutsideHandle(t *testing.T) {
 		sess.Signal("count", 42)
 		synctest.Wait()
 
-		mt.mu.Lock()
-		defer mt.mu.Unlock()
+		ct.mu.Lock()
+		defer ct.mu.Unlock()
 
-		if len(mt.sent) == 0 {
+		if len(ct.sent) == 0 {
 			t.Fatal("expected an update with signals")
 		}
-		msg := decodeMessage(mt.sent[len(mt.sent)-1])
+		msg := decodeMessage(ct.sent[len(ct.sent)-1])
 		if msg.Signals == nil {
 			t.Fatal("update.Signals is nil")
 		}

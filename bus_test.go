@@ -26,8 +26,8 @@ func TestBusPublishDeliversToSubscribers(t *testing.T) {
 func TestBusEmitDefersPublication(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		bus := NewBus[string]()
-		mt := &mockTransport{events: []Event{}}
-		sess := newTestSession(counterState{}, mt)
+		ct := newConnectedTransport()
+		sess := newTestSession(counterState{}, ct)
 
 		go sess.readTransport(sess.events)
 		go sess.run()
@@ -50,8 +50,8 @@ func TestBusEmitDefersPublication(t *testing.T) {
 func TestBusEmitPublishesOutsideHandle(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		bus := NewBus[string]()
-		mt := &mockTransport{events: []Event{}}
-		sess := newTestSession(counterState{}, mt)
+		ct := newConnectedTransport()
+		sess := newTestSession(counterState{}, ct)
 
 		go sess.readTransport(sess.events)
 		go sess.run()
@@ -73,12 +73,12 @@ func TestBusSenderFiltering(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		bus := NewBus[string]()
 
-		mt1 := &mockTransport{events: []Event{}}
-		sessA := newTestSession(counterState{}, mt1)
+		ct1 := newConnectedTransport()
+		sessA := newTestSession(counterState{}, ct1)
 		sessA.id = "A"
 
-		mt2 := &mockTransport{events: []Event{}}
-		sessB := newTestSession(counterState{}, mt2)
+		ct2 := newConnectedTransport()
+		sessB := newTestSession(counterState{}, ct2)
 		sessB.id = "B"
 
 		go sessA.readTransport(sessA.events)
@@ -138,8 +138,8 @@ func TestBusPublishNoSenderFilter(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		bus := NewBus[string]()
 
-		mt := &mockTransport{events: []Event{}}
-		sess := newTestSession(counterState{}, mt)
+		ct := newConnectedTransport()
+		sess := newTestSession(counterState{}, ct)
 
 		go sess.readTransport(sess.events)
 		go sess.run()

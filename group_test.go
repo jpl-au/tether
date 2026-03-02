@@ -43,11 +43,11 @@ func TestGroupBroadcastUpdatesAllSessions(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		g := NewGroup[counterState]()
 
-		mt1 := &mockTransport{events: []Event{}}
-		sess1 := newTestSession(counterState{Count: 0}, mt1)
+		ct1 := newConnectedTransport()
+		sess1 := newTestSession(counterState{Count: 0}, ct1)
 
-		mt2 := &mockTransport{events: []Event{}}
-		sess2 := newTestSession(counterState{Count: 10}, mt2)
+		ct2 := newConnectedTransport()
+		sess2 := newTestSession(counterState{Count: 10}, ct2)
 		sess2.id = "test-2"
 
 		g.Add(sess1)
@@ -74,17 +74,17 @@ func TestGroupBroadcastUpdatesAllSessions(t *testing.T) {
 		}
 
 		// Both transports should have received an update.
-		mt1.mu.Lock()
-		if len(mt1.sent) != 1 {
-			t.Errorf("expected 1 update on mt1, got %d", len(mt1.sent))
+		ct1.mu.Lock()
+		if len(ct1.sent) != 1 {
+			t.Errorf("expected 1 update on ct1, got %d", len(ct1.sent))
 		}
-		mt1.mu.Unlock()
+		ct1.mu.Unlock()
 
-		mt2.mu.Lock()
-		if len(mt2.sent) != 1 {
-			t.Errorf("expected 1 update on mt2, got %d", len(mt2.sent))
+		ct2.mu.Lock()
+		if len(ct2.sent) != 1 {
+			t.Errorf("expected 1 update on ct2, got %d", len(ct2.sent))
 		}
-		mt2.mu.Unlock()
+		ct2.mu.Unlock()
 	})
 }
 

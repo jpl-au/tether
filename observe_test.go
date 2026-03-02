@@ -15,8 +15,8 @@ import (
 func TestObserveDeliversCurrentValue(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		v := NewValue(42)
-		mt := &mockTransport{events: []Event{}}
-		sess := newTestSession(counterState{Count: 0}, mt)
+		ct := newConnectedTransport()
+		sess := newTestSession(counterState{Count: 0}, ct)
 
 		go sess.readTransport(sess.events)
 		go sess.run()
@@ -37,8 +37,8 @@ func TestObserveDeliversCurrentValue(t *testing.T) {
 func TestObserveDeliversFutureChanges(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		v := NewValue(0)
-		mt := &mockTransport{events: []Event{}}
-		sess := newTestSession(counterState{Count: 0}, mt)
+		ct := newConnectedTransport()
+		sess := newTestSession(counterState{Count: 0}, ct)
 
 		go sess.readTransport(sess.events)
 		go sess.run()
@@ -68,8 +68,8 @@ func TestObserveCrossHandler(t *testing.T) {
 		v := NewValue(5)
 
 		// Session A: counterState
-		mtA := &mockTransport{events: []Event{}}
-		sessA := newTestSession(counterState{Count: 0}, mtA)
+		ctA := newConnectedTransport()
+		sessA := newTestSession(counterState{Count: 0}, ctA)
 		sessA.id = "A"
 
 		go sessA.readTransport(sessA.events)
@@ -95,7 +95,7 @@ func TestObserveCrossHandler(t *testing.T) {
 			handle:    func(_ PreSession, s dashState, _ Event) dashState { return s },
 			differ:    differB,
 			encoder:   wire.JSONEncoder{},
-			transport: &mockTransport{events: []Event{}},
+			transport: newConnectedTransport(),
 			events:    make(chan Event),
 			cmds:      make(chan func(), defaultCmdBufferSize),
 			fxCh:      make(chan func(*effects), defaultCmdBufferSize),
@@ -139,8 +139,8 @@ func TestObserveCrossHandler(t *testing.T) {
 func TestObserveAutoCleanup(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		v := NewValue(0)
-		mt := &mockTransport{events: []Event{}}
-		sess := newTestSession(counterState{Count: 0}, mt)
+		ct := newConnectedTransport()
+		sess := newTestSession(counterState{Count: 0}, ct)
 
 		go sess.readTransport(sess.events)
 		go sess.run()
@@ -179,7 +179,7 @@ func TestObserveMultipleValues(t *testing.T) {
 		}
 		differ := jit.NewDiffer()
 		ctx, cancel := newTestContext()
-		mt := &mockTransport{events: []Event{}}
+		ct := newConnectedTransport()
 		sess := &Session[state]{
 			id:        "multi",
 			state:     state{},
@@ -187,7 +187,7 @@ func TestObserveMultipleValues(t *testing.T) {
 			handle:    func(_ PreSession, s state, _ Event) state { return s },
 			differ:    differ,
 			encoder:   wire.JSONEncoder{},
-			transport: mt,
+			transport: ct,
 			events:    make(chan Event),
 			cmds:      make(chan func(), defaultCmdBufferSize),
 			fxCh:      make(chan func(*effects), defaultCmdBufferSize),

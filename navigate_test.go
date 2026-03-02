@@ -184,8 +184,8 @@ func TestSessionNavigateEventWithoutOnNavigate(t *testing.T) {
 
 func TestSessionNavigateSendsURL(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		mt := &mockTransport{events: []Event{}}
-		sess := newTestSession(counterState{Count: 0}, mt)
+		ct := newConnectedTransport()
+		sess := newTestSession(counterState{Count: 0}, ct)
 
 		go sess.readTransport(sess.events)
 		go sess.run()
@@ -194,13 +194,13 @@ func TestSessionNavigateSendsURL(t *testing.T) {
 		sess.Navigate("/new-page")
 		synctest.Wait()
 
-		mt.mu.Lock()
-		defer mt.mu.Unlock()
+		ct.mu.Lock()
+		defer ct.mu.Unlock()
 
-		if len(mt.sent) != 1 {
-			t.Fatalf("expected 1 update, got %d", len(mt.sent))
+		if len(ct.sent) != 1 {
+			t.Fatalf("expected 1 update, got %d", len(ct.sent))
 		}
-		msg := decodeMessage(mt.sent[0])
+		msg := decodeMessage(ct.sent[0])
 		if msg.URL != "/new-page" {
 			t.Errorf("expected URL %q, got %q", "/new-page", msg.URL)
 		}
@@ -212,8 +212,8 @@ func TestSessionNavigateSendsURL(t *testing.T) {
 
 func TestSessionReplaceURLSendsReplace(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		mt := &mockTransport{events: []Event{}}
-		sess := newTestSession(counterState{Count: 0}, mt)
+		ct := newConnectedTransport()
+		sess := newTestSession(counterState{Count: 0}, ct)
 
 		go sess.readTransport(sess.events)
 		go sess.run()
@@ -222,13 +222,13 @@ func TestSessionReplaceURLSendsReplace(t *testing.T) {
 		sess.ReplaceURL("/current")
 		synctest.Wait()
 
-		mt.mu.Lock()
-		defer mt.mu.Unlock()
+		ct.mu.Lock()
+		defer ct.mu.Unlock()
 
-		if len(mt.sent) != 1 {
-			t.Fatalf("expected 1 update, got %d", len(mt.sent))
+		if len(ct.sent) != 1 {
+			t.Fatalf("expected 1 update, got %d", len(ct.sent))
 		}
-		msg := decodeMessage(mt.sent[0])
+		msg := decodeMessage(ct.sent[0])
 		if msg.URL != "/current" {
 			t.Errorf("expected URL %q, got %q", "/current", msg.URL)
 		}

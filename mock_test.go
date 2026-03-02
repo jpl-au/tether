@@ -76,8 +76,9 @@ func decodeMessage(data []byte) testMessage {
 	return msg
 }
 
-// mockTransport records sent bytes and replays queued events,
-// allowing session event loop tests without a real connection.
+// mockTransport delivers events from a slice then returns io.EOF.
+// Use this for tests where the session should process events and
+// then disconnect.
 type mockTransport struct {
 	mu     sync.Mutex
 	events []Event
@@ -113,6 +114,48 @@ func (m *mockTransport) Close() error {
 	return nil
 }
 
+// connectedTransport stays connected until Close is called.
+// ReceiveEvent blocks on a channel, so readTransport idles instead
+// of returning EOF. Use this for tests that only exercise
+// server-to-client behaviour (Broadcast, Signal, Observe, etc.).
+type connectedTransport struct {
+	mu     sync.Mutex
+	ch     chan Event
+	sent   [][]byte
+	closed bool
+}
+
+func newConnectedTransport() *connectedTransport {
+	return &connectedTransport{ch: make(chan Event)}
+}
+
+func (c *connectedTransport) Send(data []byte) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	cp := make([]byte, len(data))
+	copy(cp, data)
+	c.sent = append(c.sent, cp)
+	return nil
+}
+
+func (c *connectedTransport) ReceiveEvent() (Event, error) {
+	ev, ok := <-c.ch
+	if !ok {
+		return Event{}, io.EOF
+	}
+	return ev, nil
+}
+
+func (c *connectedTransport) Close() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if !c.closed {
+		c.closed = true
+		close(c.ch)
+	}
+	return nil
+}
+
 type counterState struct {
 	Count int
 }
@@ -139,7 +182,7 @@ func handleCounter(_ PreSession, state counterState, ev Event) counterState {
 //
 //	go sess.readTransport(sess.events)
 //	go sess.run()
-func newTestSession(state counterState, mt *mockTransport) *Session[counterState] {
+func newTestSession(state counterState, mt Transport) *Session[counterState] {
 	differ := jit.NewDiffer()
 	ctx, cancel := context.WithCancel(context.Background())
 	sess := &Session[counterState]{

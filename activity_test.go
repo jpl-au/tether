@@ -8,8 +8,8 @@ import (
 
 func TestUpdateRefreshesLastActivity(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		mt := &mockTransport{events: []Event{}}
-		sess := newTestSession(counterState{Count: 0}, mt)
+		ct := newConnectedTransport()
+		sess := newTestSession(counterState{Count: 0}, ct)
 
 		// Set lastActivity to the past so we can detect the change.
 		past := time.Now().Add(-10 * time.Minute)
