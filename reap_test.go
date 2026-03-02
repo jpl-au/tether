@@ -48,8 +48,8 @@ func TestPendingSessionRemovedAfterTimeout(t *testing.T) {
 
 func TestIdleTimerClosesSession(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		mt := &mockTransport{events: []Event{}}
-		sess := newTestSession(counterState{Count: 0}, mt)
+		ct := newConnectedTransport()
+		sess := newTestSession(counterState{Count: 0}, ct)
 		sess.idleTimeout = 200 * time.Millisecond
 		sess.startTimers()
 
@@ -69,8 +69,8 @@ func TestIdleTimerClosesSession(t *testing.T) {
 
 func TestMaxLifetimeClosesSession(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		mt := &mockTransport{events: []Event{}}
-		sess := newTestSession(counterState{Count: 0}, mt)
+		ct := newConnectedTransport()
+		sess := newTestSession(counterState{Count: 0}, ct)
 
 		// Set a max lifetime timer.
 		time.AfterFunc(200*time.Millisecond, func() {
@@ -92,8 +92,8 @@ func TestMaxLifetimeClosesSession(t *testing.T) {
 
 func TestIdleTimerResetsOnActivity(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		mt := &mockTransport{events: []Event{}}
-		sess := newTestSession(counterState{Count: 0}, mt)
+		ct := newConnectedTransport()
+		sess := newTestSession(counterState{Count: 0}, ct)
 		sess.idleTimeout = 300 * time.Millisecond
 		sess.startTimers()
 

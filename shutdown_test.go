@@ -9,8 +9,8 @@ import (
 
 func TestShutdownClosesActiveSessions(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		mt := &mockTransport{events: []Event{}}
-		sess := newTestSession(counterState{Count: 0}, mt)
+		ct := newConnectedTransport()
+		sess := newTestSession(counterState{Count: 0}, ct)
 
 		go sess.readTransport(sess.events)
 		go sess.run()
@@ -31,9 +31,9 @@ func TestShutdownClosesActiveSessions(t *testing.T) {
 		}
 		synctest.Wait()
 
-		mt.mu.Lock()
-		closed := mt.closed
-		mt.mu.Unlock()
+		ct.mu.Lock()
+		closed := ct.closed
+		ct.mu.Unlock()
 
 		if !closed {
 			t.Error("expected transport to be closed after shutdown")

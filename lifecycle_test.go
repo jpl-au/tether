@@ -12,8 +12,8 @@ import (
 // the goroutines.
 func TestStateBeforeLoopDoesNotDeadlock(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		mt := &mockTransport{events: []Event{}}
-		sess := newTestSession(counterState{Count: 42}, mt)
+		ct := newConnectedTransport()
+		sess := newTestSession(counterState{Count: 42}, ct)
 
 		// State() before run() — must not deadlock.
 		got := sess.State()
@@ -33,8 +33,8 @@ func TestStateBeforeLoopDoesNotDeadlock(t *testing.T) {
 // This must complete without deadlocking.
 func TestOnConnectCanCallState(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		mt := &mockTransport{events: []Event{}}
-		sess := newTestSession(counterState{Count: 7}, mt)
+		ct := newConnectedTransport()
+		sess := newTestSession(counterState{Count: 7}, ct)
 
 		// Start the loop first (the fix).
 		go sess.run()
