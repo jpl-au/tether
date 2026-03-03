@@ -119,6 +119,26 @@ Publish from external sources (database listeners, message queues) with no sende
 messages.Publish(MessageSent{Text: "System announcement"})
 ```
 
+### Raw subscriptions
+
+For non-session consumers (monitoring, logging, external services), `Subscribe` and `SubscribeAsync` register callbacks directly:
+
+```go
+// Synchronous — callback runs in the publisher's goroutine.
+// Must not block.
+bus.Subscribe(ctx, func(msg MessageSent) {
+    metrics.Counter("messages").Inc()
+})
+
+// Asynchronous — callback runs in its own goroutine per event.
+// Safe for I/O (database writes, HTTP calls, logging).
+bus.SubscribeAsync(ctx, func(msg MessageSent) {
+    db.InsertAuditLog(ctx, msg)
+})
+```
+
+Both variants return an unsubscribe function and are cleaned up automatically when `ctx` is cancelled.
+
 Subscriptions are cleaned up automatically when the session is destroyed. No manual unsubscribe needed.
 
 ## Value — shared observable state

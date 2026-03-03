@@ -205,3 +205,97 @@ func TestBusUnsubscribe(t *testing.T) {
 		t.Errorf("unsubscribed callback received %q", received)
 	}
 }
+
+func TestBusSubscribeAsyncDelivery(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		bus := NewBus[string]()
+
+		var got string
+		bus.SubscribeAsync(context.Background(), func(ev string) { got = ev })
+
+		bus.Publish("hello")
+		synctest.Wait()
+
+		if got != "hello" {
+			t.Errorf("async subscriber: got %q, want %q", got, "hello")
+		}
+	})
+}
+
+func TestBusSubscribeAsyncNonBlocking(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		bus := NewBus[string]()
+
+		blocked := make(chan struct{})
+		bus.SubscribeAsync(context.Background(), func(string) {
+			<-blocked // block until released
+		})
+
+		// A sync subscriber records delivery order.
+		var syncGot string
+		bus.Subscribe(context.Background(), func(ev string) { syncGot = ev })
+
+		// Publish returns without waiting for the async callback.
+		bus.Publish("fast")
+
+		if syncGot != "fast" {
+			t.Errorf("sync subscriber not called: got %q, want %q", syncGot, "fast")
+		}
+
+		close(blocked)
+		synctest.Wait()
+	})
+}
+
+func TestBusSubscribeAsyncAutoCleanup(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		bus := NewBus[string]()
+
+		ctx, cancel := context.WithCancel(context.Background())
+		var received string
+		bus.SubscribeAsync(ctx, func(ev string) { received = ev })
+
+		if bus.Len() != 1 {
+			t.Fatalf("Len() = %d, want 1", bus.Len())
+		}
+
+		cancel()
+		synctest.Wait()
+
+		if bus.Len() != 0 {
+			t.Fatalf("Len() = %d after cancel, want 0", bus.Len())
+		}
+
+		bus.Publish("after-cancel")
+		synctest.Wait()
+
+		if received != "" {
+			t.Errorf("cancelled async subscriber received %q", received)
+		}
+	})
+}
+
+func TestBusSubscribeAsyncUnsubscribe(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		bus := NewBus[string]()
+
+		var received string
+		unsub := bus.SubscribeAsync(context.Background(), func(ev string) { received = ev })
+
+		bus.Publish("before")
+		synctest.Wait()
+
+		if received != "before" {
+			t.Fatalf("got %q, want %q", received, "before")
+		}
+
+		unsub()
+		received = ""
+		bus.Publish("after")
+		synctest.Wait()
+
+		if received != "" {
+			t.Errorf("unsubscribed async callback received %q", received)
+		}
+	})
+}

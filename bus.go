@@ -46,6 +46,7 @@ type subscriber[E any] struct {
 	fn        func(E)
 	sessionID string          // empty for raw subscribers
 	ctx       context.Context // auto-remove on cancellation
+	async     bool            // true for SubscribeAsync subscribers
 }
 
 // NewBus creates an empty bus ready to accept subscribers.
@@ -87,10 +88,24 @@ func (b *Bus[E]) Publish(event E) {
 // The callback runs synchronously in the publisher's goroutine — it
 // must not block. If the publisher is a session (via [Bus.Emit]), a
 // blocking callback stalls that session's command loop. For expensive
-// work, spawn a goroutine inside the callback or use [On] which
-// routes through the subscriber's own command loop.
+// work, use [Bus.SubscribeAsync] or [On] which routes through the
+// subscriber's own command loop.
 func (b *Bus[E]) Subscribe(ctx context.Context, fn func(E)) func() {
 	return b.subscribe(ctx, fn, "")
+}
+
+// SubscribeAsync registers a callback that receives every event in its
+// own goroutine. Each publication spawns a new goroutine for the
+// callback, so the publisher never blocks regardless of how long the
+// callback takes.
+//
+// Use this for external consumers that perform I/O (database writes,
+// HTTP calls, logging) in response to events. For session-bound
+// subscriptions, prefer [On] which routes through the session's
+// command loop. The subscription lives until ctx is cancelled.
+// Returns an unsubscribe function for early removal.
+func (b *Bus[E]) SubscribeAsync(ctx context.Context, fn func(E)) func() {
+	return b.subscribeAsync(ctx, fn, "")
 }
 
 // Len returns the number of active subscribers. Lock-free.
@@ -103,6 +118,19 @@ func (b *Bus[E]) Len() int {
 // raw Subscribe calls. Copy-on-write: a new map is built under the
 // write lock and stored atomically.
 func (b *Bus[E]) subscribe(ctx context.Context, fn func(E), sessionID string) func() {
+	return b.add(ctx, fn, sessionID, false)
+}
+
+// subscribeAsync is like subscribe but marks the subscriber as async.
+// The callback runs in its own goroutine on each publication.
+func (b *Bus[E]) subscribeAsync(ctx context.Context, fn func(E), sessionID string) func() {
+	return b.add(ctx, fn, sessionID, true)
+}
+
+// add is the core registration method. All subscription variants
+// (sync, async, session-bound, raw) funnel through here. Copy-on-write:
+// a new map is built under the write lock and stored atomically.
+func (b *Bus[E]) add(ctx context.Context, fn func(E), sessionID string, async bool) func() {
 	b.wmu.Lock()
 	id := b.nextID
 	b.nextID++
@@ -114,11 +142,12 @@ func (b *Bus[E]) subscribe(ctx context.Context, fn func(E), sessionID string) fu
 		fn:        fn,
 		sessionID: sessionID,
 		ctx:       ctx,
+		async:     async,
 	}
 	b.subs.Store(subs)
 	b.wmu.Unlock()
 
-	dev.Debug("bus.subscribe", "session", sessionID, "subscribers", len(subs))
+	dev.Debug("bus.subscribe", "session", sessionID, "async", async, "subscribers", len(subs))
 
 	unsub := func() { b.remove(id) }
 	context.AfterFunc(ctx, unsub)
@@ -146,7 +175,7 @@ func (b *Bus[E]) remove(id uint64) {
 
 // publish iterates the subscriber map with no lock — the atomic load
 // returns a consistent snapshot. Subscribers whose sessionID matches
-// senderID are skipped.
+// senderID are skipped. Async subscribers run in their own goroutine.
 func (b *Bus[E]) publish(event E, senderID string) {
 	dev.Debug("bus.publish", "sender", senderID, "subscribers", b.Len())
 	for _, s := range b.loadSubs() {
@@ -156,7 +185,11 @@ func (b *Bus[E]) publish(event E, senderID string) {
 		if senderID != "" && s.sessionID == senderID {
 			continue // sender filtering
 		}
-		s.fn(event)
+		if s.async {
+			go s.fn(event)
+		} else {
+			s.fn(event)
+		}
 	}
 }
 

@@ -78,12 +78,13 @@ block.
 Typed pub/sub for cross-handler communication. `Bus.Emit(session, event)`
 publishes with sender filtering (the emitter's own subscriptions are
 skipped). `Bus.Publish(event)` publishes with no sender filter (for
-external sources). `Subscribe` registers a raw callback; `On` wraps the
-callback in `s.Update` so it runs in the subscriber's command loop.
+external sources). Two raw subscription modes: `Subscribe` (synchronous —
+callback runs in the publisher's goroutine, must not block) and
+`SubscribeAsync` (asynchronous — callback runs in its own goroutine per
+event, safe for I/O). `On` wraps the callback in `s.Update` so it runs
+in the subscriber's command loop.
 
-Lock-free reads via `atomic.Value`, copy-on-write for writes. `Subscribe`
-callbacks run synchronously in the publisher's goroutine — they must not
-block.
+Lock-free reads via `atomic.Value`, copy-on-write for writes.
 
 ### Group[S]
 

@@ -590,8 +590,14 @@ bus.Len()                // active subscriber count
 Raw subscription for non-session consumers (external services, monitoring):
 
 ```go
+// Synchronous — callback runs in the publisher's goroutine. Must not block.
 cancel := bus.Subscribe(ctx, func(msg ChatMessage) { ... })
+
+// Asynchronous — callback runs in its own goroutine per event. Safe for I/O.
+cancel := bus.SubscribeAsync(ctx, func(msg ChatMessage) { ... })
 ```
+
+`Subscribe` runs the callback synchronously in the publisher's goroutine — it must not block. `SubscribeAsync` spawns a goroutine per event, isolating the publisher from slow callbacks. Use `SubscribeAsync` for external consumers that perform database writes, HTTP calls, or other I/O.
 
 Session-aware subscription via `tether.On` — the primary way to connect a Bus to a session:
 
