@@ -71,6 +71,11 @@ func (b *Bus[E]) Emit(s Emitter, event E) {
 // Publish sends an event to all subscribers with no sender filter.
 // Use this for external event sources (database change listeners,
 // message queue consumers, cron jobs) that have no session identity.
+//
+// Subscriber callbacks run synchronously in the caller's goroutine.
+// Session-bound subscribers (registered via [On]) are non-blocking
+// because they route through the session's command channel, but raw
+// [Subscribe] callbacks that block will stall the caller.
 func (b *Bus[E]) Publish(event E) {
 	b.publish(event, "")
 }
@@ -78,6 +83,12 @@ func (b *Bus[E]) Publish(event E) {
 // Subscribe registers a callback that receives every event (no sender
 // filter). The subscription lives until ctx is cancelled. Returns an
 // unsubscribe function for early removal.
+//
+// The callback runs synchronously in the publisher's goroutine — it
+// must not block. If the publisher is a session (via [Bus.Emit]), a
+// blocking callback stalls that session's command loop. For expensive
+// work, spawn a goroutine inside the callback or use [On] which
+// routes through the subscriber's own command loop.
 func (b *Bus[E]) Subscribe(ctx context.Context, fn func(E)) func() {
 	return b.subscribe(ctx, fn, "")
 }
