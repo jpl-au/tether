@@ -186,6 +186,15 @@ func (c *captureSession) Context() context.Context { return context.Background()
 func (c *captureSession) Go(fn func(context.Context)) {
 	go fn(context.Background())
 }
+
+// enqueue is a no-op during pre-warm — there is no command loop and
+// no live subscribers, so bus emissions have nothing to deliver to.
+func (c *captureSession) enqueue(fn func()) {}
+
+// sessionID returns the capture session's ID for emitter interface
+// compliance. Used by Bus.Emit for sender filtering; in pre-warm
+// this is always empty and enqueue is a no-op regardless.
+func (c *captureSession) sessionID() string        { return c.id }
 func (c *captureSession) Toast(text string)        { c.fx.toast = text }
 func (c *captureSession) Navigate(rawURL string)   { c.fx.url = rawURL; c.fx.replace = false }
 func (c *captureSession) ReplaceURL(rawURL string) { c.fx.url = rawURL; c.fx.replace = true }
