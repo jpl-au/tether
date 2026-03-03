@@ -1437,6 +1437,23 @@ window.Tether.signals = window.Tether.signals || {};
     }
   }
 
+  // --- PWA lifecycle events ---
+  //
+  // Propagate standard PWA/network events to the server so handlers can
+  // pause background tasks, show banners, or manage install prompts.
+
+  window.addEventListener("online", function () {
+    sendEvent("online", "", {});
+  });
+
+  window.addEventListener("offline", function () {
+    sendEvent("offline", "", {});
+  });
+
+  window.addEventListener("appinstalled", function () {
+    sendEvent("appinstalled", "", {});
+  });
+
   // --- Extension API ---
   //
   // Expose a minimal surface for extension scripts (fluent-tether-*.js).

@@ -54,4 +54,17 @@ const (
 	// enters the visible viewport. Use this to implement infinite
 	// scroll: load the next page of data when the sentinel is reached.
 	Viewport Type = "viewport"
+
+	// Online fires when the browser transitions from offline to online.
+	// Use this to resume background tasks or dismiss a disconnection banner.
+	Online Type = "online"
+
+	// Offline fires when the browser loses network connectivity.
+	// Use this to pause background tasks or show a disconnection banner.
+	Offline Type = "offline"
+
+	// AppInstalled fires when the user installs the PWA via the browser
+	// prompt or an in-app install button. Use this to update UI that
+	// offered the install prompt.
+	AppInstalled Type = "appinstalled"
 )
