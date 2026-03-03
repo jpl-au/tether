@@ -6,6 +6,12 @@ package tether
 // session buffers effects during Handle and flushes them atomically
 // with the state diff, so the client receives everything in one frame.
 //
+// Handle runs inside the session's command loop. While it is executing,
+// no other commands, events, or effects are processed for this session.
+// Keep Handle fast — do not perform blocking I/O, sleep, or wait on
+// channels. For slow operations, use [Session.Go] to run them in a
+// background goroutine and feed results back via [Session.Update].
+//
 // The session parameter is a [PreSession] so that the same handler
 // can be used in live mode, stateless page mode, and tethertest without
 // changing its signature. In live mode the underlying value is a

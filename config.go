@@ -47,6 +47,8 @@ type Config[S any] struct {
 	// effects (toast, navigate, title, etc.) are expressed as imperative
 	// calls on the session parameter. In live mode the session is a
 	// [*Session] which can be type-asserted for Update, Go, and Close.
+	// See [HandleFunc] for concurrency constraints — Handle runs inside
+	// the session's command loop and must not block.
 	Handle HandleFunc[S]
 
 	// Middleware wraps the Handle function with cross-cutting behaviour
@@ -69,9 +71,16 @@ type Config[S any] struct {
 	OnNavigate func(session PreSession, state S, params Params) S
 
 	// OnConnect is called after a new session is created and its
-	// transport is ready. Use this to add the session to a [Group]
-	// for broadcasting, start background goroutines that push updates
-	// via [Session.Update], or log the connection. Optional.
+	// transport is ready. Use this to set up subscriptions ([On],
+	// [Observe]), join groups, start background goroutines that push
+	// updates via [Session.Update], or log the connection. Optional.
+	//
+	// OnConnect runs on the HTTP handler goroutine after the session's
+	// command loop has started but before the transport begins reading
+	// client events. This means State, Update, On, Observe, and all
+	// side-effect methods are safe to call. However, any blocking work
+	// (slow database queries, HTTP calls) delays the session becoming
+	// fully interactive — move heavy initialisation into [Session.Go].
 	OnConnect func(session *Session[S])
 
 	// OnDisconnect is called after a session's transport closes (either
