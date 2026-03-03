@@ -1182,6 +1182,22 @@ window.Tether.signals = window.Tether.signals || {};
         }
       }
 
+      // Collect current values from elements matching data-tether-collect.
+      // Keyed by the element's name or id so the server can read them
+      // by field name without the caller needing a form wrapper.
+      var collectSelector = target.getAttribute("data-tether-collect");
+      if (collectSelector) {
+        document.querySelectorAll(collectSelector).forEach(function (el) {
+          var key = el.name || el.id;
+          if (!key) return;
+          if (el.type === "checkbox" || el.type === "radio") {
+            data[key] = el.checked ? "true" : "false";
+          } else {
+            data[key] = el.value || "";
+          }
+        });
+      }
+
       // Collect event-specific data
       switch (domEvent) {
         case "input":

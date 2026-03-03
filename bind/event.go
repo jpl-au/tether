@@ -93,3 +93,18 @@ func On[E Settable[E]](el E, eventType, action string) E {
 func Viewport[E Settable[E]](el E, action string) E {
 	return el.SetData("tether-viewport", action)
 }
+
+// Collect adds a CSS selector that the client resolves at event time.
+// Matched elements have their current value included in Event.Data,
+// keyed by the element's name or id attribute. Use this to send input
+// values with a click or keydown event without wrapping elements in a
+// form:
+//
+//	bind.Collect(bind.Click(button.New().Text("Send"), "chat.send"), "#message-input")
+//
+// Multiple selectors may be combined in the standard CSS way:
+//
+//	bind.Collect(bind.Click(button.New().Text("Go"), "search"), "#query, #filter")
+func Collect[E Settable[E]](el E, selector string) E {
+	return el.SetData("tether-collect", selector)
+}

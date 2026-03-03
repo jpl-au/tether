@@ -175,6 +175,17 @@ func WithOptimistic(signal, value string) Option {
 // before the event is sent to the server.
 func WithOptimisticToggle(signal string) Option { return Option{"tether-optimistic-toggle", signal} }
 
+// WithCollect adds a CSS selector that the client resolves at event
+// time. Matched elements contribute their current value to Event.Data,
+// keyed by the element's name or id attribute. Use this to send input
+// values with a click or keydown event without wrapping in a form:
+//
+//	bind.Apply(button.New().Text("Send"),
+//	    bind.OnClick("chat.send"),
+//	    bind.WithCollect("#message-input"),
+//	)
+func WithCollect(selector string) Option { return Option{"tether-collect", selector} }
+
 // Upload options.
 
 // WithUpload marks the element as an upload trigger.
