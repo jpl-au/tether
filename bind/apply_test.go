@@ -237,3 +237,33 @@ func TestWithEventOption(t *testing.T) {
 		t.Errorf("missing mouseover attribute in:\n%s", html)
 	}
 }
+
+func TestWithCollect(t *testing.T) {
+	el := bind.Apply(button.Text("Send"),
+		bind.OnClick("send"),
+		bind.WithCollect("#message-input"),
+	)
+	html := string(el.Render())
+	if !strings.Contains(html, `data-tether-collect="#message-input"`) {
+		t.Errorf("missing collect attribute in:\n%s", html)
+	}
+}
+
+func TestCollect(t *testing.T) {
+	el := bind.Collect(bind.Click(button.Text("Send"), "send"), "#message-input")
+	html := string(el.Render())
+	if !strings.Contains(html, `data-tether-click="send"`) {
+		t.Errorf("missing click attribute in:\n%s", html)
+	}
+	if !strings.Contains(html, `data-tether-collect="#message-input"`) {
+		t.Errorf("missing collect attribute in:\n%s", html)
+	}
+}
+
+func TestCollectMultipleSelectors(t *testing.T) {
+	el := bind.Collect(bind.Click(button.Text("Go"), "search"), "#query, #filter")
+	html := string(el.Render())
+	if !strings.Contains(html, `data-tether-collect="#query, #filter"`) {
+		t.Errorf("missing collect attribute in:\n%s", html)
+	}
+}
