@@ -656,7 +656,7 @@ tether.Observe(onlineCount, sess, func(count int, s State) State {
 
 Key behaviours:
 - **Immediate sync** — the callback fires once with the current value at subscription time
-- **Atomic subscribe+read** — a concurrent Store cannot slip between the subscription and the initial delivery, preventing duplicate values
+- **Atomic subscribe+read+apply** — the subscription, read, and initial state application happen within a single session command, so a concurrent Store is always ordered after the initial value
 - **Auto-cleanup** — removed when the session is destroyed
 - **Thread-safe** — runs on the session's command loop
 
