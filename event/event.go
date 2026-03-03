@@ -49,4 +49,9 @@ const (
 	// or uses the browser back/forward buttons. Data carries "path"
 	// and "search" keys.
 	Navigate Type = "navigate"
+
+	// Viewport fires when a [bind.Viewport]-marked sentinel element
+	// enters the visible viewport. Use this to implement infinite
+	// scroll: load the next page of data when the sentinel is reached.
+	Viewport Type = "viewport"
 )
