@@ -204,7 +204,7 @@ func (e Event) Bool(key string) bool               // "true" → true
 func (e Event) Bind(dest any) error                // struct-tag form binding
 ```
 
-Event type constants live in the `event` package: `event.Click`, `event.Input`, `event.Submit`, `event.Change`, `event.KeyDown`, `event.Focus`, `event.Blur`, `event.Navigate`. Create custom types with `event.Custom("name")`.
+Event type constants live in the `event` package: `event.Click`, `event.Input`, `event.Submit`, `event.Change`, `event.KeyDown`, `event.Focus`, `event.Blur`, `event.Navigate`, `event.Viewport`, `event.Online`, `event.Offline`, `event.AppInstalled`. Create custom types with `event.Custom("name")`.
 
 ### Typed data extraction
 
@@ -321,7 +321,8 @@ bind.FilterKey(el, "Enter")        // restrict keydown to specific key
 bind.Focus(el, "action")           // focus
 bind.Blur(el, "action")            // blur
 bind.On(el, "dblclick", "action")  // arbitrary DOM event
-bind.Viewport(el, "action")       // viewport enter (infinite scroll)
+bind.Viewport(el, "action")        // viewport enter (infinite scroll)
+bind.Collect(el, "#selector")      // collect input values at click time
 bind.EventData(el, "key", "val")   // attach extra data to events
 bind.Debounce(el, 150*time.Millisecond) // override debounce
 bind.Throttle(el, time.Second)          // minimum event interval
@@ -399,6 +400,7 @@ bind.OnInput("act")         bind.OnChange("act")
 bind.OnKeyDown("act")       bind.OnFocus("act")
 bind.OnBlur("act")          bind.OnViewport("act")
 bind.WithEvent("dblclick", "act")
+bind.WithCollect("#selector")
 ```
 
 Control:
@@ -583,7 +585,7 @@ bus.Emit(sess, msg)      // to all except sender — use inside Handle
 bus.Len()                // active subscriber count
 ```
 
-`Emit` enqueues publication on the sender's command loop, so the sender's diff is sent to the client before other subscribers react. Subscriptions registered via `tether.On` whose session ID matches the emitting session are automatically skipped — preventing double-apply since Handle already updated the sender's state.
+`Emit` accepts any `PreSession` value, so it can be called directly from `Handle` without a type-assert. In live sessions, publication is enqueued on the sender's command loop so the sender's diff is sent to the client before other subscribers react. Subscriptions registered via `tether.On` whose session ID matches the emitting session are automatically skipped — preventing double-apply since `Handle` already updated the sender's state.
 
 ### Subscribing
 

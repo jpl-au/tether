@@ -57,9 +57,14 @@ goroutine. All exported methods (`State`, `Update`, `Toast`, `Signal`,
 ### PreSession
 
 The subset of Session methods available before a real session exists (during
-pre-warming in the initial GET) and in reusable components. `OnNavigate`
-and the test harness receive `PreSession`. In live mode, `PreSession` is
-the `*Session` itself (type-assert if you need `Update` or `Go`).
+pre-warming in the initial GET) and in reusable components. `OnNavigate`,
+`Handle`, and the test harness all receive `PreSession`. `Bus.Emit` accepts
+`PreSession` directly — no type-assert is needed to broadcast from `Handle`.
+
+Type-assert to `*Session[S]` only when you need methods that are not on
+`PreSession` — `Update`, `Group`, `State`, or session pool operations.
+These are lifecycle concerns and belong in `OnConnect`/`OnDisconnect`, not
+in `Handle`.
 
 ### Event
 
@@ -75,14 +80,23 @@ block.
 
 ### Bus[E]
 
-Typed pub/sub for cross-handler communication. `Bus.Emit(session, event)`
-publishes with sender filtering (the emitter's own subscriptions are
-skipped). `Bus.Publish(event)` publishes with no sender filter (for
-external sources). Two raw subscription modes: `Subscribe` (synchronous —
-callback runs in the publisher's goroutine, must not block) and
-`SubscribeAsync` (asynchronous — callback runs in its own goroutine per
-event, safe for I/O). `On` wraps the callback in `s.Update` so it runs
-in the subscriber's command loop.
+Typed pub/sub for cross-handler communication. `Bus.Emit(sess, event)`
+accepts `PreSession` directly — no type-assert needed in `Handle`.
+Publishes with sender filtering: subscriptions whose session ID matches
+the emitter are skipped, preventing double-apply. In live sessions,
+publication is enqueued on the sender's command loop so the sender's
+diff is delivered before other subscribers react.
+
+`Bus.Publish(event)` publishes with no sender filter — use for external
+sources (database listeners, message queues, cron jobs). Two raw
+subscription modes: `Subscribe` (synchronous — callback runs in the
+publisher's goroutine, must not block) and `SubscribeAsync` (asynchronous
+— callback runs in its own goroutine per event, safe for I/O). `On` wraps
+the callback in `s.Update` so it runs in the subscriber's command loop.
+
+Register raw subscriptions via a `Setup(ctx context.Context)` function
+called from `main` with the root context so they cancel on shutdown.
+Avoid `init()` — subscribers registered there have no cancellation path.
 
 Lock-free reads via `atomic.Value`, copy-on-write for writes.
 

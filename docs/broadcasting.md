@@ -106,8 +106,9 @@ Handle: func(sess tether.PreSession, s State, ev tether.Event) State {
     if ev.Action == "send" {
         msg := MessageSent{Text: ev.Value()}
         s.Messages = append(s.Messages, msg.Text)
-        // Emit skips the sender — Handle already updated their state
-        messages.Emit(sess.(*tether.Session[State]), msg)
+        // Emit skips the sender — Handle already updated their state directly.
+        // Bus.Emit accepts PreSession, so no type-assert is needed.
+        messages.Emit(sess, msg)
     }
     return s
 },
@@ -137,9 +138,32 @@ bus.SubscribeAsync(ctx, func(msg MessageSent) {
 })
 ```
 
-Both variants return an unsubscribe function and are cleaned up automatically when `ctx` is cancelled.
+Both variants are cleaned up automatically when `ctx` is cancelled.
 
-Subscriptions are cleaned up automatically when the session is destroyed. No manual unsubscribe needed.
+Register raw subscriptions via a `Setup(ctx context.Context)` function called from `main` with the root context. This gives subscriptions a managed lifetime tied to the application shutdown signal:
+
+```go
+// handler/messages.go
+var messageBus = tether.NewBus[MessageSent]()
+
+func Setup(ctx context.Context) {
+    messageBus.Subscribe(ctx, func(msg MessageSent) {
+        metrics.Counter("messages").Inc()
+    })
+    messageBus.SubscribeAsync(ctx, func(msg MessageSent) {
+        slog.Info("message received", "text", msg.Text)
+    })
+}
+
+// main.go
+ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+defer stop()
+handler.Setup(ctx)
+```
+
+Avoid registering raw subscriptions in `init()` — that creates goroutines with no context cancellation, which run until the process exits regardless of graceful shutdown signals.
+
+Session-bound subscriptions (registered via `tether.On`) are cleaned up automatically when the session is destroyed. No manual unsubscribe needed.
 
 ## Value — shared observable state
 
