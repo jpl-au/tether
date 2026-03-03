@@ -2,6 +2,7 @@ package tether
 
 import (
 	"context"
+	"log/slog"
 	"maps"
 	"sync/atomic"
 	"time"
@@ -96,6 +97,12 @@ type Session[S any] struct {
 	// set to true, so any goroutine that sees handling=true can safely
 	// read the snapshot without a data race on s.state.
 	stateSnap atomic.Value
+
+	// overflows counts how many times the command or effect buffer
+	// was full and a goroutine was spawned to deliver the item. The
+	// first overflow logs at slog.Warn (visible in production);
+	// subsequent overflows log at dev.Debug to avoid spam.
+	overflows atomic.Int64
 
 	// Lifecycle timers (replace centralised reaper).
 	idleTimer   *time.Timer
@@ -273,12 +280,33 @@ func (s *Session[S]) enqueueFx(fn func(*effects)) {
 	select {
 	case s.fxCh <- fn:
 	default:
+		s.logOverflow()
 		go func() {
 			select {
 			case s.fxCh <- fn:
 			case <-s.ctx.Done():
 			}
 		}()
+	}
+}
+
+// logOverflow increments the overflow counter and logs. The first
+// overflow for a session logs at Warn (visible in production) so
+// the developer knows buffer pressure occurred. Subsequent overflows
+// log at Debug to avoid spam.
+func (s *Session[S]) logOverflow() {
+	n := s.overflows.Add(1)
+	if n == 1 {
+		slog.Warn("command buffer full, overflowing to goroutine — consider increasing Limits.CmdBufferSize or investigating a slow handler",
+			"session", s.id,
+			"endpoint", s.endpoint,
+		)
+	} else {
+		dev.Debug("command buffer overflow",
+			"session", s.id,
+			"endpoint", s.endpoint,
+			"overflows", n,
+		)
 	}
 }
 
@@ -326,7 +354,7 @@ func (s *Session[S]) enqueue(fn func()) {
 		// Command buffer full — overflow to a goroutine to prevent
 		// deadlock. This is expected during broadcast storms but
 		// sustained overflow suggests the buffer is too small.
-		dev.Debug("command buffer full, overflow to goroutine", "session", s.id, "endpoint", s.endpoint, "url", s.lastURL)
+		s.logOverflow()
 		go func() {
 			select {
 			case s.cmds <- fn:

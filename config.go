@@ -284,7 +284,12 @@ type Limits struct {
 	// command channel. Commands include state updates, broadcasts,
 	// and side effects. When the buffer is full, a short-lived
 	// goroutine delivers the command to prevent cross-session
-	// deadlocks during broadcasts. Zero defaults to 64.
+	// deadlocks during broadcasts. The first overflow logs a warning
+	// visible in production; subsequent overflows log at debug level.
+	// Sustained overflow usually indicates a blocking [HandleFunc] or
+	// a broadcast rate that exceeds the session's processing speed —
+	// increase the buffer or move slow work into [Session.Go].
+	// Zero defaults to 64.
 	CmdBufferSize int
 
 	// MaxEventBytes limits the size of a POST event body. Events carry
