@@ -5,6 +5,9 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"reflect"
+	"runtime"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -213,12 +216,41 @@ func handlerAttrs[S any](cfg Config[S]) []any {
 		args = append(args, "worker", true)
 	}
 	if len(cfg.Middleware) > 0 {
-		args = append(args, "middleware", len(cfg.Middleware))
+		args = append(args, "middleware", middlewareNames(cfg.Middleware))
 	}
 	if cfg.DevMode {
 		args = append(args, "dev", true)
 	}
 	return args
+}
+
+// middlewareNames derives a display name for each middleware function by
+// reflecting on its program counter once at construction time. Named
+// functions produce clean short names (e.g. "withAuth"); anonymous
+// closures produce "funcN", which is an honest signal to name them.
+func middlewareNames[S any](mws []Middleware[S]) []string {
+	names := make([]string, len(mws))
+	for i, mw := range mws {
+		pc := reflect.ValueOf(mw).Pointer()
+		fn := runtime.FuncForPC(pc)
+		if fn == nil {
+			names[i] = "unknown"
+			continue
+		}
+		name := fn.Name()
+		// Trim generic suffix before splitting on package path, otherwise
+		// LastIndex picks up dots inside the type parameter list and gives
+		// us a fragment like "State].func1" instead of the function name.
+		if j := strings.Index(name, "["); j >= 0 {
+			name = name[:j]
+		}
+		// Trim package path: "github.com/example/app.withAuth" → "withAuth"
+		if j := strings.LastIndex(name, "."); j >= 0 {
+			name = name[j+1:]
+		}
+		names[i] = name
+	}
+	return names
 }
 
 // transportLabel returns a human-readable label for a mode.Transport
