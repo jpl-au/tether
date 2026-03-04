@@ -175,10 +175,8 @@ window.Tether.signals = window.Tether.signals || {};
       if (root) root.classList.remove("tether-disconnected");
       hideReconnectBar();
       if (isReconnect) {
-        // Dev mode: reload to pick up fresh server code now that
-        // the server is back. The page stayed visible during the
-        // outage instead of showing a browser error.
-        if (devMode) { location.reload(); return; }
+        // Sync the current URL with the server — the user may have
+        // navigated via back/forward while disconnected.
         sendNavigate(location.pathname + location.search);
       } else {
         mountExistingHooks();
@@ -229,7 +227,6 @@ window.Tether.signals = window.Tether.signals || {};
       if (root) root.classList.remove("tether-disconnected");
       hideReconnectBar();
       if (isReconnect) {
-        if (devMode) { location.reload(); return; }
         if (backgroundSync) replayQueuedEvents();
         sendNavigate(location.pathname + location.search);
       } else {

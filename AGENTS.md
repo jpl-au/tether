@@ -70,7 +70,20 @@ in `Handle`.
 
 Client event: `Type` (click, input, submit, navigate, etc.), `Action`
 (the `data-tether-*` value), `Data` (form fields), `EventID` (for
-client-side de-duplication).
+client-side de-duplication). Typed extraction helpers: `Value`, `Key`,
+`Get`, `Int`, `Float64`, `Bool`, `Bind`.
+
+### Params
+
+Navigation context passed to `Config.OnNavigate` and
+`router.OnNavigate`. Carries `Path` (URL path) and `Query`
+(`url.Values`). Provides typed extraction helpers that mirror `Event`'s
+API for consistency — `Get`, `Int`, `Float64`, `Bool`. Also provides
+soft getters — `IntOr`, `Float64Or`, `BoolOr` — that return a default
+when the key is missing or the value is malformed, which is the common
+case for optional URL parameters. Multi-value helpers — `Strings`,
+`Ints`, `Float64s` — handle repeated query keys. Defined in
+`params.go`.
 
 ### HandleFunc[S]
 

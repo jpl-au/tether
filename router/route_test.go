@@ -29,7 +29,7 @@ func TestRouteOverwritesExistingPage(t *testing.T) {
 
 func TestOnNavigate(t *testing.T) {
 	r := New(selector)
-	hp := r.OnNavigate(func(s *state, path string) { s.Page = path })
+	hp := r.OnNavigate(func(s *state, p tether.Params) { s.Page = p.Path })
 
 	got := hp(nil, state{}, tether.Params{Path: "/settings"})
 	if got.Page != "/settings" {

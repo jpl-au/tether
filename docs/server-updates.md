@@ -268,7 +268,7 @@ r.NotFound(router.Page[State]{Render: notFoundRender})
 tether.New(tether.Config[State]{
     Render:       r.Render,
     Handle:       r.Handle,
-    OnNavigate: r.OnNavigate(func(s *State, path string) { s.Page = path }),
+    OnNavigate: r.OnNavigate(func(s *State, p tether.Params) { s.Page = p.Path }),
     // ...
 })
 ```

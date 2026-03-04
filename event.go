@@ -1,7 +1,6 @@
 package tether
 
 import (
-	"net/url"
 	"strconv"
 
 	"github.com/jpl-au/fluent-tether/event"
@@ -11,6 +10,16 @@ import (
 // interacts with the page. The client JS intercepts DOM events on
 // elements annotated with data-tether-* attributes and serialises them
 // into this structure.
+//
+// Event and [Params] are the two data extraction types in the
+// framework. Event represents DOM interactions (clicks, inputs,
+// submits); Params represents URL navigation context (path and query
+// string). Both share a similar helper API (Get, Int, Float64, Bool)
+// so developers learn one extraction pattern. Params additionally has
+// soft getters (IntOr, BoolOr, Float64Or) because URL parameters are
+// user-supplied and routinely absent, whereas event data is developer-
+// controlled wire protocol where absence signals a bug. Params lives
+// in params.go.
 //
 // Type is the DOM [event.Type] (e.g. [event.Click], [event.Input],
 // [event.Submit], [event.Navigate]). Action is the value of the
@@ -70,13 +79,4 @@ func (e Event) Float64(key string) (float64, error) {
 // All other values — including missing keys — return false.
 func (e Event) Bool(key string) bool {
 	return e.Data[key] == "true"
-}
-
-// Params carries URL information from a navigation event. The handler
-// passes this to Config.OnNavigate on the initial page load (so the
-// application can derive state from the URL) and whenever the browser
-// navigates via a tether link click or the back/forward buttons.
-type Params struct {
-	Path  string
-	Query url.Values
 }

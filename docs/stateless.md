@@ -121,7 +121,7 @@ tether.Page(tether.PageConfig[State]{
     State:      func(r *http.Request) State { return State{} },
     Render:     r.Render,
     Handle:     r.Handle,
-    OnNavigate: r.OnNavigate(func(s *State, path string) { s.Page = path }),
+    OnNavigate: r.OnNavigate(func(s *State, p tether.Params) { s.Page = p.Path }),
     // ...
 })
 ```

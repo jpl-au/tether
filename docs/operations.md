@@ -69,7 +69,7 @@ TETHER_DEV=1 go run .
 Dev mode does the following:
 
 1. **No service worker** — unregisters any existing worker and skips registration, so you always get fresh assets
-2. **Graceful reconnect + reload** — when the server goes away, the page stays visible with a "Reconnecting…" bar. Once the server comes back, the page reloads to pick up fresh code
+2. **Graceful reconnect** — when the server goes away, the page stays visible with a "Reconnecting…" bar. Once the server comes back, the client syncs the current URL so the server re-renders without a page reload. The page is never destroyed on disconnect or reconnect.
 3. **No caching** — sets `Cache-Control: no-store` on all responses
 4. **Debug logging** — the default logger uses DEBUG level (when no Logger is provided)
 5. **Visual flash** — morphed DOM elements flash with a blue outline

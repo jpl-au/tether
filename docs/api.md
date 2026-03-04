@@ -224,8 +224,37 @@ ev.Bind(&form)
 ```go
 type Params struct {
     Path  string     // URL path
-    Query url.Values // query parameters
+    Query url.Values // parsed query parameters
 }
+```
+
+Params provides typed extraction helpers that mirror `Event`'s API for
+consistency — one data extraction pattern across the framework.
+
+**Single-value helpers** (return error on missing/invalid):
+
+```go
+p.Get("q")              // string — first value for key
+p.Int("page")           // (int, error)
+p.Float64("min")        // (float64, error)
+p.Bool("active")        // true only for "true"
+```
+
+**Soft getters** (return default on missing/invalid — ideal for optional
+URL parameters):
+
+```go
+p.IntOr("page", 1)      // int — returns 1 if missing or invalid
+p.Float64Or("min", 0.0) // float64
+p.BoolOr("drafts", false) // bool — returns default if key absent
+```
+
+**Multi-value helpers** (for repeated keys like `?tag=go&tag=web`):
+
+```go
+p.Strings("tag")        // []string — all values for key
+p.Ints("id")            // ([]int, error)
+p.Float64s("v")         // ([]float64, error)
 ```
 
 ---
@@ -299,7 +328,7 @@ r.NotFound(router.Page[State]{Render: notFoundRender})
 tether.New(tether.Config[State]{
     Render:       r.Render,
     Handle:       r.Handle,
-    OnNavigate: r.OnNavigate(func(s *State, path string) { s.Page = path }),
+    OnNavigate: r.OnNavigate(func(s *State, p tether.Params) { s.Page = p.Path }),
 })
 ```
 

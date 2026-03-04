@@ -16,7 +16,7 @@
 //	tether.New(tether.Config[State]{
 //	    Render: r.Render,
 //	    Handle: r.Handle,
-//	    OnNavigate: r.OnNavigate(func(s *State, path string) { s.Page = path }),
+//	    OnNavigate: r.OnNavigate(func(s *State, p tether.Params) { s.Page = p.Path }),
 //	})
 package router
 
@@ -121,11 +121,32 @@ func (r *Router[S]) loadNotFound() Page[S] {
 	return r.notFound.Load().(Page[S])
 }
 
-// OnNavigate is a helper for [tether.Config].OnNavigate that simply
-// updates the page field in the state.
-func (r *Router[S]) OnNavigate(setter func(*S, string)) func(tether.PreSession, S, tether.Params) S {
+// OnNavigate is a convenience helper for [tether.Config].OnNavigate.
+// It wraps a simple setter function in the full OnNavigate signature
+// that Config expects (func(PreSession, S, Params) S), handling the
+// pointer-to-value dance and return plumbing so the caller only writes
+// the state mutation logic. Without this helper, every router user
+// would have to write the same boilerplate closure manually.
+//
+// The setter receives [tether.Params] which carries the URL path and
+// query parameters with typed extraction helpers. Params is passed
+// through in full — nothing is discarded — so the setter has access
+// to both the path and every query parameter.
+//
+// For simple cases where only the path matters:
+//
+//	r.OnNavigate(func(s *State, p tether.Params) { s.Page = p.Path })
+//
+// For cases that also derive state from query parameters:
+//
+//	r.OnNavigate(func(s *State, p tether.Params) {
+//	    s.Page   = p.Path
+//	    s.Filter = p.Get("f")
+//	    s.Limit  = p.IntOr("limit", 20)
+//	})
+func (r *Router[S]) OnNavigate(setter func(*S, tether.Params)) func(tether.PreSession, S, tether.Params) S {
 	return func(_ tether.PreSession, s S, p tether.Params) S {
-		setter(&s, p.Path)
+		setter(&s, p)
 		return s
 	}
 }
