@@ -82,6 +82,10 @@ type PageConfig[S any] struct {
 	// text. Only applies when Logger is nil.
 	LogJSON bool
 
+	// Name identifies this page handler in log output. Appears in the
+	// "tether: ready" startup line. Optional.
+	Name string
+
 	// Logger is set as the slog default via slog.SetDefault. When
 	// nil, the framework creates a text (or JSON, see LogJSON)
 	// handler at INFO level (DEBUG in DevMode).
@@ -124,6 +128,16 @@ func Page[S any](cfg PageConfig[S]) http.Handler {
 	if cfg.DevMode {
 		dev.Enable()
 	}
+
+	pageArgs := []any{"transport", "http"}
+	if cfg.Name != "" {
+		pageArgs = append(pageArgs, "name", cfg.Name)
+	}
+	if cfg.DevMode {
+		pageArgs = append(pageArgs, "dev", true)
+	}
+	cfg.Logger.Info("tether: ready", pageArgs...)
+
 	if cfg.Limits.MaxEventBytes == 0 {
 		cfg.Limits.MaxEventBytes = defaultMaxEventBytes
 	}

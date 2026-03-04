@@ -298,4 +298,6 @@ go test ./...
 - `atomic.Value` + copy-on-write for lock-free reads on shared collections
 - Effects are buffered during Handle and merged atomically with the diff
 - `dev.Debug` for debug-only logging; `slog.Warn`/`slog.Error` for production
+- `New` logs one `tether: ready` line at INFO with `transport`, optional `name`, `worker`, `middleware` count, and `dev`; no other startup noise
+- `Config.Name` / `PageConfig.Name` — optional label included in startup logs to distinguish handlers that share a transport
 - `context.AfterFunc` for automatic cleanup on context cancellation

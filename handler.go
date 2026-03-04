@@ -135,7 +135,6 @@ func New[S any](cfg Config[S]) *Handler[S] {
 	slog.SetDefault(cfg.Logger)
 	if cfg.DevMode {
 		dev.Enable()
-		slog.Info("tether: dev mode enabled")
 	}
 	if cfg.Timeouts.Reconnect == 0 {
 		cfg.Timeouts.Reconnect = defaultReconnectTimeout
@@ -173,13 +172,6 @@ func New[S any](cfg Config[S]) *Handler[S] {
 	if cfg.Limits.CmdBufferSize == 0 {
 		cfg.Limits.CmdBufferSize = defaultCmdBufferSize
 	}
-	if cfg.OnNavigate != nil {
-		dev.Debug("OnNavigate composed into Handle")
-	}
-	if len(cfg.Middleware) > 0 {
-		dev.Debug("middleware chain applied", "count", len(cfg.Middleware))
-	}
-
 	mounts := buildAssetMounts(cfg.Assets)
 
 	h := &Handler[S]{
@@ -195,6 +187,8 @@ func New[S any](cfg Config[S]) *Handler[S] {
 
 	go h.reapPending()
 
+	cfg.Logger.Info("tether: ready", handlerAttrs(cfg)...)
+
 	return h
 }
 
@@ -204,6 +198,42 @@ func resolveEncoder(f wire.Format) wire.Encoder {
 	switch f {
 	default:
 		return wire.JSONEncoder{}
+	}
+}
+
+// handlerAttrs builds the slog attribute list for the "tether: ready"
+// startup log. Transport is always present; name, worker, middleware,
+// and dev are included only when set, to keep the line uncluttered.
+func handlerAttrs[S any](cfg Config[S]) []any {
+	args := []any{"transport", transportLabel(cfg.Mode)}
+	if cfg.Name != "" {
+		args = append(args, "name", cfg.Name)
+	}
+	if cfg.Worker {
+		args = append(args, "worker", true)
+	}
+	if len(cfg.Middleware) > 0 {
+		args = append(args, "middleware", len(cfg.Middleware))
+	}
+	if cfg.DevMode {
+		args = append(args, "dev", true)
+	}
+	return args
+}
+
+// transportLabel returns a human-readable label for a mode.Transport
+// value. The label appears in the "tether: ready" startup log so
+// developers can distinguish handlers at a glance.
+func transportLabel(m mode.Transport) string {
+	switch m {
+	case mode.WebSocket:
+		return "ws"
+	case mode.ServerSentEvents:
+		return "sse"
+	case mode.Both:
+		return "ws+sse"
+	default:
+		return "http"
 	}
 }
 

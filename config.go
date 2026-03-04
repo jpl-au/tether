@@ -145,6 +145,11 @@ type Config[S any] struct {
 	// div and scripts only), which puts the browser in quirks mode.
 	Layout func(state S, content node.Node) node.Node
 
+	// Name identifies this handler in log output. When multiple handlers
+	// share the same transport, a name distinguishes their "tether: ready"
+	// lines and any other structured log output that includes it. Optional.
+	Name string
+
 	// Logger is set as the slog default via slog.SetDefault. When nil,
 	// the framework creates a text (or JSON, see LogJSON) handler at
 	// INFO level (DEBUG in DevMode).
