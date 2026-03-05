@@ -46,7 +46,7 @@ type Config[S any] struct {
 	// Handle processes a client event and returns the new state. Side
 	// effects (toast, navigate, title, etc.) are expressed as imperative
 	// calls on the session parameter. In live mode the session is a
-	// [*Session] which can be type-asserted for Update, Go, and Close.
+	// [*LiveSession] which can be type-asserted for Update, Go, and Close.
 	// See [HandleFunc] for concurrency constraints — Handle runs inside
 	// the session's command loop and must not block.
 	Handle HandleFunc[S]
@@ -63,31 +63,31 @@ type Config[S any] struct {
 	// browser navigates via link click or back/forward. If nil,
 	// navigation events fall through to Handle.
 	//
-	// The session parameter is a [PreSession] because this function
+	// The session parameter is a [Session] because this function
 	// runs both during pre-warming (initial GET, before a real session
 	// exists) and during live navigation. Side-effect methods (SetTitle,
 	// Toast, etc.) are always safe to call. During pre-warming, effects
 	// are captured; during navigation, they are sent to the client.
-	OnNavigate func(session PreSession, state S, params Params) S
+	OnNavigate func(session Session, state S, params Params) S
 
 	// OnConnect is called after a new session is created and its
 	// transport is ready. Use this to set up subscriptions ([On],
 	// [Observe]), join groups, start background goroutines that push
-	// updates via [Session.Update], or log the connection. Optional.
+	// updates via [LiveSession.Update], or log the connection. Optional.
 	//
 	// OnConnect runs on the HTTP handler goroutine after the session's
 	// command loop has started but before the transport begins reading
 	// client events. This means State, Update, On, Observe, and all
 	// side-effect methods are safe to call. However, any blocking work
 	// (slow database queries, HTTP calls) delays the session becoming
-	// fully interactive — move heavy initialisation into [Session.Go].
-	OnConnect func(session *Session[S])
+	// fully interactive — move heavy initialisation into [LiveSession.Go].
+	OnConnect func(session *LiveSession[S])
 
 	// OnDisconnect is called after a session's transport closes (either
 	// because the client disconnected or the session was reaped). Use
 	// this to remove the session from a [Group] and clean up any
 	// resources started in OnConnect. Optional.
-	OnDisconnect func(session *Session[S])
+	OnDisconnect func(session *LiveSession[S])
 
 	// Equal compares two states. When provided and the old and new state
 	// are equal, the render and diff are skipped entirely — no work is
@@ -109,7 +109,7 @@ type Config[S any] struct {
 	//
 	// The callback runs inside the session's command loop — keep it
 	// fast and offload any expensive work to a goroutine. Optional.
-	OnStructuralChange func(session *Session[S], change StructuralChange)
+	OnStructuralChange func(session *LiveSession[S], change StructuralChange)
 
 	// OnNoPatch is called when a render cycle produces no patches and
 	// no structural change. This usually indicates a missing .Dynamic()
@@ -123,7 +123,7 @@ type Config[S any] struct {
 	//
 	// The callback runs inside the session's command loop — keep it
 	// fast and offload any expensive work to a goroutine. Optional.
-	OnNoPatch func(session *Session[S], info NoPatch)
+	OnNoPatch func(session *LiveSession[S], info NoPatch)
 
 	// Layout wraps the tether content in a full HTML document. The state
 	// parameter is the session's initial state, which can be used to set
@@ -293,7 +293,7 @@ type Limits struct {
 	// visible in production; subsequent overflows log at debug level.
 	// Sustained overflow usually indicates a blocking [HandleFunc] or
 	// a broadcast rate that exceeds the session's processing speed —
-	// increase the buffer or move slow work into [Session.Go].
+	// increase the buffer or move slow work into [LiveSession.Go].
 	// Zero defaults to 64.
 	CmdBufferSize int
 
@@ -365,7 +365,7 @@ type PushConfig[S any] struct {
 	// to the server. Store the subscription to send notifications later
 	// via [push.Sender.Send]. The callback runs in its own goroutine so
 	// it is safe to perform I/O (e.g. database writes). Optional.
-	OnSubscribe func(session *Session[S], sub push.Subscription)
+	OnSubscribe func(session *LiveSession[S], sub push.Subscription)
 }
 
 // defaultReconnectTimeout gives the client enough time to recover from

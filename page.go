@@ -43,15 +43,15 @@ type PageConfig[S any] struct {
 
 	// Handle processes a client event and returns the new state. Side
 	// effects (toast, navigate, title, etc.) are expressed as calls on
-	// the [PreSession] parameter — the same interface used by
+	// the [Session] parameter — the same interface used by
 	// [Config].OnNavigate. The effects are included in the JSON
 	// response so the client can apply them atomically.
-	Handle func(session PreSession, state S, event Event) S
+	Handle func(session Session, state S, event Event) S
 
 	// OnNavigate processes URL parameters on every request. Called
 	// after State on both GET and POST. Same signature as
 	// [Config].OnNavigate. Optional.
-	OnNavigate func(session PreSession, state S, params Params) S
+	OnNavigate func(session Session, state S, params Params) S
 
 	// Layout wraps the page content in a full HTML document. Runs on
 	// every GET request (stateless pages reconstruct state each time).

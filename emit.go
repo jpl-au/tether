@@ -23,7 +23,7 @@ import "github.com/jpl-au/fluent-tether/dev"
 //	    state.Messages = append(state.Messages, ev.Text)
 //	    return state
 //	})
-func On[E any, S any](bus *Bus[E], s *Session[S], fn func(E, S) S) {
+func On[E any, S any](bus *Bus[E], s *LiveSession[S], fn func(E, S) S) {
 	dev.Debug("bus.on", "session", s.ID(), "endpoint", s.endpoint)
 	bus.subscribe(s.Context(), func(ev E) {
 		s.Update(func(state S) S {

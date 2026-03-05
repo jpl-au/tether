@@ -16,8 +16,8 @@ import (
 
 // composeNav mirrors the composition in handler.go: navigate events
 // dispatch to onNavigate, everything else to appHandle.
-func composeNav[S any](appHandle HandleFunc[S], onNavigate func(PreSession, S, Params) S) HandleFunc[S] {
-	return func(sess PreSession, s S, ev Event) S {
+func composeNav[S any](appHandle HandleFunc[S], onNavigate func(Session, S, Params) S) HandleFunc[S] {
+	return func(sess Session, s S, ev Event) S {
 		if ev.Type == event.Navigate {
 			params := Params{Path: ev.Data["path"]}
 			if search := ev.Data["search"]; search != "" {
@@ -41,14 +41,14 @@ func TestSessionNavigateEvent(t *testing.T) {
 			)
 		}
 
-		onNavigate := func(_ PreSession, s state, params Params) state {
+		onNavigate := func(_ Session, s state, params Params) state {
 			s.Page = params.Path
 			return s
 		}
 
 		// Compose OnNavigate into Handle, mirroring handler.go.
 		handle := composeNav(
-			func(_ PreSession, s state, _ Event) state { return s },
+			func(_ Session, s state, _ Event) state { return s },
 			onNavigate,
 		)
 
@@ -60,7 +60,7 @@ func TestSessionNavigateEvent(t *testing.T) {
 
 		differ := jit.NewDiffer()
 		ctx, cancel := context.WithCancel(context.Background())
-		sess := &Session[state]{
+		sess := &LiveSession[state]{
 			id:        "test",
 			state:     state{Page: "/"},
 			render:    render,
@@ -104,7 +104,7 @@ func TestSessionNavigateEventWithQuery(t *testing.T) {
 			Tab  string
 		}
 
-		onNavigate := func(_ PreSession, s state, params Params) state {
+		onNavigate := func(_ Session, s state, params Params) state {
 			s.Page = params.Path
 			if params.Query != nil {
 				s.Tab = params.Query.Get("tab")
@@ -113,7 +113,7 @@ func TestSessionNavigateEventWithQuery(t *testing.T) {
 		}
 
 		handle := composeNav(
-			func(_ PreSession, s state, _ Event) state { return s },
+			func(_ Session, s state, _ Event) state { return s },
 			onNavigate,
 		)
 
@@ -125,7 +125,7 @@ func TestSessionNavigateEventWithQuery(t *testing.T) {
 
 		differ := jit.NewDiffer()
 		ctx, cancel := context.WithCancel(context.Background())
-		sess := &Session[state]{
+		sess := &LiveSession[state]{
 			id:        "test",
 			state:     state{Page: "/"},
 			render:    func(s state) node.Node { return div.New(span.Text(s.Page).Dynamic("page")) },
@@ -166,7 +166,7 @@ func TestSessionNavigateEventWithoutOnNavigate(t *testing.T) {
 		}
 
 		sess := newTestSession(counterState{Count: 0}, mt)
-		sess.handle = func(_ PreSession, s counterState, ev Event) counterState {
+		sess.handle = func(_ Session, s counterState, ev Event) counterState {
 			receivedAction = ev.Type
 			return s
 		}
@@ -273,7 +273,7 @@ func TestOnNavigateWithCaptureSession(t *testing.T) {
 		Title string
 	}
 
-	onNavigate := func(s PreSession, st state, params Params) state {
+	onNavigate := func(s Session, st state, params Params) state {
 		st.Page = params.Path
 		s.SetTitle("My App - " + params.Path)
 		return st

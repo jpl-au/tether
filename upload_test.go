@@ -34,7 +34,7 @@ func TestHandleUploadMissingSession(t *testing.T) {
 		Render:       renderCounter,
 		Handle:       handleCounter,
 		Upload: &UploadConfig[counterState]{
-			Handle: func(*Session[counterState], Upload) error { return nil },
+			Handle: func(*LiveSession[counterState], Upload) error { return nil },
 		},
 	})
 
@@ -57,7 +57,7 @@ func TestHandleUploadUnknownSession(t *testing.T) {
 		Render:       renderCounter,
 		Handle:       handleCounter,
 		Upload: &UploadConfig[counterState]{
-			Handle: func(*Session[counterState], Upload) error { return nil },
+			Handle: func(*LiveSession[counterState], Upload) error { return nil },
 		},
 	})
 
@@ -84,7 +84,7 @@ func TestHandleUploadSuccess(t *testing.T) {
 		Render:       renderCounter,
 		Handle:       handleCounter,
 		Upload: &UploadConfig[counterState]{
-			Handle: func(_ *Session[counterState], u Upload) error {
+			Handle: func(_ *LiveSession[counterState], u Upload) error {
 				received = u
 				close(done)
 				return nil
@@ -138,7 +138,7 @@ func TestHandleUploadMIMEReject(t *testing.T) {
 		Render:       renderCounter,
 		Handle:       handleCounter,
 		Upload: &UploadConfig[counterState]{
-			Handle: func(*Session[counterState], Upload) error { return nil },
+			Handle: func(*LiveSession[counterState], Upload) error { return nil },
 			Accept: []string{"image/*"},
 		},
 	})
@@ -175,7 +175,7 @@ func TestHandleUploadMIMEAcceptWildcard(t *testing.T) {
 		Render:       renderCounter,
 		Handle:       handleCounter,
 		Upload: &UploadConfig[counterState]{
-			Handle: func(*Session[counterState], Upload) error {
+			Handle: func(*LiveSession[counterState], Upload) error {
 				close(done)
 				return nil
 			},

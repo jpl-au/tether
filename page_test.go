@@ -12,7 +12,7 @@ import (
 )
 
 // pageHandleCounter is a stateless handle function for testing.
-func pageHandleCounter(sess PreSession, state counterState, ev Event) counterState {
+func pageHandleCounter(sess Session, state counterState, ev Event) counterState {
 	switch ev.Action {
 	case "increment":
 		state.Count++
@@ -93,7 +93,7 @@ func TestPageGETWithOnNavigate(t *testing.T) {
 		State:  func(r *http.Request) counterState { return counterState{} },
 		Render: renderCounter,
 		Handle: pageHandleCounter,
-		OnNavigate: func(_ PreSession, state counterState, p Params) counterState {
+		OnNavigate: func(_ Session, state counterState, p Params) counterState {
 			if p.Query.Get("count") == "5" {
 				state.Count = 5
 			}
@@ -368,7 +368,7 @@ func TestPagePOSTWithOnNavigate(t *testing.T) {
 		State:  func(r *http.Request) counterState { return counterState{} },
 		Render: renderCounter,
 		Handle: pageHandleCounter,
-		OnNavigate: func(_ PreSession, state counterState, p Params) counterState {
+		OnNavigate: func(_ Session, state counterState, p Params) counterState {
 			if p.Query.Get("count") == "5" {
 				state.Count = 5
 			}
@@ -416,13 +416,13 @@ func TestPagePOSTNavigateSkipsHandle(t *testing.T) {
 	handler := Page(PageConfig[counterState]{
 		State:  func(r *http.Request) counterState { return counterState{} },
 		Render: renderCounter,
-		Handle: func(_ PreSession, state counterState, _ Event) counterState {
+		Handle: func(_ Session, state counterState, _ Event) counterState {
 			// Handle should NOT run for navigate events when
 			// OnNavigate is set — this matches live session behaviour.
 			state.Count = 999
 			return state
 		},
-		OnNavigate: func(_ PreSession, state counterState, p Params) counterState {
+		OnNavigate: func(_ Session, state counterState, p Params) counterState {
 			if p.Query.Get("count") == "5" {
 				state.Count = 5
 			}

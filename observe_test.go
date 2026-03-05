@@ -88,11 +88,11 @@ func TestObserveCrossHandler(t *testing.T) {
 			return div.New(span.Text("dash").Dynamic("d"))
 		}
 		ctxB, cancelB := newTestContext()
-		sessB := &Session[dashState]{
+		sessB := &LiveSession[dashState]{
 			id:        "B",
 			state:     dashState{},
 			render:    renderDash,
-			handle:    func(_ PreSession, s dashState, _ Event) dashState { return s },
+			handle:    func(_ Session, s dashState, _ Event) dashState { return s },
 			differ:    differB,
 			encoder:   wire.JSONEncoder{},
 			transport: newConnectedTransport(),
@@ -180,11 +180,11 @@ func TestObserveMultipleValues(t *testing.T) {
 		differ := jit.NewDiffer()
 		ctx, cancel := newTestContext()
 		ct := newConnectedTransport()
-		sess := &Session[state]{
+		sess := &LiveSession[state]{
 			id:        "multi",
 			state:     state{},
 			render:    render,
-			handle:    func(_ PreSession, s state, _ Event) state { return s },
+			handle:    func(_ Session, s state, _ Event) state { return s },
 			differ:    differ,
 			encoder:   wire.JSONEncoder{},
 			transport: ct,

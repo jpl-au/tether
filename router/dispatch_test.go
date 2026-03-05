@@ -50,7 +50,7 @@ func TestRenderReturnsNilWithoutNotFound(t *testing.T) {
 
 func TestHandleDispatchesToMatchingPage(t *testing.T) {
 	r := New(selector)
-	r.Route("/", Page[state]{Handle: func(_ tether.PreSession, s state, _ tether.Event) state {
+	r.Route("/", Page[state]{Handle: func(_ tether.Session, s state, _ tether.Event) state {
 		s.Count = 42
 		return s
 	}})
@@ -63,7 +63,7 @@ func TestHandleDispatchesToMatchingPage(t *testing.T) {
 
 func TestHandleFallsBackToNotFound(t *testing.T) {
 	r := New(selector)
-	r.NotFound(Page[state]{Handle: func(_ tether.PreSession, s state, _ tether.Event) state {
+	r.NotFound(Page[state]{Handle: func(_ tether.Session, s state, _ tether.Event) state {
 		s.Count = -1
 		return s
 	}})

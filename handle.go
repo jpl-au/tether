@@ -12,12 +12,12 @@ package tether
 // channels. For slow operations, use [Session.Go] to run them in a
 // background goroutine and feed results back via [Session.Update].
 //
-// The session parameter is a [PreSession] so that the same handler
+// The session parameter is a [Session] so that the same handler
 // can be used in live mode, stateless page mode, and tethertest without
 // changing its signature. In live mode the underlying value is a
-// [*Session] which provides additional methods (Update, Go, Context,
+// [*LiveSession] which provides additional methods (Update, Go, Context,
 // Close) via type assertion when needed.
 //
 // Returning the original state unchanged is valid and will produce no
 // diff (especially when an Equal function is configured).
-type HandleFunc[S any] func(session PreSession, state S, event Event) S
+type HandleFunc[S any] func(session Session, state S, event Event) S

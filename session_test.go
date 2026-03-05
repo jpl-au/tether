@@ -146,7 +146,7 @@ func TestSessionStructuralChange(t *testing.T) {
 			return div.New(children...)
 		}
 
-		handle := func(_ PreSession, s state, ev Event) state {
+		handle := func(_ Session, s state, ev Event) state {
 			if ev.Action == "toggle-help" {
 				s.ShowHelp = !s.ShowHelp
 			}
@@ -161,7 +161,7 @@ func TestSessionStructuralChange(t *testing.T) {
 
 		differ := jit.NewDiffer()
 		ctx, cancel := context.WithCancel(context.Background())
-		sess := &Session[state]{
+		sess := &LiveSession[state]{
 			id:        "test",
 			state:     state{Count: 0, ShowHelp: false},
 			render:    render,

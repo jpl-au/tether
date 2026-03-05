@@ -10,11 +10,11 @@ import (
 )
 
 // emitter is the internal capability marker that [Bus.Emit] uses to
-// distinguish sessions with a live command loop from other [PreSession]
+// distinguish sessions with a live command loop from other [Session]
 // implementations. It is unexported so developers never need to know it
-// exists — they pass the PreSession they already have.
+// exists — they pass the Session they already have.
 //
-// [*Session] satisfies emitter via its command-loop enqueue.
+// [*LiveSession] satisfies emitter via its command-loop enqueue.
 // [captureSession] satisfies emitter with a no-op enqueue — pre-warm
 // has no subscribers so publishing is always a no-op.
 // [tethertest.testSession] does not satisfy emitter and falls through
@@ -66,7 +66,7 @@ func NewBus[E any]() *Bus[E] {
 // are skipped — the sender's Handle already updated its own state.
 //
 // Behaviour varies by context:
-//   - Live session ([*Session]): the publication is enqueued on the
+//   - Live session ([*LiveSession]): the publication is enqueued on the
 //     session's command loop. This preserves ordering — the sender's
 //     diff reaches the client before other subscribers react.
 //   - Pre-warm ([captureSession]): no-op. Pre-warm is stateless
@@ -74,7 +74,7 @@ func NewBus[E any]() *Bus[E] {
 //   - Test ([tethertest.testSession]): immediate synchronous publish.
 //     This makes test assertions deterministic — subscribe a callback
 //     before calling h.Send(), then assert it was invoked.
-func (b *Bus[E]) Emit(s PreSession, event E) {
+func (b *Bus[E]) Emit(s Session, event E) {
 	if em, ok := s.(emitter); ok {
 		sid := em.sessionID()
 		em.enqueue(func() { b.publish(event, sid) })

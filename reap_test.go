@@ -23,8 +23,8 @@ func TestPendingSessionRemovedAfterTimeout(t *testing.T) {
 					createdAt: time.Now(),
 				},
 			},
-			active:       make(map[string]*Session[counterState]),
-			disconnected: make(map[string]*Session[counterState]),
+			active:       make(map[string]*LiveSession[counterState]),
+			disconnected: make(map[string]*LiveSession[counterState]),
 			done:         make(chan struct{}),
 		}
 

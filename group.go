@@ -15,15 +15,15 @@ import (
 //
 //	group := tether.NewGroup[State]()
 //
-//	OnConnect: func(s *tether.Session[State]) {
+//	OnConnect: func(s *tether.LiveSession[State]) {
 //	    group.Add(s)
 //	},
-//	OnDisconnect: func(s *tether.Session[State]) {
+//	OnDisconnect: func(s *tether.LiveSession[State]) {
 //	    group.Remove(s)
 //	},
 //
 //	// Later, push an update to every session in the group:
-//	group.Broadcast(func(target *tether.Session[State], state State) State {
+//	group.Broadcast(func(target *tether.LiveSession[State], state State) State {
 //	    state.Message = "Hello everyone"
 //	    return state
 //	})
@@ -35,17 +35,17 @@ type Group[S any] struct {
 	// wmu serialises writes (Add/Remove). Reads go through the
 	// atomic.Value and need no lock.
 	wmu      sync.Mutex
-	sessions atomic.Value // holds map[string]*Session[S]
+	sessions atomic.Value // holds map[string]*LiveSession[S]
 
 	// OnJoin is called after a session is added to the group.
 	// Runs outside the write lock so it is safe to call Broadcast
 	// or other Group methods from within. Optional.
-	OnJoin func(session *Session[S])
+	OnJoin func(session *LiveSession[S])
 
 	// OnLeave is called after a session is removed from the group.
 	// Runs outside the write lock so it is safe to call Broadcast
 	// or other Group methods from within. Optional.
-	OnLeave func(session *Session[S])
+	OnLeave func(session *LiveSession[S])
 }
 
 // NewGroup creates an empty group ready to accept sessions.
@@ -53,7 +53,7 @@ type Group[S any] struct {
 // OnConnect/OnDisconnect callbacks and any code that broadcasts.
 func NewGroup[S any]() *Group[S] {
 	g := &Group[S]{}
-	g.sessions.Store(make(map[string]*Session[S]))
+	g.sessions.Store(make(map[string]*LiveSession[S]))
 	return g
 }
 
@@ -61,12 +61,12 @@ func NewGroup[S any]() *Group[S] {
 // OnJoin is set, the callback fires after the session is added.
 // Safe to call from any goroutine. Adding a session that is already
 // in the group is a no-op (OnJoin does not fire).
-func (g *Group[S]) Add(s *Session[S]) {
+func (g *Group[S]) Add(s *LiveSession[S]) {
 	g.wmu.Lock()
 	old := g.loadSessions()
 	_, exists := old[s.id]
 	if !exists {
-		sessions := make(map[string]*Session[S], len(old)+1)
+		sessions := make(map[string]*LiveSession[S], len(old)+1)
 		maps.Copy(sessions, old)
 		sessions[s.id] = s
 		g.sessions.Store(sessions)
@@ -86,12 +86,12 @@ func (g *Group[S]) Add(s *Session[S]) {
 // present and OnLeave is set, the callback fires after removal.
 // Safe to call from any goroutine. Removing a session that is not
 // in the group is a no-op (OnLeave does not fire).
-func (g *Group[S]) Remove(s *Session[S]) {
+func (g *Group[S]) Remove(s *LiveSession[S]) {
 	g.wmu.Lock()
 	old := g.loadSessions()
 	_, exists := old[s.id]
 	if exists {
-		sessions := make(map[string]*Session[S], len(old))
+		sessions := make(map[string]*LiveSession[S], len(old))
 		for k, v := range old {
 			if k != s.id {
 				sessions[k] = v
@@ -111,7 +111,7 @@ func (g *Group[S]) Remove(s *Session[S]) {
 }
 
 // Len returns the number of sessions currently in the group. Useful
-// for displaying an "N users online" indicator via [Session.Update].
+// for displaying an "N users online" indicator via [LiveSession.Update].
 // Lock-free.
 func (g *Group[S]) Len() int {
 	return len(g.loadSessions())
@@ -121,8 +121,8 @@ func (g *Group[S]) Len() int {
 // read via a single atomic load — no lock is held during iteration,
 // so it is safe to call Add, Remove, or Broadcast from within the
 // loop body.
-func (g *Group[S]) All() iter.Seq[*Session[S]] {
-	return func(yield func(*Session[S]) bool) {
+func (g *Group[S]) All() iter.Seq[*LiveSession[S]] {
+	return func(yield func(*LiveSession[S]) bool) {
 		for _, s := range g.loadSessions() {
 			if !yield(s) {
 				return
@@ -138,7 +138,7 @@ func (g *Group[S]) All() iter.Seq[*Session[S]] {
 // Broadcast does not spawn goroutines per session.
 //
 // Safe to call from any goroutine, including from within Handle.
-func (g *Group[S]) Broadcast(fn func(target *Session[S], state S) S) {
+func (g *Group[S]) Broadcast(fn func(target *LiveSession[S], state S) S) {
 	for _, t := range g.loadSessions() {
 		t.Update(func(state S) S {
 			return fn(t, state)
@@ -153,7 +153,7 @@ func (g *Group[S]) Broadcast(fn func(target *Session[S], state S) S) {
 // to everyone else, avoiding a double-apply on the sender.
 //
 // Safe to call from any goroutine, including from within Handle.
-func (g *Group[S]) BroadcastOthers(exclude *Session[S], fn func(target *Session[S], state S) S) {
+func (g *Group[S]) BroadcastOthers(exclude *LiveSession[S], fn func(target *LiveSession[S], state S) S) {
 	for _, t := range g.loadSessions() {
 		if t != exclude {
 			t.Update(func(state S) S {
@@ -164,6 +164,6 @@ func (g *Group[S]) BroadcastOthers(exclude *Session[S], fn func(target *Session[
 }
 
 // loadSessions returns the current session map from the atomic.Value.
-func (g *Group[S]) loadSessions() map[string]*Session[S] {
-	return g.sessions.Load().(map[string]*Session[S])
+func (g *Group[S]) loadSessions() map[string]*LiveSession[S] {
+	return g.sessions.Load().(map[string]*LiveSession[S])
 }

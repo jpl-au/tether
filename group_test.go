@@ -59,7 +59,7 @@ func TestGroupBroadcastUpdatesAllSessions(t *testing.T) {
 		go sess2.run()
 		defer func() { sess1.stop(); sess2.stop(); synctest.Wait() }()
 
-		g.Broadcast(func(target *Session[counterState], s counterState) counterState {
+		g.Broadcast(func(target *LiveSession[counterState], s counterState) counterState {
 			s.Count += 5
 			return s
 		})
@@ -92,7 +92,7 @@ func TestGroupBroadcastEmptyGroupIsNoop(t *testing.T) {
 	g := NewGroup[counterState]()
 
 	// Should not panic.
-	g.Broadcast(func(target *Session[counterState], s counterState) counterState {
+	g.Broadcast(func(target *LiveSession[counterState], s counterState) counterState {
 		s.Count++
 		return s
 	})

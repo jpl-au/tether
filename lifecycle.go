@@ -6,7 +6,7 @@ import "github.com/jpl-au/fluent-tether/wire"
 // A command is sent to the session's loop to swap in the new transport
 // and re-render. This avoids any locking — only the loop touches
 // session state.
-func (h *Handler[S]) reattach(sess *Session[S], transport Transport) {
+func (h *Handler[S]) reattach(sess *LiveSession[S], transport Transport) {
 	if hb, ok := transport.(heartbeater); ok && !h.cfg.Timeouts.DisableHeartbeat {
 		hb.StartHeartbeat(h.cfg.Timeouts.Heartbeat)
 	}
@@ -52,7 +52,7 @@ func (h *Handler[S]) reattach(sess *Session[S], transport Transport) {
 // disconnected pool (when reconnection is enabled) or removes it
 // entirely. Called each time a transport is attached because the
 // callback captures the handler's pool references.
-func (h *Handler[S]) wireDisconnect(sess *Session[S]) {
+func (h *Handler[S]) wireDisconnect(sess *LiveSession[S]) {
 	sess.onDisconnect = func() {
 		h.mu.Lock()
 		delete(h.active, sess.id)

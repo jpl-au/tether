@@ -181,7 +181,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 
 	now := time.Now()
 	ctx, cancel := context.WithCancel(context.Background())
-	sess := &Session[S]{
+	sess := &LiveSession[S]{
 		id:               id,
 		state:            state,
 		render:           h.cfg.Render,

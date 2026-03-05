@@ -65,8 +65,8 @@ func TestDrainReturnsWhenEmpty(t *testing.T) {
 		handler := &Handler[counterState]{
 			cfg:          Config[counterState]{},
 			pending:      make(map[string]*pendingSession[counterState]),
-			active:       make(map[string]*Session[counterState]),
-			disconnected: make(map[string]*Session[counterState]),
+			active:       make(map[string]*LiveSession[counterState]),
+			disconnected: make(map[string]*LiveSession[counterState]),
 			done:         make(chan struct{}),
 		}
 
@@ -82,8 +82,8 @@ func TestDrainReturnsWhenContextCancelled(t *testing.T) {
 	handler := &Handler[counterState]{
 		cfg:          Config[counterState]{},
 		pending:      make(map[string]*pendingSession[counterState]),
-		active:       map[string]*Session[counterState]{"a": {}},
-		disconnected: make(map[string]*Session[counterState]),
+		active:       map[string]*LiveSession[counterState]{"a": {}},
+		disconnected: make(map[string]*LiveSession[counterState]),
 		done:         make(chan struct{}),
 	}
 

@@ -22,7 +22,7 @@ func render(s state) node.Node {
 	)
 }
 
-func handle(sess tether.PreSession, s state, ev tether.Event) state {
+func handle(sess tether.Session, s state, ev tether.Event) state {
 	switch ev.Action {
 	case "increment":
 		s.Count++
@@ -145,7 +145,7 @@ func TestSendSubmit(t *testing.T) {
 	h := tethertest.New(tethertest.Config[state]{
 		State:  state{},
 		Render: render,
-		Handle: func(_ tether.PreSession, s state, ev tether.Event) state {
+		Handle: func(_ tether.Session, s state, ev tether.Event) state {
 			s.Name = ev.Data["name"]
 			return s
 		},
@@ -225,7 +225,7 @@ func TestURLWasReplaced(t *testing.T) {
 	h := tethertest.New(tethertest.Config[state]{
 		State:  state{},
 		Render: render,
-		Handle: func(sess tether.PreSession, s state, ev tether.Event) state {
+		Handle: func(sess tether.Session, s state, ev tether.Event) state {
 			switch ev.Action {
 			case "nav":
 				sess.Navigate("/new")
@@ -251,13 +251,13 @@ func TestNavigateSkipsHandle(t *testing.T) {
 	h := tethertest.New(tethertest.Config[state]{
 		State:  state{},
 		Render: render,
-		Handle: func(_ tether.PreSession, s state, _ tether.Event) state {
+		Handle: func(_ tether.Session, s state, _ tether.Event) state {
 			// Handle should NOT be called for navigate events when
 			// OnNavigate is set — this mirrors live session behaviour.
 			s.Count = 999
 			return s
 		},
-		OnNavigate: func(_ tether.PreSession, s state, params tether.Params) state {
+		OnNavigate: func(_ tether.Session, s state, params tether.Params) state {
 			s.Name = params.Path
 			return s
 		},
@@ -276,10 +276,10 @@ func TestNavigateWithPath(t *testing.T) {
 	h := tethertest.New(tethertest.Config[state]{
 		State:  state{},
 		Render: render,
-		Handle: func(_ tether.PreSession, s state, _ tether.Event) state {
+		Handle: func(_ tether.Session, s state, _ tether.Event) state {
 			return s
 		},
-		OnNavigate: func(sess tether.PreSession, s state, params tether.Params) state {
+		OnNavigate: func(sess tether.Session, s state, params tether.Params) state {
 			s.Name = params.Path
 			if id := params.Query.Get("id"); id != "" {
 				s.Name += ":" + id
@@ -299,7 +299,7 @@ func TestMiddleware(t *testing.T) {
 	// path rather than capturing closure side effects from both HTTP and
 	// local paths.
 	outer := func(next tethertest.HandleFunc[state]) tethertest.HandleFunc[state] {
-		return func(sess tether.PreSession, s state, ev tether.Event) state {
+		return func(sess tether.Session, s state, ev tether.Event) state {
 			s.Name += "A"
 			s = next(sess, s, ev)
 			s.Name += "E"
@@ -308,7 +308,7 @@ func TestMiddleware(t *testing.T) {
 	}
 
 	inner := func(next tethertest.HandleFunc[state]) tethertest.HandleFunc[state] {
-		return func(sess tether.PreSession, s state, ev tether.Event) state {
+		return func(sess tether.Session, s state, ev tether.Event) state {
 			s.Name += "B"
 			s = next(sess, s, ev)
 			s.Name += "D"
@@ -319,7 +319,7 @@ func TestMiddleware(t *testing.T) {
 	h := tethertest.New(tethertest.Config[state]{
 		State:  state{},
 		Render: render,
-		Handle: func(_ tether.PreSession, s state, ev tether.Event) state {
+		Handle: func(_ tether.Session, s state, ev tether.Event) state {
 			s.Name += "C"
 			s.Count++
 			return s
@@ -357,7 +357,7 @@ func TestConnect(t *testing.T) {
 		State:  state{},
 		Render: render,
 		Handle: handle,
-		OnConnect: func(_ tether.PreSession) {
+		OnConnect: func(_ tether.Session) {
 			called = true
 		},
 	})
@@ -374,7 +374,7 @@ func TestDisconnect(t *testing.T) {
 		State:  state{},
 		Render: render,
 		Handle: handle,
-		OnDisconnect: func(_ tether.PreSession) {
+		OnDisconnect: func(_ tether.Session) {
 			called = true
 		},
 	})
@@ -419,7 +419,7 @@ func TestBusEmitFromHandle(t *testing.T) {
 	h := tethertest.New(tethertest.Config[state]{
 		State:  state{},
 		Render: render,
-		Handle: func(sess tether.PreSession, s state, ev tether.Event) state {
+		Handle: func(sess tether.Session, s state, ev tether.Event) state {
 			bus.Emit(sess, ev.Action)
 			return s
 		},
@@ -450,7 +450,7 @@ func TestBusEmitSenderFiltering(t *testing.T) {
 	h := tethertest.New(tethertest.Config[state]{
 		State:  state{},
 		Render: render,
-		Handle: func(sess tether.PreSession, s state, ev tether.Event) state {
+		Handle: func(sess tether.Session, s state, ev tether.Event) state {
 			// Manually tag a subscriber with the session's own ID to
 			// simulate what tether.On does for live sessions. We use
 			// the internal subscribe path via a second bus to check the
@@ -493,7 +493,7 @@ func TestBusEmitStateAndBus(t *testing.T) {
 	h := tethertest.New(tethertest.Config[state]{
 		State:  state{},
 		Render: render,
-		Handle: func(sess tether.PreSession, s state, ev tether.Event) state {
+		Handle: func(sess tether.Session, s state, ev tether.Event) state {
 			if ev.Action == "send" {
 				s.Name = ev.Value()                   // sender sees their own update immediately
 				bus.Emit(sess, msg{Text: ev.Value()}) // others receive via bus

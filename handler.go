@@ -42,8 +42,8 @@ type Handler[S any] struct {
 	cfg          Config[S]
 	mu           sync.Mutex
 	pending      map[string]*pendingSession[S]
-	active       map[string]*Session[S]
-	disconnected map[string]*Session[S]
+	active       map[string]*LiveSession[S]
+	disconnected map[string]*LiveSession[S]
 	done         chan struct{}
 	closeOnce    sync.Once
 	draining     atomic.Bool
@@ -104,7 +104,7 @@ func New[S any](cfg Config[S]) *Handler[S] {
 	if cfg.OnNavigate != nil {
 		appHandle := cfg.Handle
 		appNav := cfg.OnNavigate
-		cfg.Handle = func(sess PreSession, s S, ev Event) S {
+		cfg.Handle = func(sess Session, s S, ev Event) S {
 			if ev.Type == event.Navigate {
 				params := Params{Path: ev.Data["path"]}
 				if search := ev.Data["search"]; search != "" {
@@ -180,8 +180,8 @@ func New[S any](cfg Config[S]) *Handler[S] {
 	h := &Handler[S]{
 		cfg:           cfg,
 		pending:       make(map[string]*pendingSession[S]),
-		active:        make(map[string]*Session[S]),
-		disconnected:  make(map[string]*Session[S]),
+		active:        make(map[string]*LiveSession[S]),
+		disconnected:  make(map[string]*LiveSession[S]),
 		done:          make(chan struct{}),
 		encoder:       resolveEncoder(cfg.WireFormat),
 		clientHandler: newClientHandler(cfg.Assets),
@@ -272,7 +272,7 @@ func transportLabel(m mode.Transport) string {
 // destroySession performs permanent cleanup for a session that is no
 // longer reachable (reaped, shutdown, or disconnected with timeout -1).
 // Cancelling the context causes the session loop to exit.
-func (h *Handler[S]) destroySession(s *Session[S]) {
+func (h *Handler[S]) destroySession(s *LiveSession[S]) {
 	if s.stop != nil {
 		s.stop()
 	}

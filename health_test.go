@@ -53,8 +53,8 @@ func TestHealthCountsActive(t *testing.T) {
 	})
 
 	handler.mu.Lock()
-	handler.active["a"] = &Session[counterState]{}
-	handler.active["b"] = &Session[counterState]{}
+	handler.active["a"] = &LiveSession[counterState]{}
+	handler.active["b"] = &LiveSession[counterState]{}
 	handler.mu.Unlock()
 
 	h := handler.Health()
@@ -73,7 +73,7 @@ func TestHealthCountsDisconnected(t *testing.T) {
 	})
 
 	handler.mu.Lock()
-	handler.disconnected["a"] = &Session[counterState]{}
+	handler.disconnected["a"] = &LiveSession[counterState]{}
 	handler.mu.Unlock()
 
 	h := handler.Health()

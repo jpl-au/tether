@@ -43,7 +43,7 @@ func TestScopeHandle(t *testing.T) {
 	cs := &captureSession{id: "test", fx: &effects{}}
 	ev := Event{Action: "increment"}
 
-	state = testScope.Handle(cs, state, ev, func(sess PreSession, c innerState, ev Event) innerState {
+	state = testScope.Handle(cs, state, ev, func(sess Session, c innerState, ev Event) innerState {
 		if ev.Action == "increment" {
 			c.Count++
 		}
@@ -63,7 +63,7 @@ func TestScopeHandleEffects(t *testing.T) {
 	cs := &captureSession{id: "test", fx: &effects{}}
 	ev := Event{Action: "greet"}
 
-	testScope.Handle(cs, state, ev, func(sess PreSession, c innerState, ev Event) innerState {
+	testScope.Handle(cs, state, ev, func(sess Session, c innerState, ev Event) innerState {
 		sess.Toast("hello")
 		sess.Signal("count", 42)
 		return c

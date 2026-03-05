@@ -6,18 +6,18 @@ func TestChainAppliesOutermostFirst(t *testing.T) {
 	var order []string
 
 	a := func(next HandleFunc[counterState]) HandleFunc[counterState] {
-		return func(sess PreSession, s counterState, ev Event) counterState {
+		return func(sess Session, s counterState, ev Event) counterState {
 			order = append(order, "A")
 			return next(sess, s, ev)
 		}
 	}
 	b := func(next HandleFunc[counterState]) HandleFunc[counterState] {
-		return func(sess PreSession, s counterState, ev Event) counterState {
+		return func(sess Session, s counterState, ev Event) counterState {
 			order = append(order, "B")
 			return next(sess, s, ev)
 		}
 	}
-	inner := func(_ PreSession, s counterState, _ Event) counterState {
+	inner := func(_ Session, s counterState, _ Event) counterState {
 		order = append(order, "H")
 		return s
 	}
@@ -32,7 +32,7 @@ func TestChainAppliesOutermostFirst(t *testing.T) {
 
 func TestChainEmptyMiddleware(t *testing.T) {
 	called := false
-	inner := func(_ PreSession, s counterState, _ Event) counterState {
+	inner := func(_ Session, s counterState, _ Event) counterState {
 		called = true
 		return s
 	}

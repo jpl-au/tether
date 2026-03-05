@@ -73,7 +73,7 @@ func TestEmitAndOnEndToEnd(t *testing.T) {
 		}
 		sessA := newTestSession(counterState{Count: 0}, mtA)
 		sessA.id = "sender"
-		sessA.handle = func(_ PreSession, s counterState, ev Event) counterState {
+		sessA.handle = func(_ Session, s counterState, ev Event) counterState {
 			if ev.Action == "send" {
 				s.Count += 10
 				bus.Emit(sessA, msg{Text: "hello"})

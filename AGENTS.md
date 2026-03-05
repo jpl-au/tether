@@ -48,23 +48,24 @@ transport upgraders, middleware, lifecycle callbacks, timeouts, and limits.
 Required fields: `InitialState`, `Render`, `Handle`, and at least one of
 `Upgrade` or `Fallback` (depending on `Mode`).
 
-### Session[S]
+### Session (interface)
 
-One per browser tab. Owns its own state, diff engine, and command-loop
-goroutine. All exported methods (`State`, `Update`, `Toast`, `Signal`,
-`Navigate`, `Go`, `Close`, etc.) are safe to call from any goroutine.
+The interface every handler receives. Provides side-effect methods (`Toast`,
+`Signal`, `Navigate`, `SetTitle`, `Announce`, `Flash`, `Push`, `Go`). Works
+identically in live mode, stateless page mode, and tests. `OnNavigate`,
+`Handle`, and the test harness all receive `Session`. `Bus.Emit` accepts
+`Session` directly — no type-assert is needed to broadcast from `Handle`.
 
-### PreSession
+### LiveSession[S]
 
-The subset of Session methods available before a real session exists (during
-pre-warming in the initial GET) and in reusable components. `OnNavigate`,
-`Handle`, and the test harness all receive `PreSession`. `Bus.Emit` accepts
-`PreSession` directly — no type-assert is needed to broadcast from `Handle`.
+One per browser tab. Implements `Session` and adds state-aware methods:
+`State`, `Update`, `Close`. Owns its own state, diff engine, and
+command-loop goroutine. All exported methods are safe to call from any
+goroutine.
 
-Type-assert to `*Session[S]` only when you need methods that are not on
-`PreSession` — `Update`, `Group`, `State`, or session pool operations.
-These are lifecycle concerns and belong in `OnConnect`/`OnDisconnect`, not
-in `Handle`.
+Type-assert to `*LiveSession[S]` only when you need methods that are not on
+`Session` — `Update`, `State`, `Close`, or `Group` operations. These are
+lifecycle concerns and belong in `OnConnect`/`OnDisconnect`, not in `Handle`.
 
 ### Event
 
@@ -87,14 +88,14 @@ case for optional URL parameters. Multi-value helpers — `Strings`,
 
 ### HandleFunc[S]
 
-`func(session PreSession, state S, event Event) S` — processes a client
+`func(session Session, state S, event Event) S` — processes a client
 event and returns the new state. Runs inside the command loop; must not
 block.
 
 ### Bus[E]
 
 Typed pub/sub for cross-handler communication. `Bus.Emit(sess, event)`
-accepts `PreSession` directly — no type-assert needed in `Handle`.
+accepts `Session` directly — no type-assert needed in `Handle`.
 Publishes with sender filtering: subscriptions whose session ID matches
 the emitter are skipped, preventing double-apply. In live sessions,
 publication is enqueued on the sender's command loop so the sender's

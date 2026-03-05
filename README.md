@@ -24,7 +24,7 @@ mux.Handle("/counter", tether.New(tether.Config[CounterState]{
             bind.Click(button.Text("+1"), "increment"),
         )
     },
-    Handle: func(_ tether.PreSession, state CounterState, event tether.Event) CounterState {
+    Handle: func(_ tether.Session, state CounterState, event tether.Event) CounterState {
         if event.Action == "increment" {
             state.Count++
         }

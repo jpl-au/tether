@@ -33,10 +33,10 @@ import (
 )
 
 // HandleFunc is the handler signature for tethertest. It is identical
-// to [tether.HandleFunc] — both take [tether.PreSession] — so handler
+// to [tether.HandleFunc] — both take [tether.Session] — so handler
 // functions can be shared across live mode, page mode, and tests
 // without changing their signature.
-type HandleFunc[S any] func(session tether.PreSession, state S, event tether.Event) S
+type HandleFunc[S any] func(session tether.Session, state S, event tether.Event) S
 
 // Middleware wraps a [HandleFunc] to add cross-cutting behaviour.
 // Identical to [tether.Middleware] so middleware can be shared across
@@ -52,7 +52,7 @@ type Config[S any] struct {
 	Render tether.RenderFunc[S]
 
 	// Handle processes a client event and returns the new state.
-	Handle func(session tether.PreSession, state S, event tether.Event) S
+	Handle func(session tether.Session, state S, event tether.Event) S
 
 	// Middleware wraps the Handle function with cross-cutting
 	// behaviour. Applied outermost-first: the first entry in the
@@ -60,17 +60,17 @@ type Config[S any] struct {
 	Middleware []Middleware[S]
 
 	// OnNavigate processes URL parameters. Optional.
-	OnNavigate func(session tether.PreSession, state S, params tether.Params) S
+	OnNavigate func(session tether.Session, state S, params tether.Params) S
 
 	// OnConnect is called when [Harness.Connect] is called. Use this
 	// to test session registration logic (e.g. joining a [tether.Group]
 	// or starting background tasks). Optional.
-	OnConnect func(session tether.PreSession)
+	OnConnect func(session tether.Session)
 
 	// OnDisconnect is called when [Harness.Disconnect] is called. Use
 	// this to test cleanup logic (e.g. removing from a [tether.Group]
 	// or decrementing counters). Optional.
-	OnDisconnect func(session tether.PreSession)
+	OnDisconnect func(session tether.Session)
 }
 
 // Harness drives a tether page handler for testing. Create one with
@@ -79,13 +79,13 @@ type Config[S any] struct {
 type Harness[S any] struct {
 	state      S
 	render     tether.RenderFunc[S]
-	handle     func(tether.PreSession, S, tether.Event) S
-	onNavigate func(tether.PreSession, S, tether.Params) S
+	handle     func(tether.Session, S, tether.Event) S
+	onNavigate func(tether.Session, S, tether.Params) S
 	handler    http.Handler
 
 	// Lifecycle callbacks stored from Config.
-	onConnect    func(tether.PreSession)
-	onDisconnect func(tether.PreSession)
+	onConnect    func(tether.Session)
+	onDisconnect func(tether.Session)
 
 	// Last response fields.
 	last response
@@ -121,7 +121,7 @@ type wireEntry struct {
 	HTML string `json:"html"`
 }
 
-// testSession implements [tether.PreSession] for local state tracking.
+// testSession implements [tether.Session] for local state tracking.
 // It captures side effects so the harness can report them.
 type testSession struct {
 	toast    string

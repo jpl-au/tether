@@ -18,17 +18,17 @@ type Scope[S, C any] struct {
 }
 
 // Handle dispatches an event to a component handler that only sees
-// the component's sub-state. The handler receives [PreSession] for
+// the component's sub-state. The handler receives [Session] for
 // side effects (Toast, Navigate, Signal, etc.) but cannot access the
 // full session state — true encapsulation.
 //
 // Call this from within the main [HandleFunc]:
 //
-//	func handle(sess *tether.Session[AppState], state AppState, ev tether.Event) AppState {
+//	func handle(sess *tether.LiveSession[AppState], state AppState, ev tether.Event) AppState {
 //	    return todos.Handle(sess, state, ev, todoHandle)
 //	}
 //
-//	func todoHandle(sess tether.PreSession, ts TodoState, ev tether.Event) TodoState {
+//	func todoHandle(sess tether.Session, ts TodoState, ev tether.Event) TodoState {
 //	    switch ev.Action {
 //	    case "todo.add":
 //	        ts.Items = append(ts.Items, Todo{Text: ev.Value()})
@@ -36,12 +36,12 @@ type Scope[S, C any] struct {
 //	    }
 //	    return ts
 //	}
-func (sc Scope[S, C]) Handle(sess PreSession, state S, ev Event, fn func(PreSession, C, Event) C) S {
+func (sc Scope[S, C]) Handle(sess Session, state S, ev Event, fn func(Session, C, Event) C) S {
 	return sc.Update(state, fn(sess, sc.View(state), ev))
 }
 
 // With applies a pure transformation to the component's sub-state.
-// Use this inside [Session.Update] callbacks for server-initiated
+// Use this inside [LiveSession.Update] callbacks for server-initiated
 // changes:
 //
 //	sess.Update(func(state AppState) AppState {

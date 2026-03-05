@@ -166,7 +166,7 @@ func renderCounter(state counterState) node.Node {
 	)
 }
 
-func handleCounter(_ PreSession, state counterState, ev Event) counterState {
+func handleCounter(_ Session, state counterState, ev Event) counterState {
 	switch ev.Action {
 	case "increment":
 		state.Count++
@@ -182,10 +182,10 @@ func handleCounter(_ PreSession, state counterState, ev Event) counterState {
 //
 //	go sess.readTransport(sess.events)
 //	go sess.run()
-func newTestSession(state counterState, mt Transport) *Session[counterState] {
+func newTestSession(state counterState, mt Transport) *LiveSession[counterState] {
 	differ := jit.NewDiffer()
 	ctx, cancel := context.WithCancel(context.Background())
-	sess := &Session[counterState]{
+	sess := &LiveSession[counterState]{
 		id:        "test",
 		state:     state,
 		render:    renderCounter,

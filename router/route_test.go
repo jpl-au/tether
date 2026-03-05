@@ -12,11 +12,11 @@ import (
 
 func TestRouteOverwritesExistingPage(t *testing.T) {
 	r := New(selector)
-	r.Route("/", Page[state]{Handle: func(_ tether.PreSession, s state, _ tether.Event) state {
+	r.Route("/", Page[state]{Handle: func(_ tether.Session, s state, _ tether.Event) state {
 		s.Count = 1
 		return s
 	}})
-	r.Route("/", Page[state]{Handle: func(_ tether.PreSession, s state, _ tether.Event) state {
+	r.Route("/", Page[state]{Handle: func(_ tether.Session, s state, _ tether.Event) state {
 		s.Count = 2
 		return s
 	}})

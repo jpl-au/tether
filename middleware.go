@@ -6,7 +6,7 @@ package tether
 // session before and after calling next:
 //
 //	func withLogging[S any](next tether.HandleFunc[S]) tether.HandleFunc[S] {
-//	    return func(sess tether.PreSession, s S, ev tether.Event) S {
+//	    return func(sess tether.Session, s S, ev tether.Event) S {
 //	        slog.Info("event", "action", ev.Action)
 //	        return next(sess, s, ev)
 //	    }

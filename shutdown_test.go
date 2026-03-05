@@ -18,8 +18,8 @@ func TestShutdownClosesActiveSessions(t *testing.T) {
 		h := &Handler[counterState]{
 			cfg:          Config[counterState]{},
 			pending:      make(map[string]*pendingSession[counterState]),
-			active:       map[string]*Session[counterState]{"test": sess},
-			disconnected: make(map[string]*Session[counterState]),
+			active:       map[string]*LiveSession[counterState]{"test": sess},
+			disconnected: make(map[string]*LiveSession[counterState]),
 			done:         make(chan struct{}),
 		}
 
@@ -46,8 +46,8 @@ func TestShutdownStopsPendingCleanup(t *testing.T) {
 		h := &Handler[counterState]{
 			cfg:          Config[counterState]{Timeouts: Timeouts{Pending: 30 * time.Second}},
 			pending:      make(map[string]*pendingSession[counterState]),
-			active:       make(map[string]*Session[counterState]),
-			disconnected: make(map[string]*Session[counterState]),
+			active:       make(map[string]*LiveSession[counterState]),
+			disconnected: make(map[string]*LiveSession[counterState]),
 			done:         make(chan struct{}),
 		}
 

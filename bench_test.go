@@ -117,7 +117,7 @@ func benchRender(s benchState) node.Node {
 	)
 }
 
-func benchHandle(_ PreSession, s benchState, ev Event) benchState {
+func benchHandle(_ Session, s benchState, ev Event) benchState {
 	if ev.Action == "increment" {
 		s.Count++
 	}
@@ -156,7 +156,7 @@ func BenchmarkEventCycle(b *testing.B) {
 	differ := jit.NewDiffer()
 	ctx, cancel := context.WithCancel(context.Background())
 
-	sess := &Session[benchState]{
+	sess := &LiveSession[benchState]{
 		id:        "bench",
 		state:     benchState{Count: 0},
 		render:    benchRender,

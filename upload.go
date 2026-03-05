@@ -19,7 +19,7 @@ type UploadConfig[S any] struct {
 	// runs in its own goroutine so it is safe to perform I/O (e.g.
 	// writing to disk or S3). Use [Session.Update] to re-render
 	// after processing the file.
-	Handle func(session *Session[S], upload Upload) error
+	Handle func(session *LiveSession[S], upload Upload) error
 
 	// MaxSize is the maximum upload size in bytes. Requests
 	// exceeding this limit are rejected with 413. Default 10 MB.

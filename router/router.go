@@ -100,7 +100,7 @@ func (r *Router[S]) Render(s S) node.Node {
 
 // Handle implements [tether.HandleFunc]. It dispatches to the active
 // page's Handle function. Lock-free.
-func (r *Router[S]) Handle(sess tether.PreSession, s S, ev tether.Event) S {
+func (r *Router[S]) Handle(sess tether.Session, s S, ev tether.Event) S {
 	path := r.selector(s)
 	pages := r.loadPages()
 	if p, ok := pages[path]; ok && p.Handle != nil {
@@ -123,7 +123,7 @@ func (r *Router[S]) loadNotFound() Page[S] {
 
 // OnNavigate is a convenience helper for [tether.Config].OnNavigate.
 // It wraps a simple setter function in the full OnNavigate signature
-// that Config expects (func(PreSession, S, Params) S), handling the
+// that Config expects (func(Session, S, Params) S), handling the
 // pointer-to-value dance and return plumbing so the caller only writes
 // the state mutation logic. Without this helper, every router user
 // would have to write the same boilerplate closure manually.
@@ -144,8 +144,8 @@ func (r *Router[S]) loadNotFound() Page[S] {
 //	    s.Filter = p.Get("f")
 //	    s.Limit  = p.IntOr("limit", 20)
 //	})
-func (r *Router[S]) OnNavigate(setter func(*S, tether.Params)) func(tether.PreSession, S, tether.Params) S {
-	return func(_ tether.PreSession, s S, p tether.Params) S {
+func (r *Router[S]) OnNavigate(setter func(*S, tether.Params)) func(tether.Session, S, tether.Params) S {
+	return func(_ tether.Session, s S, p tether.Params) S {
 		setter(&s, p)
 		return s
 	}

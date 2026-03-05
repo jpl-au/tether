@@ -282,7 +282,7 @@ func TestHandlePushSubscribe(t *testing.T) {
 		Handle:       handleCounter,
 		Push: &PushConfig[counterState]{
 			Sender: push.NewSender(push.Config{VAPIDPublicKey: "test-key"}),
-			OnSubscribe: func(sess *Session[counterState], sub push.Subscription) {
+			OnSubscribe: func(sess *LiveSession[counterState], sub push.Subscription) {
 				ch <- result{sub: sub, session: sess.ID()}
 			},
 		},
@@ -364,7 +364,7 @@ func TestHandlePushSubscribeMissingSession(t *testing.T) {
 		Handle:       handleCounter,
 		Push: &PushConfig[counterState]{
 			Sender:      push.NewSender(push.Config{VAPIDPublicKey: "test-key"}),
-			OnSubscribe: func(*Session[counterState], push.Subscription) {},
+			OnSubscribe: func(*LiveSession[counterState], push.Subscription) {},
 		},
 	})
 
@@ -389,7 +389,7 @@ func TestHandlePushSubscribeUnknownSession(t *testing.T) {
 		Handle:       handleCounter,
 		Push: &PushConfig[counterState]{
 			Sender:      push.NewSender(push.Config{VAPIDPublicKey: "test-key"}),
-			OnSubscribe: func(*Session[counterState], push.Subscription) {},
+			OnSubscribe: func(*LiveSession[counterState], push.Subscription) {},
 		},
 	})
 

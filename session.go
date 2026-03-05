@@ -46,14 +46,15 @@ type RenderFunc[S any] func(state S) node.Node
 // [Config].CmdBufferSize is zero.
 const defaultCmdBufferSize = 64
 
-// Session represents a single connected client. Each browser tab gets
-// its own Session with independent state, a dedicated diff engine, and
-// a command-loop goroutine that serialises all state mutations.
+// LiveSession represents a single connected client. Each browser tab
+// gets its own LiveSession with independent state, a dedicated diff
+// engine, and a command-loop goroutine that serialises all state
+// mutations.
 //
 // All exported methods are safe to call from any goroutine — including
 // from within Handle. The command loop processes them in order; there
 // is no mutex and no deadlock risk.
-type Session[S any] struct {
+type LiveSession[S any] struct {
 	id    string
 	state S
 
@@ -138,22 +139,26 @@ type Session[S any] struct {
 	equal func(a, b S) bool
 
 	// Optional telemetry hook for structural diff changes.
-	onStructuralChange func(*Session[S], StructuralChange)
+	onStructuralChange func(*LiveSession[S], StructuralChange)
 
 	// Optional hook for render cycles that produce no patches.
-	onNoPatch func(*Session[S], NoPatch)
+	onNoPatch func(*LiveSession[S], NoPatch)
 }
 
-// PreSession is the subset of Session methods available in
-// [Config.OnNavigate] and reusable components. During pre-warming
-// (initial GET) no real session exists yet, so OnNavigate receives
-// a capture implementation that buffers side effects. During live
-// navigation the real [Session] satisfies the interface.
+// Session is the interface every handler receives. It provides
+// side-effect methods (Toast, Navigate, Signal, etc.) that work
+// identically in live mode, stateless page mode, and tests.
 //
-// PreSession is deliberately non-generic — component handlers can
+// In live mode the underlying value is a [*LiveSession] which
+// provides additional methods (Update, State, Close) via type
+// assertion when needed. During pre-warming (initial GET) a
+// capture implementation buffers side effects. In tethertest a
+// test double captures them for assertions.
+//
+// Session is deliberately non-generic — component handlers can
 // accept it without inheriting the application's state type
 // parameter, making them reusable across different page states.
-type PreSession interface {
+type Session interface {
 	// ID returns the session identifier. In live mode this is the
 	// unique, cryptographically random session ID. In stateless page
 	// mode (PageConfig) this returns an empty string because there is
@@ -173,7 +178,7 @@ type PreSession interface {
 	Push(n push.Notification) error
 }
 
-// captureSession implements PreSession by buffering side effects.
+// captureSession implements Session by buffering side effects.
 // Used during pre-warming to allow OnNavigate to call SetTitle,
 // Toast, etc. without panicking on a nil session.
 type captureSession struct {
@@ -252,7 +257,7 @@ func pairsToMap(pairs []any) map[string]any {
 // ID returns the unique session identifier. This is a cryptographically
 // random string generated when the session is created. It can be used
 // for logging, metrics, or as a key in external storage.
-func (s *Session[S]) ID() string {
+func (s *LiveSession[S]) ID() string {
 	return s.id
 }
 
@@ -260,7 +265,7 @@ func (s *Session[S]) ID() string {
 // permanently destroyed (reaped or shutdown). The context survives
 // temporary disconnects and reconnects — use it for background
 // goroutines that should keep running while the client is away.
-func (s *Session[S]) Context() context.Context {
+func (s *LiveSession[S]) Context() context.Context {
 	if s.ctx != nil {
 		return s.ctx
 	}
@@ -272,20 +277,20 @@ func (s *Session[S]) Context() context.Context {
 // destroyed (reaped or shutdown). Use this in OnConnect for background
 // work like tickers, watchers, or change listeners that should stop
 // when the session is gone.
-func (s *Session[S]) Go(fn func(ctx context.Context)) {
+func (s *LiveSession[S]) Go(fn func(ctx context.Context)) {
 	go fn(s.Context())
 }
 
 // sessionID returns the session's unique identifier. Used by
 // Bus.Emit to record the sender for subscriber filtering.
-func (s *Session[S]) sessionID() string {
+func (s *LiveSession[S]) sessionID() string {
 	return s.id
 }
 
 // enqueueFx sends an effect closure to the effects channel. Under
 // normal load the send is non-blocking. When the buffer is full,
 // an overflow goroutine delivers it — same pattern as [enqueue].
-func (s *Session[S]) enqueueFx(fn func(*effects)) {
+func (s *LiveSession[S]) enqueueFx(fn func(*effects)) {
 	select {
 	case s.fxCh <- fn:
 	default:
@@ -303,7 +308,7 @@ func (s *Session[S]) enqueueFx(fn func(*effects)) {
 // overflow for a session logs at Warn (visible in production) so
 // the developer knows buffer pressure occurred. Subsequent overflows
 // log at Debug to avoid spam.
-func (s *Session[S]) logOverflow() {
+func (s *LiveSession[S]) logOverflow() {
 	n := s.overflows.Add(1)
 	if n == 1 {
 		slog.Warn("command buffer full, overflowing to goroutine — consider increasing Limits.CmdBufferSize or investigating a slow handler",
@@ -323,7 +328,7 @@ func (s *Session[S]) logOverflow() {
 // on the loop goroutine after Handle/Update returns, before the
 // render-diff-send pipeline. Pass nil to discard effects (e.g.
 // after a panic).
-func (s *Session[S]) drainFx(fx *effects) {
+func (s *LiveSession[S]) drainFx(fx *effects) {
 	for {
 		select {
 		case fn := <-s.fxCh:
@@ -338,7 +343,7 @@ func (s *Session[S]) drainFx(fx *effects) {
 
 // sendFx sends any accumulated effects as a standalone update.
 // Used by the loop when effects arrive outside of Handle.
-func (s *Session[S]) sendFx(fx *effects) {
+func (s *LiveSession[S]) sendFx(fx *effects) {
 	if !fx.any() {
 		return
 	}
@@ -356,7 +361,7 @@ func (s *Session[S]) sendFx(fx *effects) {
 //
 // The goroutine is context-aware: if the session is destroyed before
 // the command can be delivered, the goroutine exits cleanly.
-func (s *Session[S]) enqueue(fn func()) {
+func (s *LiveSession[S]) enqueue(fn func()) {
 	select {
 	case s.cmds <- fn:
 	default:
