@@ -5,10 +5,15 @@ import "strings"
 // ComponentMount wires a [Component] into the session's event dispatch.
 // Create mounts with [Mount] and list them in [Config.Components].
 //
-// ComponentMount has an unexported method so the framework controls
+// ComponentMount has unexported methods so the framework controls
 // dispatch — callers cannot implement this interface directly.
 type ComponentMount[S any] interface {
 	route(sess Session, state S, ev Event) (S, bool)
+
+	// init calls [Mounter].Mount on the component if it implements
+	// the [Mounter] interface, writing the result back into state.
+	// Components that do not implement Mounter are left unchanged.
+	init(sess Session, state S) S
 }
 
 // Mount creates a [ComponentMount] that wires a [Component]-implementing
@@ -50,10 +55,33 @@ func RouteMount[S any](mounts []ComponentMount[S], sess Session, state S, ev Eve
 	return state, false
 }
 
+// InitMounts calls [Mounter].Mount on each mounted component that
+// implements the [Mounter] interface. Called once per session after the
+// command loop starts. Components that do not implement Mounter are
+// left unchanged.
+func InitMounts[S any](mounts []ComponentMount[S], sess Session, state S) S {
+	for _, m := range mounts {
+		state = m.init(sess, state)
+	}
+	return state
+}
+
 type componentMount[S any, C Component] struct {
 	prefix string
 	getter func(S) C
 	setter func(S, C) S
+}
+
+// init calls Mounter.Mount on the component if it implements the
+// Mounter interface. This runs once per session during startup so
+// components can perform initial side effects (Toast, Signal, Go).
+func (m *componentMount[S, C]) init(sess Session, state S) S {
+	comp := m.getter(state)
+	if mounter, ok := any(comp).(Mounter); ok {
+		updated := mounter.Mount(sess).(C)
+		return m.setter(state, updated)
+	}
+	return state
 }
 
 // route checks whether the event matches this mount's prefix. If it

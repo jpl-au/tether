@@ -7,6 +7,7 @@ import (
 
 	jit "github.com/jpl-au/fluent-jit"
 	"github.com/jpl-au/fluent-tether/event"
+	"github.com/jpl-au/fluent-tether/push"
 	"github.com/jpl-au/fluent-tether/wire"
 	"github.com/jpl-au/fluent/html5/div"
 	"github.com/jpl-au/fluent/html5/span"
@@ -179,6 +180,95 @@ func (w targetWidget) Handle(sess Session, ev Event) Component {
 	}
 	return w
 }
+
+// mountableWidget implements Mounter to verify the framework calls
+// Mount once during session startup.
+type mountableWidget struct {
+	Count   int
+	Mounted bool
+}
+
+func (w mountableWidget) Render() node.Node {
+	return span.Textf("count:%d mounted:%v", w.Count, w.Mounted).Dynamic("mw")
+}
+
+func (w mountableWidget) Handle(_ Session, ev Event) Component {
+	if ev.Action == "inc" {
+		w.Count++
+	}
+	return w
+}
+
+func (w mountableWidget) Mount(sess Session) Component {
+	sess.Toast("mounted")
+	w.Mounted = true
+	return w
+}
+
+func TestMounterCalledOnInit(t *testing.T) {
+	state := mountState{Widget: testWidget{}}
+	mw := mountableWidget{}
+
+	type mState struct {
+		MW mountableWidget
+	}
+
+	mounts := []ComponentMount[mState]{
+		Mount("mw",
+			func(s mState) mountableWidget { return s.MW },
+			func(s mState, w mountableWidget) mState { s.MW = w; return s },
+		),
+	}
+
+	s := mState{MW: mw}
+	sess := &testSessionForMount{}
+	result := InitMounts(mounts, sess, s)
+
+	if !result.MW.Mounted {
+		t.Error("MW.Mounted = false, want true after InitMounts")
+	}
+	if sess.toast != "mounted" {
+		t.Errorf("toast = %q, want %q", sess.toast, "mounted")
+	}
+
+	// Verify non-Mounter components are left unchanged.
+	_ = state // suppress unused
+}
+
+func TestInitMountsSkipsNonMounter(t *testing.T) {
+	// testWidget does not implement Mounter — InitMounts should not panic.
+	mounts := []ComponentMount[mountState]{
+		Mount("widget",
+			func(s mountState) testWidget { return s.Widget },
+			func(s mountState, w testWidget) mountState { s.Widget = w; return s },
+		),
+	}
+	s := mountState{Widget: testWidget{Count: 5}}
+	result := InitMounts(mounts, &testSessionForMount{}, s)
+
+	if result.Widget.Count != 5 {
+		t.Errorf("Widget.Count = %d, want 5 (should be unchanged)", result.Widget.Count)
+	}
+}
+
+// testSessionForMount is a minimal Session for mount tests.
+type testSessionForMount struct {
+	toast string
+}
+
+func (s *testSessionForMount) ID() string                   { return "test" }
+func (s *testSessionForMount) Context() context.Context     { return context.Background() }
+func (s *testSessionForMount) Go(fn func(context.Context))  { go fn(context.Background()) }
+func (s *testSessionForMount) Toast(text string)            { s.toast = text }
+func (s *testSessionForMount) SetTitle(string)              {}
+func (s *testSessionForMount) Announce(string)              {}
+func (s *testSessionForMount) Navigate(string)              {}
+func (s *testSessionForMount) ReplaceURL(string)            {}
+func (s *testSessionForMount) Signal(string, any)           {}
+func (s *testSessionForMount) Signals(map[string]any)       {}
+func (s *testSessionForMount) Flash(string, string)         {}
+func (s *testSessionForMount) Push(push.Notification) error { return nil }
+func (s *testSessionForMount) Close()                       {}
 
 func TestMountNavigateBypassesMounts(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {

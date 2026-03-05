@@ -727,9 +727,22 @@ When `Config.Components` dispatches an event, the framework sets `Event.Target` 
 
 Returns a copy of the event with a different `Action`. Used by `Route`, `RouteTyped`, and the mount system to strip prefixes before forwarding to the component.
 
+### Mounter
+
+Optional interface for one-time component setup. The framework calls `Mount` once per component during session startup (after the command loop starts, before any client events arrive) for components registered via `Config.Components`:
+
+```go
+type Mounter interface {
+    Component
+    Mount(Session) Component
+}
+```
+
+Use Mount for initial side effects — `sess.Toast("Ready")`, `sess.Signal(...)`, `sess.Go(...)` — that a component needs when it first appears. Components that don't need setup simply implement `Component` without `Mounter`.
+
 ### Route vs Config.Components
 
-Use `Config.Components` when the component is self-contained and the page's `Handle` never needs to see its events. Use `Route`/`RouteTyped` in Handle when you need to coordinate component events with other state changes or when the component is used in stateless `PageConfig` handlers (which don't support `Config.Components`).
+Use `Config.Components` when the component is self-contained and the page's `Handle` never needs to see its events. Use `Route`/`RouteTyped` in Handle when you need to coordinate component events with other state changes.
 
 ### RouteMount
 

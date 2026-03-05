@@ -54,6 +54,11 @@ tether.Page(tether.PageConfig[State]{
     // Optional: wrap page content in a full HTML document.
     Layout: func(s State, content node.Node) node.Node { ... },
 
+    // Optional: declarative component mounts (same as Config.Components).
+    Components: []tether.ComponentMount[State]{
+        tether.Mount("widget", getWidget, setWidget),
+    },
+
     // Optional configuration.
     Assets:   []*tether.Asset{assets},
     Limits:   tether.Limits{MaxEventBytes: 128 << 10},
@@ -157,6 +162,4 @@ Start with `tether.Page` and upgrade to `tether.New` when you need:
 - **File uploads** — streaming files via the upload extension
 - **Push notifications** — Web Push via the service worker
 
-The `Render` function, `HandleFunc` signature, `OnNavigate`, `Layout`, event bindings, components (via `RouteTyped` in Handle), and the `router` package all work identically in both modes. Upgrading typically means changing `tether.Page(PageConfig{...})` to `tether.New(Config{...})` and adding transport configuration.
-
-Note: `Config.Components` (declarative mounting) is only available on live handlers. Stateless pages can use `Route`/`RouteTyped` in Handle for component dispatch.
+The `Render` function, `HandleFunc` signature, `OnNavigate`, `Layout`, event bindings, `Config.Components`, and the `router` package all work identically in both modes. Upgrading typically means changing `tether.Page(PageConfig{...})` to `tether.New(Config{...})` and adding transport configuration.

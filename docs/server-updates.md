@@ -308,6 +308,19 @@ Handle: func(sess tether.Session, s State, ev tether.Event) State {
 
 Events with actions like `"counter.increment"` are forwarded to the component with the prefix stripped — the component sees `"increment"`. Events without a matching prefix pass through unchanged.
 
+### Initial setup with Mounter
+
+Components that need one-time setup (firing a toast, pushing a signal, starting background work) can implement the optional `Mounter` interface:
+
+```go
+func (d Dashboard) Mount(sess tether.Session) tether.Component {
+    sess.Toast("Dashboard ready")
+    return d
+}
+```
+
+The framework calls `Mount` once per component during session startup for components registered via `Config.Components`. Components that don't need setup simply omit the method.
+
 ## URL routing
 
 Bidirectional sync between Go state and the browser URL:

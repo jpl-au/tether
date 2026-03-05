@@ -59,6 +59,34 @@ type EqualComponent interface {
 	EqualComponent(Component) bool
 }
 
+// Mounter is an optional interface that components can implement to
+// perform one-time setup when they are first mounted into a session.
+// The framework calls Mount once per component — after the session's
+// command loop starts but before any client events are processed —
+// when the component is registered via [Config.Components].
+//
+// Mount receives the [Session] so the component can fire side effects
+// (Toast, Signal, etc.) or start background work via [Session.Go].
+// It returns the updated component value, which the framework writes
+// back to the session state.
+//
+// Components that do not need initial setup simply implement
+// [Component] without Mounter — the framework skips the Mount call.
+//
+//	type Dashboard struct {
+//	    loaded bool
+//	    Items  []Item
+//	}
+//
+//	func (d Dashboard) Mount(sess tether.Session) tether.Component {
+//	    sess.Toast("Dashboard ready")
+//	    return d
+//	}
+type Mounter interface {
+	Component
+	Mount(Session) Component
+}
+
 // Route dispatches an event to a component by prefix. If the event's
 // action starts with "prefix.", the prefix is stripped and the event is
 // forwarded to comp.Handle. Otherwise the component is returned unchanged.

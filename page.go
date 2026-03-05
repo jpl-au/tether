@@ -66,6 +66,12 @@ type PageConfig[S any] struct {
 	// Client groups browser-side settings (debounce, transitions).
 	Client Client
 
+	// Components declares component mounts for automatic event
+	// routing, matching [Config].Components. Events whose action
+	// matches a mount's prefix are dispatched to the component
+	// before Handle runs. Optional.
+	Components []ComponentMount[S]
+
 	// Security groups origin-checking settings.
 	Security Security
 
@@ -273,7 +279,11 @@ func (p *pageHandler[S]) servePOST(w http.ResponseWriter, r *http.Request) {
 			params := Params{Path: r.URL.Path, Query: r.URL.Query()}
 			state = p.cfg.OnNavigate(cs, state, params)
 		}
-		state = p.cfg.Handle(cs, state, ev)
+		if newState, ok := RouteMount(p.cfg.Components, cs, state, ev); ok {
+			state = newState
+		} else {
+			state = p.cfg.Handle(cs, state, ev)
+		}
 	}
 
 	tree := p.cfg.Render(state)

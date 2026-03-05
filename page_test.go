@@ -9,6 +9,9 @@ import (
 
 	"github.com/jpl-au/fluent-tether/dev"
 	"github.com/jpl-au/fluent-tether/event"
+	"github.com/jpl-au/fluent/html5/div"
+	"github.com/jpl-au/fluent/html5/span"
+	"github.com/jpl-au/fluent/node"
 )
 
 // pageHandleCounter is a stateless handle function for testing.
@@ -444,6 +447,63 @@ func TestPagePOSTNavigateSkipsHandle(t *testing.T) {
 	// Should be 5 from OnNavigate, NOT 999 from Handle.
 	if !strings.Contains(msg.Morphs[0].HTML, "Count: 5") {
 		t.Errorf("expected Count: 5, got %s", msg.Morphs[0].HTML)
+	}
+}
+
+func TestPagePOSTComponentsDispatch(t *testing.T) {
+	type pageState struct {
+		Widget testWidget
+		Other  string
+	}
+
+	handler := Page(PageConfig[pageState]{
+		State: func(r *http.Request) pageState { return pageState{} },
+		Render: func(s pageState) node.Node {
+			return div.New(
+				span.Textf("count:%d", s.Widget.Count).Dynamic("count"),
+				span.Textf("other:%s", s.Other).Dynamic("other"),
+			)
+		},
+		Handle: func(_ Session, s pageState, ev Event) pageState {
+			if ev.Action == "set-other" {
+				s.Other = ev.Value()
+			}
+			return s
+		},
+		Components: []ComponentMount[pageState]{
+			Mount("widget",
+				func(s pageState) testWidget { return s.Widget },
+				func(s pageState, w testWidget) pageState { s.Widget = w; return s },
+			),
+		},
+	})
+
+	// Component event — should be routed to widget, not Handle.
+	body := `{"type":"click","action":"widget.inc","data":{},"event_id":"1"}`
+	req := httptest.NewRequest("POST", "/app", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	var msg testMessage
+	json.Unmarshal(w.Body.Bytes(), &msg)
+	if len(msg.Morphs) != 1 {
+		t.Fatalf("morphs = %d, want 1", len(msg.Morphs))
+	}
+	if !strings.Contains(msg.Morphs[0].HTML, "count:1") {
+		t.Errorf("expected count:1 from component dispatch, got %s", msg.Morphs[0].HTML)
+	}
+
+	// Non-component event — should fall through to Handle.
+	body = `{"type":"click","action":"set-other","data":{"value":"hi"},"event_id":"2"}`
+	req = httptest.NewRequest("POST", "/app", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w = httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	json.Unmarshal(w.Body.Bytes(), &msg)
+	if !strings.Contains(msg.Morphs[0].HTML, "other:hi") {
+		t.Errorf("expected other:hi from Handle fallthrough, got %s", msg.Morphs[0].HTML)
 	}
 }
 

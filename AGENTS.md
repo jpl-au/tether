@@ -158,6 +158,13 @@ events bypass mounts.
 `Event.Target` is set by the mount system to the prefix. `Event.WithAction`
 creates event copies with a different action for prefix stripping.
 
+`Mounter` is an optional interface (`Mount(Session) Component`) for one-time
+setup. The framework calls it during session startup for Config.Components
+mounts. Components that don't need setup omit it.
+
+`PageConfig.Components` mirrors `Config.Components` for stateless pages —
+same `RouteMount` dispatch before Handle, same `Mount` constructor.
+
 ### Router[S] (router package)
 
 Multi-page routing. Maps URL paths to `Page[S]{Render, Handle}` pairs.

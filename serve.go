@@ -239,6 +239,14 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 	started = true
 	go sess.run()
 
+	// Mount components that implement Mounter before any events arrive.
+	// Uses Update so side effects (Toast, Signal) are rendered and sent.
+	if len(h.cfg.Components) > 0 {
+		sess.Update(func(s S) S {
+			return InitMounts(h.cfg.Components, sess, s)
+		})
+	}
+
 	for _, w := range h.cfg.Watchers {
 		w.subscribe(sess)
 	}
