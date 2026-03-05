@@ -101,11 +101,16 @@ window.Tether.signals = window.Tether.signals || {};
       observeViewportElements(root);
     }
 
-    // Dev mode: unregister any existing service worker so cached assets
-    // are never served stale during development.
+    // Dev mode: unregister the service worker scoped to this handler so
+    // cached assets are never served stale during development. Only the
+    // worker matching this endpoint's scope is removed — workers
+    // registered by other handlers on the same origin are left alone.
     if (devMode && "serviceWorker" in navigator) {
+      var devScope = new URL(endpoint || "/", location.href).href;
       navigator.serviceWorker.getRegistrations().then(function (regs) {
-        for (var i = 0; i < regs.length; i++) regs[i].unregister();
+        for (var i = 0; i < regs.length; i++) {
+          if (regs[i].scope === devScope) regs[i].unregister();
+        }
       });
     } else if (root.hasAttribute("data-tether-worker") && "serviceWorker" in navigator) {
       // Full service worker: asset caching, offline page shells, push
