@@ -39,10 +39,10 @@ Mode constants: `mode.HTTP`, `mode.WebSocket`, `mode.ServerSentEvents`, `mode.Bo
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `OnConnect` | `func(*Session[S])` | Called when a session connects |
-| `OnDisconnect` | `func(*Session[S])` | Called when a session is permanently destroyed |
-| `OnStructuralChange` | `func(*Session[S], StructuralChange)` | Called when Dynamic keys change between renders |
-| `OnNoPatch` | `func(*Session[S], NoPatch)` | Called when a render cycle produces no patches |
+| `OnConnect` | `func(*LiveSession[S])` | Called when a session connects |
+| `OnDisconnect` | `func(*LiveSession[S])` | Called when a session is permanently destroyed |
+| `OnStructuralChange` | `func(*LiveSession[S], StructuralChange)` | Called when Dynamic keys change between renders |
+| `OnNoPatch` | `func(*LiveSession[S], NoPatch)` | Called when a render cycle produces no patches |
 | `Groups` | `[]*Group[S]` | Groups the session auto-joins on connect |
 
 `StructuralChange` reports what changed when the diff engine falls back to a root morph:
