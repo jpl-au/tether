@@ -147,15 +147,25 @@ func (g *Group[S]) Broadcast(fn func(target *LiveSession[S], state S) S) {
 }
 
 // BroadcastOthers applies fn to every session in the group except
-// the excluded one. This is the typical pattern when broadcasting from
-// inside [HandleFunc]: Handle updates the sender's state directly
-// (via the return value) and uses BroadcastOthers to push the change
-// to everyone else, avoiding a double-apply on the sender.
+// the excluded one. The exclude parameter accepts [Session] (the
+// non-generic interface) so it can be called directly from [HandleFunc]
+// without a type assertion:
+//
+//	group.BroadcastOthers(sess, func(target *tether.LiveSession[State], s State) State {
+//	    s.Message = "someone else did something"
+//	    return s
+//	})
+//
+// This is the typical pattern when broadcasting from inside Handle:
+// Handle updates the sender's state directly (via the return value)
+// and uses BroadcastOthers to push the change to everyone else,
+// avoiding a double-apply on the sender.
 //
 // Safe to call from any goroutine, including from within Handle.
-func (g *Group[S]) BroadcastOthers(exclude *LiveSession[S], fn func(target *LiveSession[S], state S) S) {
+func (g *Group[S]) BroadcastOthers(exclude Session, fn func(target *LiveSession[S], state S) S) {
+	excludeID := exclude.ID()
 	for _, t := range g.loadSessions() {
-		if t != exclude {
+		if t.id != excludeID {
 			t.Update(func(state S) S {
 				return fn(t, state)
 			})

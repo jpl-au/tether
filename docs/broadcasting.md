@@ -44,10 +44,8 @@ When broadcasting from inside `Handle`, use `BroadcastOthers` to exclude the sen
 Handle: func(sess tether.Session, s State, ev tether.Event) State {
     if ev.Action == "send-message" {
         s.Messages = append(s.Messages, ev.Data["text"])
-        // In live mode, sess is a *Session — type-assert to access
-        // Broadcast, Update, and other session-specific methods.
-        live := sess.(*tether.LiveSession[State])
-        group.BroadcastOthers(live, func(target *tether.LiveSession[State], s State) State {
+        // BroadcastOthers accepts Session directly — no type-assert needed.
+        group.BroadcastOthers(sess, func(target *tether.LiveSession[State], s State) State {
             s.Messages = append(s.Messages, ev.Data["text"])
             return s
         })
