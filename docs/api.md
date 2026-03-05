@@ -579,16 +579,18 @@ Key behaviours:
 - **Auto-cleanup** — the subscription is removed when the session is destroyed (context cancelled)
 - **Thread-safe** — the callback runs on the session's command loop, never concurrently with Handle or other Updates
 
-Typical usage is in `OnConnect`:
+Preferred usage is via `Config.Watchers` for declarative subscription:
 
 ```go
-OnConnect: func(sess *tether.LiveSession[State]) {
-    tether.On(sess, activityBus, func(item ActivityItem, s State) State {
+Watchers: []tether.Watcher[State]{
+    tether.WatchBus(activityBus, func(item ActivityItem, s State) State {
         s.Activity = append(s.Activity, item)
         return s
-    })
+    }),
 },
 ```
+
+`tether.On` is still available for conditional subscriptions in `OnConnect`.
 
 ### Bus vs Group
 
@@ -630,16 +632,18 @@ Key behaviours:
 - **Auto-cleanup** — removed when the session is destroyed
 - **Thread-safe** — runs on the session's command loop
 
-Typical usage is in `OnConnect`:
+Preferred usage is via `Config.Watchers` for declarative subscription:
 
 ```go
-OnConnect: func(sess *tether.LiveSession[State]) {
-    tether.Observe(sess, onlineCount, func(count int, s State) State {
+Watchers: []tether.Watcher[State]{
+    tether.WatchValue(onlineCount, func(count int, s State) State {
         s.OnlineCount = count
         return s
-    })
+    }),
 },
 ```
+
+`tether.Observe` is still available for conditional subscriptions in `OnConnect`.
 
 ### Value vs Bus
 

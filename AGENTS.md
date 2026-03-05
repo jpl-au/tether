@@ -128,6 +128,13 @@ publish to all observers via an internal `Bus`. `Load` is lock-free.
 subscription happen atomically within a single session command to prevent
 stale overwrites.
 
+### Watcher[S]
+
+Declarative reactive subscription for Config. `WatchValue(val, mapper)`
+creates a watcher that observes a Value; `WatchBus(bus, mapper)` creates
+one that subscribes to a Bus. Listed in `Config.Watchers`, they are
+subscribed automatically before `OnConnect` runs.
+
 ### Router[S] (router package)
 
 Multi-page routing. Maps URL paths to `Page[S]{Render, Handle}` pairs.
@@ -258,8 +265,10 @@ deterministic concurrency testing.
 | **Bus[E]** | Event type | Discrete domain events across handlers (chat messages, notifications) |
 | **Value[V]** | Value type | Shared observable state all sessions should track (online count, config) |
 
-Register subscriptions in `OnConnect`, not Handle. Subscriptions are
-cleaned up automatically when the session is destroyed.
+Prefer `Config.Watchers` for declarative subscriptions (`WatchValue`,
+`WatchBus`). Use `OnConnect` for imperative setup (incrementing counters,
+publishing events, starting tickers). Do not subscribe in Handle.
+Subscriptions are cleaned up automatically when the session is destroyed.
 
 ## Key files
 
@@ -277,6 +286,7 @@ cleaned up automatically when the session is destroyed.
 | `value.go` | Value — shared observable state with Bus internally |
 | `observe.go` | Observe — atomic subscribe + initial value delivery |
 | `emit.go` | On — subscribe a session to a Bus with sender filtering |
+| `watcher.go` | Watcher interface, WatchValue, WatchBus — declarative Config subscriptions |
 | `transport.go` | Transport interface |
 | `page.go` | PageConfig, stateless page handler |
 | `effects.go` | Effects struct — buffers Toast, Signal, Navigate, etc. |

@@ -70,10 +70,12 @@ type Config[S any] struct {
 	// are captured; during navigation, they are sent to the client.
 	OnNavigate func(session Session, state S, params Params) S
 
-	// OnConnect is called after a new session is created and its
-	// transport is ready. Use this to set up subscriptions ([On],
-	// [Observe]), join groups, start background goroutines that push
-	// updates via [LiveSession.Update], or log the connection. Optional.
+	// OnConnect is called after a new session is created, its transport
+	// is ready, and any [Config.Watchers] have been subscribed. Use
+	// this for imperative setup: incrementing counters, publishing
+	// events, starting background goroutines, or logging. For reactive
+	// subscriptions, prefer [Config.Watchers] which are declarative
+	// and visible on Config. Optional.
 	//
 	// OnConnect runs on the HTTP handler goroutine after the session's
 	// command loop has started but before the transport begins reading
@@ -202,6 +204,14 @@ type Config[S any] struct {
 	// permanently destroyed. Using Groups on Config avoids repetitive
 	// Add/Remove boilerplate in OnConnect/OnDisconnect. Optional.
 	Groups []*Group[S]
+
+	// Watchers are reactive sources that sessions automatically
+	// subscribe to when connected. Each watcher maps external changes
+	// into the session's state. Watchers are subscribed before
+	// [Config.OnConnect] runs, so the session receives updates from
+	// the moment it connects. Create watchers with [WatchValue] and
+	// [WatchBus]. Optional.
+	Watchers []Watcher[S]
 
 	// Timeouts groups all duration-based settings that control session
 	// lifecycle, reconnection, and transport keep-alive timing.

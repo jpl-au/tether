@@ -86,7 +86,18 @@ log.Printf("online: %d", group.Len())
 var messages = tether.NewBus[MessageSent]()
 ```
 
-Subscribe a session in `OnConnect`:
+Subscribe a session declaratively via `Config.Watchers`:
+
+```go
+Watchers: []tether.Watcher[State]{
+    tether.WatchBus(messages, func(msg MessageSent, s State) State {
+        s.Messages = append(s.Messages, msg.Text)
+        return s
+    }),
+},
+```
+
+Or in `OnConnect` for conditional subscriptions:
 
 ```go
 OnConnect: func(sess *tether.LiveSession[State]) {
@@ -184,7 +195,18 @@ messageBus.SubscribeAsync(ctx, func(msg MessageSent) {
 var onlineCount = tether.NewValue(0)
 ```
 
-Observe in `OnConnect` — the current value is delivered immediately:
+Observe declaratively via `Config.Watchers` — the current value is delivered immediately on connect:
+
+```go
+Watchers: []tether.Watcher[State]{
+    tether.WatchValue(onlineCount, func(count int, s State) State {
+        s.OnlineCount = count
+        return s
+    }),
+},
+```
+
+Or in `OnConnect` for conditional subscriptions:
 
 ```go
 OnConnect: func(sess *tether.LiveSession[State]) {

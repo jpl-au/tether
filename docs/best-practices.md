@@ -139,13 +139,28 @@ OnConnect: func(sess *tether.LiveSession[State]) {
 
 `Value`, `Bus`, and `Group` are all internally synchronised. See [broadcasting](broadcasting.md) for when to use each.
 
-## Use OnConnect for subscriptions
+## Declare subscriptions on Config
 
-`Observe` and `On` require `*LiveSession[S]` — not the `Session` interface — because they need to enqueue commands on the session's internal loop. This means subscriptions can only be created where you have the concrete session type: `OnConnect` and `OnDisconnect`.
+Use `Config.Watchers` to subscribe sessions to shared Values and Buses declaratively. Watchers are subscribed before `OnConnect` runs and cleaned up automatically when the session is destroyed:
 
-This is deliberate. Subscriptions are a lifecycle concern — they should be established once when the session connects, not on every event. Placing them in `OnConnect` keeps the subscription setup in one place and ensures they are cleaned up automatically when the session is destroyed.
+```go
+tether.Config[State]{
+    Watchers: []tether.Watcher[State]{
+        tether.WatchValue(onlineCount, func(n int, s State) State {
+            s.OnlineUsers = n
+            return s
+        }),
+        tether.WatchBus(messages, func(msg Message, s State) State {
+            s.Messages = append(s.Messages, msg)
+            return s
+        }),
+    },
+}
+```
 
-Call them once in `OnConnect`, not inside Handle:
+This keeps all reactive subscriptions visible in one place — right next to `Config.Groups`. Reserve `OnConnect` for imperative setup: incrementing counters, publishing events, pushing initial signals, starting background tickers.
+
+Never subscribe inside Handle — it creates a new subscription on every event:
 
 ```go
 // Wrong — creates a new subscription on every click event
@@ -157,15 +172,9 @@ Handle: func(sess tether.Session, s State, ev tether.Event) State {
     })
     return s
 },
-
-// Right — subscribe once when the session connects
-OnConnect: func(sess *tether.LiveSession[State]) {
-    tether.Observe(sess, onlineCount, func(count int, s State) State {
-        s.OnlineUsers = count
-        return s
-    })
-},
 ```
+
+`tether.Observe` and `tether.On` are still available for subscriptions that need to happen conditionally or later in the lifecycle (e.g. inside `OnConnect`).
 
 Subscriptions created in `OnConnect` are cleaned up automatically when the session is destroyed. No manual unsubscribe needed.
 

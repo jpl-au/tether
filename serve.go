@@ -236,6 +236,13 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 	started = true
 	go sess.run()
 
+	for _, w := range h.cfg.Watchers {
+		w.subscribe(sess)
+	}
+	if len(h.cfg.Watchers) > 0 {
+		dev.Debug("subscribed watchers", "session", sess.id, "endpoint", sess.endpoint, "count", len(h.cfg.Watchers))
+	}
+
 	if h.cfg.OnConnect != nil {
 		dev.Debug("calling OnConnect", "session", sess.id, "endpoint", sess.endpoint)
 		h.cfg.OnConnect(sess)
