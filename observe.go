@@ -18,11 +18,11 @@ import "github.com/jpl-au/fluent-tether/dev"
 //
 // The subscription is cleaned up when the session is destroyed.
 //
-//	tether.Observe(onlineCount, s, func(count int, state State) State {
+//	tether.Observe(s, onlineCount, func(count int, state State) State {
 //	    state.OnlineUsers = count
 //	    return state
 //	})
-func Observe[V any, S any](val *Value[V], s *LiveSession[S], fn func(V, S) S) {
+func Observe[V any, S any](s *LiveSession[S], val *Value[V], fn func(V, S) S) {
 	dev.Debug("observe.subscribe", "session", s.ID(), "endpoint", s.endpoint)
 	// Subscribe, read, and apply the current value inside a single
 	// Update so there is no gap between "subscribed" and "initial

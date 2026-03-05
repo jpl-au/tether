@@ -17,7 +17,7 @@ func TestOnSubscribesSessionToBus(t *testing.T) {
 		go sess.run()
 		defer func() { sess.stop(); synctest.Wait() }()
 
-		On(bus, sess, func(ev string, s counterState) counterState {
+		On(sess, bus, func(ev string, s counterState) counterState {
 			s.Count += len(ev)
 			return s
 		})
@@ -41,7 +41,7 @@ func TestOnAutoCleanupOnSessionDestroy(t *testing.T) {
 		go sess.readTransport(sess.events)
 		go sess.run()
 
-		On(bus, sess, func(ev string, s counterState) counterState {
+		On(sess, bus, func(ev string, s counterState) counterState {
 			s.Count++
 			return s
 		})
@@ -96,11 +96,11 @@ func TestEmitAndOnEndToEnd(t *testing.T) {
 
 		// Subscribe both. Sender filtering should prevent A from
 		// receiving its own event.
-		On(bus, sessA, func(ev msg, s counterState) counterState {
+		On(sessA, bus, func(ev msg, s counterState) counterState {
 			s.Count += 100 // should NOT fire for A's own emit
 			return s
 		})
-		On(bus, sessB, func(ev msg, s counterState) counterState {
+		On(sessB, bus, func(ev msg, s counterState) counterState {
 			s.Count += 1 // should fire
 			return s
 		})

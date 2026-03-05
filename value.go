@@ -25,7 +25,7 @@ import (
 //	onlineCount.Update(func(n int) int { return n + 1 })
 //
 //	// In OnConnect:
-//	tether.Observe(onlineCount, s, func(count int, state State) State {
+//	tether.Observe(s, onlineCount, func(count int, state State) State {
 //	    state.OnlineUsers = count
 //	    return state
 //	})

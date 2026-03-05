@@ -22,7 +22,7 @@ func TestObserveDeliversCurrentValue(t *testing.T) {
 		go sess.run()
 		defer func() { sess.stop(); synctest.Wait() }()
 
-		Observe(v, sess, func(val int, s counterState) counterState {
+		Observe(sess, v, func(val int, s counterState) counterState {
 			s.Count = val
 			return s
 		})
@@ -44,7 +44,7 @@ func TestObserveDeliversFutureChanges(t *testing.T) {
 		go sess.run()
 		defer func() { sess.stop(); synctest.Wait() }()
 
-		Observe(v, sess, func(val int, s counterState) counterState {
+		Observe(sess, v, func(val int, s counterState) counterState {
 			s.Count = val
 			return s
 		})
@@ -76,7 +76,7 @@ func TestObserveCrossHandler(t *testing.T) {
 		go sessA.run()
 		defer func() { sessA.stop(); synctest.Wait() }()
 
-		Observe(v, sessA, func(val int, s counterState) counterState {
+		Observe(sessA, v, func(val int, s counterState) counterState {
 			s.Count = val
 			return s
 		})
@@ -109,7 +109,7 @@ func TestObserveCrossHandler(t *testing.T) {
 		go sessB.run()
 		defer func() { sessB.stop(); synctest.Wait() }()
 
-		Observe(v, sessB, func(val int, s dashState) dashState {
+		Observe(sessB, v, func(val int, s dashState) dashState {
 			s.Active = val
 			return s
 		})
@@ -145,7 +145,7 @@ func TestObserveAutoCleanup(t *testing.T) {
 		go sess.readTransport(sess.events)
 		go sess.run()
 
-		Observe(v, sess, func(val int, s counterState) counterState {
+		Observe(sess, v, func(val int, s counterState) counterState {
 			s.Count = val
 			return s
 		})
@@ -201,11 +201,11 @@ func TestObserveMultipleValues(t *testing.T) {
 		go sess.run()
 		defer func() { sess.stop(); synctest.Wait() }()
 
-		Observe(vA, sess, func(val int, s state) state {
+		Observe(sess, vA, func(val int, s state) state {
 			s.A = val
 			return s
 		})
-		Observe(vB, sess, func(val string, s state) state {
+		Observe(sess, vB, func(val string, s state) state {
 			s.B = val
 			return s
 		})

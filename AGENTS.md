@@ -125,7 +125,7 @@ sender. Lock-free reads, copy-on-write writes.
 
 Thread-safe shared state with observer notifications. `Store`/`Update`
 publish to all observers via an internal `Bus`. `Load` is lock-free.
-`Observe(val, session, fn)` subscribes a session — the initial value and
+`Observe(session, val, fn)` subscribes a session — the initial value and
 subscription happen atomically within a single session command to prevent
 stale overwrites.
 
