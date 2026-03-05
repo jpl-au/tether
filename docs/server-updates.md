@@ -30,6 +30,39 @@ Available side effects:
 
 When no side effects are needed, just return the new state.
 
+### Selector helpers vs signals
+
+`Flash` and `Indicator` target DOM elements by CSS selector. This is productive — a single line shows a message or a spinner — but it couples the server to the DOM's ID structure. For simple apps and quick iterations this is the right trade-off.
+
+For reusable components or complex layouts where selectors become fragile, signals achieve the same result without coupling:
+
+```go
+// Selector approach — quick and direct
+sess.Flash("#notice", "Saved")
+
+// Signal approach — decoupled, no selector needed
+sess.Signal("saved", true)
+// In Render:
+bind.Apply(span.Text("Saved"), bind.BindShow("saved"))
+```
+
+```go
+// Selector approach — show a spinner by ID
+bind.Apply(button.Text("Load"),
+    bind.OnClick("load"),
+    bind.Indicator("#spinner"),
+)
+
+// Signal approach — show a spinner via signal binding
+bind.Apply(button.Text("Load"),
+    bind.OnClick("load"),
+    bind.Optimistic("loading", "true"),
+)
+bind.Apply(span.Text("Loading..."), bind.BindShow("loading"))
+```
+
+Both are valid. Use selector helpers when speed matters and the DOM structure is straightforward. Use signals when the element lives in a different component or when the same indicator pattern is reused across pages.
+
 ## Pushing state changes
 
 Push state changes from outside the event loop (timers, database changes, broadcasts):
