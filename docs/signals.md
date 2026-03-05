@@ -85,26 +85,35 @@ For toggle-only UI (drawers, menus, modals) where the server doesn't need to kno
 
 ## Signal truthiness
 
-`BindShow`, `BindHide`, `BindClass`, and `BindAttr` evaluate signal values using JavaScript truthiness rules. The following values are **falsy** (element hidden for BindShow, shown for BindHide):
+`BindShow`, `BindHide`, `BindClass`, and `BindAttr` evaluate signal values
+using custom truthiness rules designed so that server-side Go values and
+client-side string values behave identically. The following values are
+**falsy** (element hidden for BindShow, shown for BindHide):
 
-| Value | Falsy? |
-|-------|--------|
-| `false` | Yes |
-| `0` | Yes |
-| `""` (empty string) | Yes |
-| `nil` | Yes |
+| Value | Falsy? | Source |
+|-------|--------|--------|
+| `false` | Yes | `Signal("flag", false)` from Go |
+| `0` | Yes | `Signal("count", 0)` from Go |
+| `""` (empty string) | Yes | `Signal("name", "")` from Go |
+| `nil` / `null` | Yes | `Signal("val", nil)` from Go |
+| `"false"` | Yes | `SetSignal("flag", "false")` from client |
+| `"0"` | Yes | `SetSignal("count", "0")` from client |
+| `"null"` | Yes | String representation of null |
+| `"undefined"` | Yes | String representation of undefined |
 
-Everything else is **truthy**, including strings that look false:
+Everything else is **truthy**:
 
-| Value | Truthy? | Why |
-|-------|---------|-----|
-| `"false"` | Yes | Non-empty string |
-| `"0"` | Yes | Non-empty string |
-| `"no"` | Yes | Non-empty string |
-| `42` | Yes | Non-zero number |
-| `true` | Yes | Boolean true |
+| Value | Truthy? |
+|-------|---------|
+| `true` | Yes |
+| `42` | Yes |
+| `"hello"` | Yes |
+| `"true"` | Yes |
+| `"1"` | Yes |
 
-**Always use Go booleans and numbers for show/hide signals, not their string representations.** `Signal("flag", false)` hides the element; `Signal("flag", "false")` shows it because `"false"` is a non-empty string.
+This means `Signal("flag", false)` from Go and `SetSignal("flag", "false")`
+from a client-side directive both evaluate as falsy — no need to worry
+about whether the value is a JSON boolean or a string.
 
 ## Don't mix signals and state rendering on the same element
 

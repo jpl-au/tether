@@ -1014,10 +1014,16 @@ window.Tether.signals = window.Tether.signals || {};
     }
   }
 
-  // isTruthy mirrors JavaScript's truthiness but treats null, undefined,
-  // false, 0, and empty string as falsy. Used for show/hide/class bindings.
+  // isTruthy evaluates signal truthiness for show/hide/class/attr
+  // bindings. Signals arrive as JSON values from the server (bool, int,
+  // string, null) or as strings from client-side SetSignal / Optimistic.
+  // To avoid surprises, string representations of falsy values are also
+  // treated as falsy — so Signal("flag", false) from Go and
+  // SetSignal("flag", "false") from JS behave identically.
   function isTruthy(val) {
-    return val !== null && val !== undefined && val !== false && val !== 0 && val !== "";
+    if (val === null || val === undefined || val === false || val === 0 || val === "") return false;
+    if (val === "false" || val === "0" || val === "null" || val === "undefined") return false;
+    return true;
   }
 
   // reapplySignals restores signal-bound values on an element and its
