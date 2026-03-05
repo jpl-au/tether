@@ -141,7 +141,11 @@ OnConnect: func(sess *tether.LiveSession[State]) {
 
 ## Use OnConnect for subscriptions
 
-`Observe` and `On` register subscriptions. Call them once in `OnConnect`, not inside Handle:
+`Observe` and `On` require `*LiveSession[S]` — not the `Session` interface — because they need to enqueue commands on the session's internal loop. This means subscriptions can only be created where you have the concrete session type: `OnConnect` and `OnDisconnect`.
+
+This is deliberate. Subscriptions are a lifecycle concern — they should be established once when the session connects, not on every event. Placing them in `OnConnect` keeps the subscription setup in one place and ensures they are cleaned up automatically when the session is destroyed.
+
+Call them once in `OnConnect`, not inside Handle:
 
 ```go
 // Wrong — creates a new subscription on every click event

@@ -163,6 +163,19 @@ Avoid registering raw subscriptions in `init()` — that creates goroutines with
 
 Session-bound subscriptions (registered via `tether.On`) are cleaned up automatically when the session is destroyed. No manual unsubscribe needed.
 
+### Ordering note for synchronous subscribers
+
+Synchronous `Subscribe` callbacks run inline in the publisher's goroutine. If a callback updates a `Value`, the Value's observers fire immediately — before the original event reaches session command loops via `On`. This can cause a brief inconsistency where a session sees the Value change (e.g. a counter increment) before the event that caused it (e.g. a new message).
+
+The session's FIFO command loop restores consistency within one tick, and in practice the client coalesces rapid renders. But if strict ordering matters, use `SubscribeAsync` instead — it runs in its own goroutine, so the original event reaches session command loops first:
+
+```go
+// Ordering-safe: async subscriber doesn't block the publish loop
+messageBus.SubscribeAsync(ctx, func(msg MessageSent) {
+    messageCount.Update(func(n int) int { return n + 1 })
+})
+```
+
 ## Value — shared observable state
 
 `tether.Value` holds a single value that sessions can observe. When the value changes, all observers are notified automatically. Built on Bus internally:

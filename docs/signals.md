@@ -83,6 +83,46 @@ bind.Click(
 
 For toggle-only UI (drawers, menus, modals) where the server doesn't need to know, use client-side directives. These are covered in [client-side features](client-side.md).
 
+## Signal truthiness
+
+`BindShow`, `BindHide`, `BindClass`, and `BindAttr` evaluate signal values using JavaScript truthiness rules. The following values are **falsy** (element hidden for BindShow, shown for BindHide):
+
+| Value | Falsy? |
+|-------|--------|
+| `false` | Yes |
+| `0` | Yes |
+| `""` (empty string) | Yes |
+| `nil` | Yes |
+
+Everything else is **truthy**, including strings that look false:
+
+| Value | Truthy? | Why |
+|-------|---------|-----|
+| `"false"` | Yes | Non-empty string |
+| `"0"` | Yes | Non-empty string |
+| `"no"` | Yes | Non-empty string |
+| `42` | Yes | Non-zero number |
+| `true` | Yes | Boolean true |
+
+**Always use Go booleans and numbers for show/hide signals, not their string representations.** `Signal("flag", false)` hides the element; `Signal("flag", "false")` shows it because `"false"` is a non-empty string.
+
+## Don't mix signals and state rendering on the same element
+
+An element should be driven by **either** signals **or** state rendering — never both. If a signal updates an element's text and the next render cycle also touches that element, the render overwrites the signal value:
+
+```go
+// Wrong — the render and signal fight over the same element
+bind.BindText(span.Textf("Count: %d", s.Count).Dynamic("count"), "count")
+
+// Right — signal-only element, no Dynamic key needed
+bind.BindText(span.New(), "count")
+
+// Right — state-rendered element, no signal binding
+span.Textf("Count: %d", s.Count).Dynamic("count")
+```
+
+Pick one update path per element. Use signals for high-frequency updates that bypass rendering. Use state rendering for everything else.
+
 ## When to use what
 
 | Mode | Round-trip | Use case |
