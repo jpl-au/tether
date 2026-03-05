@@ -41,6 +41,24 @@ type Component interface {
 	Handle(Session, Event) Component
 }
 
+// EqualComponent is an optional interface that components can implement
+// to provide fast equality checking. The parent's Equal function (or the
+// framework's default comparison) checks for this interface before
+// falling back to reflect.DeepEqual or byte-level diffing.
+//
+// Implement this when your component contains slices, maps, or other
+// fields that make reflect.DeepEqual expensive. Simple components with
+// only scalar fields can rely on the default comparison.
+//
+// When a Component is stored as an interface field (Approach B), Go's ==
+// operator cannot compare interface values containing slices or maps —
+// it panics. EqualComponent is load-bearing in that scenario, not
+// optional.
+type EqualComponent interface {
+	Component
+	EqualComponent(Component) bool
+}
+
 // Route dispatches an event to a component by prefix. If the event's
 // action starts with "prefix.", the prefix is stripped and the event is
 // forwarded to comp.Handle. Otherwise the component is returned unchanged.
