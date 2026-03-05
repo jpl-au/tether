@@ -201,6 +201,9 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		reconnectTimeout: h.cfg.Timeouts.Reconnect,
 	}
 	sess.lastActivity.Store(now.UnixNano())
+	if len(h.cfg.Components) > 0 {
+		sess.mounts = h.cfg.Components
+	}
 	dev.Debug("session created", "session", id, "endpoint", r.URL.Path, "remote", r.RemoteAddr)
 
 	if h.cfg.Push != nil && h.cfg.Push.Sender != nil {

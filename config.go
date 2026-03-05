@@ -213,6 +213,17 @@ type Config[S any] struct {
 	// [WatchBus]. Optional.
 	Watchers []Watcher[S]
 
+	// Components declares component mounts for automatic event routing.
+	// Before the session's [HandleFunc] runs, each event is checked
+	// against the mounted components. If a mount's prefix matches the
+	// event action, the component handles the event and the user's
+	// Handle function never sees it. Create mounts with [Mount].
+	//
+	// This follows the same declarative pattern as [Config.Watchers]
+	// and [Config.Groups]: wired once at Config time, automatically
+	// managed by the framework.
+	Components []ComponentMount[S]
+
 	// Timeouts groups all duration-based settings that control session
 	// lifecycle, reconnection, and transport keep-alive timing.
 	Timeouts Timeouts

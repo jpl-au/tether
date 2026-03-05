@@ -135,6 +135,11 @@ type LiveSession[S any] struct {
 	// (active → disconnected or destroy).
 	onDisconnect func()
 
+	// Component mounts for automatic event routing. Events matching
+	// a mount's prefix are dispatched to the component before the
+	// user's Handle function runs.
+	mounts []ComponentMount[S]
+
 	// Optional equality check — skip render when state unchanged.
 	equal func(a, b S) bool
 

@@ -93,9 +93,8 @@ func (s *LiveSession[S]) readTransport(out chan<- Event) {
 	}
 }
 
-// exec is the core pipeline. Every client event passes through it:
-// activity tracking → snapshot → handle → drain effects → state
-// check → render → diff → send.
+// exec processes a single client event: handle it, re-render, diff,
+// and send patches to the transport.
 func (s *LiveSession[S]) exec(ev Event) {
 	now := time.Now()
 	s.lastActivity.Store(now.UnixNano())
@@ -140,15 +139,25 @@ func (s *LiveSession[S]) exec(ev Event) {
 		"type", ev.Type,
 	)
 
-	// Phase 1: Handle — produce new state. Navigate events are
-	// dispatched to OnNavigate inside the composed Handle function
-	// (see handler.go), so middleware applies to all event types.
-	newState := s.handle(s, s.state, ev)
+	// Component mounts intercept events before Handle so that
+	// mounted components are self-contained — the application's
+	// Handle never sees events meant for a component. Navigate
+	// events bypass mounts because they need the OnNavigate chain.
+	var newState S
+	handled := false
+	if ev.Type != "navigate" {
+		for _, m := range s.mounts {
+			if newState, handled = m.route(s, s.state, ev); handled {
+				break
+			}
+		}
+	}
+	if !handled {
+		newState = s.handle(s, s.state, ev)
+	}
 
-	// Phase 2: Collect effects enqueued during Handle.
 	s.drainFx(fx)
 
-	// Phase 3: State check — skip render if unchanged.
 	if s.equal != nil && s.equal(s.state, newState) {
 		dev.Debug("state unchanged, skipping render",
 			"session", s.id,
@@ -163,7 +172,6 @@ func (s *LiveSession[S]) exec(ev Event) {
 	}
 	s.state = newState
 
-	// Phase 4: Render + Diff.
 	tree := s.render(s.state)
 	patches, change := s.differ.Diff(tree)
 	dev.Debug("render complete",
@@ -193,7 +201,6 @@ func (s *LiveSession[S]) exec(ev Event) {
 		}
 	}
 
-	// Phase 5: Build and send update.
 	s.sendDiff(ev.EventID, patches, change, tree, fx)
 }
 
