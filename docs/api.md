@@ -44,6 +44,8 @@ Mode constants: `mode.HTTP`, `mode.WebSocket`, `mode.ServerSentEvents`, `mode.Bo
 | `OnStructuralChange` | `func(*LiveSession[S], StructuralChange)` | Called when Dynamic keys change between renders |
 | `OnNoPatch` | `func(*LiveSession[S], NoPatch)` | Called when a render cycle produces no patches |
 | `Groups` | `[]*Group[S]` | Groups the session auto-joins on connect |
+| `Watchers` | `[]Watcher[S]` | Declarative subscriptions to Value and Bus |
+| `Components` | `[]ComponentMount[S]` | Declarative component mounts — events are dispatched by prefix |
 
 `StructuralChange` reports what changed when the diff engine falls back to a root morph:
 
@@ -191,6 +193,7 @@ type Event struct {
     Action  string            // application-defined action name
     Data    map[string]string // event-specific key-value pairs
     EventID string            // monotonic counter for correlation
+    Target  string            // set by Config.Components to the mount prefix
 }
 
 // Accessors
@@ -201,6 +204,7 @@ func (e Event) Int(key string) (int, error)        // parse integer
 func (e Event) Float64(key string) (float64, error) // parse float
 func (e Event) Bool(key string) bool               // "true" → true
 func (e Event) Bind(dest any) error                // struct-tag form binding
+func (e Event) WithAction(action string) Event     // copy with different Action
 ```
 
 Event type constants live in the `event` package: `event.Click`, `event.Input`, `event.Submit`, `event.Change`, `event.KeyDown`, `event.Focus`, `event.Blur`, `event.Navigate`, `event.Viewport`, `event.Online`, `event.Offline`, `event.AppInstalled`. Create custom types with `event.Custom("name")`.
@@ -466,6 +470,9 @@ h := tethertest.New(tethertest.Config[State]{
     State:      State{Count: 0},
     Render:     render,
     Handle:     handle,
+    Components: []tether.ComponentMount[State]{
+        tether.Mount("likes", getLikes, setLikes),
+    },
     Middleware: []tethertest.Middleware[State]{withAuth},
     OnNavigate: onNavigate,
 })
@@ -651,24 +658,88 @@ Use Value for state that multiple sessions need to stay in sync with (online cou
 
 ---
 
-## Scope
+## Component
 
-Focus session state onto a component:
+A self-contained rendering unit with its own state. Components know how to render themselves and handle their own events, without any knowledge of the parent's state type:
 
 ```go
-sc := tether.Scope[State, FormState]{
-    View:   func(s State) FormState { return s.Form },
-    Update: func(s State, f FormState) State { s.Form = f; return s },
+type Component interface {
+    Render() node.Node
+    Handle(Session, Event) Component
 }
-
-// In Handle:
-return sc.Handle(sess, s, ev, formHandle)
-
-// In Update:
-sess.Update(func(s State) State {
-    return sc.With(s, func(f FormState) FormState { f.Valid = true; return f })
-})
 ```
+
+Components are value types — `Handle` returns a new value, the receiver is never mutated. This matches the `HandleFunc` pattern (returns new S).
+
+### EqualComponent
+
+Optional interface for fast equality checking. Implement this when your component contains slices or maps that make `reflect.DeepEqual` expensive:
+
+```go
+type EqualComponent interface {
+    Component
+    EqualComponent(Component) bool
+}
+```
+
+### Route and RouteTyped
+
+Dispatch events to a component by prefix. Events with actions starting with `"prefix."` are routed to the component with the prefix stripped:
+
+```go
+// Route returns Component — use when the field stores the interface type.
+s.Chat = tether.Route(s.Chat, "chat", sess, ev)
+
+// RouteTyped preserves the concrete type — use when the field stores a concrete struct.
+s.Chat = tether.RouteTyped(s.Chat, "chat", sess, ev)
+```
+
+`RouteTyped` is the common choice. It preserves compile-time type safety — the parent stores the concrete component type in its state struct with direct field access, no type assertions needed.
+
+### Config.Components
+
+Declarative component mounting. The framework intercepts events matching each mount's prefix and dispatches them to the component's `Handle` — the page's `Handle` function never sees these events:
+
+```go
+tether.Config[State]{
+    Components: []tether.ComponentMount[State]{
+        tether.Mount("likes",
+            func(s State) counter.Counter { return s.Likes },
+            func(s State, c counter.Counter) State { s.Likes = c; return s },
+        ),
+        tether.Mount("stars",
+            func(s State) counter.Counter { return s.Stars },
+            func(s State, c counter.Counter) State { s.Stars = c; return s },
+        ),
+    },
+}
+```
+
+`Mount` follows the same pattern as `WatchValue` and `WatchBus`: a generic constructor that returns a non-generic interface, so `Config.Components` can hold mounts for different component types.
+
+Navigate events bypass mounts — they always reach `OnNavigate`.
+
+### Event.Target
+
+When `Config.Components` dispatches an event, the framework sets `Event.Target` to the mount's prefix (e.g. `"likes"` or `"stars"`). Middleware and logging can inspect this field to identify which component handled the event without parsing the action string.
+
+### Event.WithAction
+
+Returns a copy of the event with a different `Action`. Used by `Route`, `RouteTyped`, and the mount system to strip prefixes before forwarding to the component.
+
+### Route vs Config.Components
+
+Use `Config.Components` when the component is self-contained and the page's `Handle` never needs to see its events. Use `Route`/`RouteTyped` in Handle when you need to coordinate component events with other state changes or when the component is used in stateless `PageConfig` handlers (which don't support `Config.Components`).
+
+### RouteMount
+
+Exported function used by the exec loop and `tethertest` to dispatch component events:
+
+```go
+func RouteMount[S any](mounts []ComponentMount[S], sess Session, state S, ev Event) (S, bool)
+```
+
+Returns the updated state and `true` if a mount handled the event, or the original state and `false` if no prefix matched.
 
 ---
 

@@ -95,7 +95,7 @@ tether.New(tether.Config[State]{
 | Guide | Description |
 |-------|-------------|
 | [Architecture](docs/architecture.md) | Core concepts, session lifecycle, command loop, transport |
-| [API reference](docs/api.md) | Config, Session, Event, Middleware, tethertest, bind helpers |
+| [API reference](docs/api.md) | Config, Session, Event, Component, Middleware, tethertest, bind helpers |
 | [Getting started](docs/getting-started.md) | Setup, how updates reach the browser |
 | [Stateless pages](docs/stateless.md) | tether.Page for request/response pages without persistent connections |
 | [Events](docs/events.md) | Event binding, timing, loading states, forms |

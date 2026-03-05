@@ -157,4 +157,6 @@ Start with `tether.Page` and upgrade to `tether.New` when you need:
 - **File uploads** — streaming files via the upload extension
 - **Push notifications** — Web Push via the service worker
 
-The `Render` function, `HandleFunc` signature, `OnNavigate`, `Layout`, event bindings, and the `router` package all work identically in both modes. Upgrading typically means changing `tether.Page(PageConfig{...})` to `tether.New(Config{...})` and adding transport configuration.
+The `Render` function, `HandleFunc` signature, `OnNavigate`, `Layout`, event bindings, components (via `RouteTyped` in Handle), and the `router` package all work identically in both modes. Upgrading typically means changing `tether.Page(PageConfig{...})` to `tether.New(Config{...})` and adding transport configuration.
+
+Note: `Config.Components` (declarative mounting) is only available on live handlers. Stateless pages can use `Route`/`RouteTyped` in Handle for component dispatch.

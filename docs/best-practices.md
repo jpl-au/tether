@@ -178,6 +178,44 @@ Handle: func(sess tether.Session, s State, ev tether.Event) State {
 
 Subscriptions created in `OnConnect` are cleaned up automatically when the session is destroyed. No manual unsubscribe needed.
 
+## Use Config.Components for self-contained components
+
+When a component handles its own events without needing to coordinate with the rest of the page, mount it declaratively via `Config.Components`. The framework dispatches events automatically — the page's `Handle` never sees them:
+
+```go
+Components: []tether.ComponentMount[State]{
+    tether.Mount("likes",
+        func(s State) counter.Counter { return s.Likes },
+        func(s State, c counter.Counter) State { s.Likes = c; return s },
+    ),
+},
+```
+
+Use `Route`/`RouteTyped` in Handle instead when:
+- The component needs to coordinate with other state changes
+- You are using `tether.Page` (stateless handlers don't support `Config.Components`)
+- You need to inspect or transform the event before forwarding
+
+## Keep component Render roots keyed
+
+A component's `Render` method should produce a node tree with a stable Dynamic key. Without one, changes to the component produce no patches and the client never updates:
+
+```go
+func (c Counter) Render() node.Node {
+    return div.New(
+        span.Textf("Count: %d", c.Count).Dynamic("count"),
+        bind.Apply(button.Text("+1"), bind.OnClick("increment")),
+    )
+}
+```
+
+When mounting multiple instances, wrap each in a keyed container so the diff engine can distinguish them:
+
+```go
+div.New(s.Likes.Render()).Dynamic("likes-section"),
+div.New(s.Stars.Render()).Dynamic("stars-section"),
+```
+
 ## Use Equal to skip unchanged renders
 
 When many events leave state unchanged — keypresses that don't affect the model, button clicks that only trigger side effects — the render and diff are wasted work. Provide an `Equal` function to skip them:

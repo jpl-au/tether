@@ -238,40 +238,75 @@ session.Signal("count", 42)            // push a reactive value
 
 Each sends a standalone update message. For side effects during event handling, call them on the session parameter inside `Handle` — they merge into the same message as the state diff.
 
-## Scope — component state isolation
+## Components — reusable state isolation
 
-`tether.Scope` focuses a session's state onto a smaller component type. The component handler only sees its own sub-state — never the full application state:
+`tether.Component` is a self-contained rendering unit with its own state. Components know how to render themselves and handle their own events, without any knowledge of the parent's state type:
 
 ```go
-var todos = tether.Scope[AppState, TodoState]{
-    View:   func(s AppState) TodoState { return s.Todos },
-    Update: func(s AppState, t TodoState) AppState { s.Todos = t; return s },
+type Counter struct {
+    Count int
+}
+
+func (c Counter) Render() node.Node {
+    return div.New(
+        span.Textf("Count: %d", c.Count).Dynamic("count"),
+        bind.Apply(button.Text("+1"), bind.OnClick("increment")),
+        bind.Apply(button.Text("Reset"), bind.OnClick("reset")),
+    )
+}
+
+func (c Counter) Handle(sess tether.Session, ev tether.Event) tether.Component {
+    switch ev.Action {
+    case "increment":
+        c.Count++
+    case "reset":
+        c.Count = 0
+        sess.Toast("Counter reset")
+    }
+    return c
 }
 ```
 
-Use `Handle` in the event handler to dispatch to the component:
+Components are value types — `Handle` returns a new value, the receiver is never mutated. Side effects (`sess.Toast`, `sess.Signal`, etc.) work inside components just like they do in the page handler.
+
+### Declarative mounting with Config.Components
+
+For components that are fully self-contained, mount them declaratively on Config. The framework intercepts events matching the mount's prefix and dispatches them automatically — the page's `Handle` never sees these events:
 
 ```go
-Handle: func(sess tether.Session, s AppState, ev tether.Event) AppState {
-    if ev.Action == "add-todo" || ev.Action == "remove-todo" {
-        return todos.Handle(sess, s, ev, todoHandle)
-    }
+tether.Config[State]{
+    Components: []tether.ComponentMount[State]{
+        tether.Mount("likes",
+            func(s State) Counter { return s.Likes },
+            func(s State, c Counter) State { s.Likes = c; return s },
+        ),
+    },
+}
+```
+
+In Render, call the component's `Render` method:
+
+```go
+Render: func(s State) node.Node {
+    return div.New(
+        p.Text("Likes:"),
+        div.New(s.Likes.Render()).Dynamic("likes-section"),
+    )
+},
+```
+
+### Manual routing with RouteTyped
+
+When you need to coordinate component events with other state changes, or when using `tether.Page` (which does not support `Config.Components`), route events manually in Handle:
+
+```go
+Handle: func(sess tether.Session, s State, ev tether.Event) State {
+    s.Counter = tether.RouteTyped(s.Counter, "counter", sess, ev)
     return s
 },
 ```
 
-Use `With` inside `Session.Update` for server-initiated changes:
-
-```go
-sess.Update(func(s AppState) AppState {
-    return todos.With(s, func(t TodoState) TodoState {
-        t.Valid = true
-        return t
-    })
-})
-```
-
-Scope keeps component handlers reusable — they work with `TodoState` and never import the parent `AppState` type.
+Events with actions like `"counter.increment"` are forwarded to the component with the prefix stripped — the component sees `"increment"`. Events without a matching prefix pass through unchanged.
 
 ## URL routing
 

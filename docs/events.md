@@ -210,3 +210,30 @@ Handle: func(_ tether.Session, s State, ev tether.Event) State {
 ```go
 bind.Apply(div.New().ID("sentinel"), bind.OnViewport("load-more"))
 ```
+
+## Component event routing
+
+When using `Config.Components`, events are dispatched by prefix before reaching the page's `Handle`. An event with action `"likes.increment"` is routed to the component mounted at prefix `"likes"` — the component receives the event with action `"increment"` (prefix stripped).
+
+### Event.Target
+
+When `Config.Components` dispatches an event, `Event.Target` is set to the mount's prefix (e.g. `"likes"`). This lets middleware and logging identify which component handled the event:
+
+```go
+func loggingMiddleware[S any](next tether.HandleFunc[S]) tether.HandleFunc[S] {
+    return func(sess tether.Session, s S, ev tether.Event) S {
+        if ev.Target != "" {
+            slog.Info("component event", "target", ev.Target, "action", ev.Action)
+        }
+        return next(sess, s, ev)
+    }
+}
+```
+
+### Event.WithAction
+
+Returns a copy of the event with a different `Action`. Used internally by the mount system and `Route`/`RouteTyped` to strip prefixes. Available for custom dispatchers that need to rewrite actions before forwarding:
+
+```go
+stripped := ev.WithAction(strings.TrimPrefix(ev.Action, "prefix."))
+```

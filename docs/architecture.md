@@ -101,13 +101,16 @@ When a client event arrives, `exec()` runs the full pipeline:
 ```
 1. Track activity      — update timestamp, reset idle timer
 2. Snapshot state      — capture s.state atomically for concurrent readers
-3. Handle              — call the handler, get new state
-4. Drain effects       — collect buffered Toast/Signal/Navigate calls
-5. Equality check      — skip render if Equal says state is unchanged
-6. Render              — build a new node tree from the new state
-7. Diff                — compare with the previous tree
-8. Send                — serialise patches + effects and push to the client
+3. Component dispatch  — if Config.Components matches the event prefix, route to the component
+4. Handle              — if no component matched, call the page handler
+5. Drain effects       — collect buffered Toast/Signal/Navigate calls
+6. Equality check      — skip render if Equal says state is unchanged
+7. Render              — build a new node tree from the new state
+8. Diff                — compare with the previous tree
+9. Send                — serialise patches + effects and push to the client
 ```
+
+Component dispatch (step 3) runs before Handle so that mounted components are self-contained — the application's Handle never sees events meant for a component. Navigate events bypass component dispatch because they always need the `OnNavigate` chain.
 
 ### Effect buffering
 

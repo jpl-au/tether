@@ -1,6 +1,6 @@
 # Extensions
 
-Extensions are opt-in features that add capabilities beyond the core render/handle loop. Each is activated by setting a field on `Config` — if you don't set it, there is zero overhead.
+Extensions are opt-in features that add capabilities beyond the core render/handle loop. Each is activated by setting a field on `Config` — if you don't set it, there is zero overhead. Extensions work alongside `Config.Components` — component events are dispatched before Handle, but upload callbacks and push subscriptions operate at the session level independent of component routing.
 
 ## File uploads
 

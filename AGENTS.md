@@ -32,7 +32,7 @@ tether/              Root package — Config, Handler, Session, Bus, Group, Valu
 ├── push/            Web Push notification support (VAPID, Sender, Subscription)
 ├── router/          Multi-page routing — dispatches Render/Handle to the active page by URL path
 ├── sse/             SSE+POST transport implementation
-├── tethertest/      Test harness — drives Handle functions without transport or goroutines
+├── tethertest/      Test harness — drives Handle functions and component dispatch without transport or goroutines
 ├── wire/            Wire protocol — Update struct, Encoder interface, JSON encoding
 └── ws/              WebSocket transport implementation
 ```
@@ -70,8 +70,11 @@ in `OnConnect`/`OnDisconnect`, not in `Handle`.
 
 Client event: `Type` (click, input, submit, navigate, etc.), `Action`
 (the `data-tether-*` value), `Data` (form fields), `EventID` (for
-client-side de-duplication). Typed extraction helpers: `Value`, `Key`,
-`Get`, `Int`, `Float64`, `Bool`, `Bind`.
+client-side de-duplication), `Target` (set by `Config.Components` to
+the mount prefix). Typed extraction helpers: `Value`, `Key`, `Get`,
+`Int`, `Float64`, `Bool`, `Bind`. `WithAction` returns a copy with a
+different Action (used by Route, RouteTyped, and mounts for prefix
+stripping).
 
 ### Params
 
@@ -134,6 +137,26 @@ Declarative reactive subscription for Config. `WatchValue(val, mapper)`
 creates a watcher that observes a Value; `WatchBus(bus, mapper)` creates
 one that subscribes to a Bus. Listed in `Config.Watchers`, they are
 subscribed automatically before `OnConnect` runs.
+
+### Component
+
+`Component` is a self-contained rendering unit — `Render() node.Node` builds
+the UI, `Handle(Session, Event) Component` processes events. Components are
+value types; Handle returns a new value, the receiver is not mutated. They
+receive `Session` (not `*LiveSession`), so they work in SSR pre-warming and
+tests without special cases.
+
+`EqualComponent` is an optional interface for fast equality checking.
+
+`Route` and `RouteTyped` dispatch events by prefix in Handle. `RouteTyped`
+preserves the concrete type for compile-time safety.
+
+`Config.Components` with `Mount` wires components declaratively — the framework
+intercepts events by prefix and dispatches them before Handle runs. Navigate
+events bypass mounts.
+
+`Event.Target` is set by the mount system to the prefix. `Event.WithAction`
+creates event copies with a different action for prefix stripping.
 
 ### Router[S] (router package)
 
@@ -205,12 +228,13 @@ When a client event arrives, `exec()` in `loop.go` runs:
 
 1. Track activity — update timestamp, reset idle timer
 2. Snapshot state — store atomically for concurrent `State()` readers
-3. Handle — call the handler, get new state
-4. Drain effects — collect buffered Toast/Signal/Navigate calls
-5. Equality check — skip render if `Equal` says state unchanged
-6. Render — build a new node tree
-7. Diff — compare with the previous tree via fluent-jit
-8. Send — serialise patches + effects, push to the client
+3. Component dispatch — if Config.Components matches the event prefix, route to the component
+4. Handle — if no component matched, call the page handler
+5. Drain effects — collect buffered Toast/Signal/Navigate calls
+6. Equality check — skip render if `Equal` says state unchanged
+7. Render — build a new node tree
+8. Diff — compare with the previous tree via fluent-jit
+9. Send — serialise patches + effects, push to the client
 
 ## Transport
 
@@ -281,6 +305,8 @@ Subscriptions are cleaned up automatically when the session is destroyed.
 | `methods.go` | Session methods — State, Update, Close, Toast, Navigate, Signal, Push |
 | `handle.go` | HandleFunc type, middleware chain |
 | `serve.go` | HTTP handler (ServeHTTP), session creation, reattach |
+| `component.go` | Component interface, EqualComponent, Route, RouteTyped |
+| `mount.go` | ComponentMount interface, Mount constructor, RouteMount dispatch |
 | `bus.go` | Bus — typed pub/sub with atomic reads and copy-on-write |
 | `group.go` | Group — session pool with Broadcast/BroadcastOthers |
 | `value.go` | Value — shared observable state with Bus internally |
