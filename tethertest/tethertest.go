@@ -71,6 +71,12 @@ type Config[S any] struct {
 	// this to test cleanup logic (e.g. removing from a [tether.Group]
 	// or decrementing counters). Optional.
 	OnDisconnect func(session tether.Session)
+
+	// Components declares component mounts for automatic event routing.
+	// Events matching a mount's prefix are dispatched to the component
+	// before Handle runs — mirroring [tether.Config].Components.
+	// Optional.
+	Components []tether.ComponentMount[S]
 }
 
 // Harness drives a tether page handler for testing. Create one with
@@ -86,6 +92,9 @@ type Harness[S any] struct {
 	// Lifecycle callbacks stored from Config.
 	onConnect    func(tether.Session)
 	onDisconnect func(tether.Session)
+
+	// Component mounts for automatic event routing.
+	mounts []tether.ComponentMount[S]
 
 	// Last response fields.
 	last response
@@ -186,6 +195,7 @@ func New[S any](cfg Config[S]) *Harness[S] {
 		onNavigate:   cfg.OnNavigate,
 		onConnect:    cfg.OnConnect,
 		onDisconnect: cfg.OnDisconnect,
+		mounts:       cfg.Components,
 	}
 	h.rebuildHandler()
 	return h
@@ -275,14 +285,13 @@ func (h *Harness[S]) SendEvent(ev tether.Event) {
 	// This allows subsequent Send calls to see accumulated state changes.
 	ts := &testSession{}
 	if ev.Type == event.Navigate && h.onNavigate != nil {
-		// Navigate events are routed to OnNavigate, not Handle. This
-		// mirrors the live session behaviour where navigation bypasses
-		// the event handler entirely.
 		params := tether.Params{
 			Path:  ev.Data["path"],
 			Query: parseQuery(ev.Data["search"]),
 		}
 		h.state = h.onNavigate(ts, h.state, params)
+	} else if newState, ok := tether.RouteMount(h.mounts, ts, h.state, ev); ok {
+		h.state = newState
 	} else {
 		h.state = h.handle(ts, h.state, ev)
 	}

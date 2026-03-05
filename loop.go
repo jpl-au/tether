@@ -146,11 +146,7 @@ func (s *LiveSession[S]) exec(ev Event) {
 	var newState S
 	handled := false
 	if ev.Type != "navigate" {
-		for _, m := range s.mounts {
-			if newState, handled = m.route(s, s.state, ev); handled {
-				break
-			}
-		}
+		newState, handled = RouteMount(s.mounts, s, s.state, ev)
 	}
 	if !handled {
 		newState = s.handle(s, s.state, ev)
