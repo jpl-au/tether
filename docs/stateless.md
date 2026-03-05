@@ -88,9 +88,9 @@ Since state is reconstructed from scratch on every POST, accumulated values (cou
 func render(s State) node.Node {
     return div.New(
         // The current count rides along with every click event.
-        bind.Click(
-            bind.EventData(button.Text("+1"), "count", strconv.Itoa(s.Count)),
-            "increment",
+        bind.Apply(button.Text("+1"),
+            bind.OnClick("increment"),
+            bind.EventData("count", strconv.Itoa(s.Count)),
         ),
         span.Textf("Count: %d", s.Count),
     ).Dynamic("counter")
@@ -143,7 +143,7 @@ func handle(sess tether.Session, s State, ev tether.Event) State {
 }
 ```
 
-Available methods on `Session`: `Toast`, `Navigate`, `ReplaceURL`, `SetTitle`, `Announce`, `Flash`, `Signal`, `Signals`, `SignalBatch`, `Push`.
+Available methods on `Session`: `Toast`, `Navigate`, `ReplaceURL`, `SetTitle`, `Announce`, `Flash`, `Signal`, `Signals`, `Push`.
 
 Note: `Session.ID()` returns an empty string in stateless mode — there is no persistent session. `Push` returns `ErrPushPreWarm`.
 

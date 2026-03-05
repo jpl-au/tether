@@ -21,7 +21,7 @@ mux.Handle("/counter", tether.New(tether.Config[CounterState]{
     Render: func(state CounterState) node.Node {
         return div.New(
             span.Textf("Count: %d", state.Count).Dynamic("count"),
-            bind.Click(button.Text("+1"), "increment"),
+            bind.Apply(button.Text("+1"), bind.OnClick("increment")),
         )
     },
     Handle: func(_ tether.Session, state CounterState, event tether.Event) CounterState {

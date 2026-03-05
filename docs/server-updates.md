@@ -254,7 +254,7 @@ tether.New(tether.Config[State]{
 })
 
 // Mark an anchor for client-side navigation
-bind.Link(a.Link("/profile", "Profile"))
+bind.Apply(a.Link("/profile", "Profile"), bind.Link())
 ```
 
 For multi-page apps, use the `router` package:

@@ -21,10 +21,10 @@ import (
 // Generic tether.Click vs raw SetData
 // ---------------------------------------------------------------------------
 
-// BenchmarkBindClick measures Click (generic wrapper) + Render.
+// BenchmarkBindClick measures Apply+OnClick + Render.
 func BenchmarkBindClick(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		el := bind.Click(button.Text("+"), "increment")
+		el := bind.Apply(button.Text("+"), bind.OnClick("increment"))
 		_ = el.Render()
 	}
 }
@@ -40,7 +40,7 @@ func BenchmarkSetDataDirect(b *testing.B) {
 // BenchmarkBindClickRenderOnly isolates the render cost by pre-building
 // the element, so only the Render() call is measured.
 func BenchmarkBindClickRenderOnly(b *testing.B) {
-	el := bind.Click(button.Text("+"), "increment")
+	el := bind.Apply(button.Text("+"), bind.OnClick("increment"))
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = el.Render()

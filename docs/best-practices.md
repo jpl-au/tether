@@ -88,7 +88,7 @@ A full render-diff-send cycle for a single counter increment is wasteful. Signal
 
 ```go
 // In Render — bind the element once
-bind.BindText(span.New(), "count")
+bind.Apply(span.New(), bind.BindText("count"))
 
 // From anywhere — push the value
 sess.Signal("count", 42)
@@ -98,11 +98,11 @@ Signals are ideal for counters, progress bars, status indicators, and anything w
 
 ## Prefer SetData in hot render loops
 
-The generic bind helpers (`bind.Click`, `bind.Input`, etc.) are convenient but add ~250ns per element. For most pages this is negligible. For render functions that produce thousands of event-bound elements — large tables, long lists — use `SetData` directly:
+`bind.Apply` is convenient but adds ~250ns per element. For most pages this is negligible. For render functions that produce thousands of event-bound elements — large tables, long lists — use `SetData` directly:
 
 ```go
-// Generic helper — clearer, slightly slower
-bind.Click(button.Text("+"), "increment")
+// Apply — clearer, slightly slower
+bind.Apply(button.Text("+"), bind.OnClick("increment"))
 
 // Direct — faster in bulk
 button.Text("+").SetData("tether-click", "increment")

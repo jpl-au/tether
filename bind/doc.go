@@ -1,26 +1,19 @@
 // Package bind provides element annotation helpers for fluent-tether.
-// Each function attaches a data-tether-* attribute to a Fluent element,
+// Each helper attaches a data-tether-* attribute to a Fluent element,
 // telling the client JS runtime how to handle that element — which
 // events to forward, what client-side behaviour to apply, or which
 // reactive signals to bind.
 //
-// All helpers are generic over any type with a chainable SetData
-// method, so they work with every Fluent element type.
+// All bindings are applied via [Apply] with composable [Option] values:
 //
-// Server event bindings (event.go):
+//	bind.Apply(button.Text("Delete"),
+//	    bind.OnClick("delete"),
+//	    bind.Confirm("Are you sure?"),
+//	    bind.Disable("Deleting..."),
+//	)
 //
-//	bind.Click(button.Text("+"), "increment")
-//	bind.Submit(form.New(children...), "save")
-//
-// Client-side directives (directive.go):
-//
-//	bind.Link(a.Link("/profile", "Profile"))
-//	bind.ToggleClass(button.Text("Menu"), "is-open")
-//
-// Reactive signal bindings (signal.go):
-//
-//	bind.BindText(span.New(), "count")
-//	bind.BindShow(div.New(children...), "isOpen")
+// This top-to-bottom style scales cleanly as behaviours are stacked
+// and provides a single, consistent way to annotate elements.
 package bind
 
 // Settable is the structural type constraint for element annotation

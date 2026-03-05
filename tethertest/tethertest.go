@@ -146,19 +146,6 @@ func (s *testSession) Signals(m map[string]any) {
 	s.ensureSignals()
 	maps.Copy(s.signals, m)
 }
-func (s *testSession) SignalBatch(pairs ...any) {
-	if len(pairs)%2 != 0 {
-		panic("tethertest: SignalBatch requires an even number of arguments")
-	}
-	s.ensureSignals()
-	for i := 0; i < len(pairs); i += 2 {
-		key, ok := pairs[i].(string)
-		if !ok {
-			panic("tethertest: SignalBatch keys must be strings")
-		}
-		s.signals[key] = pairs[i+1]
-	}
-}
 func (s *testSession) Flash(sel, text string)       { s.ensureFlash(); s.flash[sel] = text }
 func (s *testSession) Push(push.Notification) error { return nil }
 func (s *testSession) Close()                       {}

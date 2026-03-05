@@ -23,7 +23,7 @@ lifecycle.
 
 ```
 tether/              Root package — Config, Handler, Session, Bus, Group, Value, Observe, On
-├── bind/            Event binding and signal binding helpers (Click, Submit, Input, BindText, BindShow, etc.)
+├── bind/            Event binding and signal binding via Apply + composable Options (OnClick, BindText, Confirm, etc.)
 ├── client/          Embedded JS runtime (fluent-tether.js, idiomorph, service worker, upload, push worker)
 ├── dev/             Debug logging — dev.Enable() activates, dev.Debug() is a no-op when disabled
 ├── docs/            Markdown guides (architecture, API, events, signals, broadcasting, etc.)

@@ -6,13 +6,13 @@ Toggle CSS classes or attributes without a server round-trip:
 
 ```go
 // Toggle a CSS class on the element itself
-bind.ToggleClass(button.Text("Menu"), "is-open")
+bind.Apply(button.Text("Menu"), bind.ToggleClass("is-open"))
 
 // Toggle a CSS class on a different element
-bind.ToggleClass(bind.ToggleTarget(button.Text("Menu"), "#nav"), "is-open")
+bind.Apply(button.Text("Menu"), bind.ToggleTarget("#nav"), bind.ToggleClass("is-open"))
 
 // Toggle visibility via the hidden attribute
-bind.ToggleAttr(bind.ToggleTarget(button.Text("Show Help"), "#help"), "hidden")
+bind.Apply(button.Text("Show Help"), bind.ToggleTarget("#help"), bind.ToggleAttr("hidden"))
 ```
 
 Client-managed state survives server morphs automatically. The morph engine preserves client-toggled classes and attributes so they are not lost when the server re-renders.
@@ -20,13 +20,13 @@ Client-managed state survives server morphs automatically. The morph engine pres
 Prevent the morph engine from touching an element entirely (useful for video players, iframes, and third-party widgets):
 
 ```go
-bind.Permanent(div.New(children...))
+bind.Apply(div.New(children...), bind.Permanent())
 ```
 
 Hide an element until the tether runtime initialises (prevents flash of unstyled content):
 
 ```go
-bind.Cloak(div.New(children...))
+bind.Apply(div.New(children...), bind.Cloak())
 ```
 
 ## Transitions
@@ -34,7 +34,7 @@ bind.Cloak(div.New(children...))
 CSS transitions coordinated with the morph lifecycle:
 
 ```go
-bind.Transition(div.New(children...), "fade")
+bind.Apply(div.New(children...), bind.Transition("fade"))
 ```
 
 ```css
@@ -50,7 +50,7 @@ Enter: `tether-{name}-enter` is added before insertion and removed next frame. L
 Integrate third-party JavaScript libraries (charts, maps, rich text editors) via lifecycle hooks:
 
 ```go
-bind.Hook(div.New(), "chart")
+bind.Apply(div.New(), bind.Hook("chart"))
 ```
 
 ```js

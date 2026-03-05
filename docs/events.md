@@ -23,19 +23,19 @@ Use `event.Custom("name")` to create constants for custom event names not covere
 
 ## Binding events
 
-Every bind helper adds a `data-tether-*` attribute that the client JS picks up. The helper returns the same element type it received, so binding composes naturally:
+Use `bind.Apply` to attach event bindings to elements. Each option adds a `data-tether-*` attribute that the client JS picks up:
 
 ```go
-bind.Click(button.Text("Save"), "save")
-bind.Submit(form.New(fields...), "register")
-bind.Input(input.Text("q", ""), "search")
-bind.Change(select.New(options...), "filter")
-bind.KeyDown(input.Text("msg", ""), "send")
-bind.FilterKey(input.Text("msg", ""), "Enter")  // restrict to Enter key only
-bind.Focus(input.Text("name", ""), "focus")
-bind.Blur(input.Text("name", ""), "blur")
-bind.Viewport(div.New(), "load-more")          // fires when element enters viewport
-bind.On(el, "dblclick", "open-editor")         // arbitrary DOM event
+bind.Apply(button.Text("Save"), bind.OnClick("save"))
+bind.Apply(form.New(fields...), bind.OnSubmit("register"))
+bind.Apply(input.Text("q", ""), bind.OnInput("search"))
+bind.Apply(select.New(options...), bind.OnChange("filter"))
+bind.Apply(input.Text("msg", ""), bind.OnKeyDown("send"))
+bind.Apply(input.Text("msg", ""), bind.OnKeyDown("send"), bind.FilterKey("Enter"))
+bind.Apply(input.Text("name", ""), bind.OnFocus("focus"))
+bind.Apply(input.Text("name", ""), bind.OnBlur("blur"))
+bind.Apply(div.New(), bind.OnViewport("load-more"))
+bind.Apply(el, bind.Event("dblclick", "open-editor"))
 ```
 
 ### Collecting input values on click
@@ -43,10 +43,9 @@ bind.On(el, "dblclick", "open-editor")         // arbitrary DOM event
 `bind.Collect` lets a button gather values from inputs elsewhere in the DOM at click time, without requiring a form wrapper:
 
 ```go
-// The button collects the value of #search-input when clicked
-bind.Collect(
-    bind.Click(button.Text("Search"), "search"),
-    "#search-input",
+bind.Apply(button.Text("Search"),
+    bind.OnClick("search"),
+    bind.Collect("#search-input"),
 )
 ```
 
@@ -55,18 +54,9 @@ The selector is evaluated at click time with `document.querySelectorAll`. Elemen
 Multiple selectors work the same way:
 
 ```go
-bind.Collect(
-    bind.Click(button.Text("Go"), "go"),
-    "#query, #filter, #sort",
-)
-```
-
-With `bind.Apply`:
-
-```go
-bind.Apply(button.Text("Search"),
-    bind.OnClick("search"),
-    bind.WithCollect("#search-input"),
+bind.Apply(button.Text("Go"),
+    bind.OnClick("go"),
+    bind.Collect("#query, #filter, #sort"),
 )
 ```
 
@@ -74,14 +64,12 @@ bind.Apply(button.Text("Search"),
 
 ### Debounce
 
-`bind.Input` is debounced at 300ms by default (configurable via `Config.Client.DefaultDebounce`). Override per element:
+`bind.OnInput` is debounced at 300ms by default (configurable via `Config.Client.DefaultDebounce`). Override per element:
 
 ```go
-bind.Debounce(bind.Input(input.Text("q", ""), "search"), 150*time.Millisecond)
-// or
 bind.Apply(input.Text("q", ""),
     bind.OnInput("search"),
-    bind.WithDebounce(150*time.Millisecond),
+    bind.Debounce(150*time.Millisecond),
 )
 ```
 
@@ -90,7 +78,10 @@ bind.Apply(input.Text("q", ""),
 Minimum interval between events — useful for scroll or resize handlers:
 
 ```go
-bind.Throttle(bind.Viewport(div.New(), "scroll"), time.Second)
+bind.Apply(div.New(),
+    bind.OnViewport("scroll"),
+    bind.Throttle(time.Second),
+)
 ```
 
 ## Loading states
@@ -100,7 +91,10 @@ bind.Throttle(bind.Viewport(div.New(), "scroll"), time.Second)
 Disable the element while its event is being processed:
 
 ```go
-bind.Disable(bind.Click(button.Text("Save"), "save"), "Saving...")
+bind.Apply(button.Text("Save"),
+    bind.OnClick("save"),
+    bind.Disable("Saving..."),
+)
 ```
 
 The optional text argument replaces the button label during the request and is restored when the response arrives.
@@ -110,7 +104,10 @@ The optional text argument replaces the button label during the request and is r
 Show a browser `confirm()` dialog before sending the event:
 
 ```go
-bind.Confirm(bind.Click(button.Text("Delete"), "delete"), "Are you sure?")
+bind.Apply(button.Text("Delete"),
+    bind.OnClick("delete"),
+    bind.Confirm("Are you sure?"),
+)
 ```
 
 The event is only sent if the user confirms.
@@ -120,19 +117,22 @@ The event is only sent if the user confirms.
 Show or hide a loading indicator at a CSS selector while the event is in flight:
 
 ```go
-bind.Indicator(bind.Click(button.Text("Load"), "load"), "#spinner")
+bind.Apply(button.Text("Load"),
+    bind.OnClick("load"),
+    bind.Indicator("#spinner"),
+)
 ```
 
 ## Forms
 
-`bind.Submit` sends all named field values as `ev.Data`:
+`bind.OnSubmit` sends all named field values as `ev.Data`:
 
 ```go
-form.New(
+bind.Apply(form.New(
     input.Text("email", "").Name("email"),
     input.Password("password").Name("password"),
-    bind.Submit(button.Text("Login"), "login"),
-)
+    button.Text("Login"),
+), bind.OnSubmit("login"))
 
 // In Handle:
 email := ev.Data["email"]
@@ -142,7 +142,10 @@ password := ev.Data["password"]
 `bind.Reset` clears form fields after a successful submit:
 
 ```go
-bind.Reset(bind.Submit(button.Text("Send"), "send"))
+bind.Apply(form.New(fields...),
+    bind.OnSubmit("send"),
+    bind.Reset(),
+)
 ```
 
 ### Typed data extraction
@@ -165,7 +168,10 @@ ev.Bind(&form)
 Attach static key-value pairs to any event — they arrive in `ev.Data`:
 
 ```go
-bind.EventData(button.Text("Delete"), "id", itemID)
+bind.Apply(button.Text("Delete"),
+    bind.OnClick("delete"),
+    bind.EventData("id", itemID),
+)
 ```
 
 ## Key filtering
@@ -173,7 +179,10 @@ bind.EventData(button.Text("Delete"), "id", itemID)
 Restrict a `keydown` binding to a specific key:
 
 ```go
-bind.FilterKey(input.Text("msg", ""), "Enter")
+bind.Apply(input.Text("msg", ""),
+    bind.OnKeyDown("send"),
+    bind.FilterKey("Enter"),
+)
 ```
 
 The event is only sent when that key is pressed. Use `ev.Key()` in Handle to read the key name when not filtering.
@@ -199,5 +208,5 @@ Handle: func(_ tether.Session, s State, ev tether.Event) State {
 `event.Viewport` fires when a bound element scrolls into the viewport — useful for infinite scroll and lazy loading:
 
 ```go
-bind.Viewport(div.New().ID("sentinel"), "load-more")
+bind.Apply(div.New().ID("sentinel"), bind.OnViewport("load-more"))
 ```

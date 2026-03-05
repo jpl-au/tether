@@ -214,18 +214,6 @@ func (s *LiveSession[S]) Signals(signals map[string]any) {
 	})
 }
 
-// SignalBatch pushes multiple reactive values using a flat key-value
-// list. This is a convenience wrapper around [LiveSession.Signals] that
-// avoids the map literal syntax for small batches:
-//
-//	s.SignalBatch("count", 42, "status", "online")
-//
-// Panics if an odd number of arguments is provided or if any key is
-// not a string.
-func (s *LiveSession[S]) SignalBatch(pairs ...any) {
-	s.Signals(pairsToMap(pairs))
-}
-
 // Push sends a Web Push notification to the browser. Only works when
 // the session has an active push subscription and a [push.Sender] is
 // configured. Returns an error if either is missing.

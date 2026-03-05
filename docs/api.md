@@ -160,7 +160,6 @@ s.ReplaceURL("/current?saved=1")       // replaceState
 s.SetTitle("Settings — My App")        // document.title
 s.Signal("count", 42)                  // push reactive value
 s.Signals(map[string]any{"a": 1})      // push multiple values
-s.SignalBatch("count", 42, "status", "online")  // flat key-value pairs
 s.Push(push.Notification{...})         // Web Push notification
 ```
 
@@ -178,7 +177,7 @@ func todoHandle(sess tether.Session, ts TodoState, ev tether.Event) TodoState {
 }
 ```
 
-Methods: `ID`, `Context`, `Go`, `Toast`, `Navigate`, `ReplaceURL`, `SetTitle`, `Announce`, `Flash`, `Signal`, `Signals`, `SignalBatch`, `Push`, `Close`.
+Methods: `ID`, `Context`, `Go`, `Toast`, `Navigate`, `ReplaceURL`, `SetTitle`, `Announce`, `Flash`, `Signal`, `Signals`, `Push`, `Close`.
 
 `ID` returns an empty string in stateless page mode (PageConfig) — there is no persistent session. `Push` returns an error during pre-warming (initial GET) since no browser subscription exists yet. `Close` terminates the session's transport; in stateless page mode and tethertest it is a no-op. During live sessions all methods work normally.
 
@@ -344,162 +343,88 @@ tether.New(tether.Config[State]{
 
 ## Bind helpers
 
-All helpers live in the `bind` package and work with any Fluent element type.
-
-### Server events
-
-```go
-bind.Click(el, "action")           // click
-bind.Submit(el, "action")          // form submit (includes field values)
-bind.Input(el, "action")           // input (debounced at 300ms)
-bind.Change(el, "action")          // select/checkbox/radio commit
-bind.KeyDown(el, "action")         // keydown (modifiers in Data)
-bind.FilterKey(el, "Enter")        // restrict keydown to specific key
-bind.Focus(el, "action")           // focus
-bind.Blur(el, "action")            // blur
-bind.On(el, "dblclick", "action")  // arbitrary DOM event
-bind.Viewport(el, "action")        // viewport enter (infinite scroll)
-bind.Collect(el, "#selector")      // collect input values at click time
-bind.EventData(el, "key", "val")   // attach extra data to events
-bind.Debounce(el, 150*time.Millisecond) // override debounce
-bind.Throttle(el, time.Second)          // minimum event interval
-```
-
-### Signal bindings
-
-```go
-bind.BindText(el, "count")            // set textContent from signal
-bind.BindShow(el, "isOpen")           // show when truthy
-bind.BindHide(el, "isOpen")           // hide when truthy
-bind.BindClass(el, "active", "sel")   // toggle class from signal
-bind.BindAttr(el, "disabled", "busy") // set attribute from signal
-bind.BindValue(el, "email")           // set form value from signal
-```
-
-### Client directives
-
-```go
-bind.Link(el)                          // client-side navigation
-bind.ToggleClass(el, "is-open")        // toggle class on click
-bind.ToggleTarget(el, "#nav")          // direct toggle at selector
-bind.ToggleAttr(el, "hidden")          // toggle attribute on click
-bind.ToggleSignal(el, "menuOpen")      // toggle boolean signal
-bind.SetSignal(el, "tab", "settings")  // set signal to value
-bind.Optimistic(el, "liked", "true")   // optimistic signal update
-bind.OptimisticToggle(el, "liked")     // optimistic signal toggle
-bind.Cloak(el)                         // hide until runtime ready
-bind.Permanent(el)                     // exclude from morphing
-```
-
-### Control
-
-```go
-bind.Disable(el, "Saving...")    // disable during event, optional text swap
-bind.Confirm(el, "Are you sure?") // confirmation prompt before send
-bind.Reset(el)                   // reset form fields after submit
-bind.AutoFocus(el)               // focus after next server update
-bind.Indicator(el, "#spinner")   // show loading indicator at selector
-bind.FocusTrap(el)               // trap Tab within descendants
-```
-
-### Uploads
-
-```go
-bind.Upload(el, "avatar")              // trigger file upload
-bind.UploadInput(el, "#avatar-input")  // CSS selector for distant file inputs
-bind.UploadProgress(el, "avatar")      // bind to upload progress signal
-```
-
-### Lifecycle
-
-```go
-bind.Hook(el, "chart")           // JS lifecycle callbacks
-bind.Transition(el, "fade")      // CSS enter/leave transitions
-```
-
-### Composition with Apply
-
-Stack multiple behaviours top-to-bottom instead of nested inside-out:
+All helpers live in the `bind` package. Use `bind.Apply` to attach behaviours to any Fluent element:
 
 ```go
 bind.Apply(btn,
     bind.OnClick("delete"),
-    bind.WithConfirm("Sure?"),
-    bind.WithDisable("Deleting..."),
+    bind.Confirm("Sure?"),
+    bind.Disable("Deleting..."),
 )
 ```
 
-Every nested helper has a `With*` Apply option. Server events:
+### Server events
 
 ```go
 bind.OnClick("act")         bind.OnSubmit("act")
 bind.OnInput("act")         bind.OnChange("act")
 bind.OnKeyDown("act")       bind.OnFocus("act")
 bind.OnBlur("act")          bind.OnViewport("act")
-bind.WithEvent("dblclick", "act")
-bind.WithCollect("#selector")
+bind.Event("dblclick", "act")
+bind.Collect("#selector")
 ```
 
-Control:
+### Timing
 
 ```go
-bind.WithDisable("...")     bind.WithConfirm("...")
-bind.WithPreserve()         bind.WithAutoFocus()
-bind.WithIndicator("#el")   bind.WithFocusTrap()
+bind.Debounce(150*time.Millisecond)
+bind.Throttle(time.Second)
+bind.FilterKey("Enter")
+bind.EventData("key", "val")
 ```
 
-Timing:
+### Control
 
 ```go
-bind.WithDebounce(150*time.Millisecond)
-bind.WithThrottle(time.Second)
-bind.WithFilterKey("Enter")
-bind.WithEventData("key", "val")
+bind.Disable("...")     bind.Confirm("...")
+bind.Reset()            bind.AutoFocus()
+bind.Indicator("#el")   bind.FocusTrap()
 ```
 
-Directives:
+### Signal bindings
 
 ```go
-bind.WithLink()             bind.WithCloak()
-bind.WithPermanent()        bind.WithToggleClass("cls")
-bind.WithToggleTarget("#x") bind.WithToggleAttr("hidden")
+bind.BindText("count")           bind.BindShow("isOpen")
+bind.BindHide("isOpen")          bind.BindClass("active", "sel")
+bind.BindAttr("disabled", "busy") bind.BindValue("email")
 ```
 
-Signal bindings:
+### Client directives
 
 ```go
-bind.WithBindText("count")           bind.WithBindShow("isOpen")
-bind.WithBindHide("isOpen")          bind.WithBindClass("active", "sel")
-bind.WithBindAttr("disabled", "busy") bind.WithBindValue("email")
+bind.Link()             bind.Cloak()
+bind.Permanent()        bind.ToggleClass("cls")
+bind.ToggleTarget("#x") bind.ToggleAttr("hidden")
 ```
 
-Signal directives:
+### Signal directives
 
 ```go
-bind.WithToggleSignal("menuOpen")
-bind.WithSetSignal("tab", "settings")
-bind.WithOptimistic("liked", "true")
-bind.WithOptimisticToggle("liked")
+bind.ToggleSignal("menuOpen")
+bind.SetSignal("tab", "settings")
+bind.Optimistic("liked", "true")
+bind.OptimisticToggle("liked")
 ```
 
-Upload:
+### Uploads
 
 ```go
-bind.WithUpload("avatar")
-bind.WithUploadInput("#avatar-input")
-bind.WithUploadProgress("avatar")
+bind.Upload("avatar")
+bind.UploadInput("#avatar-input")
+bind.UploadProgress("avatar")
+bind.PushSubscribe()
 ```
 
-Lifecycle:
+### Lifecycle
 
 ```go
-bind.WithHook("chart")      bind.WithTransition("fade")
+bind.Hook("chart")      bind.Transition("fade")
 ```
 
-Escape hatch for custom attributes:
+### Custom attributes
 
 ```go
-bind.WithData("tether-custom", "value")  // data-tether-custom="value"
+bind.Data("tether-custom", "value")  // data-tether-custom="value"
 ```
 
 ---

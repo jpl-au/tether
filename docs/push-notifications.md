@@ -45,7 +45,7 @@ sender.Send(sub, push.Notification{
 Subscription is never automatic — browsers require a user gesture for the push permission prompt. Use `bind.PushSubscribe` on a button or link to let the user opt in:
 
 ```go
-bind.PushSubscribe(button.Text("Enable notifications"))
+bind.Apply(button.Text("Enable notifications"), bind.PushSubscribe())
 ```
 
 When clicked, the JS runtime requests notification permission, subscribes via the service worker's PushManager, and sends the subscription to the server via `OnSubscribe`.

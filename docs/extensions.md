@@ -50,7 +50,7 @@ Call `upload.Open()` to get a `multipart.File` for reading. The caller must clos
 Mark an element as an upload trigger:
 
 ```go
-bind.Upload(button.Text("Upload Avatar"), "avatar")
+bind.Apply(button.Text("Upload Avatar"), bind.Upload("avatar"))
 ```
 
 When clicked, the JS runtime finds file inputs in the closest form or parent element and POSTs the files to the server. For file inputs, the upload fires on change.
@@ -67,11 +67,11 @@ The client sets two signals during upload:
 Bind a progress bar:
 
 ```go
-bind.UploadProgress(
+bind.Apply(
     progress.New().Attr("max", "100"),
-    "avatar",
+    bind.UploadProgress("avatar"),
 )
-// Shorthand for: bind.BindAttr(el, "value", "upload:avatar:progress")
+// Shorthand for: bind.Apply(el, bind.BindAttr("value", "upload:avatar:progress"))
 ```
 
 ## Service worker

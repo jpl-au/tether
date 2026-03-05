@@ -14,8 +14,8 @@ import (
 func TestApplyMultipleOptions(t *testing.T) {
 	el := bind.Apply(button.Text("Delete"),
 		bind.OnClick("delete"),
-		bind.WithConfirm("Are you sure?"),
-		bind.WithDisable("Deleting..."),
+		bind.Confirm("Are you sure?"),
+		bind.Disable("Deleting..."),
 	)
 	html := string(el.Render())
 
@@ -57,10 +57,10 @@ func TestApplyEventOptions(t *testing.T) {
 
 func TestApplyControlOptions(t *testing.T) {
 	el := bind.Apply(input.Text("name", ""),
-		bind.WithAutoFocus(),
-		bind.WithReset(),
-		bind.WithFocusTrap(),
-		bind.WithIndicator("#spin"),
+		bind.AutoFocus(),
+		bind.Reset(),
+		bind.FocusTrap(),
+		bind.Indicator("#spin"),
 	)
 	html := string(el.Render())
 
@@ -79,7 +79,7 @@ func TestApplyControlOptions(t *testing.T) {
 func TestApplyTimingOptions(t *testing.T) {
 	el := bind.Apply(input.Text("q", ""),
 		bind.OnInput("search"),
-		bind.WithDebounce(150*time.Millisecond),
+		bind.Debounce(150*time.Millisecond),
 	)
 	html := string(el.Render())
 	if !strings.Contains(html, `data-tether-debounce="150"`) {
@@ -87,21 +87,16 @@ func TestApplyTimingOptions(t *testing.T) {
 	}
 }
 
-func TestWithFilterKeyMatchesFilterKey(t *testing.T) {
-	// WithFilterKey must produce the same attribute as bind.FilterKey.
-	nested := string(bind.FilterKey(input.Text("q", ""), "Enter").Render())
-	applied := string(bind.Apply(input.Text("q", ""), bind.WithFilterKey("Enter")).Render())
+func TestFilterKey(t *testing.T) {
+	html := string(bind.Apply(input.Text("q", ""), bind.FilterKey("Enter")).Render())
 	want := `data-tether-key="Enter"`
-	if !strings.Contains(nested, want) {
-		t.Errorf("FilterKey missing %s in:\n%s", want, nested)
-	}
-	if !strings.Contains(applied, want) {
-		t.Errorf("WithFilterKey missing %s in:\n%s", want, applied)
+	if !strings.Contains(html, want) {
+		t.Errorf("FilterKey missing %s in:\n%s", want, html)
 	}
 }
 
-func TestWithData(t *testing.T) {
-	el := bind.Apply(div.New(), bind.WithData("tether-custom", "value"))
+func TestData(t *testing.T) {
+	el := bind.Apply(div.New(), bind.Data("tether-custom", "value"))
 	html := string(el.Render())
 	if !strings.Contains(html, `data-tether-custom="value"`) {
 		t.Errorf("missing custom attribute in:\n%s", html)
@@ -110,10 +105,10 @@ func TestWithData(t *testing.T) {
 
 func TestApplyDirectiveOptions(t *testing.T) {
 	el := bind.Apply(div.New(),
-		bind.WithCloak(),
-		bind.WithPermanent(),
-		bind.WithHook("chart"),
-		bind.WithTransition("fade"),
+		bind.Cloak(),
+		bind.Permanent(),
+		bind.Hook("chart"),
+		bind.Transition("fade"),
 	)
 	html := string(el.Render())
 
@@ -135,12 +130,12 @@ func TestApplySignalBindingOptions(t *testing.T) {
 		opt  bind.Option
 		attr string
 	}{
-		{"WithBindText", bind.WithBindText("count"), `data-tether-bind-text="count"`},
-		{"WithBindShow", bind.WithBindShow("isOpen"), `data-tether-bind-show="isOpen"`},
-		{"WithBindHide", bind.WithBindHide("isHidden"), `data-tether-bind-hide="isHidden"`},
-		{"WithBindClass", bind.WithBindClass("active", "isSelected"), `data-tether-bind-class="active isSelected"`},
-		{"WithBindAttr", bind.WithBindAttr("disabled", "isLoading"), `data-tether-bind-attr="disabled isLoading"`},
-		{"WithBindValue", bind.WithBindValue("email"), `data-tether-bind-value="email"`},
+		{"BindText", bind.BindText("count"), `data-tether-bind-text="count"`},
+		{"BindShow", bind.BindShow("isOpen"), `data-tether-bind-show="isOpen"`},
+		{"BindHide", bind.BindHide("isHidden"), `data-tether-bind-hide="isHidden"`},
+		{"BindClass", bind.BindClass("active", "isSelected"), `data-tether-bind-class="active isSelected"`},
+		{"BindAttr", bind.BindAttr("disabled", "isLoading"), `data-tether-bind-attr="disabled isLoading"`},
+		{"BindValue", bind.BindValue("email"), `data-tether-bind-value="email"`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -158,10 +153,10 @@ func TestApplySignalDirectiveOptions(t *testing.T) {
 		opt  bind.Option
 		attr string
 	}{
-		{"WithToggleSignal", bind.WithToggleSignal("menuOpen"), `data-tether-toggle-signal="menuOpen"`},
-		{"WithSetSignal", bind.WithSetSignal("tab", "settings"), `data-tether-set-signal="tab settings"`},
-		{"WithOptimistic", bind.WithOptimistic("liked", "true"), `data-tether-optimistic="liked true"`},
-		{"WithOptimisticToggle", bind.WithOptimisticToggle("liked"), `data-tether-optimistic-toggle="liked"`},
+		{"ToggleSignal", bind.ToggleSignal("menuOpen"), `data-tether-toggle-signal="menuOpen"`},
+		{"SetSignal", bind.SetSignal("tab", "settings"), `data-tether-set-signal="tab settings"`},
+		{"Optimistic", bind.Optimistic("liked", "true"), `data-tether-optimistic="liked true"`},
+		{"OptimisticToggle", bind.OptimisticToggle("liked"), `data-tether-optimistic-toggle="liked"`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -175,7 +170,7 @@ func TestApplySignalDirectiveOptions(t *testing.T) {
 
 func TestApplyUploadOptions(t *testing.T) {
 	el := bind.Apply(button.Text("Upload"),
-		bind.WithUpload("avatar"),
+		bind.Upload("avatar"),
 	)
 	html := string(el.Render())
 	if !strings.Contains(html, `data-tether-upload="avatar"`) {
@@ -185,7 +180,7 @@ func TestApplyUploadOptions(t *testing.T) {
 
 func TestApplyUploadProgressOption(t *testing.T) {
 	el := bind.Apply(div.New(),
-		bind.WithUploadProgress("avatar"),
+		bind.UploadProgress("avatar"),
 	)
 	html := string(el.Render())
 	if !strings.Contains(html, `data-tether-bind-attr="value upload:avatar:progress"`) {
@@ -196,9 +191,9 @@ func TestApplyUploadProgressOption(t *testing.T) {
 func TestApplyCompositionWithSignalBindings(t *testing.T) {
 	el := bind.Apply(button.Text("Like"),
 		bind.OnClick("like"),
-		bind.WithDisable("Liking..."),
-		bind.WithBindShow("isLiked"),
-		bind.WithOptimisticToggle("liked"),
+		bind.Disable("Liking..."),
+		bind.BindShow("isLiked"),
+		bind.OptimisticToggle("liked"),
 	)
 	html := string(el.Render())
 
@@ -222,26 +217,26 @@ func TestApplyNoOptions(t *testing.T) {
 	}
 }
 
-func TestOnArbitraryEvent(t *testing.T) {
-	el := bind.On(div.New(), "dblclick", "open-editor")
+func TestEventArbitrary(t *testing.T) {
+	el := bind.Apply(div.New(), bind.Event("dblclick", "open-editor"))
 	html := string(el.Render())
 	if !strings.Contains(html, `data-tether-dblclick="open-editor"`) {
 		t.Errorf("missing dblclick attribute in:\n%s", html)
 	}
 }
 
-func TestWithEventOption(t *testing.T) {
-	el := bind.Apply(div.New(), bind.WithEvent("mouseover", "hover"))
+func TestEventOption(t *testing.T) {
+	el := bind.Apply(div.New(), bind.Event("mouseover", "hover"))
 	html := string(el.Render())
 	if !strings.Contains(html, `data-tether-mouseover="hover"`) {
 		t.Errorf("missing mouseover attribute in:\n%s", html)
 	}
 }
 
-func TestWithCollect(t *testing.T) {
+func TestCollect(t *testing.T) {
 	el := bind.Apply(button.Text("Send"),
 		bind.OnClick("send"),
-		bind.WithCollect("#message-input"),
+		bind.Collect("#message-input"),
 	)
 	html := string(el.Render())
 	if !strings.Contains(html, `data-tether-collect="#message-input"`) {
@@ -249,19 +244,11 @@ func TestWithCollect(t *testing.T) {
 	}
 }
 
-func TestCollect(t *testing.T) {
-	el := bind.Collect(bind.Click(button.Text("Send"), "send"), "#message-input")
-	html := string(el.Render())
-	if !strings.Contains(html, `data-tether-click="send"`) {
-		t.Errorf("missing click attribute in:\n%s", html)
-	}
-	if !strings.Contains(html, `data-tether-collect="#message-input"`) {
-		t.Errorf("missing collect attribute in:\n%s", html)
-	}
-}
-
 func TestCollectMultipleSelectors(t *testing.T) {
-	el := bind.Collect(bind.Click(button.Text("Go"), "search"), "#query, #filter")
+	el := bind.Apply(button.Text("Go"),
+		bind.OnClick("search"),
+		bind.Collect("#query, #filter"),
+	)
 	html := string(el.Render())
 	if !strings.Contains(html, `data-tether-collect="#query, #filter"`) {
 		t.Errorf("missing collect attribute in:\n%s", html)

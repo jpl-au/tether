@@ -30,15 +30,15 @@ sess.Signals(map[string]any{
 })
 ```
 
-Bind elements to signals in your render function using the `bind` package:
+Bind elements to signals in your render function:
 
 ```go
-bind.BindText(span.New(), "count")                    // sets textContent
-bind.BindShow(div.New(children...), "isOpen")          // shows when truthy, hides when falsy
-bind.BindHide(div.New(children...), "isOpen")          // inverse of BindShow
-bind.BindClass(span.New(), "active", "isSelected")     // toggles CSS class
-bind.BindAttr(button.New(), "disabled", "isLoading")   // sets/removes attribute
-bind.BindValue(input.Text("email", ""), "email")       // sets form field value
+bind.Apply(span.New(), bind.BindText("count"))                    // sets textContent
+bind.Apply(div.New(children...), bind.BindShow("isOpen"))          // shows when truthy
+bind.Apply(div.New(children...), bind.BindHide("isOpen"))          // inverse of BindShow
+bind.Apply(span.New(), bind.BindClass("active", "isSelected"))     // toggles CSS class
+bind.Apply(button.New(), bind.BindAttr("disabled", "isLoading"))   // sets/removes attribute
+bind.Apply(input.Text("email", ""), bind.BindValue("email"))       // sets form field value
 ```
 
 Signal bindings work **document-wide**, not just inside the tether root. This means navigation highlights, status indicators, and layout shell elements react instantly to signal pushes without triggering a full render.
@@ -53,10 +53,10 @@ Signal directives update signal values on the client without contacting the serv
 
 ```go
 // Toggle a boolean signal on click
-bind.ToggleSignal(button.Text("Menu"), "menuOpen")
+bind.Apply(button.Text("Menu"), bind.ToggleSignal("menuOpen"))
 
 // Set a signal to a specific value on click (tab bars, radio selection)
-bind.SetSignal(button.Text("Settings"), "tab", "settings")
+bind.Apply(button.Text("Settings"), bind.SetSignal("tab", "settings"))
 ```
 
 The server can override any client-set signal at any time by calling `sess.Signal(key, correctValue)`.
@@ -67,15 +67,15 @@ For predictable actions where the round-trip delay would feel sluggish, update a
 
 ```go
 // Set a signal to a specific value immediately, then send the event
-bind.Click(
-    bind.Optimistic(button.Text("Like"), "liked", "true"),
-    "like",
+bind.Apply(button.Text("Like"),
+    bind.OnClick("like"),
+    bind.Optimistic("liked", "true"),
 )
 
 // Toggle a boolean signal immediately, then send the event
-bind.Click(
-    bind.OptimisticToggle(button.Text("Like"), "liked"),
-    "like",
+bind.Apply(button.Text("Like"),
+    bind.OnClick("like"),
+    bind.OptimisticToggle("liked"),
 )
 ```
 
@@ -117,10 +117,10 @@ An element should be driven by **either** signals **or** state rendering — nev
 
 ```go
 // Wrong — the render and signal fight over the same element
-bind.BindText(span.Textf("Count: %d", s.Count).Dynamic("count"), "count")
+bind.Apply(span.Textf("Count: %d", s.Count).Dynamic("count"), bind.BindText("count"))
 
 // Right — signal-only element, no Dynamic key needed
-bind.BindText(span.New(), "count")
+bind.Apply(span.New(), bind.BindText("count"))
 
 // Right — state-rendered element, no signal binding
 span.Textf("Count: %d", s.Count).Dynamic("count")

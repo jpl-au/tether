@@ -14,7 +14,7 @@ import (
 )
 
 func TestClickRendersDataAttribute(t *testing.T) {
-	el := bind.Click(button.Text("+"), "increment")
+	el := bind.Apply(button.Text("+"), bind.OnClick("increment"))
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-tether-click="increment"`) {
@@ -23,7 +23,7 @@ func TestClickRendersDataAttribute(t *testing.T) {
 }
 
 func TestSubmitRendersDataAttribute(t *testing.T) {
-	el := bind.Submit(form.New(), "save")
+	el := bind.Apply(form.New(), bind.OnSubmit("save"))
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-tether-submit="save"`) {
@@ -32,7 +32,7 @@ func TestSubmitRendersDataAttribute(t *testing.T) {
 }
 
 func TestInputRendersDataAttribute(t *testing.T) {
-	el := bind.Input(input.Text("name", ""), "update")
+	el := bind.Apply(input.Text("name", ""), bind.OnInput("update"))
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-tether-input="update"`) {
@@ -41,7 +41,7 @@ func TestInputRendersDataAttribute(t *testing.T) {
 }
 
 func TestLinkRendersDataAttribute(t *testing.T) {
-	el := bind.Link(a.Link("/profile", "Profile"))
+	el := bind.Apply(a.Link("/profile", "Profile"), bind.Link())
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-tether-link=""`) {
@@ -53,7 +53,7 @@ func TestLinkRendersDataAttribute(t *testing.T) {
 }
 
 func TestToggleClassRendersDataAttribute(t *testing.T) {
-	el := bind.ToggleClass(button.Text("Menu"), "is-open")
+	el := bind.Apply(button.Text("Menu"), bind.ToggleClass("is-open"))
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-tether-toggle-class="is-open"`) {
@@ -62,7 +62,7 @@ func TestToggleClassRendersDataAttribute(t *testing.T) {
 }
 
 func TestToggleTargetRendersDataAttribute(t *testing.T) {
-	el := bind.ToggleTarget(button.Text("Menu"), "#nav")
+	el := bind.Apply(button.Text("Menu"), bind.ToggleTarget("#nav"))
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-tether-toggle-target="#nav"`) {
@@ -71,7 +71,7 @@ func TestToggleTargetRendersDataAttribute(t *testing.T) {
 }
 
 func TestToggleAttrRendersDataAttribute(t *testing.T) {
-	el := bind.ToggleAttr(button.Text("Toggle"), "hidden")
+	el := bind.Apply(button.Text("Toggle"), bind.ToggleAttr("hidden"))
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-tether-toggle-attr="hidden"`) {
@@ -80,9 +80,9 @@ func TestToggleAttrRendersDataAttribute(t *testing.T) {
 }
 
 func TestToggleClassWithTargetChains(t *testing.T) {
-	el := bind.ToggleClass(
-		bind.ToggleTarget(button.Text("Menu"), "#nav"),
-		"is-open",
+	el := bind.Apply(button.Text("Menu"),
+		bind.ToggleTarget("#nav"),
+		bind.ToggleClass("is-open"),
 	).Style("cursor: pointer")
 	html := string(el.Render())
 
@@ -98,7 +98,7 @@ func TestToggleClassWithTargetChains(t *testing.T) {
 }
 
 func TestTransitionRendersDataAttribute(t *testing.T) {
-	el := bind.Transition(button.Text("Item"), "fade")
+	el := bind.Apply(button.Text("Item"), bind.Transition("fade"))
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-tether-transition="fade"`) {
@@ -107,7 +107,7 @@ func TestTransitionRendersDataAttribute(t *testing.T) {
 }
 
 func TestResetRendersDataAttribute(t *testing.T) {
-	el := bind.Reset(form.New())
+	el := bind.Apply(form.New(), bind.Reset())
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-tether-reset=""`) {
@@ -116,7 +116,7 @@ func TestResetRendersDataAttribute(t *testing.T) {
 }
 
 func TestAutoFocusRendersDataAttribute(t *testing.T) {
-	el := bind.AutoFocus(input.Text("name", ""))
+	el := bind.Apply(input.Text("name", ""), bind.AutoFocus())
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-tether-autofocus=""`) {
@@ -125,7 +125,7 @@ func TestAutoFocusRendersDataAttribute(t *testing.T) {
 }
 
 func TestHookRendersDataAttribute(t *testing.T) {
-	el := bind.Hook(button.Text("Chart"), "chart")
+	el := bind.Apply(button.Text("Chart"), bind.Hook("chart"))
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-tether-hook="chart"`) {
@@ -134,7 +134,10 @@ func TestHookRendersDataAttribute(t *testing.T) {
 }
 
 func TestDisableRendersDataAttribute(t *testing.T) {
-	el := bind.Disable(bind.Click(button.Text("Save"), "save"), "Saving...")
+	el := bind.Apply(button.Text("Save"),
+		bind.OnClick("save"),
+		bind.Disable("Saving..."),
+	)
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-tether-disable="Saving..."`) {
@@ -143,7 +146,10 @@ func TestDisableRendersDataAttribute(t *testing.T) {
 }
 
 func TestDisableEmptyTextRendersDataAttribute(t *testing.T) {
-	el := bind.Disable(bind.Click(button.Text("Go"), "go"), "")
+	el := bind.Apply(button.Text("Go"),
+		bind.OnClick("go"),
+		bind.Disable(""),
+	)
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-tether-disable=""`) {
@@ -152,7 +158,10 @@ func TestDisableEmptyTextRendersDataAttribute(t *testing.T) {
 }
 
 func TestConfirmRendersDataAttribute(t *testing.T) {
-	el := bind.Confirm(bind.Click(button.Text("Delete"), "delete"), "Are you sure?")
+	el := bind.Apply(button.Text("Delete"),
+		bind.OnClick("delete"),
+		bind.Confirm("Are you sure?"),
+	)
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-tether-confirm="Are you sure?"`) {
@@ -161,7 +170,10 @@ func TestConfirmRendersDataAttribute(t *testing.T) {
 }
 
 func TestDebounceRendersDataAttribute(t *testing.T) {
-	el := bind.Debounce(bind.Input(input.Text("q", ""), "search"), 500*time.Millisecond)
+	el := bind.Apply(input.Text("q", ""),
+		bind.OnInput("search"),
+		bind.Debounce(500*time.Millisecond),
+	)
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-tether-debounce="500"`) {
@@ -170,7 +182,10 @@ func TestDebounceRendersDataAttribute(t *testing.T) {
 }
 
 func TestThrottleRendersDataAttribute(t *testing.T) {
-	el := bind.Throttle(bind.Click(button.Text("Go"), "fire"), 1*time.Second)
+	el := bind.Apply(button.Text("Go"),
+		bind.OnClick("fire"),
+		bind.Throttle(1*time.Second),
+	)
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-tether-throttle="1000"`) {
@@ -179,7 +194,7 @@ func TestThrottleRendersDataAttribute(t *testing.T) {
 }
 
 func TestViewportRendersDataAttribute(t *testing.T) {
-	el := bind.Viewport(button.Text("Sentinel"), "load-more")
+	el := bind.Apply(button.Text("Sentinel"), bind.OnViewport("load-more"))
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-tether-viewport="load-more"`) {
@@ -188,7 +203,7 @@ func TestViewportRendersDataAttribute(t *testing.T) {
 }
 
 func TestChangeRendersDataAttribute(t *testing.T) {
-	el := bind.Change(dropdown.New(), "filter")
+	el := bind.Apply(dropdown.New(), bind.OnChange("filter"))
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-tether-change="filter"`) {
@@ -197,7 +212,7 @@ func TestChangeRendersDataAttribute(t *testing.T) {
 }
 
 func TestKeyDownRendersDataAttribute(t *testing.T) {
-	el := bind.KeyDown(input.Text("cmd", ""), "exec")
+	el := bind.Apply(input.Text("cmd", ""), bind.OnKeyDown("exec"))
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-tether-keydown="exec"`) {
@@ -206,7 +221,7 @@ func TestKeyDownRendersDataAttribute(t *testing.T) {
 }
 
 func TestFocusRendersDataAttribute(t *testing.T) {
-	el := bind.Focus(input.Text("name", ""), "focus-name")
+	el := bind.Apply(input.Text("name", ""), bind.OnFocus("focus-name"))
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-tether-focus="focus-name"`) {
@@ -215,7 +230,7 @@ func TestFocusRendersDataAttribute(t *testing.T) {
 }
 
 func TestBlurRendersDataAttribute(t *testing.T) {
-	el := bind.Blur(input.Text("name", ""), "blur-name")
+	el := bind.Apply(input.Text("name", ""), bind.OnBlur("blur-name"))
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-tether-blur="blur-name"`) {
@@ -224,7 +239,10 @@ func TestBlurRendersDataAttribute(t *testing.T) {
 }
 
 func TestFilterKeyRendersDataAttribute(t *testing.T) {
-	el := bind.FilterKey(bind.KeyDown(input.Text("cmd", ""), "exec"), "Enter")
+	el := bind.Apply(input.Text("cmd", ""),
+		bind.OnKeyDown("exec"),
+		bind.FilterKey("Enter"),
+	)
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-tether-key="Enter"`) {
@@ -236,7 +254,7 @@ func TestFilterKeyRendersDataAttribute(t *testing.T) {
 }
 
 func TestFocusTrapRendersDataAttribute(t *testing.T) {
-	el := bind.FocusTrap(button.Text("Dialog"))
+	el := bind.Apply(button.Text("Dialog"), bind.FocusTrap())
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-tether-focus-trap=""`) {
@@ -245,7 +263,7 @@ func TestFocusTrapRendersDataAttribute(t *testing.T) {
 }
 
 func TestBindTextRendersDataAttribute(t *testing.T) {
-	el := bind.BindText(button.Text("0"), "count")
+	el := bind.Apply(button.Text("0"), bind.BindText("count"))
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-tether-bind-text="count"`) {
@@ -254,7 +272,7 @@ func TestBindTextRendersDataAttribute(t *testing.T) {
 }
 
 func TestBindShowRendersDataAttribute(t *testing.T) {
-	el := bind.BindShow(button.Text("Panel"), "isOpen")
+	el := bind.Apply(button.Text("Panel"), bind.BindShow("isOpen"))
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-tether-bind-show="isOpen"`) {
@@ -263,7 +281,7 @@ func TestBindShowRendersDataAttribute(t *testing.T) {
 }
 
 func TestBindHideRendersDataAttribute(t *testing.T) {
-	el := bind.BindHide(button.Text("Spinner"), "isLoaded")
+	el := bind.Apply(button.Text("Spinner"), bind.BindHide("isLoaded"))
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-tether-bind-hide="isLoaded"`) {
@@ -272,7 +290,7 @@ func TestBindHideRendersDataAttribute(t *testing.T) {
 }
 
 func TestBindClassRendersDataAttribute(t *testing.T) {
-	el := bind.BindClass(button.Text("Tab"), "active", "isSelected")
+	el := bind.Apply(button.Text("Tab"), bind.BindClass("active", "isSelected"))
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-tether-bind-class="active isSelected"`) {
@@ -281,7 +299,7 @@ func TestBindClassRendersDataAttribute(t *testing.T) {
 }
 
 func TestBindAttrRendersDataAttribute(t *testing.T) {
-	el := bind.BindAttr(button.Text("Save"), "disabled", "isSaving")
+	el := bind.Apply(button.Text("Save"), bind.BindAttr("disabled", "isSaving"))
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-tether-bind-attr="disabled isSaving"`) {
@@ -290,7 +308,7 @@ func TestBindAttrRendersDataAttribute(t *testing.T) {
 }
 
 func TestBindValueRendersDataAttribute(t *testing.T) {
-	el := bind.BindValue(input.Text("email", ""), "email")
+	el := bind.Apply(input.Text("email", ""), bind.BindValue("email"))
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-tether-bind-value="email"`) {
@@ -299,7 +317,10 @@ func TestBindValueRendersDataAttribute(t *testing.T) {
 }
 
 func TestIndicatorRendersDataAttribute(t *testing.T) {
-	el := bind.Indicator(bind.Click(button.Text("Save"), "save"), "#spinner")
+	el := bind.Apply(button.Text("Save"),
+		bind.OnClick("save"),
+		bind.Indicator("#spinner"),
+	)
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-tether-indicator="#spinner"`) {
@@ -308,7 +329,7 @@ func TestIndicatorRendersDataAttribute(t *testing.T) {
 }
 
 func TestCloakRendersDataAttribute(t *testing.T) {
-	el := bind.Cloak(button.Text("Hidden"))
+	el := bind.Apply(button.Text("Hidden"), bind.Cloak())
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-tether-cloak=""`) {
@@ -317,7 +338,7 @@ func TestCloakRendersDataAttribute(t *testing.T) {
 }
 
 func TestPermanentRendersDataAttribute(t *testing.T) {
-	el := bind.Permanent(button.Text("Video"))
+	el := bind.Apply(button.Text("Video"), bind.Permanent())
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-tether-permanent=""`) {
@@ -326,7 +347,7 @@ func TestPermanentRendersDataAttribute(t *testing.T) {
 }
 
 func TestToggleSignalRendersDataAttribute(t *testing.T) {
-	el := bind.ToggleSignal(button.Text("Menu"), "menuOpen")
+	el := bind.Apply(button.Text("Menu"), bind.ToggleSignal("menuOpen"))
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-tether-toggle-signal="menuOpen"`) {
@@ -335,7 +356,7 @@ func TestToggleSignalRendersDataAttribute(t *testing.T) {
 }
 
 func TestSetSignalRendersDataAttribute(t *testing.T) {
-	el := bind.SetSignal(button.Text("Settings"), "tab", "settings")
+	el := bind.Apply(button.Text("Settings"), bind.SetSignal("tab", "settings"))
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-tether-set-signal="tab settings"`) {
@@ -343,9 +364,8 @@ func TestSetSignalRendersDataAttribute(t *testing.T) {
 	}
 }
 
-func TestClickChains(t *testing.T) {
-	// Verify the return type preserves chainability
-	el := bind.Click(button.Text("+"), "increment").
+func TestApplyChains(t *testing.T) {
+	el := bind.Apply(button.Text("+"), bind.OnClick("increment")).
 		Style("cursor: pointer").
 		Class("btn")
 	html := string(el.Render())

@@ -11,22 +11,18 @@ import (
 //
 //	bind.Apply(button.Text("Delete"),
 //	    bind.OnClick("delete"),
-//	    bind.WithConfirm("Are you sure?"),
-//	    bind.WithDisable("Deleting..."),
+//	    bind.Confirm("Are you sure?"),
+//	    bind.Disable("Deleting..."),
 //	)
 type Option struct {
 	key   string
 	value string
 }
 
-// Apply attaches all options to an element in order. This provides a
-// readable top-to-bottom alternative to nesting helpers:
+// Apply attaches all options to an element in order. Stack multiple
+// behaviours top-to-bottom for readable composition:
 //
-//	// Nested (inside-out)
-//	bind.Disable(bind.Confirm(bind.Click(btn, "delete"), "Sure?"), "Deleting...")
-//
-//	// Applied (top-to-bottom)
-//	bind.Apply(btn, bind.OnClick("delete"), bind.WithConfirm("Sure?"), bind.WithDisable("Deleting..."))
+//	bind.Apply(btn, bind.OnClick("delete"), bind.Confirm("Sure?"), bind.Disable("Deleting..."))
 func Apply[E Settable[E]](el E, opts ...Option) E {
 	for _, o := range opts {
 		el = el.SetData(o.key, o.value)
@@ -60,150 +56,156 @@ func OnBlur(action string) Option { return Option{"tether-blur", action} }
 // OnViewport binds a tether-viewport event.
 func OnViewport(action string) Option { return Option{"tether-viewport", action} }
 
-// WithEvent binds an arbitrary DOM event. Use this for events not
+// Event binds an arbitrary DOM event. Use this for events not
 // covered by the built-in options (OnClick, OnSubmit, etc.).
 //
-//	bind.Apply(el, bind.WithEvent("dblclick", "open-editor"))
-func WithEvent(eventType, action string) Option {
+//	bind.Apply(el, bind.Event("dblclick", "open-editor"))
+func Event(eventType, action string) Option {
 	return Option{"tether-" + eventType, action}
 }
 
 // Control options.
 
-// WithDisable disables the element while an event is in flight.
-func WithDisable(text string) Option { return Option{"tether-disable", text} }
+// Disable disables the element while an event is in flight.
+func Disable(text string) Option { return Option{"tether-disable", text} }
 
-// WithConfirm shows a confirmation prompt before sending the event.
-func WithConfirm(message string) Option { return Option{"tether-confirm", message} }
+// Confirm shows a confirmation prompt before sending the event.
+func Confirm(message string) Option { return Option{"tether-confirm", message} }
 
-// WithReset resets form fields after submit.
-func WithReset() Option { return Option{"tether-reset", ""} }
+// Reset resets form fields after submit.
+func Reset() Option { return Option{"tether-reset", ""} }
 
-// WithAutoFocus gives the element focus after the next server update.
-func WithAutoFocus() Option { return Option{"tether-autofocus", ""} }
+// AutoFocus gives the element focus after the next server update.
+func AutoFocus() Option { return Option{"tether-autofocus", ""} }
 
-// WithIndicator shows a loading indicator at the given selector.
-func WithIndicator(selector string) Option { return Option{"tether-indicator", selector} }
+// Indicator shows a loading indicator at the given selector.
+func Indicator(selector string) Option { return Option{"tether-indicator", selector} }
 
-// WithFocusTrap traps keyboard focus within the element.
-func WithFocusTrap() Option { return Option{"tether-focus-trap", ""} }
+// FocusTrap traps keyboard focus within the element.
+func FocusTrap() Option { return Option{"tether-focus-trap", ""} }
 
 // Timing options.
 
-// WithDebounce overrides the default input debounce delay.
-func WithDebounce(d time.Duration) Option {
+// Debounce overrides the default input debounce delay.
+func Debounce(d time.Duration) Option {
 	return Option{"tether-debounce", strconv.Itoa(int(d.Milliseconds()))}
 }
 
-// WithThrottle sets a minimum interval between events.
-func WithThrottle(d time.Duration) Option {
+// Throttle sets a minimum interval between events.
+func Throttle(d time.Duration) Option {
 	return Option{"tether-throttle", strconv.Itoa(int(d.Milliseconds()))}
 }
 
-// WithFilterKey restricts a keydown event to a specific key.
-func WithFilterKey(key string) Option { return Option{"tether-key", key} }
+// FilterKey restricts a keydown event to a specific key.
+func FilterKey(key string) Option { return Option{"tether-key", key} }
 
-// WithData sets a custom data-tether-* attribute. Use this for
-// attributes that don't have a dedicated With* helper.
-func WithData(key, value string) Option { return Option{key, value} }
+// Data sets a custom data-tether-* attribute.
+func Data(key, value string) Option { return Option{key, value} }
 
-// WithEventData attaches an extra key-value pair to events.
-func WithEventData(key, value string) Option { return Option{"tether-data-" + key, value} }
+// EventData attaches an extra key-value pair to events.
+func EventData(key, value string) Option { return Option{"tether-data-" + key, value} }
 
 // Directive options.
 
-// WithLink marks the element for client-side navigation.
-func WithLink() Option { return Option{"tether-link", ""} }
+// Link marks the element for client-side navigation.
+func Link() Option { return Option{"tether-link", ""} }
 
-// WithToggleClass toggles a CSS class on click.
-func WithToggleClass(class string) Option { return Option{"tether-toggle-class", class} }
+// ToggleClass toggles a CSS class on click.
+func ToggleClass(class string) Option { return Option{"tether-toggle-class", class} }
 
-// WithToggleTarget directs the toggle at a different element.
-func WithToggleTarget(selector string) Option { return Option{"tether-toggle-target", selector} }
+// ToggleTarget directs the toggle at a different element.
+func ToggleTarget(selector string) Option { return Option{"tether-toggle-target", selector} }
 
-// WithToggleAttr toggles a boolean attribute on click.
-func WithToggleAttr(attr string) Option { return Option{"tether-toggle-attr", attr} }
+// ToggleAttr toggles a boolean attribute on click.
+func ToggleAttr(attr string) Option { return Option{"tether-toggle-attr", attr} }
 
-// WithCloak hides the element until the runtime initialises.
-func WithCloak() Option { return Option{"tether-cloak", ""} }
+// Cloak hides the element until the runtime initialises.
+func Cloak() Option { return Option{"tether-cloak", ""} }
 
-// WithPermanent excludes the element from morphing.
-func WithPermanent() Option { return Option{"tether-permanent", ""} }
+// Permanent excludes the element from morphing.
+func Permanent() Option { return Option{"tether-permanent", ""} }
 
 // Signal binding options.
 
-// WithBindText binds an element's text content to a named signal.
-func WithBindText(signal string) Option { return Option{"tether-bind-text", signal} }
+// BindText binds an element's text content to a named signal.
+func BindText(signal string) Option { return Option{"tether-bind-text", signal} }
 
-// WithBindShow shows an element when the named signal is truthy.
-func WithBindShow(signal string) Option { return Option{"tether-bind-show", signal} }
+// BindShow shows an element when the named signal is truthy.
+func BindShow(signal string) Option { return Option{"tether-bind-show", signal} }
 
-// WithBindHide hides an element when the named signal is truthy.
-func WithBindHide(signal string) Option { return Option{"tether-bind-hide", signal} }
+// BindHide hides an element when the named signal is truthy.
+func BindHide(signal string) Option { return Option{"tether-bind-hide", signal} }
 
-// WithBindClass binds a CSS class to a named signal. The class is
+// BindClass binds a CSS class to a named signal. The class is
 // added when truthy and removed when falsy.
-func WithBindClass(class, signal string) Option {
+func BindClass(class, signal string) Option {
 	return Option{"tether-bind-class", class + " " + signal}
 }
 
-// WithBindAttr binds an HTML attribute to a named signal.
-func WithBindAttr(attr, signal string) Option {
+// BindAttr binds an HTML attribute to a named signal.
+func BindAttr(attr, signal string) Option {
 	return Option{"tether-bind-attr", attr + " " + signal}
 }
 
-// WithBindValue binds a form element's value property to a named signal.
-func WithBindValue(signal string) Option { return Option{"tether-bind-value", signal} }
+// BindValue binds a form element's value property to a named signal.
+func BindValue(signal string) Option { return Option{"tether-bind-value", signal} }
 
 // Signal directive options.
 
-// WithToggleSignal flips a boolean signal on click without a server round-trip.
-func WithToggleSignal(signal string) Option { return Option{"tether-toggle-signal", signal} }
+// ToggleSignal flips a boolean signal on click without a server round-trip.
+func ToggleSignal(signal string) Option { return Option{"tether-toggle-signal", signal} }
 
-// WithSetSignal sets a signal to a specific value on click without a server round-trip.
-func WithSetSignal(signal, value string) Option {
+// SetSignal sets a signal to a specific value on click without a server round-trip.
+func SetSignal(signal, value string) Option {
 	return Option{"tether-set-signal", signal + " " + value}
 }
 
-// WithOptimistic sets a signal immediately on click, before the event
+// Optimistic sets a signal immediately on click, before the event
 // is sent to the server.
-func WithOptimistic(signal, value string) Option {
+func Optimistic(signal, value string) Option {
 	return Option{"tether-optimistic", signal + " " + value}
 }
 
-// WithOptimisticToggle flips a boolean signal immediately on click,
+// OptimisticToggle flips a boolean signal immediately on click,
 // before the event is sent to the server.
-func WithOptimisticToggle(signal string) Option { return Option{"tether-optimistic-toggle", signal} }
+func OptimisticToggle(signal string) Option { return Option{"tether-optimistic-toggle", signal} }
 
-// WithCollect adds a CSS selector that the client resolves at event
+// Collect adds a CSS selector that the client resolves at event
 // time. Matched elements contribute their current value to Event.Data,
 // keyed by the element's name or id attribute. Use this to send input
 // values with a click or keydown event without wrapping in a form:
 //
 //	bind.Apply(button.New().Text("Send"),
 //	    bind.OnClick("chat.send"),
-//	    bind.WithCollect("#message-input"),
+//	    bind.Collect("#message-input"),
 //	)
-func WithCollect(selector string) Option { return Option{"tether-collect", selector} }
+func Collect(selector string) Option { return Option{"tether-collect", selector} }
 
 // Upload options.
 
-// WithUpload marks the element as an upload trigger.
-func WithUpload(action string) Option { return Option{"tether-upload", action} }
+// Upload marks the element as an upload trigger.
+func Upload(action string) Option { return Option{"tether-upload", action} }
 
-// WithUploadInput sets a CSS selector for finding file inputs when the
+// UploadInput sets a CSS selector for finding file inputs when the
 // upload trigger is not adjacent to them in the DOM.
-func WithUploadInput(selector string) Option { return Option{"tether-upload-input", selector} }
+func UploadInput(selector string) Option { return Option{"tether-upload-input", selector} }
 
-// WithUploadProgress binds an element's value attribute to upload progress.
-func WithUploadProgress(action string) Option {
+// UploadProgress binds an element's value attribute to upload progress.
+func UploadProgress(action string) Option {
 	return Option{"tether-bind-attr", "value upload:" + action + ":progress"}
 }
 
+// Push options.
+
+// PushSubscribe marks a button for Web Push subscription. The browser
+// requests notification permission on click and subscribes via the
+// service worker's PushManager.
+func PushSubscribe() Option { return Option{"tether-push-subscribe", ""} }
+
 // Lifecycle options.
 
-// WithHook attaches a JS lifecycle hook.
-func WithHook(name string) Option { return Option{"tether-hook", name} }
+// Hook attaches a JS lifecycle hook.
+func Hook(name string) Option { return Option{"tether-hook", name} }
 
-// WithTransition enables CSS enter/leave transitions.
-func WithTransition(name string) Option { return Option{"tether-transition", name} }
+// Transition enables CSS enter/leave transitions.
+func Transition(name string) Option { return Option{"tether-transition", name} }
