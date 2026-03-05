@@ -59,13 +59,12 @@ identically in live mode, stateless page mode, and tests. `OnNavigate`,
 ### LiveSession[S]
 
 One per browser tab. Implements `Session` and adds state-aware methods:
-`State`, `Update`, `Close`. Owns its own state, diff engine, and
-command-loop goroutine. All exported methods are safe to call from any
-goroutine.
+`State` and `Update`. Owns its own state, diff engine, and command-loop
+goroutine. All exported methods are safe to call from any goroutine.
 
 Type-assert to `*LiveSession[S]` only when you need methods that are not on
-`Session` — `Update`, `State`, `Close`, or `Group` operations. These are
-lifecycle concerns and belong in `OnConnect`/`OnDisconnect`, not in `Handle`.
+`Session` — `Update` and `State`. These are lifecycle concerns and belong
+in `OnConnect`/`OnDisconnect`, not in `Handle`.
 
 ### Event
 

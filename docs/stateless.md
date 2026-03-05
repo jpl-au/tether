@@ -69,7 +69,7 @@ tether.Page(tether.PageConfig[State]{
 |---------|-------------|------------|
 | State creation | `State(r)` — every request | `InitialState(r)` — once per session |
 | Transport | HTTP POST/response | WebSocket or SSE |
-| Handle parameter | `Session` only | `Session` (type-assert to `*LiveSession` for Update, Go, Close) |
+| Handle parameter | `Session` only | `Session` (type-assert to `*LiveSession` for Update and State) |
 | Server push | No | Yes (Update, Signal, Toast from any goroutine) |
 | OnConnect/OnDisconnect | No | Yes |
 | Groups/Broadcast | No | Yes |

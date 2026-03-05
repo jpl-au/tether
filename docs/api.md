@@ -178,9 +178,9 @@ func todoHandle(sess tether.Session, ts TodoState, ev tether.Event) TodoState {
 }
 ```
 
-Methods: `ID`, `Context`, `Go`, `Toast`, `Navigate`, `ReplaceURL`, `SetTitle`, `Announce`, `Flash`, `Signal`, `Signals`, `SignalBatch`, `Push`.
+Methods: `ID`, `Context`, `Go`, `Toast`, `Navigate`, `ReplaceURL`, `SetTitle`, `Announce`, `Flash`, `Signal`, `Signals`, `SignalBatch`, `Push`, `Close`.
 
-`ID` returns an empty string in stateless page mode (PageConfig) — there is no persistent session. `Push` returns an error during pre-warming (initial GET) since no browser subscription exists yet. During live sessions both work normally.
+`ID` returns an empty string in stateless page mode (PageConfig) — there is no persistent session. `Push` returns an error during pre-warming (initial GET) since no browser subscription exists yet. `Close` terminates the session's transport; in stateless page mode and tethertest it is a no-op. During live sessions all methods work normally.
 
 ---
 

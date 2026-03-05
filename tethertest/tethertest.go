@@ -161,6 +161,7 @@ func (s *testSession) SignalBatch(pairs ...any) {
 }
 func (s *testSession) Flash(sel, text string)       { s.ensureFlash(); s.flash[sel] = text }
 func (s *testSession) Push(push.Notification) error { return nil }
+func (s *testSession) Close()                       {}
 
 func (s *testSession) ensureSignals() {
 	if s.signals == nil {

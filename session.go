@@ -176,6 +176,10 @@ type Session interface {
 	Signals(signals map[string]any)
 	SignalBatch(pairs ...any)
 	Push(n push.Notification) error
+	// Close terminates the session by closing its transport. In
+	// stateless page mode (captureSession) and tethertest this is a
+	// no-op — there is no persistent connection to close.
+	Close()
 }
 
 // captureSession implements Session by buffering side effects.
@@ -211,6 +215,9 @@ func (c *captureSession) Announce(text string)     { c.fx.announce = text }
 func (c *captureSession) Push(push.Notification) error {
 	return ErrPushPreWarm
 }
+
+// Close is a no-op during pre-warming — there is no transport.
+func (c *captureSession) Close() {}
 
 func (c *captureSession) Flash(selector, text string) {
 	if c.fx.flash == nil {
