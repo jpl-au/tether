@@ -80,3 +80,11 @@ func (e Event) Float64(key string) (float64, error) {
 func (e Event) Bool(key string) bool {
 	return e.Data[key] == "true"
 }
+
+// WithAction returns a copy of the event with a different Action.
+// Used by [Route] and [RouteTyped] to strip the component prefix
+// before forwarding the event to a component's Handle method.
+func (e Event) WithAction(action string) Event {
+	e.Action = action
+	return e
+}
