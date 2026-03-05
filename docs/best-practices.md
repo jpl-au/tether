@@ -6,7 +6,7 @@ Handle runs inside the session's command loop. While it executes, no other event
 
 ```go
 // Wrong — blocks the loop for the duration of the query
-Handle: func(sess tether.PreSession, s State, ev tether.Event) State {
+Handle: func(sess tether.Session, s State, ev tether.Event) State {
     rows, _ := db.Query("SELECT * FROM items WHERE user_id = ?", s.UserID)
     s.Items = scanItems(rows)
     return s
@@ -16,9 +16,9 @@ Handle: func(sess tether.PreSession, s State, ev tether.Event) State {
 Move slow work into a background goroutine and push the result back via `Update`:
 
 ```go
-Handle: func(sess tether.PreSession, s State, ev tether.Event) State {
+Handle: func(sess tether.Session, s State, ev tether.Event) State {
     if ev.Action == "refresh" {
-        live := sess.(*tether.Session[State])
+        live := sess.(*tether.LiveSession[State])
         live.Go(func(ctx context.Context) {
             rows, _ := db.QueryContext(ctx, "SELECT * FROM items WHERE user_id = ?", s.UserID)
             items := scanItems(rows)
@@ -49,7 +49,7 @@ span.Textf("Count: %d", state.Count).Dynamic("count")
 Use `Config.OnNoPatch` to detect missing keys in development and production:
 
 ```go
-OnNoPatch: func(sess *tether.Session[State], info tether.NoPatch) {
+OnNoPatch: func(sess *tether.LiveSession[State], info tether.NoPatch) {
     if info.Source != "update" {
         slog.Warn("no patches produced",
             "session", sess.ID(),
@@ -118,7 +118,7 @@ Each session has its own state. Shared mutable state at the package level create
 // Wrong — package-level mutable state accessed from multiple sessions
 var onlineUsers int
 
-OnConnect: func(sess *tether.Session[State]) {
+OnConnect: func(sess *tether.LiveSession[State]) {
     onlineUsers++ // data race
 },
 ```
@@ -128,9 +128,9 @@ Use `Value` for shared state that sessions observe, `Bus` for discrete events, a
 ```go
 var onlineCount = tether.NewValue(0)
 
-OnConnect: func(sess *tether.Session[State]) {
+OnConnect: func(sess *tether.LiveSession[State]) {
     onlineCount.Update(func(n int) int { return n + 1 })
-    tether.Observe(onlineCount, sess, func(count int, s State) State {
+    tether.Observe(sess, onlineCount, func(count int, s State) State {
         s.OnlineUsers = count
         return s
     })
@@ -145,9 +145,9 @@ OnConnect: func(sess *tether.Session[State]) {
 
 ```go
 // Wrong — creates a new subscription on every click event
-Handle: func(sess tether.PreSession, s State, ev tether.Event) State {
-    live := sess.(*tether.Session[State])
-    tether.Observe(onlineCount, live, func(count int, s State) State {
+Handle: func(sess tether.Session, s State, ev tether.Event) State {
+    live := sess.(*tether.LiveSession[State])
+    tether.Observe(live, onlineCount, func(count int, s State) State {
         s.OnlineUsers = count
         return s
     })
@@ -155,8 +155,8 @@ Handle: func(sess tether.PreSession, s State, ev tether.Event) State {
 },
 
 // Right — subscribe once when the session connects
-OnConnect: func(sess *tether.Session[State]) {
-    tether.Observe(onlineCount, sess, func(count int, s State) State {
+OnConnect: func(sess *tether.LiveSession[State]) {
+    tether.Observe(sess, onlineCount, func(count int, s State) State {
         s.OnlineUsers = count
         return s
     })

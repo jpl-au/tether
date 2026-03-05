@@ -117,7 +117,7 @@ When the diff engine detects a structural change (Dynamic keys added, removed, o
 
 ```go
 tether.New(tether.Config[State]{
-    OnStructuralChange: func(s *tether.Session[State], c tether.StructuralChange) {
+    OnStructuralChange: func(s *tether.LiveSession[State], c tether.StructuralChange) {
         slog.Warn("structural change",
             "session", s.ID(),
             "added", c.Added,

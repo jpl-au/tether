@@ -5,7 +5,7 @@
 Side effects are called directly on the session parameter during `Handle`. They are buffered and merged into the same update message as the state diff, so the client receives everything atomically:
 
 ```go
-Handle: func(sess tether.PreSession, s State, ev tether.Event) State {
+Handle: func(sess tether.Session, s State, ev tether.Event) State {
     if ev.Action == "add-todo" {
         s.Todos = append(s.Todos, todo)
         sess.Announce("Todo added")
@@ -104,7 +104,7 @@ When the diff engine detects a structural change, it falls back to a full root m
 
 ```go
 tether.New(tether.Config[State]{
-    OnStructuralChange: func(sess *tether.Session[State], change tether.StructuralChange) {
+    OnStructuralChange: func(sess *tether.LiveSession[State], change tether.StructuralChange) {
         slog.Warn("structural change",
             "session", sess.ID(),
             "added", change.Added,
@@ -126,7 +126,7 @@ When a render cycle produces no patches and no structural change, the framework 
 
 ```go
 tether.New(tether.Config[State]{
-    OnNoPatch: func(sess *tether.Session[State], info tether.NoPatch) {
+    OnNoPatch: func(sess *tether.LiveSession[State], info tether.NoPatch) {
         // Signal-only updates (e.g. a ticker) intentionally produce
         // no patches — log at debug. Navigate and event sources that
         // produce nothing are likely missing Dynamic keys — warn.
@@ -166,7 +166,7 @@ Signals (`sess.Signal`, `bind.BindText`, `bind.BindShow`, etc.) update bound ele
 Use `Session.Go` to launch background work tied to a session's lifetime. The context is cancelled when the session is permanently destroyed (reaped or shutdown), but survives temporary disconnects:
 
 ```go
-OnConnect: func(s *tether.Session[State]) {
+OnConnect: func(s *tether.LiveSession[State]) {
     s.Go(func(ctx context.Context) {
         ticker := time.NewTicker(time.Second)
         defer ticker.Stop()
@@ -219,7 +219,7 @@ var todos = tether.Scope[AppState, TodoState]{
 Use `Handle` in the event handler to dispatch to the component:
 
 ```go
-Handle: func(sess tether.PreSession, s AppState, ev tether.Event) AppState {
+Handle: func(sess tether.Session, s AppState, ev tether.Event) AppState {
     if ev.Action == "add-todo" || ev.Action == "remove-todo" {
         return todos.Handle(sess, s, ev, todoHandle)
     }
@@ -246,7 +246,7 @@ Bidirectional sync between Go state and the browser URL:
 
 ```go
 tether.New(tether.Config[State]{
-    OnNavigate: func(_ tether.PreSession, s State, p tether.Params) State {
+    OnNavigate: func(_ tether.Session, s State, p tether.Params) State {
         s.Page = p.Path
         return s
     },

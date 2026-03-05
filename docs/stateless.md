@@ -43,13 +43,13 @@ tether.Page(tether.PageConfig[State]{
     Render: func(s State) node.Node { ... },
 
     // Required: process a client event and return the new state.
-    // The session parameter is a PreSession — call Toast, Navigate,
+    // The session parameter is a Session — call Toast, Navigate,
     // Flash, etc. for side effects.
-    Handle: func(sess tether.PreSession, s State, ev tether.Event) State { ... },
+    Handle: func(sess tether.Session, s State, ev tether.Event) State { ... },
 
     // Optional: process URL parameters on every request.
     // Called after State on both GET and POST.
-    OnNavigate: func(sess tether.PreSession, s State, p tether.Params) State { ... },
+    OnNavigate: func(sess tether.Session, s State, p tether.Params) State { ... },
 
     // Optional: wrap page content in a full HTML document.
     Layout: func(s State, content node.Node) node.Node { ... },
@@ -69,7 +69,7 @@ tether.Page(tether.PageConfig[State]{
 |---------|-------------|------------|
 | State creation | `State(r)` — every request | `InitialState(r)` — once per session |
 | Transport | HTTP POST/response | WebSocket or SSE |
-| Handle parameter | `PreSession` only | `PreSession` (type-assert to `*Session` for Update, Go, Close) |
+| Handle parameter | `Session` only | `Session` (type-assert to `*LiveSession` for Update, Go, Close) |
 | Server push | No | Yes (Update, Signal, Toast from any goroutine) |
 | OnConnect/OnDisconnect | No | Yes |
 | Groups/Broadcast | No | Yes |
@@ -96,7 +96,7 @@ func render(s State) node.Node {
     ).Dynamic("counter")
 }
 
-func handle(_ tether.PreSession, s State, ev tether.Event) State {
+func handle(_ tether.Session, s State, ev tether.Event) State {
     if ev.Action == "increment" {
         count, _ := ev.Int("count")
         s.Count = count + 1
@@ -133,7 +133,7 @@ tether.Page(tether.PageConfig[State]{
 Side effects work the same as in live mode, but they travel in the POST response instead of over a persistent channel:
 
 ```go
-func handle(sess tether.PreSession, s State, ev tether.Event) State {
+func handle(sess tether.Session, s State, ev tether.Event) State {
     if ev.Action == "save" {
         // ... save to database
         sess.Toast("Settings saved")
@@ -143,9 +143,9 @@ func handle(sess tether.PreSession, s State, ev tether.Event) State {
 }
 ```
 
-Available methods on `PreSession`: `Toast`, `Navigate`, `ReplaceURL`, `SetTitle`, `Announce`, `Flash`, `Signal`, `Signals`, `SignalBatch`, `Push`.
+Available methods on `Session`: `Toast`, `Navigate`, `ReplaceURL`, `SetTitle`, `Announce`, `Flash`, `Signal`, `Signals`, `SignalBatch`, `Push`.
 
-Note: `PreSession.ID()` returns an empty string in stateless mode — there is no persistent session. `Push` returns `ErrPushPreWarm`.
+Note: `Session.ID()` returns an empty string in stateless mode — there is no persistent session. `Push` returns `ErrPushPreWarm`.
 
 ## When to upgrade to live mode
 

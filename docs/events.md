@@ -183,7 +183,7 @@ The event is only sent when that key is pressed. Use `ev.Key()` in Handle to rea
 `event.Online`, `event.Offline`, and `event.AppInstalled` are fired automatically by the client JS when the corresponding browser events occur. No bind helper is needed — the events arrive as regular server events:
 
 ```go
-Handle: func(_ tether.PreSession, s State, ev tether.Event) State {
+Handle: func(_ tether.Session, s State, ev tether.Event) State {
     switch ev.Action {
     case "online":
         s.Status = "Connected"

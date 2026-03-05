@@ -9,7 +9,7 @@ Enable uploads by setting `Config.Upload`:
 ```go
 tether.New(tether.Config[State]{
     Upload: &tether.UploadConfig[State]{
-        Handle: func(sess *tether.Session[State], upload tether.Upload) error {
+        Handle: func(sess *tether.LiveSession[State], upload tether.Upload) error {
             file, err := upload.Open()
             if err != nil {
                 return err
@@ -123,7 +123,7 @@ tether.New(tether.Config[State]{
             VAPIDPrivateKey: privateKey,
             Subject:         "mailto:admin@example.com",
         }),
-        OnSubscribe: func(sess *tether.Session[State], sub push.Subscription) {
+        OnSubscribe: func(sess *tether.LiveSession[State], sub push.Subscription) {
             // Store subscription in your database
         },
     },

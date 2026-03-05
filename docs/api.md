@@ -19,9 +19,9 @@ tether.New(tether.Config[State]{
 |-------|------|-------------|
 | `InitialState` | `func(*http.Request) S` | Creates initial state per connection |
 | `Render` | `func(S) node.Node` | Builds the node tree from state |
-| `Handle` | `func(PreSession, S, Event) S` | Processes events, returns new state |
+| `Handle` | `func(Session, S, Event) S` | Processes events, returns new state |
 | `Middleware` | `[]Middleware[S]` | Wraps Handle with cross-cutting behaviour |
-| `OnNavigate` | `func(PreSession, S, Params) S` | Handles URL navigation and initial load |
+| `OnNavigate` | `func(Session, S, Params) S` | Handles URL navigation and initial load |
 | `Layout` | `func(S, node.Node) node.Node` | Wraps the tether root in a full HTML document |
 | `Equal` | `func(a, b S) bool` | Skips render when state is unchanged |
 
@@ -131,7 +131,7 @@ When either callback is configured, the framework's own logging for that event i
 
 ## Session
 
-`*tether.Session[S]` is the handle for an active connection. Methods are safe to call from any goroutine.
+`*tether.LiveSession[S]` is the handle for an active connection. Methods are safe to call from any goroutine.
 
 ### State
 
@@ -164,14 +164,14 @@ s.SignalBatch("count", 42, "status", "online")  // flat key-value pairs
 s.Push(push.Notification{...})         // Web Push notification
 ```
 
-### PreSession
+### Session (interface)
 
-`tether.PreSession` is a non-generic interface exposing Session's side-effect methods without the state type parameter. It is available in `OnNavigate`, stateless page handlers, and reusable components.
+`tether.Session` is a non-generic interface exposing LiveSession's side-effect methods without the state type parameter. It is available in `Handle`, `OnNavigate`, stateless page handlers, and reusable components.
 
-Because PreSession has no generic parameter, component handlers can accept it directly — they don't need to know the application's state type:
+Because Session has no generic parameter, component handlers can accept it directly — they don't need to know the application's state type:
 
 ```go
-func todoHandle(sess tether.PreSession, ts TodoState, ev tether.Event) TodoState {
+func todoHandle(sess tether.Session, ts TodoState, ev tether.Event) TodoState {
     sess.Toast("Saved")   // works — no generic needed
     sess.Signal("count", len(ts.Items))
     return ts
@@ -296,14 +296,14 @@ group := tether.NewGroup[State]()
 group.Add(sess)
 group.Remove(sess)
 group.Len()       // member count
-group.All()       // iter.Seq[*Session[S]]
+group.All()       // iter.Seq[*LiveSession[S]]
 
-group.Broadcast(func(target *tether.Session[State], s State) State {
+group.Broadcast(func(target *tether.LiveSession[State], s State) State {
     s.Message = "hello"
     return s
 })
 
-group.BroadcastOthers(sender, func(target *tether.Session[State], s State) State {
+group.BroadcastOthers(sender, func(target *tether.LiveSession[State], s State) State {
     s.Message = "hello"
     return s
 })
@@ -589,10 +589,10 @@ h.URLWasReplaced()               // last URL used ReplaceURL (not Navigate)
 
 ### Middleware
 
-`tethertest.Middleware` wraps the `PreSession`-based handler used by tethertest and `PageConfig`:
+`tethertest.Middleware` wraps the `Session`-based handler used by tethertest and `PageConfig`:
 
 ```go
-type HandleFunc[S any] func(tether.PreSession, S, tether.Event) S
+type HandleFunc[S any] func(tether.Session, S, tether.Event) S
 type Middleware[S any] func(next HandleFunc[S]) HandleFunc[S]
 ```
 
@@ -614,7 +614,7 @@ bus.Emit(sess, msg)      // to all except sender — use inside Handle
 bus.Len()                // active subscriber count
 ```
 
-`Emit` accepts any `PreSession` value, so it can be called directly from `Handle` without a type-assert. In live sessions, publication is enqueued on the sender's command loop so the sender's diff is sent to the client before other subscribers react. Subscriptions registered via `tether.On` whose session ID matches the emitting session are automatically skipped — preventing double-apply since `Handle` already updated the sender's state.
+`Emit` accepts any `Session` value, so it can be called directly from `Handle` without a type-assert. In live sessions, publication is enqueued on the sender's command loop so the sender's diff is sent to the client before other subscribers react. Subscriptions registered via `tether.On` whose session ID matches the emitting session are automatically skipped — preventing double-apply since `Handle` already updated the sender's state.
 
 ### Subscribing
 
@@ -633,7 +633,7 @@ cancel := bus.SubscribeAsync(ctx, func(msg ChatMessage) { ... })
 Session-aware subscription via `tether.On` — the primary way to connect a Bus to a session:
 
 ```go
-tether.On(messages, sess, func(msg MessageSent, state ChatState) ChatState {
+tether.On(sess, messages, func(msg MessageSent, state ChatState) ChatState {
     state.Messages = append(state.Messages, msg.Text)
     return state
 })
@@ -649,8 +649,8 @@ Key behaviours:
 Typical usage is in `OnConnect`:
 
 ```go
-OnConnect: func(sess *tether.Session[State]) {
-    tether.On(activityBus, sess, func(item ActivityItem, s State) State {
+OnConnect: func(sess *tether.LiveSession[State]) {
+    tether.On(sess, activityBus, func(item ActivityItem, s State) State {
         s.Activity = append(s.Activity, item)
         return s
     })
@@ -685,7 +685,7 @@ v.Len()               // active observer count
 `tether.Observe` subscribes a session to a Value. The current value is delivered immediately so the session's state is up to date from the moment of subscription. Future changes via Store or Update are delivered automatically:
 
 ```go
-tether.Observe(onlineCount, sess, func(count int, s State) State {
+tether.Observe(sess, onlineCount, func(count int, s State) State {
     s.OnlineUsers = count
     return s
 })
@@ -700,8 +700,8 @@ Key behaviours:
 Typical usage is in `OnConnect`:
 
 ```go
-OnConnect: func(sess *tether.Session[State]) {
-    tether.Observe(onlineCount, sess, func(count int, s State) State {
+OnConnect: func(sess *tether.LiveSession[State]) {
+    tether.Observe(sess, onlineCount, func(count int, s State) State {
         s.OnlineCount = count
         return s
     })

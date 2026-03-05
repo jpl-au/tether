@@ -8,13 +8,13 @@ Push updates to multiple sessions at once:
 group := tether.NewGroup[State]()
 
 tether.New(tether.Config[State]{
-    OnConnect:    func(s *tether.Session[State]) { group.Add(s) },
-    OnDisconnect: func(s *tether.Session[State]) { group.Remove(s) },
+    OnConnect:    func(s *tether.LiveSession[State]) { group.Add(s) },
+    OnDisconnect: func(s *tether.LiveSession[State]) { group.Remove(s) },
     // ...
 })
 
 // Send a message to every connected client
-group.Broadcast(func(target *tether.Session[State], s State) State {
+group.Broadcast(func(target *tether.LiveSession[State], s State) State {
     s.Notification = "System update complete"
     target.Announce("System update complete")
     return s
@@ -41,13 +41,13 @@ Sessions are automatically added when the transport connects and removed when th
 When broadcasting from inside `Handle`, use `BroadcastOthers` to exclude the sender. Handle already updates the sender's state via the return value — broadcasting to everyone would double-apply the change on the sender:
 
 ```go
-Handle: func(sess tether.PreSession, s State, ev tether.Event) State {
+Handle: func(sess tether.Session, s State, ev tether.Event) State {
     if ev.Action == "send-message" {
         s.Messages = append(s.Messages, ev.Data["text"])
         // In live mode, sess is a *Session — type-assert to access
         // Broadcast, Update, and other session-specific methods.
-        live := sess.(*tether.Session[State])
-        group.BroadcastOthers(live, func(target *tether.Session[State], s State) State {
+        live := sess.(*tether.LiveSession[State])
+        group.BroadcastOthers(live, func(target *tether.LiveSession[State], s State) State {
             s.Messages = append(s.Messages, ev.Data["text"])
             return s
         })
@@ -62,10 +62,10 @@ Track who is online with callbacks and iteration:
 
 ```go
 group := tether.NewGroup[State]()
-group.OnJoin = func(s *tether.Session[State]) {
+group.OnJoin = func(s *tether.LiveSession[State]) {
     log.Printf("user joined: %s", s.ID())
 }
-group.OnLeave = func(s *tether.Session[State]) {
+group.OnLeave = func(s *tether.LiveSession[State]) {
     log.Printf("user left: %s", s.ID())
 }
 
@@ -91,8 +91,8 @@ var messages = tether.NewBus[MessageSent]()
 Subscribe a session in `OnConnect`:
 
 ```go
-OnConnect: func(sess *tether.Session[State]) {
-    tether.On(messages, sess, func(msg MessageSent, s State) State {
+OnConnect: func(sess *tether.LiveSession[State]) {
+    tether.On(sess, messages, func(msg MessageSent, s State) State {
         s.Messages = append(s.Messages, msg.Text)
         return s
     })
@@ -102,12 +102,12 @@ OnConnect: func(sess *tether.Session[State]) {
 Publish from Handle with sender filtering:
 
 ```go
-Handle: func(sess tether.PreSession, s State, ev tether.Event) State {
+Handle: func(sess tether.Session, s State, ev tether.Event) State {
     if ev.Action == "send" {
         msg := MessageSent{Text: ev.Value()}
         s.Messages = append(s.Messages, msg.Text)
         // Emit skips the sender — Handle already updated their state directly.
-        // Bus.Emit accepts PreSession, so no type-assert is needed.
+        // Bus.Emit accepts Session, so no type-assert is needed.
         messages.Emit(sess, msg)
     }
     return s
@@ -176,8 +176,8 @@ var onlineCount = tether.NewValue(0)
 Observe in `OnConnect` — the current value is delivered immediately:
 
 ```go
-OnConnect: func(sess *tether.Session[State]) {
-    tether.Observe(onlineCount, sess, func(count int, s State) State {
+OnConnect: func(sess *tether.LiveSession[State]) {
+    tether.Observe(sess, onlineCount, func(count int, s State) State {
         s.OnlineCount = count
         return s
     })
