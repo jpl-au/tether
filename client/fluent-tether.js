@@ -1014,16 +1014,26 @@ window.Tether.signals = window.Tether.signals || {};
     }
   }
 
+  // parseSignalValue converts a string from an HTML data attribute into
+  // a properly typed JS value. Data attributes are always strings, but
+  // signals should hold typed values so that isTruthy works predictably:
+  //   "true"  → true    "false" → false
+  //   "42"    → 42      "3.14"  → 3.14
+  //   "hello" → "hello" ""      → ""
+  function parseSignalValue(str) {
+    if (str === "true") return true;
+    if (str === "false") return false;
+    if (str !== "" && !isNaN(str)) return Number(str);
+    return str;
+  }
+
   // isTruthy evaluates signal truthiness for show/hide/class/attr
-  // bindings. Signals arrive as JSON values from the server (bool, int,
-  // string, null) or as strings from client-side SetSignal / Optimistic.
-  // To avoid surprises, string representations of falsy values are also
-  // treated as falsy — so Signal("flag", false) from Go and
-  // SetSignal("flag", "false") from JS behave identically.
+  // bindings. Signal values are always properly typed — booleans from
+  // the server arrive as JSON booleans, strings from data attributes
+  // are parsed by parseSignalValue before storage — so standard JS
+  // falsy checks are sufficient.
   function isTruthy(val) {
-    if (val === null || val === undefined || val === false || val === 0 || val === "") return false;
-    if (val === "false" || val === "0" || val === "null" || val === "undefined") return false;
-    return true;
+    return val !== null && val !== undefined && val !== false && val !== 0 && val !== "";
   }
 
   // reapplySignals restores signal-bound values on an element and its
@@ -1163,7 +1173,7 @@ window.Tether.signals = window.Tether.signals || {};
       if (optSet) {
         var idx = optSet.indexOf(" ");
         var key = idx === -1 ? optSet : optSet.substring(0, idx);
-        var val = idx === -1 ? "true" : optSet.substring(idx + 1);
+        var val = parseSignalValue(idx === -1 ? "true" : optSet.substring(idx + 1));
         Tether.setSignal(key, val);
       }
       var optToggle = target.getAttribute("data-tether-optimistic-toggle");
@@ -1439,7 +1449,7 @@ window.Tether.signals = window.Tether.signals || {};
       var raw = setter.getAttribute("data-tether-set-signal");
       var idx = raw.indexOf(" ");
       var key = idx === -1 ? raw : raw.substring(0, idx);
-      var value = idx === -1 ? "" : raw.substring(idx + 1);
+      var value = parseSignalValue(idx === -1 ? "" : raw.substring(idx + 1));
       Tether.signals[key] = value;
       updateSignalBindings(key, value);
     }

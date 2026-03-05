@@ -86,34 +86,30 @@ For toggle-only UI (drawers, menus, modals) where the server doesn't need to kno
 ## Signal truthiness
 
 `BindShow`, `BindHide`, `BindClass`, and `BindAttr` evaluate signal values
-using custom truthiness rules designed so that server-side Go values and
-client-side string values behave identically. The following values are
-**falsy** (element hidden for BindShow, shown for BindHide):
+for truthiness. The signal store always holds properly typed values:
 
-| Value | Falsy? | Source |
-|-------|--------|--------|
-| `false` | Yes | `Signal("flag", false)` from Go |
-| `0` | Yes | `Signal("count", 0)` from Go |
-| `""` (empty string) | Yes | `Signal("name", "")` from Go |
-| `nil` / `null` | Yes | `Signal("val", nil)` from Go |
-| `"false"` | Yes | `SetSignal("flag", "false")` from client |
-| `"0"` | Yes | `SetSignal("count", "0")` from client |
-| `"null"` | Yes | String representation of null |
-| `"undefined"` | Yes | String representation of undefined |
+- **Server → client**: `Signal("flag", false)` serialises to JSON `false`
+  (boolean). `Signal("count", 42)` serialises to JSON `42` (number).
+- **Client-side directives**: `SetSignal` and `Optimistic` read string
+  values from HTML data attributes, but the runtime parses them to proper
+  types before storing: `"true"` → `true`, `"false"` → `false`, `"42"` →
+  `42`. Plain text stays as strings.
 
-Everything else is **truthy**:
+Because values are always typed, truthiness follows standard rules:
 
-| Value | Truthy? |
-|-------|---------|
-| `true` | Yes |
-| `42` | Yes |
-| `"hello"` | Yes |
-| `"true"` | Yes |
-| `"1"` | Yes |
+| Value | Falsy? |
+|-------|--------|
+| `false` | Yes |
+| `0` | Yes |
+| `""` (empty string) | Yes |
+| `nil` / `null` | Yes |
 
-This means `Signal("flag", false)` from Go and `SetSignal("flag", "false")`
-from a client-side directive both evaluate as falsy — no need to worry
-about whether the value is a JSON boolean or a string.
+Everything else is **truthy** — `true`, non-zero numbers, non-empty strings.
+
+**Always use Go booleans for boolean signals.** `Signal("flag", false)` is
+correct. `Signal("flag", "false")` stores the string `"false"` which is a
+non-empty string and therefore **truthy** — this is a bug in your code, not
+a framework issue.
 
 ## Don't mix signals and state rendering on the same element
 
