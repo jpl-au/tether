@@ -7,11 +7,71 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
+	"time"
 )
 
-// ListenAndServe starts an HTTP server with graceful shutdown. It
-// handles SIGINT and SIGTERM, drains sessions, shuts down the HTTP
+// Drainable is satisfied by [*Handler]. It provides graceful shutdown
+// in two phases: Drain stops accepting new sessions and waits for
+// existing ones to finish; Shutdown force-closes any remaining
+// sessions. Use with [ListenAndServe] when multiple handlers share
+// a single HTTP server.
+type Drainable interface {
+	Drain(ctx context.Context) error
+	Shutdown(ctx context.Context) error
+}
+
+// ListenAndServe starts an HTTP server at addr with the provided
+// [http.Handler] and shuts down gracefully on SIGINT or SIGTERM. All
+// drainers are drained concurrently, then the HTTP server is stopped,
+// then remaining sessions are force-closed.
+//
+// Use this when multiple tether handlers share a single mux:
+//
+//	mux := http.NewServeMux()
+//	mux.Handle("/ws/", wsHandler)
+//	mux.Handle("/sse/", sseHandler)
+//	tether.ListenAndServe("", mux, wsHandler, sseHandler)
+//
+// The addr parameter follows [net.Listen] conventions. When empty,
+// the PORT environment variable is checked; if that is also empty,
+// ":8080" is used.
+//
+// Returns nil on clean shutdown. Returns an error only for startup
+// failures such as a port already in use. A second signal during
+// shutdown forces an immediate exit.
+//
+// For single-handler apps, [Handler.ListenAndServe] is simpler — it
+// uses the handler's configured ShutdownGrace timeout and serves
+// itself without a separate mux.
+func ListenAndServe(addr string, handler http.Handler, drainers ...Drainable) error {
+	addr = resolveAddr(addr)
+	srv := &http.Server{Addr: addr, Handler: handler}
+
+	return serve(srv, func() error {
+		return srv.ListenAndServe()
+	}, displayURL(addr), defaultShutdownGrace, drainers)
+}
+
+// ListenAndServeTLS starts an HTTPS server with graceful shutdown.
+// It behaves identically to [ListenAndServe] but accepts TLS
+// certificate and key file paths. If addr is empty and the PORT
+// environment variable is not set, ":443" is used.
+func ListenAndServeTLS(addr, certFile, keyFile string, handler http.Handler, drainers ...Drainable) error {
+	if addr == "" && os.Getenv("PORT") == "" {
+		addr = ":443"
+	}
+	addr = resolveAddr(addr)
+	srv := &http.Server{Addr: addr, Handler: handler}
+
+	return serve(srv, func() error {
+		return srv.ListenAndServeTLS(certFile, keyFile)
+	}, displayTLSURL(addr), defaultShutdownGrace, drainers)
+}
+
+// Handler.ListenAndServe starts an HTTP server with graceful shutdown.
+// It handles SIGINT and SIGTERM, drains sessions, shuts down the HTTP
 // listener, then force-closes any remaining sessions.
 //
 // The addr parameter follows [net.Listen] conventions (e.g. ":8080",
@@ -32,13 +92,16 @@ import (
 // ListenAndServe returns nil on clean shutdown. It only returns an
 // error for startup failures such as a port already in use. A second
 // signal during shutdown forces an immediate exit.
+//
+// For multi-handler apps, use the package-level [ListenAndServe]
+// which drains and shuts down all handlers.
 func (h *Handler[S]) ListenAndServe(addr string, handler ...http.Handler) error {
 	addr = resolveAddr(addr)
 	srv := h.newServer(addr, handler)
 
-	return h.serve(srv, func() error {
+	return serve(srv, func() error {
 		return srv.ListenAndServe()
-	}, displayURL(addr))
+	}, displayURL(addr), h.cfg.Timeouts.ShutdownGrace, []Drainable{h})
 }
 
 // ListenAndServeTLS starts an HTTPS server with graceful shutdown.
@@ -52,9 +115,9 @@ func (h *Handler[S]) ListenAndServeTLS(addr, certFile, keyFile string, handler .
 	addr = resolveAddr(addr)
 	srv := h.newServer(addr, handler)
 
-	return h.serve(srv, func() error {
+	return serve(srv, func() error {
 		return srv.ListenAndServeTLS(certFile, keyFile)
-	}, displayTLSURL(addr))
+	}, displayTLSURL(addr), h.cfg.Timeouts.ShutdownGrace, []Drainable{h})
 }
 
 // newServer creates an [http.Server] with the resolved handler.
@@ -70,9 +133,9 @@ func (h *Handler[S]) newServer(addr string, handler []http.Handler) *http.Server
 }
 
 // serve runs the HTTP server, waits for a signal, and performs
-// graceful shutdown. The start function is called in a goroutine to
-// begin accepting connections. The url string is logged on startup.
-func (h *Handler[S]) serve(srv *http.Server, start func() error, url string) error {
+// graceful shutdown. All drainers are drained concurrently, the HTTP
+// server is stopped, then remaining sessions are force-closed.
+func serve(srv *http.Server, start func() error, url string, grace time.Duration, drainers []Drainable) error {
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- start()
@@ -99,15 +162,28 @@ func (h *Handler[S]) serve(srv *http.Server, start func() error, url string) err
 		os.Exit(1)
 	}()
 
-	ctx, cancel := context.WithTimeout(context.Background(), h.cfg.Timeouts.ShutdownGrace)
+	ctx, cancel := context.WithTimeout(context.Background(), grace)
 	defer cancel()
 
-	if err := h.Drain(ctx); err != nil {
-		slog.Warn("drain timed out, forcing shutdown", "timeout", h.cfg.Timeouts.ShutdownGrace)
+	// Drain all handlers concurrently — let existing sessions
+	// finish naturally before force-closing anything.
+	var wg sync.WaitGroup
+	for _, d := range drainers {
+		wg.Go(func() {
+			if err := d.Drain(ctx); err != nil {
+				slog.Warn("drain timed out", "error", err)
+			}
+		})
 	}
+	wg.Wait()
 
+	// Stop accepting new HTTP requests.
 	srv.Shutdown(ctx)
-	h.Shutdown(ctx)
+
+	// Force-close any sessions that didn't drain in time.
+	for _, d := range drainers {
+		d.Shutdown(ctx)
+	}
 
 	slog.Info("shutdown complete")
 	signal.Stop(sigCh)

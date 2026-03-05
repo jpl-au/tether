@@ -282,7 +282,7 @@ cleaned up automatically when the session is destroyed.
 | `effects.go` | Effects struct — buffers Toast, Signal, Navigate, etc. |
 | `render.go` | Render helpers, tetherBody (root div with data attributes) |
 | `asset.go` | Embedded asset serving with content-hashed URLs |
-| `listen.go` | ListenAndServe — signal trapping, graceful shutdown |
+| `listen.go` | ListenAndServe (method + package-level), Drainable interface, signal trapping, graceful shutdown |
 | `drain.go` | Graceful drain — stop accepting new sessions, wait for existing |
 | `health.go` | Health check endpoint |
 

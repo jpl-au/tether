@@ -274,7 +274,7 @@ h.Shutdown(ctx)     // close all sessions
 
 ### ListenAndServe
 
-For full-page apps, `ListenAndServe` handles signal trapping, graceful shutdown, and sensible defaults:
+For single-handler apps, `Handler.ListenAndServe` handles signal trapping, graceful shutdown, and sensible defaults:
 
 ```go
 h.ListenAndServe("")                      // checks PORT env, defaults to :8080
@@ -283,7 +283,15 @@ h.ListenAndServe("", existingMux)         // mount on an existing mux
 h.ListenAndServeTLS("", "cert.pem", "key.pem")  // HTTPS, defaults to :443
 ```
 
-On `SIGINT` or `SIGTERM`, sessions are drained gracefully (up to `Timeouts.ShutdownGrace`, default 10s) before the process exits. When an existing `http.Handler` is passed, the handler is mounted on it alongside the client JS runtime and any configured assets.
+On `SIGINT` or `SIGTERM`, sessions are drained gracefully (up to `Timeouts.ShutdownGrace`, default 10s) before the process exits.
+
+For multi-handler apps, use the package-level `tether.ListenAndServe` which drains and shuts down all handlers concurrently:
+
+```go
+tether.ListenAndServe("", mux, wsHandler, sseHandler, swHandler)
+```
+
+Any `*Handler[S]` satisfies the `Drainable` interface automatically — no type-assert or adapter needed.
 
 ---
 

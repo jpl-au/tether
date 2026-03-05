@@ -112,7 +112,20 @@ mux.Handle("/{path...}", h)
 h.ListenAndServe("", mux)
 ```
 
-Signal handling, drain, and shutdown still work exactly the same. For
+Signal handling, drain, and shutdown still work exactly the same. When
+multiple tether handlers share a single mux, use the package-level
+`tether.ListenAndServe` which drains and shuts down all of them:
+
+```go
+mux := http.NewServeMux()
+mux.Handle("/ws/", wsHandler)
+mux.Handle("/sse/", sseHandler)
+mux.Handle("/", httpHandler)
+
+tether.ListenAndServe("", mux, wsHandler, sseHandler)
+```
+
+For
 sub-path mounting, use `tether.ServeClient()` to serve the client JS
 runtime separately:
 

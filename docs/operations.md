@@ -19,8 +19,10 @@ mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 
 ## Graceful shutdown
 
-`ListenAndServe` handles shutdown automatically — draining sessions on
-SIGINT or SIGTERM, then force-closing after the grace period:
+### Single handler
+
+`Handler.ListenAndServe` handles shutdown automatically — draining sessions
+on SIGINT or SIGTERM, then force-closing after the grace period:
 
 ```go
 h := tether.New(tether.Config[State]{
@@ -33,7 +35,24 @@ h := tether.New(tether.Config[State]{
 h.ListenAndServe("") // PORT env var, then :8080
 ```
 
-A second Ctrl+C during shutdown forces an immediate exit.
+### Multiple handlers
+
+When several handlers share a single mux, use the package-level
+`tether.ListenAndServe`. It drains all handlers concurrently, stops
+the HTTP server, then force-closes any remaining sessions:
+
+```go
+mux := http.NewServeMux()
+mux.Handle("/ws/", wsHandler)
+mux.Handle("/sse/", sseHandler)
+mux.Handle("/sw/", swHandler)
+mux.Handle("/", httpHandler)
+
+tether.ListenAndServe("", mux, wsHandler, sseHandler, swHandler)
+```
+
+Both variants trap SIGINT and SIGTERM. A second signal during shutdown
+forces an immediate exit.
 
 ### Manual shutdown
 
