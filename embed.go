@@ -125,6 +125,8 @@ func newClientHandler(assets []*Asset) http.Handler {
 
 	var workerOnce sync.Once
 	var workerBody []byte
+	var pushWorkerOnce sync.Once
+	var pushWorkerBody []byte
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// The service worker needs the content-hash cache version
@@ -160,14 +162,16 @@ func newClientHandler(assets []*Asset) http.Handler {
 					return
 				}
 			}
+			pushWorkerOnce.Do(func() {
+				raw, err := fs.ReadFile(clientFiles(), "fluent-tether-push-worker.js")
+				if err != nil {
+					panic("tether: failed to read embedded push worker script: " + err.Error())
+				}
+				pushWorkerBody = raw
+			})
 			w.Header().Set("Service-Worker-Allowed", "/")
 			w.Header().Set("Content-Type", "application/javascript")
-			raw, err := fs.ReadFile(clientFiles(), "fluent-tether-push-worker.js")
-			if err != nil {
-				http.Error(w, "push worker not found", http.StatusInternalServerError)
-				return
-			}
-			if _, err := w.Write(raw); err != nil {
+			if _, err := w.Write(pushWorkerBody); err != nil {
 				slog.Warn("failed to write push worker script", "err", err)
 			}
 			return
