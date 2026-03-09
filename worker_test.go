@@ -2,6 +2,9 @@ package tether
 
 import (
 	"bytes"
+	"crypto/ecdh"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -323,11 +326,17 @@ func TestHandlePushSubscribe(t *testing.T) {
 	handler.active["test-session"] = sess
 	handler.mu.Unlock()
 
+	// Use a real P-256 key pair so the subscription passes Validate().
+	subKey, err := ecdh.P256().GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("generate subscriber key: %v", err)
+	}
+	authBytes := make([]byte, 16)
 	sub := push.Subscription{
 		Endpoint: "https://push.example.com/v1/send/abc",
 		Keys: push.SubscriptionKeys{
-			P256dh: "subscriber-public-key",
-			Auth:   "subscriber-auth-secret",
+			P256dh: base64.RawURLEncoding.EncodeToString(subKey.PublicKey().Bytes()),
+			Auth:   base64.RawURLEncoding.EncodeToString(authBytes),
 		},
 	}
 	body, _ := json.Marshal(sub)

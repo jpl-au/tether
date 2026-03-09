@@ -247,6 +247,10 @@ func (h *Handler[S]) handlePushSubscribe(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "malformed JSON subscription", http.StatusBadRequest)
 		return
 	}
+	if err := sub.Validate(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	// Store the subscription via the session loop so it doesn't race
 	// with other loop operations. The select guards against hanging

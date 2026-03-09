@@ -330,6 +330,44 @@ func TestSendWithActions(t *testing.T) {
 	}
 }
 
+func TestValidateSuccess(t *testing.T) {
+	sub := newTestSubscription(t, "https://push.example.com/v1/send")
+	if err := sub.Validate(); err != nil {
+		t.Fatalf("Validate: %v", err)
+	}
+}
+
+func TestValidateEmptyEndpoint(t *testing.T) {
+	sub := newTestSubscription(t, "https://push.example.com")
+	sub.Endpoint = ""
+	if err := sub.Validate(); err == nil {
+		t.Fatal("Validate should reject empty endpoint")
+	}
+}
+
+func TestValidateBadScheme(t *testing.T) {
+	sub := newTestSubscription(t, "ftp://push.example.com")
+	if err := sub.Validate(); err == nil {
+		t.Fatal("Validate should reject non-http(s) scheme")
+	}
+}
+
+func TestValidateBadPublicKey(t *testing.T) {
+	sub := newTestSubscription(t, "https://push.example.com")
+	sub.Keys.P256dh = base64.RawURLEncoding.EncodeToString([]byte("too-short"))
+	if err := sub.Validate(); err == nil {
+		t.Fatal("Validate should reject malformed P-256 key")
+	}
+}
+
+func TestValidateBadAuth(t *testing.T) {
+	sub := newTestSubscription(t, "https://push.example.com")
+	sub.Keys.Auth = base64.RawURLEncoding.EncodeToString([]byte("short"))
+	if err := sub.Validate(); err == nil {
+		t.Fatal("Validate should reject auth secret that isn't 16 bytes")
+	}
+}
+
 // --- Test helpers ---
 
 // newTestSubscription creates a Subscription with a real P-256 key pair

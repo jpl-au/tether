@@ -109,6 +109,41 @@ type SubscriptionKeys struct {
 	Auth   string `json:"auth"`
 }
 
+// Validate checks that the subscription has a valid endpoint URL, a
+// 65-byte uncompressed P-256 public key, and a 16-byte auth secret.
+// Call this before storing a subscription to catch malformed data
+// early rather than hitting opaque crypto errors during [Send].
+func (s Subscription) Validate() error {
+	if s.Endpoint == "" {
+		return errors.New("push: empty endpoint")
+	}
+	u, err := url.Parse(s.Endpoint)
+	if err != nil {
+		return fmt.Errorf("push: invalid endpoint: %w", err)
+	}
+	if u.Scheme != "https" && u.Scheme != "http" {
+		return fmt.Errorf("push: endpoint scheme must be https or http, got %q", u.Scheme)
+	}
+
+	pub, err := decodeBase64URL(s.Keys.P256dh)
+	if err != nil {
+		return fmt.Errorf("push: invalid P-256 public key encoding: %w", err)
+	}
+	if len(pub) != 65 || pub[0] != 0x04 {
+		return errors.New("push: P-256 public key must be 65 bytes (uncompressed)")
+	}
+
+	auth, err := decodeBase64URL(s.Keys.Auth)
+	if err != nil {
+		return fmt.Errorf("push: invalid auth secret encoding: %w", err)
+	}
+	if len(auth) != 16 {
+		return fmt.Errorf("push: auth secret must be 16 bytes, got %d", len(auth))
+	}
+
+	return nil
+}
+
 // ErrSubscriptionExpired is returned by [Send] when the push service
 // responds with HTTP 410 Gone, indicating the subscription is no longer
 // valid and should be removed from storage.
