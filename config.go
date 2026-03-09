@@ -306,16 +306,26 @@ type Limits struct {
 	// (pending + active + disconnected). Zero means unlimited.
 	MaxSessions int
 
+	// MaxPending limits the number of pre-warmed sessions waiting
+	// for a browser to open a transport connection. Each GET request
+	// creates a pending session (state + differ), so this cap
+	// protects against GET-flooding attacks where an attacker
+	// scripts thousands of requests without ever connecting.
+	// Pending sessions are cheap but unauthenticated — capping them
+	// separately prevents an attacker from crowding out legitimate
+	// active sessions under the global MaxSessions limit. Zero
+	// defaults to 128.
+	MaxPending int
+
 	// CmdBufferSize sets the capacity of each session's internal
 	// command channel. Commands include state updates, broadcasts,
 	// and side effects. When the buffer is full, a short-lived
 	// goroutine delivers the command to prevent cross-session
-	// deadlocks during broadcasts. The first overflow logs a warning
-	// visible in production; subsequent overflows log at debug level.
-	// Sustained overflow usually indicates a blocking [HandleFunc] or
-	// a broadcast rate that exceeds the session's processing speed —
-	// increase the buffer or move slow work into [LiveSession.Go].
-	// Zero defaults to 64.
+	// deadlocks during broadcasts. Each overflow emits a
+	// [BufferOverflow] diagnostic. Sustained overflow usually
+	// indicates a blocking [HandleFunc] or a broadcast rate that
+	// exceeds the session's processing speed — increase the buffer
+	// or move slow work into [LiveSession.Go]. Zero defaults to 64.
 	CmdBufferSize int
 
 	// MaxEventBytes limits the size of a POST event body. Events carry
@@ -397,6 +407,12 @@ const defaultReconnectTimeout = 30 * time.Second
 const defaultMaxEventBytes = 64 << 10 // 64 KB
 
 const defaultHeartbeatInterval = 20 * time.Second
+
+// defaultMaxPending caps the number of pre-warmed sessions waiting for
+// a browser to connect. Pending sessions are cheap but unauthenticated,
+// so the default protects against GET-flooding while being generous
+// enough for legitimate traffic spikes.
+const defaultMaxPending = 128
 
 // defaultShutdownGrace is how long ListenAndServe waits for sessions to
 // drain during graceful shutdown before force-closing them.

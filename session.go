@@ -102,6 +102,11 @@ type LiveSession[S any] struct {
 	// Each overflow emits a BufferOverflow diagnostic.
 	overflows atomic.Int64
 
+	// overflowSem caps the number of concurrent overflow goroutines.
+	// When both the command buffer and the semaphore are full, the
+	// command is dropped and a CommandDropped diagnostic is emitted.
+	overflowSem chan struct{}
+
 	// Lifecycle timers (replace centralised reaper).
 	idleTimer   *time.Timer
 	idleTimeout time.Duration
@@ -322,18 +327,29 @@ func (s *LiveSession[S]) sessionID() string {
 
 // enqueueFx sends an effect closure to the effects channel. Under
 // normal load the send is non-blocking. When the buffer is full,
-// an overflow goroutine delivers it — same pattern as [enqueue].
+// an overflow goroutine delivers it — same semaphore-bounded
+// pattern as [enqueue].
 func (s *LiveSession[S]) enqueueFx(fn func(*effects)) {
 	select {
 	case s.fxCh <- fn:
 	default:
 		s.logOverflow()
-		go func() {
-			select {
-			case s.fxCh <- fn:
-			case <-s.ctx.Done():
-			}
-		}()
+		select {
+		case s.overflowSem <- struct{}{}:
+			go func() {
+				defer func() { <-s.overflowSem }()
+				select {
+				case s.fxCh <- fn:
+				case <-s.ctx.Done():
+				}
+			}()
+		default:
+			s.emitDiagnostic(Diagnostic{
+				Kind:      CommandDropped,
+				SessionID: s.id,
+				Detail:    s.endpoint,
+			})
+		}
 	}
 }
 
@@ -391,21 +407,29 @@ func (s *LiveSession[S]) sendFx(fx *effects) {
 // cross-session deadlocks where two sessions broadcast to each other
 // simultaneously with full buffers.
 //
-// The goroutine is context-aware: if the session is destroyed before
-// the command can be delivered, the goroutine exits cleanly.
+// The number of overflow goroutines is capped by a semaphore sized to
+// CmdBufferSize. If both the buffer and the semaphore are full, the
+// command is dropped and a [CommandDropped] diagnostic is emitted.
 func (s *LiveSession[S]) enqueue(fn func()) {
 	select {
 	case s.cmds <- fn:
 	default:
-		// Command buffer full — overflow to a goroutine to prevent
-		// deadlock. This is expected during broadcast storms but
-		// sustained overflow suggests the buffer is too small.
 		s.logOverflow()
-		go func() {
-			select {
-			case s.cmds <- fn:
-			case <-s.ctx.Done():
-			}
-		}()
+		select {
+		case s.overflowSem <- struct{}{}:
+			go func() {
+				defer func() { <-s.overflowSem }()
+				select {
+				case s.cmds <- fn:
+				case <-s.ctx.Done():
+				}
+			}()
+		default:
+			s.emitDiagnostic(Diagnostic{
+				Kind:      CommandDropped,
+				SessionID: s.id,
+				Detail:    s.endpoint,
+			})
+		}
 	}
 }

@@ -92,22 +92,10 @@ tether.New(tether.Config[State]{
 
 ## Diagnostics
 
-`Handler.Diagnostics` is a typed event bus for framework-level signals.
-Subscribe for metrics, alerting, or custom logging — the framework is
-quiet by default (slog is only used for panics):
-
-```go
-h.Diagnostics.Subscribe(ctx, func(d tether.Diagnostic) {
-    switch d.Kind {
-    case tether.HandlerPanic:
-        alerting.Critical(d.SessionID, d.Err)
-    case tether.TransportError:
-        log.Warn("transport", "session", d.SessionID, "err", d.Err)
-    case tether.BufferOverflow:
-        metrics.Inc("tether.overflow")
-    }
-})
-```
+`Handler.Diagnostics` is a typed event bus for framework-level signals —
+transport errors, panics, buffer overflows, and more. Subscribe for metrics,
+alerting, or custom logging. See [operations](docs/operations.md#diagnostics-bus)
+for details and examples.
 
 ## Documentation
 

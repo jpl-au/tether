@@ -36,6 +36,11 @@ func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 	dev.Debug("serving initial page", "path", r.URL.Path, "remote", r.RemoteAddr)
 
 	h.mu.Lock()
+	if h.cfg.Limits.MaxPending > 0 && len(h.pending) >= h.cfg.Limits.MaxPending {
+		h.mu.Unlock()
+		http.Error(w, "too many pending sessions", http.StatusServiceUnavailable)
+		return
+	}
 	if h.cfg.Limits.MaxSessions > 0 && len(h.pending)+len(h.active)+len(h.disconnected) >= h.cfg.Limits.MaxSessions {
 		h.mu.Unlock()
 		http.Error(w, "too many sessions", http.StatusServiceUnavailable)
@@ -194,6 +199,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		events:           make(chan Event),
 		cmds:             make(chan func(), h.cfg.Limits.CmdBufferSize),
 		fxCh:             make(chan func(*effects), h.cfg.Limits.CmdBufferSize),
+		overflowSem:      make(chan struct{}, h.cfg.Limits.CmdBufferSize),
 		loopDone:         make(chan struct{}),
 		ctx:              ctx,
 		stop:             cancel,

@@ -175,6 +175,9 @@ func New[S any](cfg Config[S]) *Handler[S] {
 	if cfg.Limits.MaxEventBytes == 0 {
 		cfg.Limits.MaxEventBytes = defaultMaxEventBytes
 	}
+	if cfg.Limits.MaxPending == 0 {
+		cfg.Limits.MaxPending = defaultMaxPending
+	}
 	if cfg.Timeouts.Pending == 0 {
 		cfg.Timeouts.Pending = defaultPendingTimeout
 	}

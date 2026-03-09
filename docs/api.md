@@ -88,7 +88,8 @@ When either callback is configured, the framework's own logging for that event i
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `MaxSessions` | `int` | 0 (unlimited) | Maximum concurrent sessions |
+| `MaxSessions` | `int` | 0 (unlimited) | Maximum concurrent sessions (pending + active + disconnected) |
+| `MaxPending` | `int` | 128 | Maximum pre-warmed sessions awaiting transport connection |
 | `CmdBufferSize` | `int` | 64 | Session command channel capacity |
 | `MaxEventBytes` | `int64` | 64 KB | Maximum POST event body size |
 

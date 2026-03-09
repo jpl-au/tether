@@ -130,6 +130,57 @@ Tether.onError = function(err) {
 
 When set, `Tether.onError` is called for every error and warning the JS runtime encounters. When not set, warnings are logged to `console.warn` and silent errors (parse failures, IndexedDB issues) remain silent.
 
+## Diagnostics bus
+
+`Handler.Diagnostics` is a typed event bus (`Bus[Diagnostic]`) for framework-level
+signals. The framework is quiet by default — `slog` is only used for panics as a
+critical safety net. All other operational signals flow exclusively through this bus.
+
+```go
+h.Diagnostics.Subscribe(ctx, func(d tether.Diagnostic) {
+    switch d.Kind {
+    case tether.HandlerPanic:
+        alerting.Critical(d.SessionID, d.Err)
+    case tether.TransportError:
+        log.Warn("transport", "session", d.SessionID, "err", d.Err)
+    case tether.BufferOverflow:
+        metrics.Inc("tether.overflow")
+    case tether.CommandDropped:
+        metrics.Inc("tether.dropped")
+    }
+})
+```
+
+Use `SubscribeAsync` for callbacks that perform I/O (database writes, HTTP calls):
+
+```go
+h.Diagnostics.SubscribeAsync(ctx, func(d tether.Diagnostic) {
+    if d.Kind == tether.HandlerPanic {
+        alerting.Critical(d.SessionID, d.Err)
+    }
+})
+```
+
+### Diagnostic kinds
+
+| Kind | Meaning |
+|------|---------|
+| `TransportError` | Failure reading from or writing to the transport. Normal disconnects (io.EOF) are not emitted |
+| `EncodeError` | JSON serialisation failure — usually an unencodable type in state or render output |
+| `BufferOverflow` | Command channel was full; an overflow goroutine was spawned to deliver the command |
+| `CommandDropped` | Both the command buffer and the overflow goroutine cap were exhausted — data was lost |
+| `HandlerPanic` | Recovered panic inside Handle, Update, or a command callback |
+| `UploadError` | Failure in an upload handler callback |
+
+`BufferOverflow` means the system coped (spawned a goroutine). `CommandDropped`
+means data was lost — the session is critically overwhelmed. Sustained overflow
+usually indicates a blocking `HandleFunc` or a broadcast rate exceeding the
+session's processing speed. Increase `Limits.CmdBufferSize` or move slow work
+into `LiveSession.Go`.
+
+The overflow goroutine count is capped by a semaphore sized to `CmdBufferSize`,
+preventing unbounded goroutine growth under sustained pressure.
+
 ## Structural change diagnostics
 
 When the diff engine detects a structural change (Dynamic keys added, removed, or reordered), it falls back to a full root morph. The `OnStructuralChange` callback lets you observe these for logging, metrics, or debugging:

@@ -187,11 +187,18 @@ path.
 
 ### Overflow handling
 
-The `cmds` channel is buffered (default 64, configurable via
+The `cmds` and `fxCh` channels are buffered (default 64, configurable via
 `Limits.CmdBufferSize`). When full, a short-lived goroutine delivers the
 command instead of blocking the caller. This prevents cross-session
-deadlocks during broadcast storms. The first overflow per session logs at
-`slog.Warn`; subsequent overflows log at `dev.Debug`.
+deadlocks during broadcast storms. Each overflow emits a `BufferOverflow`
+diagnostic via `Handler.Diagnostics`.
+
+Overflow goroutines are capped by a semaphore sized to `CmdBufferSize`. When
+both the buffer and the semaphore are full, the command is dropped and a
+`CommandDropped` diagnostic is emitted — this signals data loss.
+
+See [operations](docs/operations.md#diagnostics-bus) for the full list of
+diagnostic kinds and subscription examples.
 
 ### State snapshots
 
@@ -311,7 +318,9 @@ h.Diagnostics.Subscribe(ctx, func(d tether.Diagnostic) {
 The framework is quiet by default — `slog` is only used for panics
 (as a critical safety net). All other operational signals flow through
 the diagnostic bus. `DiagnosticKind` constants: `TransportError`,
-`EncodeError`, `BufferOverflow`, `HandlerPanic`, `UploadError`.
+`EncodeError`, `BufferOverflow`, `CommandDropped`, `HandlerPanic`,
+`UploadError`. See [operations](docs/operations.md#diagnostics-bus) for
+details.
 
 Prefer `Config.Watchers` for declarative subscriptions (`WatchValue`,
 `WatchBus`). Use `OnConnect` for imperative setup (incrementing counters,
