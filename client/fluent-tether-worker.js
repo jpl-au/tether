@@ -103,7 +103,11 @@ self.addEventListener("push", function (e) {
     actions: data.actions || [],
     data: { url: data.url || "/", actions: data.actions || [] }
   };
-  e.waitUntil(self.registration.showNotification(title, opts));
+  e.waitUntil(
+    self.registration.showNotification(title, opts).catch(function (err) {
+      console.error("tether: showNotification failed:", err);
+    })
+  );
 });
 
 self.addEventListener("notificationclick", function (e) {

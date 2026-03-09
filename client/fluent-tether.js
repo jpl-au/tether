@@ -363,7 +363,9 @@ window.Tether.signals = window.Tether.signals || {};
           sendPushSubscription(sub);
         } else {
           // VAPID key changed — subscription is useless, discard it.
-          sub.unsubscribe();
+          sub.unsubscribe().catch(function (err) {
+            reportError("push", "unsubscribe failed: " + err);
+          });
         }
       });
     });
