@@ -405,7 +405,7 @@ window.Tether.signals = window.Tether.signals || {};
 
   function sendPushSubscription(sub) {
     var url = location.protocol + "//" + location.host + endpoint;
-    fetch(url, {
+    var opts = {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -413,8 +413,15 @@ window.Tether.signals = window.Tether.signals || {};
         "X-Tether-Push-Subscribe": "true"
       },
       body: JSON.stringify(sub.toJSON())
-    }).catch(function (err) {
-      reportError("push", "push subscription POST failed: " + err);
+    };
+    fetch(url, opts).catch(function () {
+      // Retry once after a short delay — covers transient network
+      // blips during mobile handoffs or server rolling deploys.
+      setTimeout(function () {
+        fetch(url, opts).catch(function (err) {
+          reportError("push", "push subscription POST failed: " + err);
+        });
+      }, 2000);
     });
   }
 
