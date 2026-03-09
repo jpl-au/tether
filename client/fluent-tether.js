@@ -184,6 +184,7 @@ window.Tether.signals = window.Tether.signals || {};
       retryDelay = initialRetryDelay;
       if (root) root.classList.remove("tether-disconnected");
       hideReconnectBar();
+      resyncPushSubscription();
       if (isReconnect) {
         // Sync the current URL with the server — the user may have
         // navigated via back/forward while disconnected.
@@ -236,6 +237,7 @@ window.Tether.signals = window.Tether.signals || {};
       retryDelay = initialRetryDelay;
       if (root) root.classList.remove("tether-disconnected");
       hideReconnectBar();
+      resyncPushSubscription();
       if (isReconnect) {
         if (backgroundSync) replayQueuedEvents();
         sendNavigate(location.pathname + location.search);
@@ -323,13 +325,70 @@ window.Tether.signals = window.Tether.signals || {};
   // data-tether-push-subscribe. Browsers require a user gesture for
   // pushManager.subscribe — auto-prompting causes permission denials
   // and can permanently block the site from ever prompting again.
+  //
+  // On every connect (including reconnects), resyncPushSubscription
+  // checks whether the browser already holds a valid subscription for
+  // the current VAPID key and re-sends it to the server so the new
+  // session can use it immediately. Stale subscriptions bound to old
+  // VAPID keys are unsubscribed silently — the user will need to
+  // click the subscribe button again to create a fresh one.
+
+  // Compare the existing subscription's applicationServerKey against
+  // the VAPID key the server advertises. Returns true when they match.
+  function pushKeyMatches(sub, vapidKey) {
+    var subKey = sub.options && sub.options.applicationServerKey;
+    if (!subKey) return false;
+    var expected = urlBase64ToUint8Array(vapidKey);
+    var actual = new Uint8Array(subKey);
+    if (expected.length !== actual.length) return false;
+    for (var i = 0; i < expected.length; i++) {
+      if (expected[i] !== actual[i]) return false;
+    }
+    return true;
+  }
+
+  // resyncPushSubscription runs on every transport connect. If the
+  // browser holds a subscription matching the current VAPID key, it
+  // is sent to the server so the session's pushSub is populated. If
+  // the subscription was created with a different VAPID key (e.g. the
+  // server restarted and generated new keys), it is unsubscribed so
+  // a clean subscribe can happen later via the button.
+  function resyncPushSubscription() {
+    var pushKey = root.getAttribute("data-tether-push-key");
+    if (!pushKey || !("serviceWorker" in navigator) || !("PushManager" in window)) return;
+    navigator.serviceWorker.ready.then(function (reg) {
+      reg.pushManager.getSubscription().then(function (sub) {
+        if (!sub) return;
+        if (pushKeyMatches(sub, pushKey)) {
+          sendPushSubscription(sub);
+        } else {
+          // VAPID key changed — subscription is useless, discard it.
+          sub.unsubscribe();
+        }
+      });
+    });
+  }
 
   function subscribePush(reg, vapidKey) {
     reg.pushManager.getSubscription().then(function (sub) {
       if (sub) {
-        // Already subscribed — send to server in case it restarted.
-        sendPushSubscription(sub);
-        return;
+        if (pushKeyMatches(sub, vapidKey)) {
+          // Already subscribed with the current key — re-send in case
+          // the server restarted and lost the session's subscription.
+          sendPushSubscription(sub);
+          return;
+        }
+        // Subscription bound to old VAPID keys — discard and
+        // resubscribe so the push service accepts messages signed
+        // with the current key.
+        return sub.unsubscribe().then(function () {
+          return reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(vapidKey)
+          });
+        }).then(function (newSub) {
+          sendPushSubscription(newSub);
+        });
       }
       return reg.pushManager.subscribe({
         userVisibleOnly: true,

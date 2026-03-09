@@ -45,6 +45,33 @@ func TestClientWorkerHeader(t *testing.T) {
 		}
 	})
 
+	t.Run("fluent-tether-push-worker.js gets Service-Worker-Allowed header", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/_tether/fluent-tether-push-worker.js", nil)
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+
+		if w.Header().Get("Service-Worker-Allowed") != "/" {
+			t.Errorf("Service-Worker-Allowed = %q, want %q", w.Header().Get("Service-Worker-Allowed"), "/")
+		}
+		if w.Code != http.StatusOK {
+			t.Errorf("status = %d, want %d", w.Code, http.StatusOK)
+		}
+		if w.Header().Get("Content-Type") != "application/javascript" {
+			t.Errorf("Content-Type = %q, want %q", w.Header().Get("Content-Type"), "application/javascript")
+		}
+	})
+
+	t.Run("fluent-tether-push-worker.js rejects cross-origin", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "http://myapp.com/_tether/fluent-tether-push-worker.js", nil)
+		req.Header.Set("Origin", "https://evil.com")
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+
+		if w.Code != http.StatusForbidden {
+			t.Errorf("status = %d, want %d", w.Code, http.StatusForbidden)
+		}
+	})
+
 	t.Run("fluent-tether.js does not get Service-Worker-Allowed header", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/_tether/fluent-tether.js", nil)
 		w := httptest.NewRecorder()

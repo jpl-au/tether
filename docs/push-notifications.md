@@ -50,6 +50,12 @@ bind.Apply(button.Text("Enable notifications"), bind.PushSubscribe())
 
 When clicked, the JS runtime requests notification permission, subscribes via the service worker's PushManager, and sends the subscription to the server via `OnSubscribe`.
 
+### Automatic resync on connect
+
+The client runtime automatically re-sends the browser's existing push subscription to the server on every transport connect (including reconnects). This means subscriptions survive page reloads, navigation between pages on the same handler, and temporary disconnects — the user only needs to click the subscribe button once.
+
+If the server's VAPID keys have changed since the subscription was created (e.g. the server restarted with new ephemeral keys), the client detects the mismatch and silently unsubscribes. The user will need to click the subscribe button again to create a fresh subscription bound to the new keys. Production apps should persist VAPID keys across restarts to avoid this.
+
 ### Notification fields
 
 | Field | Type | Description |

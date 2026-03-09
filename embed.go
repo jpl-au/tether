@@ -150,6 +150,28 @@ func newClientHandler(assets []*Asset) http.Handler {
 			}
 			return
 		}
+		// The push-only worker also needs the scope header so it can
+		// be registered at the handler's endpoint (e.g. /app/) rather
+		// than being restricted to /_tether/.
+		if r.URL.Path == "/fluent-tether-push-worker.js" || r.URL.Path == "fluent-tether-push-worker.js" {
+			if origin := r.Header.Get("Origin"); origin != "" {
+				if u, err := url.Parse(origin); err != nil || stripPort(u.Host) != stripPort(r.Host) {
+					http.Error(w, "Forbidden", http.StatusForbidden)
+					return
+				}
+			}
+			w.Header().Set("Service-Worker-Allowed", "/")
+			w.Header().Set("Content-Type", "application/javascript")
+			raw, err := fs.ReadFile(clientFiles(), "fluent-tether-push-worker.js")
+			if err != nil {
+				http.Error(w, "push worker not found", http.StatusInternalServerError)
+				return
+			}
+			if _, err := w.Write(raw); err != nil {
+				slog.Warn("failed to write push worker script", "err", err)
+			}
+			return
+		}
 		fileServer.ServeHTTP(w, r)
 	})
 }
