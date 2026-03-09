@@ -171,7 +171,7 @@ func (h *Handler[S]) handlePostEvent(w http.ResponseWriter, r *http.Request) {
 	// to keep it out of server access logs and browser history.
 	id := r.Header.Get("X-Tether-Session")
 	if id == "" {
-		http.Error(w, "missing session", http.StatusBadRequest)
+		http.Error(w, "missing X-Tether-Session header", http.StatusBadRequest)
 		return
 	}
 
@@ -189,7 +189,7 @@ func (h *Handler[S]) handlePostEvent(w http.ResponseWriter, r *http.Request) {
 
 	var ev Event
 	if err := json.NewDecoder(r.Body).Decode(&ev); err != nil {
-		http.Error(w, "invalid event", http.StatusBadRequest)
+		http.Error(w, "malformed JSON event", http.StatusBadRequest)
 		return
 	}
 
@@ -227,7 +227,7 @@ func (h *Handler[S]) handlePushSubscribe(w http.ResponseWriter, r *http.Request)
 
 	id := r.Header.Get("X-Tether-Session")
 	if id == "" {
-		http.Error(w, "missing session", http.StatusBadRequest)
+		http.Error(w, "missing X-Tether-Session header", http.StatusBadRequest)
 		return
 	}
 
@@ -243,7 +243,7 @@ func (h *Handler[S]) handlePushSubscribe(w http.ResponseWriter, r *http.Request)
 
 	var sub push.Subscription
 	if err := json.NewDecoder(r.Body).Decode(&sub); err != nil {
-		http.Error(w, "invalid subscription", http.StatusBadRequest)
+		http.Error(w, "malformed JSON subscription", http.StatusBadRequest)
 		return
 	}
 

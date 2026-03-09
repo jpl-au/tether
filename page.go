@@ -255,7 +255,7 @@ func (p *pageHandler[S]) servePOST(w http.ResponseWriter, r *http.Request) {
 
 	var ev Event
 	if err := json.Unmarshal(body, &ev); err != nil {
-		http.Error(w, "invalid event", http.StatusBadRequest)
+		http.Error(w, "malformed JSON event", http.StatusBadRequest)
 		return
 	}
 

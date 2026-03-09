@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 	"sync"
 
 	tether "github.com/jpl-au/fluent-tether"
@@ -93,6 +94,7 @@ func (h *eventHandler) OnMessage(conn *gws.Conn, msg *gws.Message) {
 	var ev tether.Event
 	if err := json.Unmarshal(msg.Bytes(), &ev); err != nil {
 		t.closeWithErr(err)
+		conn.WriteClose(1007, []byte("invalid payload"))
 		return
 	}
 
@@ -103,9 +105,27 @@ func (h *eventHandler) OnMessage(conn *gws.Conn, msg *gws.Message) {
 }
 
 func (h *eventHandler) OnClose(conn *gws.Conn, err error) {
-	if t := sessionTransport(conn); t != nil {
-		t.closeWithErr(io.EOF)
+	t := sessionTransport(conn)
+	if t == nil {
+		return
 	}
+	// Normal closure codes (1000 normal, 1001 going away) are expected
+	// lifecycle events, not errors. Map them to io.EOF so the session's
+	// readTransport treats them as a clean disconnect rather than logging
+	// a spurious error. Genuine protocol errors propagate as-is.
+	if err == nil || isNormalClose(err) {
+		t.closeWithErr(io.EOF)
+	} else {
+		t.closeWithErr(err)
+	}
+}
+
+// isNormalClose reports whether err represents a WebSocket closure that
+// is part of normal operation (code 1000 or 1001). gws returns a
+// structured error whose string contains the close code.
+func isNormalClose(err error) bool {
+	s := err.Error()
+	return strings.Contains(s, "code=1000") || strings.Contains(s, "code=1001")
 }
 
 // transport implements [tether.Transport] over a single WebSocket
@@ -144,7 +164,10 @@ func (t *transport) Send(data []byte) error {
 func (t *transport) ReceiveEvent() (tether.Event, error) {
 	ev, ok := <-t.events
 	if !ok {
-		return tether.Event{}, t.err
+		if t.err != nil {
+			return tether.Event{}, t.err
+		}
+		return tether.Event{}, io.EOF
 	}
 	return ev, nil
 }

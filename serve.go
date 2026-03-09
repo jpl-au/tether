@@ -201,6 +201,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		endpoint:         r.URL.Path,
 		idleTimeout:      h.cfg.Timeouts.Idle,
 		reconnectTimeout: h.cfg.Timeouts.Reconnect,
+		diagnostics:      h.Diagnostics,
 	}
 	sess.lastActivity.Store(now.UnixNano())
 	if len(h.cfg.Components) > 0 {

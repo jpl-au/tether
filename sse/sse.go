@@ -46,7 +46,9 @@ func Upgrade() func(http.ResponseWriter, *http.Request) (tether.Transport, error
 
 		// Set the EventSource reconnection interval so the browser
 		// retries promptly if the stream drops before our JS loads.
-		fmt.Fprintf(w, "retry: 1000\n\n")
+		if _, err := fmt.Fprintf(w, "retry: 1000\n\n"); err != nil {
+			return nil, fmt.Errorf("SSE handshake write failed: %w", err)
+		}
 		flusher.Flush()
 
 		t := &transport{
@@ -72,14 +74,16 @@ func Upgrade() func(http.ResponseWriter, *http.Request) (tether.Transport, error
 // — Send and StartHeartbeat submit payloads to the writes channel, and
 // the writer serialises them onto the wire.
 //
-// ReceiveEvent blocks until the transport is closed (returning io.EOF).
-// Client events in SSE mode arrive as HTTP POSTs and are routed
-// directly to the session's command channel by the tether handler — they
-// never pass through the transport.
+// ReceiveEvent blocks until the transport is closed. It returns the
+// write error that caused the closure (if any) so the session can
+// distinguish clean disconnects from broken pipes. Client events in
+// SSE mode arrive as HTTP POSTs and are routed directly to the
+// session's command channel — they never pass through the transport.
 type transport struct {
 	writes chan []byte
 	done   chan struct{}
 	once   sync.Once
+	err    error
 }
 
 // writeLoop owns the http.ResponseWriter. It reads framed payloads
@@ -91,7 +95,7 @@ func (t *transport) writeLoop(w io.Writer, flusher http.Flusher) {
 		select {
 		case data := <-t.writes:
 			if _, err := w.Write(data); err != nil {
-				t.Close()
+				t.closeWithErr(err)
 				return
 			}
 			flusher.Flush()
@@ -130,6 +134,9 @@ func (t *transport) Send(data []byte) error {
 // connection drop or session shutdown).
 func (t *transport) ReceiveEvent() (tether.Event, error) {
 	<-t.done
+	if t.err != nil {
+		return tether.Event{}, t.err
+	}
 	return tether.Event{}, io.EOF
 }
 
@@ -159,9 +166,18 @@ func (t *transport) StartHeartbeat(interval time.Duration) {
 	}()
 }
 
+// closeWithErr records the terminal error and closes the transport.
+// Safe to call from any goroutine; only the first call takes effect.
+func (t *transport) closeWithErr(err error) {
+	t.once.Do(func() {
+		t.err = err
+		close(t.done)
+	})
+}
+
 // Close terminates the transport. Safe to call from any goroutine and
 // safe to call more than once.
 func (t *transport) Close() error {
-	t.once.Do(func() { close(t.done) })
+	t.closeWithErr(io.EOF)
 	return nil
 }

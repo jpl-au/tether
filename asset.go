@@ -71,7 +71,7 @@ func (a *Asset) init() {
 		}
 
 		a.hashes = make(map[string]string)
-		fs.WalkDir(a.FS, ".", func(path string, d fs.DirEntry, err error) error {
+		if err := fs.WalkDir(a.FS, ".", func(path string, d fs.DirEntry, err error) error {
 			if err != nil || d.IsDir() {
 				return err
 			}
@@ -83,7 +83,9 @@ func (a *Asset) init() {
 			h := sha256.Sum256(data)
 			a.hashes[path] = hex.EncodeToString(h[:])[:12]
 			return nil
-		})
+		}); err != nil {
+			panic("tether: failed to walk asset filesystem: " + err.Error())
+		}
 
 		a.handler = http.FileServer(http.FS(a.FS))
 	})

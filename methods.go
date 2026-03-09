@@ -72,16 +72,15 @@ func (s *LiveSession[S]) Update(fn func(S) S) {
 		fx := &effects{}
 		defer func() {
 			if r := recover(); r != nil {
-				slog.Error("panic in Update",
-					"session", s.id,
-					"endpoint", s.endpoint,
-					"url", s.lastURL,
-					"panic", r,
-				)
+				err := panicErr(r)
+				slog.Error("panic in Update", "session", s.id, "panic", r)
+				s.emitDiagnostic(Diagnostic{
+					Kind:      HandlerPanic,
+					SessionID: s.id,
+					Err:       err,
+					Detail:    s.endpoint,
+				})
 				s.drainFx(nil)
-				dev.Warn("side effects discarded due to Update panic — any Toast, Signal, or Navigate calls before the panic were dropped",
-					"session", s.id,
-				)
 			}
 			s.handling.Store(false)
 		}()

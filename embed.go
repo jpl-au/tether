@@ -89,7 +89,10 @@ func buildWorkerJS(assets []*Asset) []byte {
 		[]byte(`"tether-`+version+`"`), 1)
 
 	if len(precache) > 0 {
-		extra, _ := json.Marshal(precache)
+		extra, err := json.Marshal(precache)
+		if err != nil {
+			panic("tether: failed to marshal precache URLs: " + err.Error())
+		}
 		body = bytes.Replace(body,
 			[]byte("var PRECACHE_EXTRA = [];"),
 			[]byte("var PRECACHE_EXTRA = "+string(extra)+";"), 1)

@@ -59,12 +59,14 @@ func (s *LiveSession[S]) run() {
 func (s *LiveSession[S]) runCmd(cmd func()) {
 	defer func() {
 		if r := recover(); r != nil {
-			slog.Error("panic in command",
-				"session", s.id,
-				"endpoint", s.endpoint,
-				"url", s.lastURL,
-				"panic", r,
-			)
+			err := panicErr(r)
+			slog.Error("panic in command", "session", s.id, "panic", r)
+			s.emitDiagnostic(Diagnostic{
+				Kind:      HandlerPanic,
+				SessionID: s.id,
+				Err:       err,
+				Detail:    s.endpoint,
+			})
 		}
 	}()
 	cmd()
@@ -80,12 +82,12 @@ func (s *LiveSession[S]) readTransport(out chan<- Event) {
 		ev, err := s.transport.ReceiveEvent()
 		if err != nil {
 			if !errors.Is(err, io.EOF) {
-				slog.Error("transport receive failed",
-					"session", s.id,
-					"endpoint", s.endpoint,
-					"url", s.lastURL,
-					"err", err,
-				)
+				s.emitDiagnostic(Diagnostic{
+					Kind:      TransportError,
+					SessionID: s.id,
+					Err:       err,
+					Detail:    s.endpoint,
+				})
 			}
 			return
 		}
@@ -112,22 +114,15 @@ func (s *LiveSession[S]) exec(ev Event) {
 	fx := &effects{}
 	defer func() {
 		if r := recover(); r != nil {
-			slog.Error("panic in handler",
-				"session", s.id,
-				"endpoint", s.endpoint,
-				"url", s.lastURL,
-				"action", ev.Action,
-				"type", ev.Type,
-				"panic", r,
-			)
-			// Discard any effects (Toast, Signal, Navigate, etc.)
-			// enqueued before the panic — they may reference
-			// inconsistent state.
+			err := panicErr(r)
+			slog.Error("panic in handler", "session", s.id, "action", ev.Action, "panic", r)
+			s.emitDiagnostic(Diagnostic{
+				Kind:      HandlerPanic,
+				SessionID: s.id,
+				Err:       err,
+				Detail:    ev.Action,
+			})
 			s.drainFx(nil)
-			dev.Warn("side effects discarded due to handler panic — any Toast, Signal, or Navigate calls before the panic were dropped",
-				"session", s.id,
-				"action", ev.Action,
-			)
 		}
 		s.handling.Store(false)
 	}()
@@ -313,22 +308,21 @@ func (s *LiveSession[S]) send(u wire.Update) {
 	}
 	data, err := s.encoder.Encode(u)
 	if err != nil {
-		slog.Error("failed to encode update",
-			"session", s.id,
-			"endpoint", s.endpoint,
-			"url", s.lastURL,
-			"err", err,
-		)
+		s.emitDiagnostic(Diagnostic{
+			Kind:      EncodeError,
+			SessionID: s.id,
+			Err:       err,
+			Detail:    s.endpoint,
+		})
 		return
 	}
 	if err := s.transport.Send(data); err != nil {
-		slog.Error("failed to send update to transport",
-			"session", s.id,
-			"endpoint", s.endpoint,
-			"url", s.lastURL,
-			"bytes", len(data),
-			"err", err,
-		)
+		s.emitDiagnostic(Diagnostic{
+			Kind:      TransportError,
+			SessionID: s.id,
+			Err:       err,
+			Detail:    s.endpoint,
+		})
 	}
 }
 

@@ -296,6 +296,23 @@ deterministic concurrency testing.
 | **Bus[E]** | Event type | Discrete domain events across handlers (chat messages, notifications) |
 | **Value[V]** | Value type | Shared observable state all sessions should track (online count, config) |
 
+## Diagnostics
+
+`Handler.Diagnostics` is a `Bus[Diagnostic]` that emits framework-level
+events: transport errors, encode failures, panics, buffer overflows, and
+upload errors. Subscribe for metrics, alerting, or custom logging:
+
+```go
+h.Diagnostics.Subscribe(ctx, func(d tether.Diagnostic) {
+    metrics.Inc("tether_" + string(d.Kind))
+})
+```
+
+The framework is quiet by default — `slog` is only used for panics
+(as a critical safety net). All other operational signals flow through
+the diagnostic bus. `DiagnosticKind` constants: `TransportError`,
+`EncodeError`, `BufferOverflow`, `HandlerPanic`, `UploadError`.
+
 Prefer `Config.Watchers` for declarative subscriptions (`WatchValue`,
 `WatchBus`). Use `OnConnect` for imperative setup (incrementing counters,
 publishing events, starting tickers). Do not subscribe in Handle.
@@ -307,7 +324,8 @@ Subscriptions are cleaned up automatically when the session is destroyed.
 |------|---------|
 | `config.go` | Config, Timeouts, Limits, Client, Security structs |
 | `handler.go` | Handler — session pools, routing, transport upgrade |
-| `session.go` | Session struct, enqueue, enqueueFx, drainFx, logOverflow |
+| `diagnostic.go` | Diagnostic struct, DiagnosticKind constants, panicErr helper |
+| `session.go` | Session struct, enqueue, enqueueFx, drainFx, emitDiagnostic |
 | `loop.go` | Command loop (run), exec pipeline, readTransport, send |
 | `methods.go` | Session methods — State, Update, Close, Toast, Navigate, Signal, Push |
 | `handle.go` | HandleFunc type, middleware chain |
@@ -353,7 +371,7 @@ go test ./...
 - Short receiver names (`s` for Session, `b` for Bus, `g` for Group, `h` for Handler/Harness)
 - `atomic.Value` + copy-on-write for lock-free reads on shared collections
 - Effects are buffered during Handle and merged atomically with the diff
-- `dev.Debug` for debug-only logging; `slog.Warn`/`slog.Error` for production
+- `dev.Debug` for debug-only logging; `slog` only for panics; all other signals flow through `Handler.Diagnostics`
 - `New` logs one `tether: ready` line at INFO with `transport`, optional `name`, `worker`, `middleware` count, and `dev`; no other startup noise
 - `Config.Name` / `PageConfig.Name` — optional label included in startup logs to distinguish handlers that share a transport
 - `context.AfterFunc` for automatic cleanup on context cancellation

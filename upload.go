@@ -1,7 +1,6 @@
 package tether
 
 import (
-	"log/slog"
 	"mime"
 	"mime/multipart"
 	"net/http"
@@ -72,7 +71,7 @@ func (h *Handler[S]) handleUpload(w http.ResponseWriter, r *http.Request) {
 
 	id := r.Header.Get("X-Tether-Session")
 	if id == "" {
-		http.Error(w, "missing session", http.StatusBadRequest)
+		http.Error(w, "missing X-Tether-Session header", http.StatusBadRequest)
 		return
 	}
 
@@ -129,18 +128,17 @@ func (h *Handler[S]) handleUpload(w http.ResponseWriter, r *http.Request) {
 	form := r.MultipartForm
 	handler := h.cfg.Upload.Handle
 	sessionID := sess.id
+	diag := h.Diagnostics
 	go func() {
 		defer form.RemoveAll()
 		for _, u := range uploads {
 			if err := handler(sess, u); err != nil {
-				slog.Error("upload handler failed",
-					"session", sessionID,
-					"endpoint", sess.endpoint,
-					"action", u.Action,
-					"file", u.Name,
-					"size", u.Size,
-					"err", err,
-				)
+				diag.Publish(Diagnostic{
+					Kind:      UploadError,
+					SessionID: sessionID,
+					Err:       err,
+					Detail:    u.Action,
+				})
 			}
 		}
 	}()

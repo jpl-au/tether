@@ -58,6 +58,27 @@ type Handler[S any] struct {
 	// assetMounts serves embedded application assets at their
 	// configured URL prefixes, one per [Asset] in Config.Assets.
 	assetMounts []assetMount
+
+	// Diagnostics emits framework-level events so application code
+	// can observe them for metrics, alerting, or custom logging.
+	// The framework is quiet by default — slog is only used for
+	// panics. All other operational signals (transport errors,
+	// encode failures, buffer overflows, upload errors) flow
+	// exclusively through this bus.
+	//
+	// Subscribe with [Bus.Subscribe] (synchronous) or
+	// [Bus.SubscribeAsync] (own goroutine per event, safe for I/O):
+	//
+	//	h.Diagnostics.Subscribe(ctx, func(d tether.Diagnostic) {
+	//	    metrics.Inc("tether." + string(d.Kind))
+	//	})
+	//
+	//	h.Diagnostics.SubscribeAsync(ctx, func(d tether.Diagnostic) {
+	//	    if d.Kind == tether.HandlerPanic {
+	//	        alerting.Critical(d.SessionID, d.Err)
+	//	    }
+	//	})
+	Diagnostics *Bus[Diagnostic]
 }
 
 // assetMount pairs a URL prefix with a handler that serves files from
@@ -96,6 +117,11 @@ func New[S any](cfg Config[S]) *Handler[S] {
 	}
 	if cfg.Mode != mode.WebSocket && cfg.Fallback == nil {
 		panic("tether: Config.Fallback is required — use sse.Upgrade() or set Mode to mode.WebSocket")
+	}
+	for _, o := range cfg.Security.AllowedOrigins {
+		if o == "" {
+			panic("tether: Security.AllowedOrigins contains an empty string — remove it or provide a valid origin like \"https://example.com\"")
+		}
 	}
 
 	// Compose OnNavigate into Handle so the middleware chain applies
@@ -193,6 +219,7 @@ func New[S any](cfg Config[S]) *Handler[S] {
 		encoder:       resolveEncoder(cfg.WireFormat),
 		clientHandler: newClientHandler(cfg.Assets),
 		assetMounts:   mounts,
+		Diagnostics:   NewBus[Diagnostic](),
 	}
 
 	go h.reapPending()

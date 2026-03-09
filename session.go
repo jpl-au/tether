@@ -2,12 +2,10 @@ package tether
 
 import (
 	"context"
-	"log/slog"
 	"maps"
 	"sync/atomic"
 	"time"
 
-	"github.com/jpl-au/fluent-tether/dev"
 	"github.com/jpl-au/fluent-tether/wire"
 
 	jit "github.com/jpl-au/fluent-jit"
@@ -100,9 +98,8 @@ type LiveSession[S any] struct {
 	stateSnap atomic.Value
 
 	// overflows counts how many times the command or effect buffer
-	// was full and a goroutine was spawned to deliver the item. The
-	// first overflow logs at slog.Warn (visible in production);
-	// subsequent overflows log at dev.Debug to avoid spam.
+	// was full and a goroutine was spawned to deliver the item.
+	// Each overflow emits a BufferOverflow diagnostic.
 	overflows atomic.Int64
 
 	// Lifecycle timers (replace centralised reaper).
@@ -148,6 +145,10 @@ type LiveSession[S any] struct {
 
 	// Optional hook for render cycles that produce no patches.
 	onNoPatch func(*LiveSession[S], NoPatch)
+
+	// diagnostics is the handler's diagnostic bus. The session emits
+	// transport errors, encode failures, panics, and buffer overflows.
+	diagnostics *Bus[Diagnostic]
 }
 
 // Session is the interface every handler receives. It provides
@@ -336,23 +337,22 @@ func (s *LiveSession[S]) enqueueFx(fn func(*effects)) {
 	}
 }
 
-// logOverflow increments the overflow counter and logs. The first
-// overflow for a session logs at Warn (visible in production) so
-// the developer knows buffer pressure occurred. Subsequent overflows
-// log at Debug to avoid spam.
+// logOverflow increments the overflow counter and emits a diagnostic.
 func (s *LiveSession[S]) logOverflow() {
-	n := s.overflows.Add(1)
-	if n == 1 {
-		slog.Warn("command buffer full, overflowing to goroutine — consider increasing Limits.CmdBufferSize or investigating a slow handler",
-			"session", s.id,
-			"endpoint", s.endpoint,
-		)
-	} else {
-		dev.Debug("command buffer overflow",
-			"session", s.id,
-			"endpoint", s.endpoint,
-			"overflows", n,
-		)
+	s.overflows.Add(1)
+	s.emitDiagnostic(Diagnostic{
+		Kind:      BufferOverflow,
+		SessionID: s.id,
+		Detail:    s.endpoint,
+	})
+}
+
+// emitDiagnostic publishes a diagnostic event to the handler's bus.
+// No-op if the bus is nil (e.g. in tests that construct sessions
+// directly without a handler).
+func (s *LiveSession[S]) emitDiagnostic(d Diagnostic) {
+	if s.diagnostics != nil {
+		s.diagnostics.Publish(d)
 	}
 }
 
