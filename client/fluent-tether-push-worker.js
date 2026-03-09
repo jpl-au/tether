@@ -40,9 +40,13 @@ self.addEventListener("notificationclick", function (e) {
 
   e.waitUntil(
     self.clients.matchAll({ type: "window" }).then(function (list) {
+      var target = new URL(url, self.location.origin);
       for (var i = 0; i < list.length; i++) {
-        if (list[i].url.indexOf(url) !== -1 && "focus" in list[i]) {
-          return list[i].focus();
+        var clientURL = new URL(list[i].url);
+        if (clientURL.pathname === target.pathname && "focus" in list[i]) {
+          return list[i].focus().catch(function () {
+            return self.clients.openWindow(url);
+          });
         }
       }
       return self.clients.openWindow(url);
