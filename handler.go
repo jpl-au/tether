@@ -1,6 +1,7 @@
 package tether
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -319,6 +320,20 @@ func transportLabel(m mode.Transport) string {
 func (h *Handler[S]) destroySession(s *LiveSession[S]) {
 	if s.stop != nil {
 		s.stop()
+	}
+
+	// Remove stored snapshots for sessions that were offloaded to
+	// the store during disconnect. No-op if nothing was stored.
+	if h.cfg.Store != nil {
+		if err := h.cfg.Store.Delete(context.Background(), s.id); err != nil {
+			dev.Warn("store delete failed on destroy", "session", s.id, "error", err)
+			h.Diagnostics.Publish(Diagnostic{
+				Kind:      StoreError,
+				SessionID: s.id,
+				Err:       err,
+				Detail:    "delete",
+			})
+		}
 	}
 
 	for _, g := range h.cfg.Groups {

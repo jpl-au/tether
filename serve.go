@@ -144,6 +144,19 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		h.active[id] = sess
 		h.mu.Unlock()
 
+		// Clean up stored snapshots — Render rebuilds them.
+		if h.cfg.Store != nil {
+			if err := h.cfg.Store.Delete(sess.ctx, id); err != nil {
+				dev.Warn("store delete failed on reconnect", "session", id, "error", err)
+				h.Diagnostics.Publish(Diagnostic{
+					Kind:      StoreError,
+					SessionID: id,
+					Err:       err,
+					Detail:    "delete",
+				})
+			}
+		}
+
 		dev.Debug("session reattached", "session", id, "endpoint", sess.endpoint, "remote", r.RemoteAddr)
 		started = true
 		h.reattach(sess, transport)
@@ -229,6 +242,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		idleTimeout:      h.cfg.Timeouts.Idle,
 		reconnectTimeout: h.cfg.Timeouts.Reconnect,
 		diagnostics:      h.Diagnostics,
+		store:            h.cfg.Store,
 	}
 	sess.lastActivity.Store(now.UnixNano())
 	if len(h.cfg.Components) > 0 {

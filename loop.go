@@ -198,7 +198,10 @@ func (s *LiveSession[S]) exec(ev Event) {
 // onTransportClose handles transport disconnection. The transport is
 // closed and nilled so send() silently drops updates during the
 // reconnect window. A disconnect timer is started (if reconnection is
-// enabled) and the onDisconnect callback fires for pool transitions.
+// enabled), differ snapshots are persisted to the Store (if configured),
+// and the onDisconnect callback fires for pool transitions. The store
+// save runs before the pool transition so the data is persisted before
+// the session becomes visible as reconnectable.
 func (s *LiveSession[S]) onTransportClose() {
 	dev.Debug("transport closed",
 		"session", s.id,
@@ -217,6 +220,27 @@ func (s *LiveSession[S]) onTransportClose() {
 		s.disconnectTimer = time.AfterFunc(s.reconnectTimeout, func() {
 			s.stop()
 		})
+	}
+
+	// Save differ snapshots to the store before the pool transition
+	// so the data is persisted before the session becomes visible as
+	// reconnectable. Export copies without clearing; Clear is only
+	// called after a confirmed successful save.
+	if s.store != nil {
+		if data := s.differ.Export(); data != nil {
+			if err := s.store.Save(s.ctx, s.id, data); err != nil {
+				dev.Warn("store save failed, keeping snapshots in memory",
+					"session", s.id, "error", err)
+				s.emitDiagnostic(Diagnostic{
+					Kind:      StoreError,
+					SessionID: s.id,
+					Err:       err,
+					Detail:    "save",
+				})
+			} else {
+				s.differ.Clear()
+			}
+		}
 	}
 
 	if s.onDisconnect != nil {

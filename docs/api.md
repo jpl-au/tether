@@ -115,6 +115,7 @@ When either callback is configured, the framework's own logging for that event i
 | `Push` | `*PushConfig[S]` | Web Push notifications (see [push](push-notifications.md)) |
 | `Worker` | `bool` | Enable service worker (auto-enabled by Push) |
 | `Assets` | `[]*Asset` | Embedded asset collections — auto-served with content-hashed URLs |
+| `Store` | `Store` | External persistence for disconnected session snapshots (opt-in, nil by default) |
 | `DevMode` | `bool` | Development mode (or set `TETHER_DEV=1`). See [operations](operations.md#dev-mode) |
 | `WireFormat` | `wire.Format` | Encoding for server-to-client updates (default `wire.JSON`) |
 

@@ -42,6 +42,13 @@ const (
 	// the one captured when the session was created. This may
 	// indicate a stolen session ID. The connection is rejected.
 	SessionBindingFailed DiagnosticKind = "session_binding_failed"
+
+	// StoreError signals a failure saving, loading, or deleting
+	// differ snapshots from the configured [Store]. The Detail field
+	// indicates the operation ("save", "load", or "delete"). Store
+	// failures are non-fatal — the framework falls back to in-memory
+	// behaviour.
+	StoreError DiagnosticKind = "store_error"
 )
 
 // Diagnostic carries a framework-level event from the session lifecycle,

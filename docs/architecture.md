@@ -152,7 +152,7 @@ Sessions move through three pools managed by the Handler:
 
 **Active** sessions have a connected transport and a running command loop.
 
-**Disconnected** sessions have lost their transport but remain alive for `Timeouts.Reconnect` (default 30s). The command loop keeps running — `Update`, `Broadcast`, and timer callbacks continue to modify state. When the client reconnects, the session is reattached: the transport is swapped, a full re-render is sent to catch the client up, and the browser's URL and title are replayed (they live outside the DOM and would otherwise desync).
+**Disconnected** sessions have lost their transport but remain alive for `Timeouts.Reconnect` (default 30s). The command loop keeps running — `Update`, `Broadcast`, and timer callbacks continue to modify state. When a Store is configured, differ snapshots are saved to external storage on disconnect and cleared from memory, reducing per-session overhead during the reconnect window. When the client reconnects, the session is reattached: the transport is swapped, the store entry is deleted (Render re-seeds the differ), a full re-render is sent to catch the client up, and the browser's URL and title are replayed (they live outside the DOM and would otherwise desync).
 
 ## Transport abstraction
 
