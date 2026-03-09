@@ -17,8 +17,9 @@ sender := push.NewSender(push.Config{
 tether.New(tether.Config[State]{
     Push: &tether.PushConfig[State]{
         Sender: sender,
-        OnSubscribe: func(sess *tether.LiveSession[State], sub push.Subscription) {
+        OnSubscribe: func(ctx context.Context, sess *tether.LiveSession[State], sub push.Subscription) {
             // Store sub.Endpoint and sub.Keys for later use.
+            // Use ctx for database calls — it cancels when the session is destroyed.
         },
     },
     // ...

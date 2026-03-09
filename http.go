@@ -240,7 +240,7 @@ func (h *Handler[S]) handlePushSubscribe(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	r.Body = http.MaxBytesReader(w, r.Body, h.cfg.Limits.MaxEventBytes)
+	r.Body = http.MaxBytesReader(w, r.Body, h.cfg.Limits.MaxPushSubscriptionBytes)
 
 	var sub push.Subscription
 	if err := json.NewDecoder(r.Body).Decode(&sub); err != nil {
@@ -252,13 +252,18 @@ func (h *Handler[S]) handlePushSubscribe(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Store the subscription via the session loop so it doesn't race
-	// with other loop operations. The select guards against hanging
-	// if the session is destroyed mid-request.
+	// Non-blocking send: store the subscription via the session loop
+	// so it doesn't race with other loop operations. If the buffer is
+	// full, the session is overloaded — return 429 to apply back-pressure
+	// (matching the pattern in handlePostEvent).
 	select {
 	case sess.cmds <- func() { sess.pushSub.Store(&sub) }:
-	case <-sess.ctx.Done():
-		http.Error(w, "session closed", http.StatusGone)
+	default:
+		if sess.ctx.Err() != nil {
+			http.Error(w, "session closed", http.StatusGone)
+			return
+		}
+		http.Error(w, "session busy", http.StatusTooManyRequests)
 		return
 	}
 
@@ -279,7 +284,7 @@ func (h *Handler[S]) handlePushSubscribe(w http.ResponseWriter, r *http.Request)
 				})
 			}
 		}()
-		h.cfg.Push.OnSubscribe(sess, sub)
+		h.cfg.Push.OnSubscribe(sess.ctx, sess, sub)
 	}()
 
 	w.WriteHeader(http.StatusNoContent)

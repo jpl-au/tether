@@ -146,6 +146,7 @@ intentionally left to the deployment layer:
 | `MaxSessions` | 0 (unlimited) | Total concurrent sessions — **set this in production** |
 | `MaxPending` | 128 | Pre-warmed sessions awaiting transport connection |
 | `MaxEventBytes` | 64 KB | POST event body size |
+| `MaxPushSubscriptionBytes` | 4 KB | Push subscription body size |
 
 `MaxPending` protects against GET-flooding where an attacker scripts
 thousands of requests without connecting. `MaxSessions` caps total resource

@@ -1,6 +1,7 @@
 package tether
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"time"
@@ -333,6 +334,12 @@ type Limits struct {
 	// fields). Zero defaults to 64 KB. Increase this if your forms
 	// contain large text fields (e.g. a rich-text editor).
 	MaxEventBytes int64
+
+	// MaxPushSubscriptionBytes limits the size of a push subscription
+	// POST body. Push subscriptions contain base64-encoded P-256 keys
+	// and vendor-specific endpoint URLs that are typically larger than
+	// UI events. Zero defaults to 4 KB.
+	MaxPushSubscriptionBytes int64
 }
 
 // Client groups settings that control the browser-side JS runtime.
@@ -410,9 +417,15 @@ type PushConfig[S any] struct {
 
 	// OnSubscribe is called when a client sends its push subscription
 	// to the server. Store the subscription to send notifications later
-	// via [push.Sender.Send]. The callback runs in its own goroutine so
-	// it is safe to perform I/O (e.g. database writes). Optional.
-	OnSubscribe func(session *LiveSession[S], sub push.Subscription)
+	// via [push.Sender.Send]. The callback runs in its own goroutine
+	// so it is safe to perform I/O (e.g. database writes).
+	//
+	// The context is derived from the session and cancels when the
+	// session is destroyed — use it for database calls and external
+	// requests to avoid leaking goroutines. The subscription is passed
+	// as a parameter; do not read it from the session object as the
+	// store may not have completed yet. Optional.
+	OnSubscribe func(ctx context.Context, session *LiveSession[S], sub push.Subscription)
 }
 
 // defaultReconnectTimeout gives the client enough time to recover from
@@ -421,6 +434,11 @@ const defaultReconnectTimeout = 30 * time.Second
 
 // defaultMaxEventBytes is used when MaxEventBytes is zero.
 const defaultMaxEventBytes = 64 << 10 // 64 KB
+
+// defaultMaxPushSubscriptionBytes is used when MaxPushSubscriptionBytes
+// is zero. Push subscriptions contain base64 keys (~130 bytes) and
+// vendor-specific endpoint URLs (variable length). 4 KB is generous.
+const defaultMaxPushSubscriptionBytes = 4 << 10 // 4 KB
 
 const defaultHeartbeatInterval = 20 * time.Second
 

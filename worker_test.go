@@ -2,6 +2,7 @@ package tether
 
 import (
 	"bytes"
+	"context"
 	"crypto/ecdh"
 	"crypto/rand"
 	"encoding/base64"
@@ -312,7 +313,7 @@ func TestHandlePushSubscribe(t *testing.T) {
 		Handle:       handleCounter,
 		Push: &PushConfig[counterState]{
 			Sender: push.NewSender(push.Config{VAPIDPublicKey: "test-key"}),
-			OnSubscribe: func(sess *LiveSession[counterState], sub push.Subscription) {
+			OnSubscribe: func(_ context.Context, sess *LiveSession[counterState], sub push.Subscription) {
 				ch <- result{sub: sub, session: sess.ID()}
 			},
 		},
@@ -400,7 +401,7 @@ func TestHandlePushSubscribeMissingSession(t *testing.T) {
 		Handle:       handleCounter,
 		Push: &PushConfig[counterState]{
 			Sender:      push.NewSender(push.Config{VAPIDPublicKey: "test-key"}),
-			OnSubscribe: func(*LiveSession[counterState], push.Subscription) {},
+			OnSubscribe: func(context.Context, *LiveSession[counterState], push.Subscription) {},
 		},
 	})
 
@@ -425,7 +426,7 @@ func TestHandlePushSubscribeUnknownSession(t *testing.T) {
 		Handle:       handleCounter,
 		Push: &PushConfig[counterState]{
 			Sender:      push.NewSender(push.Config{VAPIDPublicKey: "test-key"}),
-			OnSubscribe: func(*LiveSession[counterState], push.Subscription) {},
+			OnSubscribe: func(context.Context, *LiveSession[counterState], push.Subscription) {},
 		},
 	})
 

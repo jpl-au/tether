@@ -92,6 +92,7 @@ When either callback is configured, the framework's own logging for that event i
 | `MaxPending` | `int` | 128 | Maximum pre-warmed sessions awaiting transport connection |
 | `CmdBufferSize` | `int` | 64 | Session command channel capacity |
 | `MaxEventBytes` | `int64` | 64 KB | Maximum POST event body size |
+| `MaxPushSubscriptionBytes` | `int64` | 4 KB | Maximum push subscription body size |
 
 ### Client
 

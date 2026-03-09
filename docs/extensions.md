@@ -123,8 +123,9 @@ tether.New(tether.Config[State]{
             VAPIDPrivateKey: privateKey,
             Subject:         "mailto:admin@example.com",
         }),
-        OnSubscribe: func(sess *tether.LiveSession[State], sub push.Subscription) {
-            // Store subscription in your database
+        OnSubscribe: func(ctx context.Context, sess *tether.LiveSession[State], sub push.Subscription) {
+            // Store subscription in your database.
+            // Use ctx for database calls — it cancels when the session is destroyed.
         },
     },
     // ...
