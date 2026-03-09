@@ -171,6 +171,7 @@ h.Diagnostics.SubscribeAsync(ctx, func(d tether.Diagnostic) {
 | `CommandDropped` | Both the command buffer and the overflow goroutine cap were exhausted — data was lost |
 | `HandlerPanic` | Recovered panic inside Handle, Update, or a command callback |
 | `UploadError` | Failure in an upload handler callback |
+| `SessionBindingFailed` | A reconnect or session claim was rejected because the User-Agent did not match the original |
 
 `BufferOverflow` means the system coped (spawned a goroutine). `CommandDropped`
 means data was lost — the session is critically overwhelmed. Sustained overflow

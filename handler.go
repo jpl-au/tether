@@ -26,6 +26,7 @@ type pendingSession[S any] struct {
 	state     S
 	differ    *jit.Differ
 	createdAt time.Time
+	userAgent string
 }
 
 // defaultPendingTimeout is used when PendingTimeout is zero.

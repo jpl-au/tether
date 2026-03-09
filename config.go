@@ -373,7 +373,8 @@ type Client struct {
 	SyncRetention time.Duration
 }
 
-// Security groups origin-checking and CSRF protection settings.
+// Security groups origin-checking, CSRF protection, and session
+// binding settings.
 type Security struct {
 	// AllowedOrigins restricts WebSocket upgrades, SSE streams, and
 	// POST events to requests whose Origin header matches one of these
@@ -387,6 +388,14 @@ type Security struct {
 	// is suitable for development but should be replaced with an
 	// explicit list in production.
 	AllowedOrigins []string
+
+	// DisableSessionBinding turns off User-Agent verification on
+	// session reconnect. By default, the framework captures the
+	// User-Agent when a session is created and verifies it matches
+	// on every reconnect. This detects stolen session IDs presented
+	// from a different client. Disable only if your environment has
+	// clients whose User-Agent changes mid-session.
+	DisableSessionBinding bool
 }
 
 // PushConfig enables Web Push notifications for the page. The VAPID

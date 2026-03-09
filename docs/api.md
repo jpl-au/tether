@@ -119,11 +119,12 @@ When either callback is configured, the framework's own logging for that event i
 
 ### Security
 
-`Config.Security` groups CSRF protection:
+`Config.Security` groups CSRF protection and session binding:
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `AllowedOrigins` | `[]string` | Restrict connections to these origins |
+| `DisableSessionBinding` | `bool` | Disable User-Agent verification on reconnect (default: enabled) |
 
 ### Other
 

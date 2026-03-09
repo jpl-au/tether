@@ -16,6 +16,30 @@ Each session is identified by a cryptographically random ID generated with
 `crypto/rand.Text` (128-bit entropy). The ID is the sole proof of ownership
 — there is no secondary authentication, no cookie, and no HMAC.
 
+### Session binding
+
+The framework verifies the `User-Agent` header on session reconnect by
+default. When a session is created, the client's User-Agent is captured.
+On every subsequent reconnect or session claim, the User-Agent must match
+the original. A mismatch rejects the connection and emits a
+`SessionBindingFailed` diagnostic.
+
+This detects stolen session IDs presented from a different client. It does
+not prevent spoofing by an attacker who also knows the User-Agent string,
+but it raises the bar for casual attacks and adds a layer of defence
+alongside TLS and origin checking.
+
+To disable (e.g. for environments where User-Agents change mid-session):
+
+```go
+tether.New(tether.Config[State]{
+    Security: tether.Security{
+        DisableSessionBinding: true,
+    },
+    // ...
+})
+```
+
 ### Where the ID appears
 
 | Location | Purpose |
@@ -33,8 +57,14 @@ eliminate cookie-based CSRF) or the WebSocket sub-protocol field (a misuse
 of the spec). A query parameter is the standard approach used by Phoenix
 LiveView, Laravel Livewire, and similar frameworks.
 
+Session binding mitigates the risk of URL exposure — knowing the session ID
+alone is not sufficient to hijack a session; the attacker must also present
+the correct User-Agent.
+
 ### Mitigations
 
+- **Session binding** — User-Agent verification on reconnect (enabled by
+  default).
 - `Referrer-Policy: same-origin` prevents leakage via the Referer header on
   external navigation.
 - Custom headers (`X-Tether-Session`) on POST requests trigger CORS

@@ -120,6 +120,12 @@ type LiveSession[S any] struct {
 	// so errors can be traced back to a page.
 	endpoint string
 
+	// userAgent is the User-Agent header captured when the session was
+	// created. Used for session binding — on reconnect, the framework
+	// verifies the reconnecting client's UA matches the original to
+	// detect stolen session IDs.
+	userAgent string
+
 	// Last URL and title sent to the client. Captured in send() so
 	// reattach can replay them — the browser's address bar and title
 	// are separate from the DOM and would otherwise desync.

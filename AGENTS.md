@@ -319,7 +319,7 @@ The framework is quiet by default — `slog` is only used for panics
 (as a critical safety net). All other operational signals flow through
 the diagnostic bus. `DiagnosticKind` constants: `TransportError`,
 `EncodeError`, `BufferOverflow`, `CommandDropped`, `HandlerPanic`,
-`UploadError`. See [operations](docs/operations.md#diagnostics-bus) for
+`UploadError`, `SessionBindingFailed`. See [operations](docs/operations.md#diagnostics-bus) for
 details.
 
 Prefer `Config.Watchers` for declarative subscriptions (`WatchValue`,
@@ -376,10 +376,13 @@ go test ./...
 
 ## Security
 
-Session IDs are bearer tokens — TLS is a hard requirement. Origin checking
-protects against browser-based attacks only. Rate limiting is operator
-responsibility (reverse proxy or middleware). See
-[security](docs/security.md) for the full model.
+Session IDs are bearer tokens — TLS is a hard requirement. User-Agent
+binding is enabled by default: the framework captures the User-Agent on
+session creation and verifies it on reconnect, rejecting mismatches with
+a `SessionBindingFailed` diagnostic. Origin checking protects against
+browser-based attacks only. Rate limiting is operator responsibility
+(reverse proxy or middleware). See [security](docs/security.md) for the
+full model.
 
 ## Conventions
 

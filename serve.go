@@ -65,7 +65,7 @@ func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 	id := newID()
 	now := time.Now()
 	h.mu.Lock()
-	h.pending[id] = &pendingSession[S]{state: state, differ: differ, createdAt: now}
+	h.pending[id] = &pendingSession[S]{state: state, differ: differ, createdAt: now, userAgent: r.UserAgent()}
 	h.mu.Unlock()
 
 	var pushKey string
@@ -131,6 +131,15 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 	// Try to reattach to a disconnected session.
 	h.mu.Lock()
 	if sess, ok := h.disconnected[id]; ok {
+		if !h.cfg.Security.DisableSessionBinding && r.UserAgent() != sess.userAgent {
+			h.mu.Unlock()
+			h.Diagnostics.Publish(Diagnostic{
+				Kind:      SessionBindingFailed,
+				SessionID: id,
+				Detail:    "user-agent mismatch on reconnect",
+			})
+			return
+		}
 		delete(h.disconnected, id)
 		h.active[id] = sess
 		h.mu.Unlock()
@@ -148,6 +157,16 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 
 	h.mu.Lock()
 	if ps, ok := h.pending[id]; ok {
+		if !h.cfg.Security.DisableSessionBinding && r.UserAgent() != ps.userAgent {
+			delete(h.pending, id)
+			h.mu.Unlock()
+			h.Diagnostics.Publish(Diagnostic{
+				Kind:      SessionBindingFailed,
+				SessionID: id,
+				Detail:    "user-agent mismatch on session claim",
+			})
+			return
+		}
 		state = ps.state
 		differ = ps.differ
 		delete(h.pending, id)
@@ -206,6 +225,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		stop:             cancel,
 		createdAt:        now,
 		endpoint:         r.URL.Path,
+		userAgent:        r.UserAgent(),
 		idleTimeout:      h.cfg.Timeouts.Idle,
 		reconnectTimeout: h.cfg.Timeouts.Reconnect,
 		diagnostics:      h.Diagnostics,
