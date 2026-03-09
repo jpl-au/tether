@@ -1,30 +1,26 @@
 package ws
 
 import (
-	"context"
 	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
-	"github.com/coder/websocket"
+	gorilla "github.com/gorilla/websocket"
 	tether "github.com/jpl-au/fluent-tether"
 	"github.com/jpl-au/fluent-tether/event"
 )
 
 // dial starts an httptest server that upgrades to WebSocket via ws.Upgrade,
-// sends the server-side transport to the caller, and returns a client
-// connection for the test to read/write against. The handler stays
-// alive until the test completes, mirroring production where the
-// session event loop holds the connection open.
-func dial(t *testing.T) (*transport, *websocket.Conn) {
+// sends the server-side transport to the caller, and returns a gorilla
+// client connection for the test to read/write against.
+func dial(t *testing.T) (*transport, *gorilla.Conn) {
 	t.Helper()
 
 	ready := make(chan *transport, 1)
-	done := make(chan struct{})
-	t.Cleanup(func() { close(done) })
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		upgradeFn := Upgrade()
@@ -34,17 +30,16 @@ func dial(t *testing.T) (*transport, *websocket.Conn) {
 			return
 		}
 		ready <- tp.(*transport)
-		// Block until the test finishes so r.Context() stays alive.
-		<-done
+		// gws hijacks the connection — the handler can return.
 	}))
 	t.Cleanup(srv.Close)
 
-	ctx := context.Background()
-	client, _, err := websocket.Dial(ctx, srv.URL, nil)
+	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http")
+	client, _, err := gorilla.DefaultDialer.Dial(wsURL, nil)
 	if err != nil {
-		t.Fatalf("websocket.Dial: %v", err)
+		t.Fatalf("dial: %v", err)
 	}
-	t.Cleanup(func() { client.CloseNow() })
+	t.Cleanup(func() { client.Close() })
 
 	tp := <-ready
 	return tp, client
@@ -58,7 +53,7 @@ func TestSendDeliversJSON(t *testing.T) {
 		t.Fatalf("Send: %v", err)
 	}
 
-	_, received, err := client.Read(context.Background())
+	_, received, err := client.ReadMessage()
 	if err != nil {
 		t.Fatalf("client read: %v", err)
 	}
@@ -89,7 +84,7 @@ func TestSendPreservesAngleBrackets(t *testing.T) {
 		t.Fatalf("Send: %v", err)
 	}
 
-	_, received, err := client.Read(context.Background())
+	_, received, err := client.ReadMessage()
 	if err != nil {
 		t.Fatalf("client read: %v", err)
 	}
@@ -105,7 +100,7 @@ func TestReceiveEventReadsClientJSON(t *testing.T) {
 
 	want := tether.Event{Type: event.Click, Action: "increment"}
 	data, _ := json.Marshal(want)
-	if err := client.Write(context.Background(), websocket.MessageText, data); err != nil {
+	if err := client.WriteMessage(gorilla.TextMessage, data); err != nil {
 		t.Fatalf("client write: %v", err)
 	}
 
@@ -121,9 +116,10 @@ func TestReceiveEventReadsClientJSON(t *testing.T) {
 func TestReceiveEventReturnsEOFOnNormalClose(t *testing.T) {
 	tp, client := dial(t)
 
-	// Close in a goroutine — the close handshake needs the server
-	// to echo the frame, which happens inside ReceiveEvent's Read.
-	go client.Close(websocket.StatusNormalClosure, "bye")
+	go func() {
+		msg := gorilla.FormatCloseMessage(gorilla.CloseNormalClosure, "bye")
+		client.WriteControl(gorilla.CloseMessage, msg, time.Now().Add(time.Second))
+	}()
 
 	_, err := tp.ReceiveEvent()
 	if err != io.EOF {
@@ -134,7 +130,10 @@ func TestReceiveEventReturnsEOFOnNormalClose(t *testing.T) {
 func TestReceiveEventReturnsEOFOnGoingAway(t *testing.T) {
 	tp, client := dial(t)
 
-	go client.Close(websocket.StatusGoingAway, "navigating")
+	go func() {
+		msg := gorilla.FormatCloseMessage(gorilla.CloseGoingAway, "navigating")
+		client.WriteControl(gorilla.CloseMessage, msg, time.Now().Add(time.Second))
+	}()
 
 	_, err := tp.ReceiveEvent()
 	if err != io.EOF {
@@ -145,10 +144,9 @@ func TestReceiveEventReturnsEOFOnGoingAway(t *testing.T) {
 func TestCloseEndsConnection(t *testing.T) {
 	tp, client := dial(t)
 
-	// Start a client read so it can respond to the server's close frame.
 	readErr := make(chan error, 1)
 	go func() {
-		_, _, err := client.Read(context.Background())
+		_, _, err := client.ReadMessage()
 		readErr <- err
 	}()
 
@@ -160,8 +158,8 @@ func TestCloseEndsConnection(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error after server close, got nil")
 	}
-	status := websocket.CloseStatus(err)
-	if status != websocket.StatusNormalClosure {
-		t.Errorf("expected StatusNormalClosure, got %v (err: %v)", status, err)
+	closeErr, ok := err.(*gorilla.CloseError)
+	if !ok || closeErr.Code != gorilla.CloseNormalClosure {
+		t.Errorf("expected CloseNormalClosure, got %v", err)
 	}
 }

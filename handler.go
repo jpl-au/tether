@@ -108,7 +108,11 @@ func New[S any](cfg Config[S]) *Handler[S] {
 			if ev.Type == event.Navigate {
 				params := Params{Path: ev.Data["path"]}
 				if search := ev.Data["search"]; search != "" {
-					params.Query, _ = url.ParseQuery(search)
+					var err error
+					params.Query, err = url.ParseQuery(search)
+					if err != nil {
+						slog.Warn("malformed query string in navigate event", "search", search, "err", err)
+					}
 				}
 				return appNav(sess, s, params)
 			}
@@ -174,6 +178,9 @@ func New[S any](cfg Config[S]) *Handler[S] {
 	}
 	if cfg.Limits.CmdBufferSize == 0 {
 		cfg.Limits.CmdBufferSize = defaultCmdBufferSize
+	}
+	if cfg.Limits.MaxSessions == 0 {
+		slog.Warn("tether: Limits.MaxSessions is 0 (unlimited) — set a limit in production to prevent resource exhaustion")
 	}
 	mounts := buildAssetMounts(cfg.Assets)
 

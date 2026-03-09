@@ -398,8 +398,8 @@ const defaultMaxEventBytes = 64 << 10 // 64 KB
 
 const defaultHeartbeatInterval = 20 * time.Second
 
-// Defaults for the client-side JS runtime. These are passed to the
-// browser as data attributes on the tether root element.
+// defaultShutdownGrace is how long ListenAndServe waits for sessions to
+// drain during graceful shutdown before force-closing them.
 const defaultShutdownGrace = 10 * time.Second
 
 const (

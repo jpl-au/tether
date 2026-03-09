@@ -21,7 +21,11 @@ func composeNav[S any](appHandle HandleFunc[S], onNavigate func(Session, S, Para
 		if ev.Type == event.Navigate {
 			params := Params{Path: ev.Data["path"]}
 			if search := ev.Data["search"]; search != "" {
-				params.Query, _ = url.ParseQuery(search)
+				v, err := url.ParseQuery(search)
+				if err != nil {
+					panic("test: malformed query string: " + err.Error())
+				}
+				params.Query = v
 			}
 			return onNavigate(sess, s, params)
 		}

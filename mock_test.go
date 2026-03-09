@@ -69,10 +69,13 @@ func morphMessages(sent [][]byte) []testMessage {
 	return result
 }
 
-// decodeMessage unmarshals a single raw JSON message.
+// decodeMessage unmarshals a single raw JSON message. Panics on
+// malformed JSON so test failures surface immediately.
 func decodeMessage(data []byte) testMessage {
 	var msg testMessage
-	json.Unmarshal(data, &msg)
+	if err := json.Unmarshal(data, &msg); err != nil {
+		panic("decodeMessage: " + err.Error())
+	}
 	return msg
 }
 

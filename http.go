@@ -200,6 +200,7 @@ func (h *Handler[S]) handlePostEvent(w http.ResponseWriter, r *http.Request) {
 	// or simply overloaded (429).
 	select {
 	case sess.cmds <- func() { sess.exec(ev) }:
+		w.Header().Set("Cache-Control", "no-store")
 		w.WriteHeader(http.StatusNoContent)
 	default:
 		if sess.ctx.Err() != nil {

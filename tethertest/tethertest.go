@@ -130,8 +130,16 @@ type wireEntry struct {
 	HTML string `json:"html"`
 }
 
-// testSession implements [tether.Session] for local state tracking.
-// It captures side effects so the harness can report them.
+// testSession implements [tether.Session] for the test harness. Every
+// side effect that a Handle function can produce (toasts, navigation,
+// title changes, signals, flash messages, announcements) is captured
+// into local fields rather than sent to a client. The harness exposes
+// these via assertion helpers — HasToast, URL, Title, Signals, etc. —
+// so tests verify behaviour without a transport layer.
+//
+// Each call to [Harness.Send], [Harness.SendEvent], or [Harness.Navigate]
+// resets the captured state before invoking Handle, so assertions always
+// reflect the most recent event cycle.
 type testSession struct {
 	toast    string
 	url      string
@@ -142,22 +150,65 @@ type testSession struct {
 	signals  map[string]any
 }
 
-func (s *testSession) ID() string                  { return "tethertest" }
-func (s *testSession) Context() context.Context    { return context.Background() }
+// ID returns a fixed identifier. All harness events appear to come
+// from the same session, which simplifies test assertions and avoids
+// non-deterministic IDs in snapshot comparisons.
+func (s *testSession) ID() string { return "tethertest" }
+
+// Context returns a detached background context. The test harness
+// does not model session lifecycle cancellation — tests run
+// synchronously and do not need context-driven teardown.
+func (s *testSession) Context() context.Context { return context.Background() }
+
+// Go spawns a goroutine against a background context. In tests this
+// runs truly concurrently — test code that calls Go should use
+// synchronisation if it needs to observe the goroutine's effects.
 func (s *testSession) Go(fn func(context.Context)) { go fn(context.Background()) }
-func (s *testSession) Toast(text string)           { s.toast = text }
-func (s *testSession) SetTitle(title string)       { s.title = title }
-func (s *testSession) Announce(text string)        { s.announce = text }
-func (s *testSession) Navigate(rawURL string)      { s.url = rawURL; s.replace = false }
-func (s *testSession) ReplaceURL(rawURL string)    { s.url = rawURL; s.replace = true }
-func (s *testSession) Signal(key string, v any)    { s.ensureSignals(); s.signals[key] = v }
+
+// Toast captures a toast message. Assert with [Harness.HasToast] or
+// read directly with [Harness.Toast].
+func (s *testSession) Toast(text string) { s.toast = text }
+
+// SetTitle captures a document title change. Read with [Harness.Title].
+func (s *testSession) SetTitle(title string) { s.title = title }
+
+// Announce captures an accessibility announcement. Assert with
+// [Harness.HasAnnounce] or read with [Harness.Announce].
+func (s *testSession) Announce(text string) { s.announce = text }
+
+// Navigate captures a client-side navigation with a new history entry.
+// Read the target URL with [Harness.URL].
+func (s *testSession) Navigate(rawURL string) { s.url = rawURL; s.replace = false }
+
+// ReplaceURL captures a history replacement (no new entry). Read the
+// target URL with [Harness.URL]; distinguish from Navigate with
+// [Harness.URLWasReplaced].
+func (s *testSession) ReplaceURL(rawURL string) { s.url = rawURL; s.replace = true }
+
+// Signal captures a single signal update. Assert with [Harness.HasSignal]
+// or read the full map with [Harness.Signals].
+func (s *testSession) Signal(key string, v any) { s.ensureSignals(); s.signals[key] = v }
+
+// Signals captures a batch signal update, merging into any previously
+// set signals from the same event cycle.
 func (s *testSession) Signals(m map[string]any) {
 	s.ensureSignals()
 	maps.Copy(s.signals, m)
 }
-func (s *testSession) Flash(sel, text string)       { s.ensureFlash(); s.flash[sel] = text }
+
+// Flash captures a targeted flash message keyed by CSS selector.
+// Assert with [Harness.HasFlash] or read the full map with
+// [Harness.Flash].
+func (s *testSession) Flash(sel, text string) { s.ensureFlash(); s.flash[sel] = text }
+
+// Push is a no-op in the test harness. Push notifications require a
+// browser subscription that does not exist in unit tests.
 func (s *testSession) Push(push.Notification) error { return nil }
-func (s *testSession) Close()                       {}
+
+// Close is a no-op in the test harness. There is no transport to shut
+// down — the harness manages session lifecycle explicitly via
+// [Harness.Connect] and [Harness.Disconnect].
+func (s *testSession) Close() {}
 
 func (s *testSession) ensureSignals() {
 	if s.signals == nil {
@@ -256,14 +307,19 @@ func (h *Harness[S]) SendEvent(ev tether.Event) {
 	}
 
 	// Run through the Page handler to get the wire response (HTML + effects).
-	body, _ := json.Marshal(ev)
+	body, err := json.Marshal(ev)
+	if err != nil {
+		panic("tethertest: failed to marshal event: " + err.Error())
+	}
 	req := httptest.NewRequest("POST", target, strings.NewReader(string(body)))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	h.handler.ServeHTTP(w, req)
 
 	var msg wireMessage
-	json.Unmarshal(w.Body.Bytes(), &msg)
+	if err := json.Unmarshal(w.Body.Bytes(), &msg); err != nil {
+		panic("tethertest: failed to unmarshal response: " + err.Error())
+	}
 
 	html := ""
 	if len(msg.Morphs) > 0 {
@@ -429,12 +485,16 @@ func (h *Harness[S]) URLWasReplaced() bool {
 }
 
 // parseQuery extracts query parameters from a search string (e.g.
-// "?id=42"). Returns nil for empty input.
+// "?id=42"). Returns nil for empty input. Panics on malformed input
+// so test failures surface immediately.
 func parseQuery(search string) url.Values {
 	search = strings.TrimPrefix(search, "?")
 	if search == "" {
 		return nil
 	}
-	v, _ := url.ParseQuery(search)
+	v, err := url.ParseQuery(search)
+	if err != nil {
+		panic("tethertest: malformed query string: " + err.Error())
+	}
 	return v
 }

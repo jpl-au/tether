@@ -186,41 +186,83 @@ type Session interface {
 	Close()
 }
 
-// captureSession implements Session by buffering side effects.
-// Used during pre-warming to allow OnNavigate to call SetTitle,
-// Toast, etc. without panicking on a nil session.
+// captureSession implements [Session] for the pre-warming phase — the
+// window between the initial GET request and the WebSocket/SSE upgrade.
+//
+// During pre-warming, OnNavigate, Config.Components (via InitMounts),
+// and Layout all receive a Session. They may call Toast, SetTitle, or
+// Navigate to set up the initial page. There is no transport yet, so
+// these effects are buffered in an [effects] struct. When the real
+// [LiveSession] connects seconds later, sendDiff drains the buffered
+// effects into the first update message — the user sees the toast or
+// title change immediately on connection.
+//
+// Context returns a detached background context because the session's
+// lifecycle context does not exist until the command loop starts. Go
+// spawns a goroutine against this background context — anything
+// launched during pre-warm runs independently and must manage its own
+// cancellation.
 type captureSession struct {
 	id string
 	fx *effects
 }
 
-func (c *captureSession) ID() string               { return c.id }
+// ID returns the session identifier assigned during the initial GET.
+// The same ID is carried over to the LiveSession when the transport
+// connects, so any logging or debugging during pre-warm correlates
+// with the eventual live session.
+func (c *captureSession) ID() string { return c.id }
+
+// Context returns a detached background context. The session's real
+// lifecycle context does not exist until the command loop starts, so
+// pre-warm code cannot rely on cancellation propagation.
 func (c *captureSession) Context() context.Context { return context.Background() }
+
+// Go spawns a goroutine against a background context. Anything
+// launched during pre-warm runs independently — there is no command
+// loop to synchronise with yet.
 func (c *captureSession) Go(fn func(context.Context)) {
 	go fn(context.Background())
 }
 
-// enqueue is a no-op during pre-warm — there is no command loop and
+// enqueue is a no-op during pre-warm. There is no command loop and
 // no live subscribers, so bus emissions have nothing to deliver to.
+// This prevents Bus.Emit calls in OnNavigate from panicking.
 func (c *captureSession) enqueue(fn func()) {}
 
-// sessionID returns the capture session's ID for emitter interface
-// compliance. Used by Bus.Emit for sender filtering; in pre-warm
-// this is always empty and enqueue is a no-op regardless.
-func (c *captureSession) sessionID() string        { return c.id }
-func (c *captureSession) Toast(text string)        { c.fx.toast = text }
-func (c *captureSession) Navigate(rawURL string)   { c.fx.url = rawURL; c.fx.replace = false }
-func (c *captureSession) ReplaceURL(rawURL string) { c.fx.url = rawURL; c.fx.replace = true }
-func (c *captureSession) SetTitle(title string)    { c.fx.title = title }
-func (c *captureSession) Announce(text string)     { c.fx.announce = text }
+// sessionID satisfies the emitter interface for Bus.Emit sender
+// filtering. During pre-warm the ID is set but enqueue is a no-op,
+// so emissions are effectively discarded.
+func (c *captureSession) sessionID() string { return c.id }
 
-// Push returns an error during pre-warming because no browser
-// subscription exists yet.
+// Toast buffers a toast message into the effects struct. The message
+// is delivered to the client in the first update after connection.
+func (c *captureSession) Toast(text string) { c.fx.toast = text }
+
+// Navigate buffers a client-side navigation. The redirect is applied
+// in the first update after connection, before the client renders.
+func (c *captureSession) Navigate(rawURL string) { c.fx.url = rawURL; c.fx.replace = false }
+
+// ReplaceURL buffers a history replacement. Unlike Navigate, this
+// replaces the current URL without adding a history entry.
+func (c *captureSession) ReplaceURL(rawURL string) { c.fx.url = rawURL; c.fx.replace = true }
+
+// SetTitle buffers a document title change for replay after connection.
+func (c *captureSession) SetTitle(title string) { c.fx.title = title }
+
+// Announce buffers an accessibility announcement (ARIA live region)
+// for replay after connection.
+func (c *captureSession) Announce(text string) { c.fx.announce = text }
+
+// Push returns ErrPushPreWarm because no browser push subscription
+// exists during pre-warming — the service worker has not registered
+// yet, so there is nowhere to deliver the notification.
 func (c *captureSession) Push(push.Notification) error {
 	return ErrPushPreWarm
 }
 
-// Close is a no-op during pre-warming — there is no transport.
+// Close is a no-op during pre-warming. There is no transport to shut
+// down and no command loop to stop.
 func (c *captureSession) Close() {}
 
 func (c *captureSession) Flash(selector, text string) {

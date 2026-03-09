@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"io/fs"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"sync"
@@ -48,7 +49,12 @@ func clientVersion() string {
 			if err != nil || d.IsDir() {
 				return err
 			}
-			data, _ := fs.ReadFile(clientFS, path)
+			data, err := fs.ReadFile(clientFS, path)
+			if err != nil {
+				// Embedded files should always be readable; a failure
+				// here indicates a corrupted binary.
+				panic("tether: failed to read embedded file " + path + ": " + err.Error())
+			}
 			h.Write(data)
 			return nil
 		})
@@ -74,7 +80,10 @@ func buildWorkerJS(assets []*Asset) []byte {
 	}
 	version := hex.EncodeToString(h.Sum(nil))[:12]
 
-	raw, _ := fs.ReadFile(clientFiles(), "fluent-tether-worker.js")
+	raw, err := fs.ReadFile(clientFiles(), "fluent-tether-worker.js")
+	if err != nil {
+		panic("tether: failed to read embedded worker script: " + err.Error())
+	}
 	body := bytes.Replace(raw,
 		[]byte(`"tether-v1"`),
 		[]byte(`"tether-`+version+`"`), 1)
@@ -133,7 +142,9 @@ func newClientHandler(assets []*Asset) http.Handler {
 			})
 			w.Header().Set("Service-Worker-Allowed", "/")
 			w.Header().Set("Content-Type", "application/javascript")
-			w.Write(workerBody)
+			if _, err := w.Write(workerBody); err != nil {
+				slog.Warn("failed to write worker script", "err", err)
+			}
 			return
 		}
 		fileServer.ServeHTTP(w, r)

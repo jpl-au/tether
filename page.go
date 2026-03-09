@@ -220,6 +220,8 @@ func (p *pageHandler[S]) serveGET(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("X-Frame-Options", "DENY")
 	w.Header().Set("Referrer-Policy", "same-origin")
 	if dev.Enabled() {
 		w.Header().Set("Cache-Control", "no-store")
@@ -268,7 +270,11 @@ func (p *pageHandler[S]) servePOST(w http.ResponseWriter, r *http.Request) {
 		// the live handler in handler.go.
 		params := Params{Path: ev.Data["path"]}
 		if search := ev.Data["search"]; search != "" {
-			params.Query, _ = url.ParseQuery(strings.TrimPrefix(search, "?"))
+			var err error
+			params.Query, err = url.ParseQuery(strings.TrimPrefix(search, "?"))
+			if err != nil {
+				slog.Warn("malformed query string in navigate event", "search", search, "err", err)
+			}
 		}
 		state = p.cfg.OnNavigate(cs, state, params)
 	} else {
@@ -303,5 +309,7 @@ func (p *pageHandler[S]) servePOST(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.Write(data)
+	if _, err := w.Write(data); err != nil {
+		slog.Warn("failed to write page response", "path", r.URL.Path, "err", err)
+	}
 }

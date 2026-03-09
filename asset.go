@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io/fs"
+	"log/slog"
 	"net/http"
 	"strings"
 	"sync"
@@ -74,7 +75,11 @@ func (a *Asset) init() {
 			if err != nil || d.IsDir() {
 				return err
 			}
-			data, _ := fs.ReadFile(a.FS, path)
+			data, err := fs.ReadFile(a.FS, path)
+			if err != nil {
+				slog.Error("failed to read asset file", "path", path, "err", err)
+				return nil
+			}
 			h := sha256.Sum256(data)
 			a.hashes[path] = hex.EncodeToString(h[:])[:12]
 			return nil
@@ -160,6 +165,7 @@ func buildAssetMounts(assets []*Asset) []assetMount {
 // cache headers.
 func cacheHandler(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
 		if dev.Enabled() {
 			w.Header().Set("Cache-Control", "no-store")
 		} else if r.URL.Query().Get("v") != "" {

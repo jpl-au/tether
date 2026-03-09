@@ -115,4 +115,5 @@ tether.New(tether.Config[State]{
 | Library | Licence | Purpose |
 |---------|---------|---------|
 | [idiomorph](https://github.com/bigskysoftware/idiomorph) 0.3.0 | [0BSD](https://opensource.org/license/0bsd) | DOM morphing (bundled JS) |
-| [coder/websocket](https://github.com/coder/websocket) | [ISC](https://github.com/coder/websocket/blob/main/LICENSE.txt) | WebSocket transport |
+| [lxzan/gws](https://github.com/lxzan/gws) | [Apache-2.0](https://github.com/lxzan/gws/blob/main/LICENSE) | WebSocket transport |
+| [gorilla/websocket](https://github.com/gorilla/websocket) | [BSD-2-Clause](https://github.com/gorilla/websocket/blob/main/LICENSE) | WebSocket test client |
