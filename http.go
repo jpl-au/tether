@@ -2,6 +2,7 @@ package tether
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
@@ -247,9 +248,9 @@ func (h *Handler[S]) handlePushSubscribe(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Send the subscription to the session loop so it's stored
-	// without racing with other loop operations. The select guards
-	// against hanging if the session is destroyed mid-request.
+	// Store the subscription via the session loop so it doesn't race
+	// with other loop operations. The select guards against hanging
+	// if the session is destroyed mid-request.
 	select {
 	case sess.cmds <- func() { sess.pushSub.Store(&sub) }:
 	case <-sess.ctx.Done():
@@ -257,6 +258,25 @@ func (h *Handler[S]) handlePushSubscribe(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	go h.cfg.Push.OnSubscribe(sess, sub)
+	// Fire OnSubscribe asynchronously so the HTTP response returns
+	// immediately — the callback receives the subscription as a
+	// parameter so it doesn't need to read session state. Panic
+	// recovery matches the pattern used in exec() and runCmd().
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				err := panicErr(r)
+				slog.Error("panic in OnSubscribe", "session", sess.ID(), "panic", r)
+				sess.emitDiagnostic(Diagnostic{
+					Kind:      HandlerPanic,
+					SessionID: sess.ID(),
+					Err:       err,
+					Detail:    "OnSubscribe",
+				})
+			}
+		}()
+		h.cfg.Push.OnSubscribe(sess, sub)
+	}()
+
 	w.WriteHeader(http.StatusNoContent)
 }
