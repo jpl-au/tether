@@ -113,7 +113,8 @@ for details and examples.
 | [Extensions](docs/extensions.md) | File uploads, service worker, push notifications |
 | [Transport](docs/transport.md) | WebSocket, SSE, resilience |
 | [Push notifications](docs/push-notifications.md) | Web Push with VAPID |
-| [Operations](docs/operations.md) | Health check, drain, dev mode, error reporting |
+| [Operations](docs/operations.md) | Health check, drain, dev mode, diagnostics, error reporting |
+| [Security](docs/security.md) | TLS, session identity, origin checking, CSRF, rate limiting |
 | [Best practices](docs/best-practices.md) | Common patterns, performance tips, pitfalls to avoid |
 | [Performance](docs/performance.md) | Benchmarks, PGO |
 

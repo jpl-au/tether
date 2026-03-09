@@ -374,6 +374,13 @@ go build ./...
 go test ./...
 ```
 
+## Security
+
+Session IDs are bearer tokens — TLS is a hard requirement. Origin checking
+protects against browser-based attacks only. Rate limiting is operator
+responsibility (reverse proxy or middleware). See
+[security](docs/security.md) for the full model.
+
 ## Conventions
 
 - British spelling in comments, docs, and strings
