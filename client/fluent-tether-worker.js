@@ -140,7 +140,16 @@ var EVENT_DB_NAME = "tether-events";
 var EVENT_DB_VERSION = 1;
 var EVENT_STORE = "queue";
 // Discard events older than this to avoid replaying stale actions.
-var EVENT_MAX_AGE_MS = 60000;
+// Read from the registration URL query string so the server's
+// Client.SyncRetention config is respected. Falls back to 1 hour.
+var EVENT_MAX_AGE_MS = (function () {
+  try {
+    var params = new URL(self.location).searchParams;
+    return parseInt(params.get("syncRetention")) || 3600000;
+  } catch (e) {
+    return 3600000;
+  }
+})();
 
 function openEventDB() {
   return new Promise(function (resolve, reject) {
@@ -199,9 +208,13 @@ function replayEvent(db, key, ev) {
     },
     body: ev.payload
   }).then(function (resp) {
-    if (resp.ok) deleteFromEventDB(db, key);
+    // Delete on success or permanent client error (4xx — e.g. session
+    // not found). Keep on server error (5xx) for retry on next sync.
+    if (resp.ok || (resp.status >= 400 && resp.status < 500)) {
+      deleteFromEventDB(db, key);
+    }
   }).catch(function () {
-    // Still failing — leave in IndexedDB for the next sync attempt.
+    // Network failure — leave in IndexedDB for the next sync attempt.
   });
 }
 

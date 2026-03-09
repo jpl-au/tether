@@ -87,6 +87,7 @@ func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 		worker:            h.cfg.Worker,
 		pushKey:           pushKey,
 		backgroundSync:    h.cfg.Client.BackgroundSync,
+		syncRetention:     h.cfg.Client.SyncRetention,
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

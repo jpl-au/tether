@@ -49,6 +49,7 @@ window.Tether.signals = window.Tether.signals || {};
   var sseOpened = false;
   var devMode = false;
   var backgroundSync = false;
+  var syncRetention = 3600000; // 1 hour default
   var flashDuration = 5000;
   var toastDuration = 5000;
   var pendingCount = 0;
@@ -79,6 +80,7 @@ window.Tether.signals = window.Tether.signals || {};
     transitionTimeout = parseInt(root.getAttribute("data-tether-transition-timeout")) || 5000;
     devMode = root.hasAttribute("data-tether-dev");
     backgroundSync = root.hasAttribute("data-tether-background-sync");
+    syncRetention = parseInt(root.getAttribute("data-tether-sync-retention")) || 3600000;
     flashDuration = parseInt(root.getAttribute("data-tether-flash-duration")) || 5000;
     toastDuration = parseInt(root.getAttribute("data-tether-toast-duration")) || 5000;
     // Remove cloak attributes so hidden elements become visible now
@@ -115,7 +117,10 @@ window.Tether.signals = window.Tether.signals || {};
     } else if (root.hasAttribute("data-tether-worker") && "serviceWorker" in navigator) {
       // Full service worker: asset caching, offline page shells, push
       // notification handling, and background sync for SSE resilience.
-      navigator.serviceWorker.register("/_tether/fluent-tether-worker.js", { scope: endpoint || "/" })
+      // Pass sync retention so the worker discards stale events
+      // consistently with the main thread.
+      var workerURL = "/_tether/fluent-tether-worker.js?syncRetention=" + syncRetention;
+      navigator.serviceWorker.register(workerURL, { scope: endpoint || "/" })
         .catch(function (err) {
           reportError("worker", "service worker registration failed: " + err);
         });
@@ -430,15 +435,29 @@ window.Tether.signals = window.Tether.signals || {};
         var events = allReq.result;
         var keys = keysReq.result;
         var url = location.protocol + "//" + location.host + endpoint;
+        var now = Date.now();
         for (var i = 0; i < events.length; i++) {
-          // Only replay events for the current session.
-          if (events[i].sessionID !== sessionID) continue;
+          // Delete orphaned events from previous sessions.
+          if (events[i].sessionID !== sessionID) {
+            deleteEventFromDB(db, keys[i]);
+            continue;
+          }
+          // Discard events older than the retention window.
+          if (now - events[i].ts > syncRetention) {
+            deleteEventFromDB(db, keys[i]);
+            continue;
+          }
           replayAndDeleteEvent(db, keys[i], events[i].payload, url);
         }
       };
     }).catch(function (err) {
       reportError("indexeddb", "failed to replay queued events: " + err, true);
     });
+  }
+
+  function deleteEventFromDB(db, key) {
+    var tx = db.transaction(EVENT_STORE, "readwrite");
+    tx.objectStore(EVENT_STORE).delete(key);
   }
 
   function replayAndDeleteEvent(db, key, payload, url) {
@@ -450,9 +469,10 @@ window.Tether.signals = window.Tether.signals || {};
       },
       body: payload
     }).then(function (resp) {
-      if (resp.ok) {
-        var tx = db.transaction(EVENT_STORE, "readwrite");
-        tx.objectStore(EVENT_STORE).delete(key);
+      // Delete on success or permanent client error (4xx). Keep on
+      // server error (5xx) so the next sync attempt can retry.
+      if (resp.ok || (resp.status >= 400 && resp.status < 500)) {
+        deleteEventFromDB(db, key);
       }
     }).catch(function (err) {
       reportError("fetch", "event replay failed: " + err, true);

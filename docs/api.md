@@ -104,6 +104,7 @@ When either callback is configured, the framework's own logging for that event i
 | `FlashDuration` | `time.Duration` | 5s | Flash message auto-clear duration |
 | `ToastDuration` | `time.Duration` | 5s | Toast notification auto-dismiss duration |
 | `BackgroundSync` | `bool` | false | Queue failed SSE events in IndexedDB for replay |
+| `SyncRetention` | `time.Duration` | 1h | How long queued events survive before expiry |
 
 ### Extensions
 

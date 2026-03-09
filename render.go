@@ -45,6 +45,7 @@ type tetherBody struct {
 	worker            bool
 	pushKey           string
 	backgroundSync    bool
+	syncRetention     time.Duration
 }
 
 func (p *tetherBody) Render(w ...io.Writer) []byte {
@@ -114,6 +115,9 @@ func (p *tetherBody) RenderBuilder(buf *bytes.Buffer) {
 	}
 	if p.backgroundSync {
 		buf.WriteString(` data-tether-background-sync`)
+		buf.WriteString(` data-tether-sync-retention="`)
+		buf.WriteString(strconv.FormatInt(p.syncRetention.Milliseconds(), 10))
+		buf.WriteString(`"`)
 	}
 	if dev.Enabled() {
 		buf.WriteString(` data-tether-dev`)

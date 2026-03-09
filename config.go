@@ -364,6 +364,13 @@ type Client struct {
 	// Background Sync API). When false (default), failed events are
 	// reported as errors and not retried.
 	BackgroundSync bool
+
+	// SyncRetention controls how long queued events are retained in
+	// IndexedDB before being discarded as stale. Events older than
+	// this are deleted during replay rather than sent to the server.
+	// Zero defaults to 1 hour. Only relevant when BackgroundSync is
+	// enabled.
+	SyncRetention time.Duration
 }
 
 // Security groups origin-checking and CSRF protection settings.
@@ -425,4 +432,5 @@ const (
 	defaultTransitionTimeout = 5 * time.Second
 	defaultFlashDuration     = 5 * time.Second
 	defaultToastDuration     = 5 * time.Second
+	defaultSyncRetention     = 1 * time.Hour
 )

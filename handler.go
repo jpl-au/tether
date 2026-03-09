@@ -202,6 +202,9 @@ func New[S any](cfg Config[S]) *Handler[S] {
 	if cfg.Client.ToastDuration == 0 {
 		cfg.Client.ToastDuration = defaultToastDuration
 	}
+	if cfg.Client.SyncRetention == 0 {
+		cfg.Client.SyncRetention = defaultSyncRetention
+	}
 	if cfg.Timeouts.Heartbeat == 0 {
 		cfg.Timeouts.Heartbeat = defaultHeartbeatInterval
 	}
