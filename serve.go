@@ -145,8 +145,8 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		h.mu.Unlock()
 
 		// Clean up stored snapshots — Render rebuilds them.
-		if h.cfg.Store != nil {
-			if err := h.cfg.Store.Delete(sess.ctx, id); err != nil {
+		if h.cfg.DiffStore != nil {
+			if err := h.cfg.DiffStore.Delete(sess.ctx, id); err != nil {
 				dev.Warn("store delete failed on reconnect", "session", id, "error", err)
 				h.Diagnostics.Publish(Diagnostic{
 					Kind:      StoreError,
@@ -242,7 +242,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		idleTimeout:      h.cfg.Timeouts.Idle,
 		reconnectTimeout: h.cfg.Timeouts.Reconnect,
 		diagnostics:      h.Diagnostics,
-		store:            h.cfg.Store,
+		store:            h.cfg.DiffStore,
 	}
 	sess.lastActivity.Store(now.UnixNano())
 	if len(h.cfg.Components) > 0 {

@@ -44,10 +44,10 @@ const (
 	SessionBindingFailed DiagnosticKind = "session_binding_failed"
 
 	// StoreError signals a failure saving, loading, or deleting
-	// differ snapshots from the configured [Store]. The Detail field
-	// indicates the operation ("save", "load", or "delete"). Store
-	// failures are non-fatal — the framework falls back to in-memory
-	// behaviour.
+	// differ snapshots from the configured [DiffStore]. The Detail
+	// field indicates the operation ("save", "load", or "delete").
+	// Store failures are non-fatal — the framework falls back to
+	// in-memory behaviour.
 	StoreError DiagnosticKind = "store_error"
 )
 

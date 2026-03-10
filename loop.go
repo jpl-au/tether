@@ -198,7 +198,7 @@ func (s *LiveSession[S]) exec(ev Event) {
 // onTransportClose handles transport disconnection. The transport is
 // closed and nilled so send() silently drops updates during the
 // reconnect window. A disconnect timer is started (if reconnection is
-// enabled), differ snapshots are persisted to the Store (if configured),
+// enabled), differ snapshots are persisted to the DiffStore (if configured),
 // and the onDisconnect callback fires for pool transitions. The store
 // save runs before the pool transition so the data is persisted before
 // the session becomes visible as reconnectable.

@@ -157,11 +157,11 @@ type LiveSession[S any] struct {
 	// Optional hook for render cycles that produce no patches.
 	onNoPatch func(*LiveSession[S], NoPatch)
 
-	// store is the external snapshot store from Config.Store. When
-	// non-nil, differ snapshots are saved here on disconnect and
-	// deleted on reconnect or destroy, freeing process memory during
-	// the reconnect window.
-	store Store
+	// store is the external snapshot store from Config.DiffStore.
+	// When non-nil, differ snapshots are saved here on disconnect
+	// and deleted on reconnect or destroy, freeing process memory
+	// during the reconnect window.
+	store DiffStore
 
 	// diagnostics is the handler's diagnostic bus. The session emits
 	// transport errors, encode failures, panics, and buffer overflows.

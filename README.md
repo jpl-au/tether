@@ -90,10 +90,10 @@ tether.New(tether.Config[State]{
 // GET /static/styles.css?v=a1b2c3d4e5f6 → served automatically with immutable cache headers
 ```
 
-## Snapshot store
+## Diff store
 
 Disconnected sessions keep their differ snapshots in process memory while
-waiting to reconnect. For deployments where this matters, set `Config.Store`
+waiting to reconnect. For deployments where this matters, set `Config.DiffStore`
 to offload that data to external storage (Redis, SQLite, filesystem — you
 provide the implementation). The framework saves on disconnect, deletes on
 reconnect, and falls back to in-memory if the store is unavailable. See
@@ -120,7 +120,7 @@ for details and examples.
 | [Client-side](docs/client-side.md) | Directives, transitions, JS hooks |
 | [Broadcasting](docs/broadcasting.md) | Groups, broadcast, presence |
 | [Extensions](docs/extensions.md) | File uploads, service worker, push notifications |
-| [Store](docs/store.md) | External snapshot persistence for disconnected sessions |
+| [DiffStore](docs/store.md) | External snapshot persistence for disconnected sessions |
 | [Transport](docs/transport.md) | WebSocket, SSE, resilience |
 | [Push notifications](docs/push-notifications.md) | Web Push with VAPID |
 | [Operations](docs/operations.md) | Health check, drain, dev mode, diagnostics, error reporting |

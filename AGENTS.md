@@ -138,16 +138,16 @@ creates a watcher that observes a Value; `WatchBus(bus, mapper)` creates
 one that subscribes to a Bus. Listed in `Config.Watchers`, they are
 subscribed automatically before `OnConnect` runs.
 
-### Store
+### DiffStore
 
-`Store` is an interface with three methods: `Save`, `Load`, and `Delete`.
+`DiffStore` is an interface with three methods: `Save`, `Load`, and `Delete`.
 The framework calls `Save` when a session disconnects (persisting the differ
 snapshot to external storage) and `Delete` when the session reconnects or is
 destroyed. `Load` is included for tooling and debugging but is not called by
 the framework today — reconnecting sessions re-render from state, which
 re-seeds the differ.
 
-Nil by default (opt-in via `Config.Store`). No first-party implementations
+Nil by default (opt-in via `Config.DiffStore`). No first-party implementations
 are provided — developers supply their own, backed by whatever storage suits
 their deployment (SQLite, Redis, filesystem, etc.).
 
@@ -245,12 +245,12 @@ Pending  →  Active  ⇄  Disconnected  →  Destroyed
 - **Active**: transport connected, command loop running.
 - **Disconnected**: transport lost but session alive for
   `Timeouts.Reconnect` (default 30s). Commands, broadcasts, and timers
-  continue. When a Store is configured, differ snapshots are saved to
+  continue. When a DiffStore is configured, differ snapshots are saved to
   external storage and cleared from memory during the reconnect window.
   On reconnect: transport swapped, store entry deleted (Render re-seeds the
   differ), full re-render sent, URL and title replayed.
-- **Destroyed**: context cancelled, loop exits, timers stopped. Store entry
-  deleted if present.
+- **Destroyed**: context cancelled, loop exits, timers stopped. DiffStore
+  entry deleted if present.
 
 ## Event pipeline
 
@@ -364,7 +364,7 @@ Subscriptions are cleaned up automatically when the session is destroyed.
 | `emit.go` | On — subscribe a session to a Bus with sender filtering |
 | `watcher.go` | Watcher interface, WatchValue, WatchBus — declarative Config subscriptions |
 | `transport.go` | Transport interface |
-| `store.go` | Store interface for external snapshot persistence |
+| `diff_store.go` | DiffStore interface for external snapshot persistence |
 | `page.go` | PageConfig, stateless page handler |
 | `effects.go` | Effects struct — buffers Toast, Signal, Navigate, etc. |
 | `render.go` | Render helpers, tetherBody (root div with data attributes) |

@@ -242,12 +242,12 @@ type Config[S any] struct {
 	// additional formats (e.g. HTML fragments) will be added in future.
 	WireFormat wire.Format
 
-	// Store provides external persistence for disconnected session
+	// DiffStore provides external persistence for disconnected session
 	// snapshots. When set, differ data is saved to the store on
 	// disconnect and deleted on reconnect (Render re-seeds the
 	// differ), freeing Go memory during the reconnect window. When
 	// nil (default), snapshots remain in process memory.
-	Store Store
+	DiffStore DiffStore
 
 	// Security groups origin-checking and CSRF protection settings.
 	Security Security
