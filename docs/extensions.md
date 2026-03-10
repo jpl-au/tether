@@ -85,7 +85,7 @@ tether.New(tether.Config[State]{
 })
 ```
 
-The service worker caches the JS runtime (`fluent-tether.js`, `idiomorph.min.js`) using a cache-first strategy. Navigation responses are only cached when the server sends the `X-Tether-Cache: true` header. Cached pages are served as a fallback when offline.
+The service worker caches the JS runtime (`tether.js`, `idiomorph.min.js`) using a cache-first strategy. Navigation responses are only cached when the server sends the `X-Tether-Cache: true` header. Cached pages are served as a fallback when offline.
 
 ### Precaching additional assets
 

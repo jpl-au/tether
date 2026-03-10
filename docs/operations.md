@@ -210,7 +210,7 @@ Wrapping conditional elements in a stable keyed container keeps morphs scoped in
 
 ### Architecture model
 
-fluent-tether is a **stateful, server-driven** framework. Each session holds
+tether is a **stateful, server-driven** framework. Each session holds
 its state, diff engine, and command loop in server memory for the duration of
 the connection. This is fundamentally different from stateless REST/GraphQL
 APIs and has direct implications for scaling.

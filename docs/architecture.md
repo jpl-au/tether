@@ -2,7 +2,7 @@
 
 ## Core concepts
 
-fluent-tether keeps server state and browser DOM in sync over a persistent connection. The core loop is:
+tether keeps server state and browser DOM in sync over a persistent connection. The core loop is:
 
 1. **State** — a Go value (typically a struct) owned by a single session
 2. **Render** — a pure function that builds a node tree from state
@@ -17,9 +17,9 @@ Each browser tab gets its own session with its own state, its own goroutine, and
 |---------|------|
 | [fluent](https://github.com/jpl-au/fluent) | Structural representation of HTML — composable node trees |
 | [fluent-jit](https://github.com/jpl-au/fluent-jit) | Diff engine — compares two node trees and produces patches or morphs |
-| **fluent-tether** | Session management, transport, wire protocol, and the command loop that ties everything together |
+| **tether** | Session management, transport, wire protocol, and the command loop that ties everything together |
 
-fluent builds the tree. fluent-jit diffs it. fluent-tether orchestrates the lifecycle.
+fluent builds the tree. fluent-jit diffs it. tether orchestrates the lifecycle.
 
 ## Request lifecycle
 
@@ -46,7 +46,7 @@ The session ID is embedded as a data attribute on the root element. The rendered
 
 ### 2. Client connects
 
-The client JS (`fluent-tether.js`) runs on `DOMContentLoaded`:
+The client JS (`tether.js`) runs on `DOMContentLoaded`:
 
 1. Reads configuration from data attributes on the tether root element
 2. Opens a transport connection — WebSocket by default, SSE as fallback

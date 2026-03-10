@@ -1,6 +1,6 @@
 package tether
 
-import "github.com/jpl-au/fluent-tether/dev"
+import "github.com/jpl-au/tether/dev"
 
 // On subscribes a session to a typed event bus. When the bus publishes
 // an event, fn is called inside the session's command loop (via

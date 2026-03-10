@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/jpl-au/fluent-tether/mode"
-	"github.com/jpl-au/fluent-tether/push"
-	"github.com/jpl-au/fluent-tether/wire"
+	"github.com/jpl-au/tether/mode"
+	"github.com/jpl-au/tether/push"
+	"github.com/jpl-au/tether/wire"
 	"github.com/jpl-au/fluent/node"
 )
 
@@ -160,7 +160,7 @@ type Config[S any] struct {
 
 	// Worker enables the full service worker for asset caching, offline
 	// page shells, and background sync. When true, the client JS
-	// registers /_tether/fluent-tether-worker.js as a service worker with
+	// registers /_tether/tether-worker.js as a service worker with
 	// scope "/". When false and Push is configured, a lightweight
 	// push-only service worker is registered instead — it handles push
 	// events without intercepting fetch requests or caching. Default

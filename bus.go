@@ -6,7 +6,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/jpl-au/fluent-tether/dev"
+	"github.com/jpl-au/tether/dev"
 )
 
 // emitter is the internal capability marker that [Bus.Emit] uses to

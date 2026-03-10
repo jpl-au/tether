@@ -1,8 +1,8 @@
-# fluent-tether
+# tether
 
 Reactive server-driven UI for [Fluent](https://github.com/jpl-au/fluent). Write Go, get live updates.
 
-fluent-tether connects Fluent's node trees to the browser via WebSocket (with SSE fallback). When state changes, only the parts that actually changed are sent as targeted patches. The client morphs the DOM in place, preserving input focus, scroll position, and form state.
+tether connects Fluent's node trees to the browser via WebSocket (with SSE fallback). When state changes, only the parts that actually changed are sent as targeted patches. The client morphs the DOM in place, preserving input focus, scroll position, and form state.
 
 Three update modes give you the right tool for every situation:
 

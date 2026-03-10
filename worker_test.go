@@ -14,16 +14,16 @@ import (
 	"testing/fstest"
 	"time"
 
-	"github.com/jpl-au/fluent-tether/dev"
-	"github.com/jpl-au/fluent-tether/mode"
-	"github.com/jpl-au/fluent-tether/push"
+	"github.com/jpl-au/tether/dev"
+	"github.com/jpl-au/tether/mode"
+	"github.com/jpl-au/tether/push"
 )
 
 func TestClientWorkerHeader(t *testing.T) {
 	handler := newTestHandler()
 
-	t.Run("fluent-tether-worker.js gets Service-Worker-Allowed header", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/_tether/fluent-tether-worker.js", nil)
+	t.Run("tether-worker.js gets Service-Worker-Allowed header", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/_tether/tether-worker.js", nil)
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, req)
 
@@ -35,8 +35,8 @@ func TestClientWorkerHeader(t *testing.T) {
 		}
 	})
 
-	t.Run("fluent-tether-worker.js has content-hash cache version", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/_tether/fluent-tether-worker.js", nil)
+	t.Run("tether-worker.js has content-hash cache version", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/_tether/tether-worker.js", nil)
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, req)
 
@@ -49,8 +49,8 @@ func TestClientWorkerHeader(t *testing.T) {
 		}
 	})
 
-	t.Run("fluent-tether-push-worker.js gets Service-Worker-Allowed header", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/_tether/fluent-tether-push-worker.js", nil)
+	t.Run("tether-push-worker.js gets Service-Worker-Allowed header", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/_tether/tether-push-worker.js", nil)
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, req)
 
@@ -65,8 +65,8 @@ func TestClientWorkerHeader(t *testing.T) {
 		}
 	})
 
-	t.Run("fluent-tether-push-worker.js rejects cross-origin", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "http://myapp.com/_tether/fluent-tether-push-worker.js", nil)
+	t.Run("tether-push-worker.js rejects cross-origin", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "http://myapp.com/_tether/tether-push-worker.js", nil)
 		req.Header.Set("Origin", "https://evil.com")
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, req)
@@ -76,8 +76,8 @@ func TestClientWorkerHeader(t *testing.T) {
 		}
 	})
 
-	t.Run("fluent-tether.js does not get Service-Worker-Allowed header", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/_tether/fluent-tether.js", nil)
+	t.Run("tether.js does not get Service-Worker-Allowed header", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/_tether/tether.js", nil)
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, req)
 
@@ -106,7 +106,7 @@ func TestClientPrecache(t *testing.T) {
 		Assets:       []*Asset{assets},
 	})
 
-	req := httptest.NewRequest("GET", "/_tether/fluent-tether-worker.js", nil)
+	req := httptest.NewRequest("GET", "/_tether/tether-worker.js", nil)
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 
@@ -125,7 +125,7 @@ func TestClientPrecache(t *testing.T) {
 func TestClientNoPrecache(t *testing.T) {
 	handler := newTestHandler()
 
-	req := httptest.NewRequest("GET", "/_tether/fluent-tether-worker.js", nil)
+	req := httptest.NewRequest("GET", "/_tether/tether-worker.js", nil)
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 
@@ -139,7 +139,7 @@ func TestClientWorkerOriginCheck(t *testing.T) {
 	handler := newTestHandler()
 
 	t.Run("cross-origin request is rejected", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "http://myapp.com/_tether/fluent-tether-worker.js", nil)
+		req := httptest.NewRequest("GET", "http://myapp.com/_tether/tether-worker.js", nil)
 		req.Header.Set("Origin", "https://evil.com")
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, req)
@@ -150,7 +150,7 @@ func TestClientWorkerOriginCheck(t *testing.T) {
 	})
 
 	t.Run("same-origin request is allowed", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "http://myapp.com/_tether/fluent-tether-worker.js", nil)
+		req := httptest.NewRequest("GET", "http://myapp.com/_tether/tether-worker.js", nil)
 		req.Header.Set("Origin", "http://myapp.com")
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, req)
@@ -161,7 +161,7 @@ func TestClientWorkerOriginCheck(t *testing.T) {
 	})
 
 	t.Run("no origin header is allowed", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/_tether/fluent-tether-worker.js", nil)
+		req := httptest.NewRequest("GET", "/_tether/tether-worker.js", nil)
 		w := httptest.NewRecorder()
 		handler.ServeHTTP(w, req)
 
@@ -191,13 +191,13 @@ func TestTetherBodyScriptHashes(t *testing.T) {
 		t.Errorf("expected %q in rendered HTML", want)
 	}
 
-	want = "/_tether/fluent-tether.js?v=" + v
+	want = "/_tether/tether.js?v=" + v
 	if !strings.Contains(html, want) {
 		t.Errorf("expected %q in rendered HTML", want)
 	}
 
 	// Extension scripts also get the hash.
-	want = "/_tether/fluent-tether-upload.js?v=" + v
+	want = "/_tether/tether-upload.js?v=" + v
 	if !strings.Contains(html, want) {
 		t.Errorf("expected %q in rendered HTML", want)
 	}

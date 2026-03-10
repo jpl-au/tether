@@ -4,8 +4,8 @@ import (
 	"testing"
 	"testing/synctest"
 
-	"github.com/jpl-au/fluent-tether/event"
-	"github.com/jpl-au/fluent-tether/wire"
+	"github.com/jpl-au/tether/event"
+	"github.com/jpl-au/tether/wire"
 )
 
 func TestSignalOutsideHandle(t *testing.T) {

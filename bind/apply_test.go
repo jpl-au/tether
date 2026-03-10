@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jpl-au/fluent-tether/bind"
+	"github.com/jpl-au/tether/bind"
 	"github.com/jpl-au/fluent/html5/button"
 	"github.com/jpl-au/fluent/html5/div"
 	"github.com/jpl-au/fluent/html5/input"

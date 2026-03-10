@@ -6,8 +6,8 @@ import (
 	"testing"
 	"testing/synctest"
 
-	"github.com/jpl-au/fluent-tether/event"
-	"github.com/jpl-au/fluent-tether/mode"
+	"github.com/jpl-au/tether/event"
+	"github.com/jpl-au/tether/mode"
 )
 
 func TestSessionHandlePanicDoesNotKillSession(t *testing.T) {

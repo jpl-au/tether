@@ -4,7 +4,7 @@ import (
 	"testing"
 	"testing/synctest"
 
-	"github.com/jpl-au/fluent-tether/event"
+	"github.com/jpl-au/tether/event"
 )
 
 func TestOnSubscribesSessionToBus(t *testing.T) {

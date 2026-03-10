@@ -7,8 +7,8 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"github.com/jpl-au/fluent-tether/dev"
-	"github.com/jpl-au/fluent-tether/mode"
+	"github.com/jpl-au/tether/dev"
+	"github.com/jpl-au/tether/mode"
 )
 
 func testAssetFS() *Asset {
@@ -312,7 +312,7 @@ func TestMultipleAssets(t *testing.T) {
 func TestAssetChangesWorkerVersion(t *testing.T) {
 	workerBody := func(assets []*Asset) string {
 		h := newClientHandler(assets)
-		req := httptest.NewRequest("GET", "/fluent-tether-worker.js", nil)
+		req := httptest.NewRequest("GET", "/tether-worker.js", nil)
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, req)
 		return w.Body.String()

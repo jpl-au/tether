@@ -8,7 +8,7 @@ import (
 	"time"
 
 	jit "github.com/jpl-au/fluent-jit"
-	"github.com/jpl-au/fluent-tether/mode"
+	"github.com/jpl-au/tether/mode"
 )
 
 func TestSessionBindingRejectsReattachWithMismatchedUA(t *testing.T) {

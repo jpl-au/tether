@@ -1,4 +1,4 @@
-// Package bind provides element annotation helpers for fluent-tether.
+// Package bind provides element annotation helpers for tether.
 // Each helper attaches a data-tether-* attribute to a Fluent element,
 // telling the client JS runtime how to handle that element — which
 // events to forward, what client-side behaviour to apply, or which

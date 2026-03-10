@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/jpl-au/fluent-tether/mode"
+	"github.com/jpl-au/tether/mode"
 )
 
 func TestHealthEmpty(t *testing.T) {

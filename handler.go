@@ -14,10 +14,10 @@ import (
 	"time"
 
 	jit "github.com/jpl-au/fluent-jit"
-	"github.com/jpl-au/fluent-tether/dev"
-	"github.com/jpl-au/fluent-tether/event"
-	"github.com/jpl-au/fluent-tether/mode"
-	"github.com/jpl-au/fluent-tether/wire"
+	"github.com/jpl-au/tether/dev"
+	"github.com/jpl-au/tether/event"
+	"github.com/jpl-au/tether/mode"
+	"github.com/jpl-au/tether/wire"
 )
 
 // pendingSession holds a pre-warmed session created during the initial GET

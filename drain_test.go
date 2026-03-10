@@ -8,7 +8,7 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/jpl-au/fluent-tether/mode"
+	"github.com/jpl-au/tether/mode"
 )
 
 func TestDrainRejectsNewPages(t *testing.T) {

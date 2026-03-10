@@ -1,13 +1,13 @@
-// fluent-tether-worker.js — service worker for Fluent Tether.
+// tether-worker.js — service worker for Fluent Tether.
 //
 // Provides asset caching for faster loads, offline page shells for
 // graceful disconnects, push notification handling, and background
-// sync for SSE event resilience. Registered by fluent-tether.js when
+// sync for SSE event resilience. Registered by tether.js when
 // the server enables Worker mode.
 
 var CACHE_VERSION = "tether-v1";
 var PRECACHE_URLS = [
-  "/_tether/fluent-tether.js",
+  "/_tether/tether.js",
   "/_tether/idiomorph.min.js"
 ];
 var PRECACHE_EXTRA = [];

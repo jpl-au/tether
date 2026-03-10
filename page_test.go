@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jpl-au/fluent-tether/dev"
-	"github.com/jpl-au/fluent-tether/event"
+	"github.com/jpl-au/tether/dev"
+	"github.com/jpl-au/tether/event"
 	"github.com/jpl-au/fluent/html5/div"
 	"github.com/jpl-au/fluent/html5/span"
 	"github.com/jpl-au/fluent/node"
@@ -318,15 +318,15 @@ func TestPageGETPanicRecovery(t *testing.T) {
 func TestPageServesClientJS(t *testing.T) {
 	handler := newTestPageHandler()
 
-	req := httptest.NewRequest("GET", "/_tether/fluent-tether.js", nil)
+	req := httptest.NewRequest("GET", "/_tether/tether.js", nil)
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
 		t.Errorf("status = %d, want %d", w.Code, http.StatusOK)
 	}
-	if !strings.Contains(w.Body.String(), "fluent-tether") {
-		t.Error("expected fluent-tether.js content")
+	if !strings.Contains(w.Body.String(), "tether") {
+		t.Error("expected tether.js content")
 	}
 }
 

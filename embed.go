@@ -16,12 +16,12 @@ import (
 // clientFS embeds the client-side JS runtime and the idiomorph library.
 // These files are served at the /_tether/ path by the Handler.
 //
-//go:embed client/fluent-tether.js client/idiomorph.min.js client/fluent-tether-worker.js client/fluent-tether-push-worker.js client/fluent-tether-upload.js
+//go:embed client/tether.js client/idiomorph.min.js client/tether-worker.js client/tether-push-worker.js client/tether-upload.js
 var clientFS embed.FS
 
 // clientFiles returns an fs.FS rooted at the client/ directory so that
 // file paths served by http.FileServer match the expected URL paths
-// (e.g. /fluent-tether.js rather than /client/fluent-tether.js).
+// (e.g. /tether.js rather than /client/tether.js).
 func clientFiles() fs.FS {
 	sub, err := fs.Sub(clientFS, "client")
 	if err != nil {
@@ -80,7 +80,7 @@ func buildWorkerJS(assets []*Asset) []byte {
 	}
 	version := hex.EncodeToString(h.Sum(nil))[:12]
 
-	raw, err := fs.ReadFile(clientFiles(), "fluent-tether-worker.js")
+	raw, err := fs.ReadFile(clientFiles(), "tether-worker.js")
 	if err != nil {
 		panic("tether: failed to read embedded worker script: " + err.Error())
 	}
@@ -102,7 +102,7 @@ func buildWorkerJS(assets []*Asset) []byte {
 }
 
 // ServeClient returns an http.Handler that serves the embedded client
-// JS runtime (fluent-tether.js, idiomorph, service worker). Mount it at
+// JS runtime (tether.js, idiomorph, service worker). Mount it at
 // /_tether/ when the tether handler is not at the root path:
 //
 //	mux.Handle("/_tether/", http.StripPrefix("/_tether/", tether.ServeClient()))
@@ -115,7 +115,7 @@ func ServeClient() http.Handler {
 
 // newClientHandler builds an http.Handler that serves the embedded
 // client runtime. The Handler mounts this at /_tether/ so the HTML page
-// can load fluent-tether.js and idiomorph. The service worker script
+// can load tether.js and idiomorph. The service worker script
 // gets special treatment: its CACHE_VERSION is set to a content hash
 // of the embedded files, and a Service-Worker-Allowed header permits
 // the client to register the worker at any scope (the client scopes
@@ -132,7 +132,7 @@ func newClientHandler(assets []*Asset) http.Handler {
 		// The service worker needs the content-hash cache version
 		// injected and the scope header set, so it is served directly
 		// rather than through the static file server.
-		if r.URL.Path == "/fluent-tether-worker.js" || r.URL.Path == "fluent-tether-worker.js" {
+		if r.URL.Path == "/tether-worker.js" || r.URL.Path == "tether-worker.js" {
 			// Defence-in-depth: reject cross-origin requests for the
 			// worker script. The browser already prevents cross-origin
 			// registration, but this guards against misconfigured proxies.
@@ -155,7 +155,7 @@ func newClientHandler(assets []*Asset) http.Handler {
 		// The push-only worker also needs the scope header so it can
 		// be registered at the handler's endpoint (e.g. /app/) rather
 		// than being restricted to /_tether/.
-		if r.URL.Path == "/fluent-tether-push-worker.js" || r.URL.Path == "fluent-tether-push-worker.js" {
+		if r.URL.Path == "/tether-push-worker.js" || r.URL.Path == "tether-push-worker.js" {
 			if origin := r.Header.Get("Origin"); origin != "" {
 				if u, err := url.Parse(origin); err != nil || stripPort(u.Host) != stripPort(r.Host) {
 					http.Error(w, "Forbidden", http.StatusForbidden)
@@ -163,7 +163,7 @@ func newClientHandler(assets []*Asset) http.Handler {
 				}
 			}
 			pushWorkerOnce.Do(func() {
-				raw, err := fs.ReadFile(clientFiles(), "fluent-tether-push-worker.js")
+				raw, err := fs.ReadFile(clientFiles(), "tether-push-worker.js")
 				if err != nil {
 					panic("tether: failed to read embedded push worker script: " + err.Error())
 				}

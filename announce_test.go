@@ -5,7 +5,7 @@ import (
 	"testing"
 	"testing/synctest"
 
-	"github.com/jpl-au/fluent-tether/wire"
+	"github.com/jpl-au/tether/wire"
 )
 
 func TestSessionAnnounceSendsUpdate(t *testing.T) {

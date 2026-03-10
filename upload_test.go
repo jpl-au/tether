@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jpl-au/fluent-tether/mode"
+	"github.com/jpl-au/tether/mode"
 )
 
 func TestHandleUploadNotConfigured(t *testing.T) {
@@ -246,8 +246,8 @@ func TestExtensionScriptIncluded(t *testing.T) {
 	body.RenderBuilder(&buf)
 	html := buf.String()
 
-	if !strings.Contains(html, "fluent-tether-upload.js") {
-		t.Error("expected fluent-tether-upload.js script tag when data-tether-upload is present")
+	if !strings.Contains(html, "tether-upload.js") {
+		t.Error("expected tether-upload.js script tag when data-tether-upload is present")
 	}
 }
 
@@ -261,8 +261,8 @@ func TestExtensionScriptOmitted(t *testing.T) {
 	body.RenderBuilder(&buf)
 	html := buf.String()
 
-	if strings.Contains(html, "fluent-tether-upload.js") {
-		t.Error("fluent-tether-upload.js should not appear when no upload elements exist")
+	if strings.Contains(html, "tether-upload.js") {
+		t.Error("tether-upload.js should not appear when no upload elements exist")
 	}
 }
 

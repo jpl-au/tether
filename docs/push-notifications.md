@@ -3,7 +3,7 @@
 Reach users even when their tab is closed:
 
 ```go
-import "github.com/jpl-au/fluent-tether/push"
+import "github.com/jpl-au/tether/push"
 
 // Generate VAPID keys once during setup (store them securely).
 pub, priv, err := push.GenerateVAPIDKeys()

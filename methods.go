@@ -5,8 +5,8 @@ import (
 	"maps"
 	"time"
 
-	"github.com/jpl-au/fluent-tether/dev"
-	"github.com/jpl-au/fluent-tether/push"
+	"github.com/jpl-au/tether/dev"
+	"github.com/jpl-au/tether/push"
 )
 
 // State returns the current session state. When called from inside

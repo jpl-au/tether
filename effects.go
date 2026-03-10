@@ -1,6 +1,6 @@
 package tether
 
-import "github.com/jpl-au/fluent-tether/wire"
+import "github.com/jpl-au/tether/wire"
 
 // effects accumulates side effects during an exec cycle. Session
 // methods (Toast, Navigate, Signal, etc.) populate these fields when

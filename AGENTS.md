@@ -1,4 +1,4 @@
-# fluent-tether — Agent Guide
+# tether — Agent Guide
 
 ## What this is
 
@@ -14,9 +14,9 @@ Three libraries work together:
 |---------|------|
 | [fluent](https://github.com/jpl-au/fluent) | HTML node trees — composable, renderable, no side effects |
 | [fluent-jit](https://github.com/jpl-au/fluent-jit) | Diff engine — compares two trees, produces patches or morphs |
-| **fluent-tether** | Session management, transport, wire protocol, command loop |
+| **tether** | Session management, transport, wire protocol, command loop |
 
-fluent builds the tree. fluent-jit diffs it. fluent-tether orchestrates the
+fluent builds the tree. fluent-jit diffs it. tether orchestrates the
 lifecycle.
 
 ## Package structure
@@ -24,7 +24,7 @@ lifecycle.
 ```
 tether/              Root package — Config, Handler, Session, Bus, Group, Value, Observe, On
 ├── bind/            Event binding and signal binding via Apply + composable Options (OnClick, BindText, Confirm, etc.)
-├── client/          Embedded JS runtime (fluent-tether.js, idiomorph, service worker, upload, push worker)
+├── client/          Embedded JS runtime (tether.js, idiomorph, service worker, upload, push worker)
 ├── dev/             Debug logging — dev.Enable() activates, dev.Debug() is a no-op when disabled
 ├── docs/            Markdown guides (architecture, API, events, signals, broadcasting, etc.)
 ├── event/           Event type constants (click, input, submit, navigate, etc.)

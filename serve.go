@@ -7,7 +7,7 @@ import (
 	"time"
 
 	jit "github.com/jpl-au/fluent-jit"
-	"github.com/jpl-au/fluent-tether/dev"
+	"github.com/jpl-au/tether/dev"
 )
 
 // serveInitialPage handles the initial GET request. It pre-warms the

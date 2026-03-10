@@ -1,4 +1,4 @@
-module github.com/jpl-au/fluent-tether
+module github.com/jpl-au/tether
 
 go 1.25.0
 

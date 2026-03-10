@@ -11,9 +11,9 @@
 import (
     "net/http"
 
-    "github.com/jpl-au/fluent-tether"
-    "github.com/jpl-au/fluent-tether/bind"
-    "github.com/jpl-au/fluent-tether/ws"
+    "github.com/jpl-au/tether"
+    "github.com/jpl-au/tether/bind"
+    "github.com/jpl-au/tether/ws"
     "github.com/jpl-au/fluent/html5/button"
     "github.com/jpl-au/fluent/html5/div"
     "github.com/jpl-au/fluent/html5/span"
@@ -55,7 +55,7 @@ sess.Announce("Item added to cart")
 
 ## How updates reach the browser
 
-fluent-tether uses a unified update protocol. Every message sent to the client is a single `"update"` type containing either **patches** (targeted content updates) or **morphs** (structural DOM changes). The default wire format is JSON (`wire.JSON`):
+tether uses a unified update protocol. Every message sent to the client is a single `"update"` type containing either **patches** (targeted content updates) or **morphs** (structural DOM changes). The default wire format is JSON (`wire.JSON`):
 
 ```json
 {"type":"update","patches":[{"key":"count","html":"<span>43</span>"}]}

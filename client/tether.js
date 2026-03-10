@@ -1,4 +1,4 @@
-// fluent-tether.js — client runtime for Fluent Tether reactive UI.
+// tether.js — client runtime for Fluent Tether reactive UI.
 //
 // This script is injected automatically by the tether handler. It connects
 // to the server via WebSocket, applies patches to the DOM using idiomorph,
@@ -60,7 +60,7 @@ window.Tether.signals = window.Tether.signals || {};
     if (typeof window.Tether.onError === "function") {
       window.Tether.onError({ type: type, message: message });
     } else if (!silent) {
-      console.warn("fluent-tether: " + message);
+      console.warn("tether: " + message);
     }
   }
 
@@ -119,7 +119,7 @@ window.Tether.signals = window.Tether.signals || {};
       // notification handling, and background sync for SSE resilience.
       // Pass sync retention so the worker discards stale events
       // consistently with the main thread.
-      var workerURL = "/_tether/fluent-tether-worker.js?syncRetention=" + syncRetention;
+      var workerURL = "/_tether/tether-worker.js?syncRetention=" + syncRetention;
       navigator.serviceWorker.register(workerURL, { scope: endpoint || "/" })
         .catch(function (err) {
           reportError("worker", "service worker registration failed: " + err);
@@ -127,7 +127,7 @@ window.Tether.signals = window.Tether.signals || {};
     } else if (root.hasAttribute("data-tether-push-key") && "serviceWorker" in navigator) {
       // Push-only service worker: receives push events and shows
       // notifications without intercepting fetch requests or caching.
-      navigator.serviceWorker.register("/_tether/fluent-tether-push-worker.js", { scope: endpoint || "/" })
+      navigator.serviceWorker.register("/_tether/tether-push-worker.js", { scope: endpoint || "/" })
         .catch(function (err) {
           reportError("worker", "push worker registration failed: " + err);
         });
@@ -968,7 +968,7 @@ window.Tether.signals = window.Tether.signals || {};
     if (!el) return;
 
     if (devMode) {
-      console.log("fluent-tether: patch", patch.key);
+      console.log("tether: patch", patch.key);
       flashElement(el);
     }
 
@@ -985,7 +985,7 @@ window.Tether.signals = window.Tether.signals || {};
 
   function applyMorph(morph) {
     if (devMode) {
-      console.log("fluent-tether: morph", morph.key || "root");
+      console.log("tether: morph", morph.key || "root");
     }
 
     if (!morph.key) {
@@ -1378,7 +1378,7 @@ window.Tether.signals = window.Tether.signals || {};
 
   function sendEvent(type, action, data) {
     if (devMode) {
-      console.log("fluent-tether: event", {type: type, action: action, data: data});
+      console.log("tether: event", {type: type, action: action, data: data});
     }
     var id = String(++eventCounter);
     var payload = JSON.stringify({type: type, action: action, data: data, event_id: id});
@@ -1424,13 +1424,13 @@ window.Tether.signals = window.Tether.signals || {};
 
     if (!ws || ws.readyState !== WebSocket.OPEN) {
       if (devMode) {
-        console.warn("fluent-tether: ws not open", "readyState", ws ? ws.readyState : "null", "connectionMode", connectionMode);
+        console.warn("tether: ws not open", "readyState", ws ? ws.readyState : "null", "connectionMode", connectionMode);
       }
       return null;
     }
     ws.send(payload);
     if (devMode) {
-      console.log("fluent-tether: ws.send", action);
+      console.log("tether: ws.send", action);
     }
     return id;
   }
@@ -1562,7 +1562,7 @@ window.Tether.signals = window.Tether.signals || {};
 
   // --- Extension API ---
   //
-  // Expose a minimal surface for extension scripts (fluent-tether-*.js).
+  // Expose a minimal surface for extension scripts (tether-*.js).
   // Extensions load after this file and use these to communicate with
   // the server and update client-side state.
 

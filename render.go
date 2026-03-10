@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/jpl-au/fluent-tether/dev"
-	"github.com/jpl-au/fluent-tether/mode"
+	"github.com/jpl-au/tether/dev"
+	"github.com/jpl-au/tether/mode"
 	"github.com/jpl-au/fluent/node"
 )
 
@@ -17,13 +17,13 @@ import (
 // When the rendered HTML contains the marker, the script is included.
 type extension struct {
 	marker []byte // e.g. []byte("data-tether-upload")
-	script string // e.g. "fluent-tether-upload.js"
+	script string // e.g. "tether-upload.js"
 }
 
 // extensions is the registry of optional JS files. Add entries here
 // when new extension scripts are created in client/.
 var extensions = []extension{
-	{marker: []byte("data-tether-upload"), script: "fluent-tether-upload.js"},
+	{marker: []byte("data-tether-upload"), script: "tether-upload.js"},
 }
 
 // tetherBody implements node.Node for the tether root div and client
@@ -130,7 +130,7 @@ func (p *tetherBody) RenderBuilder(buf *bytes.Buffer) {
 	v := clientVersion()
 	buf.WriteString("</div>\n<script src=\"/_tether/idiomorph.min.js?v=")
 	buf.WriteString(v)
-	buf.WriteString("\"></script>\n<script src=\"/_tether/fluent-tether.js?v=")
+	buf.WriteString("\"></script>\n<script src=\"/_tether/tether.js?v=")
 	buf.WriteString(v)
 	buf.WriteString("\"></script>\n")
 

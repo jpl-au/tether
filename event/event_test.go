@@ -3,7 +3,7 @@ package event_test
 import (
 	"testing"
 
-	"github.com/jpl-au/fluent-tether/event"
+	"github.com/jpl-au/tether/event"
 )
 
 func TestConstants(t *testing.T) {

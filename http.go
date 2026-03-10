@@ -9,9 +9,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/jpl-au/fluent-tether/dev"
-	"github.com/jpl-au/fluent-tether/mode"
-	"github.com/jpl-au/fluent-tether/push"
+	"github.com/jpl-au/tether/dev"
+	"github.com/jpl-au/tether/mode"
+	"github.com/jpl-au/tether/push"
 )
 
 // ServeHTTP implements http.Handler. A single endpoint serves the

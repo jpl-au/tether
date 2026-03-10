@@ -1,4 +1,4 @@
-// Package router provides multi-page routing for fluent-tether. It
+// Package router provides multi-page routing for tether. It
 // dispatches render and handle calls to the active page based on a
 // field in the session state, enabling single-binary applications
 // with multiple views.
@@ -25,7 +25,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	tether "github.com/jpl-au/fluent-tether"
+	tether "github.com/jpl-au/tether"
 	"github.com/jpl-au/fluent/node"
 )
 

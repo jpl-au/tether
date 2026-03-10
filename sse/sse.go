@@ -1,4 +1,4 @@
-// Package sse provides an SSE transport for fluent-tether. Use it when
+// Package sse provides an SSE transport for tether. Use it when
 // the deployment environment does not support WebSocket (e.g. certain
 // PaaS providers, corporate proxies, or HTTP/2-only setups).
 //
@@ -20,7 +20,7 @@ import (
 	"sync"
 	"time"
 
-	tether "github.com/jpl-au/fluent-tether"
+	tether "github.com/jpl-au/tether"
 )
 
 // heartbeatMsg is the SSE comment written by the heartbeat ticker.

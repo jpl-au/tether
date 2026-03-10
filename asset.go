@@ -10,7 +10,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/jpl-au/fluent-tether/dev"
+	"github.com/jpl-au/tether/dev"
 	"github.com/jpl-au/fluent/html5/attr/rel"
 	"github.com/jpl-au/fluent/html5/link"
 	"github.com/jpl-au/fluent/html5/script"

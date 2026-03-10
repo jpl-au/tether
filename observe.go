@@ -1,6 +1,6 @@
 package tether
 
-import "github.com/jpl-au/fluent-tether/dev"
+import "github.com/jpl-au/tether/dev"
 
 // Observe subscribes a session to a shared [Value]. The callback
 // receives the shared value and the session's current state, and

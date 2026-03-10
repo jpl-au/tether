@@ -9,8 +9,8 @@ import (
 	"sync"
 	"testing"
 
-	tether "github.com/jpl-au/fluent-tether"
-	"github.com/jpl-au/fluent-tether/event"
+	tether "github.com/jpl-au/tether"
+	"github.com/jpl-au/tether/event"
 	"github.com/lxzan/gws"
 )
 

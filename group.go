@@ -6,7 +6,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/jpl-au/fluent-tether/dev"
+	"github.com/jpl-au/tether/dev"
 )
 
 // Group tracks a set of sessions for broadcasting state updates.

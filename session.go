@@ -6,10 +6,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/jpl-au/fluent-tether/wire"
+	"github.com/jpl-au/tether/wire"
 
 	jit "github.com/jpl-au/fluent-jit"
-	"github.com/jpl-au/fluent-tether/push"
+	"github.com/jpl-au/tether/push"
 	"github.com/jpl-au/fluent/node"
 )
 

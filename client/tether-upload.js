@@ -1,4 +1,4 @@
-// fluent-tether-upload.js — file upload extension for Fluent Tether.
+// tether-upload.js — file upload extension for Fluent Tether.
 //
 // Loaded automatically when any element uses data-tether-upload. Handles
 // file selection, multipart POST to the server, and progress tracking

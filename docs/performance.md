@@ -12,7 +12,7 @@ In practice the difference is ~250ns per element — negligible unless you're re
 
 ## Profile-Guided Optimisation (PGO)
 
-Applications using fluent-tether benefit from [Profile-Guided Optimisation](https://go.dev/doc/pgo) (Go 1.21+). Expect **10-20% speed improvements** with no code changes.
+Applications using tether benefit from [Profile-Guided Optimisation](https://go.dev/doc/pgo) (Go 1.21+). Expect **10-20% speed improvements** with no code changes.
 
 1. Collect a CPU profile under realistic load:
    ```bash

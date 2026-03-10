@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	tether "github.com/jpl-au/fluent-tether"
-	"github.com/jpl-au/fluent-tether/tethertest"
+	tether "github.com/jpl-au/tether"
+	"github.com/jpl-au/tether/tethertest"
 	"github.com/jpl-au/fluent/html5/div"
 	"github.com/jpl-au/fluent/html5/span"
 	"github.com/jpl-au/fluent/node"

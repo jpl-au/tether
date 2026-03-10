@@ -3,7 +3,7 @@ package tether
 import (
 	"strconv"
 
-	"github.com/jpl-au/fluent-tether/event"
+	"github.com/jpl-au/tether/event"
 )
 
 // Event is the message the client sends to the server when the user

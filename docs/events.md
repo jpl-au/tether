@@ -2,7 +2,7 @@
 
 ## Event types
 
-Event type constants live in the `event` package. Import `github.com/jpl-au/fluent-tether/event`.
+Event type constants live in the `event` package. Import `github.com/jpl-au/tether/event`.
 
 | Constant | Wire value | Trigger |
 |----------|-----------|---------|

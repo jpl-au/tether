@@ -26,9 +26,9 @@ import (
 	"net/url"
 	"strings"
 
-	tether "github.com/jpl-au/fluent-tether"
-	"github.com/jpl-au/fluent-tether/event"
-	"github.com/jpl-au/fluent-tether/push"
+	tether "github.com/jpl-au/tether"
+	"github.com/jpl-au/tether/event"
+	"github.com/jpl-au/tether/push"
 	"github.com/jpl-au/fluent/node"
 )
 

@@ -1,4 +1,4 @@
-// Package ws provides a WebSocket transport for fluent-tether. WebSocket
+// Package ws provides a WebSocket transport for tether. WebSocket
 // gives full-duplex communication over a single TCP connection, so both
 // server updates and client events travel on the same channel with
 // minimal overhead. This is the default and preferred transport.
@@ -15,7 +15,7 @@ import (
 	"strings"
 	"sync"
 
-	tether "github.com/jpl-au/fluent-tether"
+	tether "github.com/jpl-au/tether"
 	"github.com/lxzan/gws"
 )
 
