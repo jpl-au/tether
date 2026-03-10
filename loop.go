@@ -1,6 +1,7 @@
 package tether
 
 import (
+	"context"
 	"errors"
 	"io"
 	"log/slog"
@@ -248,7 +249,7 @@ func (s *LiveSession[S]) onTransportClose() {
 	// bytes. TTL matches the reconnect window — if the client never
 	// comes back, the store entry can expire.
 	if s.sessionStore != nil {
-		s.saveSessionState(s.reconnectTimeout)
+		s.saveSessionState(s.ctx, s.reconnectTimeout)
 	}
 
 	if s.onDisconnect != nil {
@@ -257,10 +258,12 @@ func (s *LiveSession[S]) onTransportClose() {
 }
 
 // saveSessionState encodes the session's state and metadata into an
-// envelope and persists it to the SessionStore. Failures are logged
-// and emitted as diagnostics but are non-fatal — the session
-// continues with in-memory state.
-func (s *LiveSession[S]) saveSessionState(ttl time.Duration) {
+// envelope and persists it to the SessionStore. The caller provides
+// the context — onTransportClose passes s.ctx (still valid during
+// disconnect), Shutdown passes context.Background() (s.ctx is
+// cancelled after the loop exits). Failures are logged and emitted
+// as diagnostics but are non-fatal.
+func (s *LiveSession[S]) saveSessionState(ctx context.Context, ttl time.Duration) {
 	stateBytes, err := s.codec.Marshal(s.state)
 	if err != nil {
 		dev.Warn("session state marshal failed", "session", s.id, "error", err)
@@ -292,7 +295,7 @@ func (s *LiveSession[S]) saveSessionState(ttl time.Duration) {
 		return
 	}
 
-	if err := s.sessionStore.Save(s.ctx, s.id, data, ttl); err != nil {
+	if err := s.sessionStore.Save(ctx, s.id, data, ttl); err != nil {
 		dev.Warn("session store save failed", "session", s.id, "error", err)
 		s.emitDiagnostic(Diagnostic{
 			Kind:      SessionStoreError,
