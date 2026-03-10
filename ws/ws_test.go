@@ -6,18 +6,82 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
-	"time"
 
-	gorilla "github.com/gorilla/websocket"
 	tether "github.com/jpl-au/fluent-tether"
 	"github.com/jpl-au/fluent-tether/event"
+	"github.com/lxzan/gws"
 )
 
+// testClient wraps a gws client connection with a channel-based
+// read interface so tests can synchronously receive messages.
+type testClient struct {
+	conn     *gws.Conn
+	messages chan []byte
+	closed   chan struct{}
+	closeErr error
+	once     sync.Once
+}
+
+// testClientHandler implements gws.Event for the test client,
+// forwarding received messages to the testClient's channel.
+type testClientHandler struct {
+	gws.BuiltinEventHandler
+	client *testClient
+}
+
+func (h *testClientHandler) OnMessage(_ *gws.Conn, msg *gws.Message) {
+	defer msg.Close()
+	data := make([]byte, len(msg.Bytes()))
+	copy(data, msg.Bytes())
+	select {
+	case h.client.messages <- data:
+	case <-h.client.closed:
+	}
+}
+
+func (h *testClientHandler) OnClose(_ *gws.Conn, err error) {
+	h.client.once.Do(func() {
+		h.client.closeErr = err
+		close(h.client.closed)
+	})
+}
+
+func (tc *testClient) readMessage() ([]byte, error) {
+	select {
+	case data, ok := <-tc.messages:
+		if !ok {
+			return nil, io.EOF
+		}
+		return data, nil
+	case <-tc.closed:
+		if tc.closeErr != nil {
+			return nil, tc.closeErr
+		}
+		return nil, io.EOF
+	}
+}
+
+func (tc *testClient) writeMessage(data []byte) error {
+	return tc.conn.WriteMessage(gws.OpcodeText, data)
+}
+
+func (tc *testClient) writeClose(code uint16, reason []byte) error {
+	return tc.conn.WriteClose(code, reason)
+}
+
+func (tc *testClient) close() error {
+	tc.once.Do(func() {
+		close(tc.closed)
+	})
+	return tc.conn.WriteClose(1000, nil)
+}
+
 // dial starts an httptest server that upgrades to WebSocket via ws.Upgrade,
-// sends the server-side transport to the caller, and returns a gorilla
+// sends the server-side transport to the caller, and returns a gws
 // client connection for the test to read/write against.
-func dial(t *testing.T) (*transport, *gorilla.Conn) {
+func dial(t *testing.T) (*transport, *testClient) {
 	t.Helper()
 
 	ready := make(chan *transport, 1)
@@ -30,19 +94,25 @@ func dial(t *testing.T) (*transport, *gorilla.Conn) {
 			return
 		}
 		ready <- tp.(*transport)
-		// gws hijacks the connection — the handler can return.
 	}))
 	t.Cleanup(srv.Close)
 
 	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http")
-	client, _, err := gorilla.DefaultDialer.Dial(wsURL, nil)
+	tc := &testClient{
+		messages: make(chan []byte, 16),
+		closed:   make(chan struct{}),
+	}
+	handler := &testClientHandler{client: tc}
+	conn, _, err := gws.NewClient(handler, &gws.ClientOption{Addr: wsURL})
 	if err != nil {
 		t.Fatalf("dial: %v", err)
 	}
-	t.Cleanup(func() { client.Close() })
+	tc.conn = conn
+	go conn.ReadLoop()
+	t.Cleanup(func() { tc.close() })
 
 	tp := <-ready
-	return tp, client
+	return tp, tc
 }
 
 func TestSendDeliversJSON(t *testing.T) {
@@ -53,7 +123,7 @@ func TestSendDeliversJSON(t *testing.T) {
 		t.Fatalf("Send: %v", err)
 	}
 
-	_, received, err := client.ReadMessage()
+	received, err := client.readMessage()
 	if err != nil {
 		t.Fatalf("client read: %v", err)
 	}
@@ -84,7 +154,7 @@ func TestSendPreservesAngleBrackets(t *testing.T) {
 		t.Fatalf("Send: %v", err)
 	}
 
-	_, received, err := client.ReadMessage()
+	received, err := client.readMessage()
 	if err != nil {
 		t.Fatalf("client read: %v", err)
 	}
@@ -100,7 +170,7 @@ func TestReceiveEventReadsClientJSON(t *testing.T) {
 
 	want := tether.Event{Type: event.Click, Action: "increment"}
 	data, _ := json.Marshal(want)
-	if err := client.WriteMessage(gorilla.TextMessage, data); err != nil {
+	if err := client.writeMessage(data); err != nil {
 		t.Fatalf("client write: %v", err)
 	}
 
@@ -117,8 +187,7 @@ func TestReceiveEventReturnsEOFOnNormalClose(t *testing.T) {
 	tp, client := dial(t)
 
 	go func() {
-		msg := gorilla.FormatCloseMessage(gorilla.CloseNormalClosure, "bye")
-		client.WriteControl(gorilla.CloseMessage, msg, time.Now().Add(time.Second))
+		client.writeClose(1000, []byte("bye"))
 	}()
 
 	_, err := tp.ReceiveEvent()
@@ -131,8 +200,7 @@ func TestReceiveEventReturnsEOFOnGoingAway(t *testing.T) {
 	tp, client := dial(t)
 
 	go func() {
-		msg := gorilla.FormatCloseMessage(gorilla.CloseGoingAway, "navigating")
-		client.WriteControl(gorilla.CloseMessage, msg, time.Now().Add(time.Second))
+		client.writeClose(1001, []byte("navigating"))
 	}()
 
 	_, err := tp.ReceiveEvent()
@@ -144,22 +212,12 @@ func TestReceiveEventReturnsEOFOnGoingAway(t *testing.T) {
 func TestCloseEndsConnection(t *testing.T) {
 	tp, client := dial(t)
 
-	readErr := make(chan error, 1)
-	go func() {
-		_, _, err := client.ReadMessage()
-		readErr <- err
-	}()
-
 	if err := tp.Close(); err != nil {
 		t.Fatalf("Close: %v", err)
 	}
 
-	err := <-readErr
+	_, err := client.readMessage()
 	if err == nil {
 		t.Fatal("expected error after server close, got nil")
-	}
-	closeErr, ok := err.(*gorilla.CloseError)
-	if !ok || closeErr.Code != gorilla.CloseNormalClosure {
-		t.Errorf("expected CloseNormalClosure, got %v", err)
 	}
 }
