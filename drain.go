@@ -54,6 +54,21 @@ func (h *Handler[S]) Shutdown(ctx context.Context) error {
 	clear(h.disconnected)
 	h.mu.Unlock()
 
+	// Persist session state before stopping — the context is still
+	// valid so store writes can complete. The TTL uses the shutdown
+	// grace period as a recovery window for the restarting server.
+	if h.cfg.SessionStore != nil {
+		ttl := h.cfg.Timeouts.ShutdownGrace
+		if ttl == 0 {
+			ttl = defaultShutdownGrace
+		}
+		for _, sess := range sessions {
+			if sess.sessionStore != nil {
+				sess.saveSessionState(ttl)
+			}
+		}
+	}
+
 	// Cancel all sessions and close their transports.
 	for _, sess := range sessions {
 		sess.stop()

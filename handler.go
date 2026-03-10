@@ -322,13 +322,24 @@ func (h *Handler[S]) destroySession(s *LiveSession[S]) {
 		s.stop()
 	}
 
-	// Remove stored snapshots for sessions that were offloaded to
-	// the store during disconnect. No-op if nothing was stored.
+	// Remove stored data for sessions that were offloaded during
+	// disconnect. No-op if nothing was stored.
 	if h.cfg.DiffStore != nil {
 		if err := h.cfg.DiffStore.Delete(context.Background(), s.id); err != nil {
 			dev.Warn("store delete failed on destroy", "session", s.id, "error", err)
 			h.Diagnostics.Publish(Diagnostic{
 				Kind:      StoreError,
+				SessionID: s.id,
+				Err:       err,
+				Detail:    "delete",
+			})
+		}
+	}
+	if h.cfg.SessionStore != nil {
+		if err := h.cfg.SessionStore.Delete(context.Background(), s.id); err != nil {
+			dev.Warn("session store delete failed on destroy", "session", s.id, "error", err)
+			h.Diagnostics.Publish(Diagnostic{
+				Kind:      SessionStoreError,
 				SessionID: s.id,
 				Err:       err,
 				Detail:    "delete",

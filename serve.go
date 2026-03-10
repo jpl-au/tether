@@ -144,12 +144,24 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		h.active[id] = sess
 		h.mu.Unlock()
 
-		// Clean up stored snapshots — Render rebuilds them.
+		// Clean up stored data — Render rebuilds differ snapshots,
+		// and state S is already current in memory.
 		if h.cfg.DiffStore != nil {
 			if err := h.cfg.DiffStore.Delete(sess.ctx, id); err != nil {
 				dev.Warn("store delete failed on reconnect", "session", id, "error", err)
 				h.Diagnostics.Publish(Diagnostic{
 					Kind:      StoreError,
+					SessionID: id,
+					Err:       err,
+					Detail:    "delete",
+				})
+			}
+		}
+		if h.cfg.SessionStore != nil {
+			if err := h.cfg.SessionStore.Delete(sess.ctx, id); err != nil {
+				dev.Warn("session store delete failed on reconnect", "session", id, "error", err)
+				h.Diagnostics.Publish(Diagnostic{
+					Kind:      SessionStoreError,
 					SessionID: id,
 					Err:       err,
 					Detail:    "delete",
@@ -163,6 +175,18 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		return
 	}
 	h.mu.Unlock()
+
+	// Try to restore from the session store (crash recovery / node
+	// migration). The client has an ID that isn't in any in-memory
+	// pool, but the store may have persisted state from a previous
+	// server instance.
+	if h.cfg.SessionStore != nil {
+		if restored, ok := h.restoreSession(id, r, transport); ok {
+			started = true
+			_ = restored // session is running; block on loopDone below
+			return
+		}
+	}
 
 	// Try to claim a pending (pre-warmed) session.
 	var state S
@@ -243,6 +267,8 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		reconnectTimeout: h.cfg.Timeouts.Reconnect,
 		diagnostics:      h.Diagnostics,
 		store:            h.cfg.DiffStore,
+		sessionStore:     h.cfg.SessionStore,
+		codec:            h.sessionCodec(),
 	}
 	sess.lastActivity.Store(now.UnixNano())
 	if len(h.cfg.Components) > 0 {
@@ -325,4 +351,182 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 	// here, net/http would cancel the context and kill the connection
 	// immediately.
 	<-sess.loopDone
+}
+
+// sessionCodec returns the codec for serialising state S. Uses the
+// developer's custom codec if configured, otherwise falls back to
+// the default CBOR implementation.
+func (h *Handler[S]) sessionCodec() SessionCodec[S] {
+	if h.cfg.Codec != nil {
+		return h.cfg.Codec
+	}
+	return cborCodec[S]{}
+}
+
+// restoreSession attempts to recover a session from the SessionStore.
+// Returns the restored session and true on success, or nil and false
+// if the store has no data for this ID or restoration fails. The
+// caller should treat a false return as "no session to restore" and
+// continue with normal session creation.
+func (h *Handler[S]) restoreSession(id string, r *http.Request, transport Transport) (*LiveSession[S], bool) {
+	data, err := h.cfg.SessionStore.Load(r.Context(), id)
+	if err != nil {
+		dev.Warn("session store load failed", "session", id, "error", err)
+		h.Diagnostics.Publish(Diagnostic{
+			Kind:      SessionStoreError,
+			SessionID: id,
+			Err:       err,
+			Detail:    "load",
+		})
+		return nil, false
+	}
+	if data == nil {
+		return nil, false
+	}
+
+	env, err := unmarshalEnvelope(data)
+	if err != nil {
+		dev.Warn("session envelope unmarshal failed", "session", id, "error", err)
+		h.Diagnostics.Publish(Diagnostic{
+			Kind:      SessionStoreError,
+			SessionID: id,
+			Err:       err,
+			Detail:    "envelope",
+		})
+		return nil, false
+	}
+
+	// Verify the reconnecting client matches the original session.
+	if !h.cfg.Security.DisableSessionBinding && r.UserAgent() != env.UserAgent {
+		h.Diagnostics.Publish(Diagnostic{
+			Kind:      SessionBindingFailed,
+			SessionID: id,
+			Detail:    "user-agent mismatch on restore",
+		})
+		return nil, false
+	}
+
+	codec := h.sessionCodec()
+	state, err := codec.Unmarshal(env.State)
+	if err != nil {
+		dev.Warn("session state unmarshal failed", "session", id, "error", err)
+		h.Diagnostics.Publish(Diagnostic{
+			Kind:      SessionStoreError,
+			SessionID: id,
+			Err:       err,
+			Detail:    "unmarshal",
+		})
+		return nil, false
+	}
+
+	// Build a fresh session with the restored state.
+	differ := jit.NewDiffer()
+	tree := h.cfg.Render(state)
+	differ.Render(tree)
+
+	now := time.Now()
+	ctx, cancel := context.WithCancel(context.Background())
+	sess := &LiveSession[S]{
+		id:               id,
+		state:            state,
+		render:           h.cfg.Render,
+		handle:           h.cfg.Handle,
+		differ:           differ,
+		encoder:          h.encoder,
+		transport:        transport,
+		events:           make(chan Event),
+		cmds:             make(chan func(), h.cfg.Limits.CmdBufferSize),
+		fxCh:             make(chan func(*effects), h.cfg.Limits.CmdBufferSize),
+		overflowSem:      make(chan struct{}, h.cfg.Limits.CmdBufferSize),
+		loopDone:         make(chan struct{}),
+		ctx:              ctx,
+		stop:             cancel,
+		createdAt:        now,
+		endpoint:         env.Endpoint,
+		userAgent:        env.UserAgent,
+		idleTimeout:      h.cfg.Timeouts.Idle,
+		reconnectTimeout: h.cfg.Timeouts.Reconnect,
+		diagnostics:      h.Diagnostics,
+		store:            h.cfg.DiffStore,
+		sessionStore:     h.cfg.SessionStore,
+		codec:            codec,
+	}
+	sess.lastURL = env.URL
+	sess.lastTitle = env.Title
+	sess.lastActivity.Store(now.UnixNano())
+	if len(h.cfg.Components) > 0 {
+		sess.mounts = h.cfg.Components
+	}
+
+	if h.cfg.Push != nil && h.cfg.Push.Sender != nil {
+		sess.pushSender = h.cfg.Push.Sender
+	}
+	if h.cfg.Equal != nil {
+		sess.equal = h.cfg.Equal
+	}
+	if h.cfg.OnStructuralChange != nil {
+		sess.onStructuralChange = h.cfg.OnStructuralChange
+	}
+	if h.cfg.OnNoPatch != nil {
+		sess.onNoPatch = h.cfg.OnNoPatch
+	}
+	if h.cfg.Timeouts.MaxLifetime > 0 {
+		time.AfterFunc(h.cfg.Timeouts.MaxLifetime, func() {
+			sess.stop()
+		})
+	}
+	sess.startTimers()
+
+	h.mu.Lock()
+	h.active[id] = sess
+	h.mu.Unlock()
+
+	h.wireDisconnect(sess)
+
+	go sess.run()
+
+	// Mount components before events arrive.
+	if len(h.cfg.Components) > 0 {
+		sess.Update(func(s S) S {
+			return InitMounts(h.cfg.Components, sess, s)
+		})
+	}
+
+	for _, w := range h.cfg.Watchers {
+		w.subscribe(sess)
+	}
+
+	// Fire OnRestore if set, otherwise fall back to OnConnect.
+	if h.cfg.OnRestore != nil {
+		dev.Debug("calling OnRestore", "session", sess.id, "endpoint", sess.endpoint)
+		h.cfg.OnRestore(sess)
+	} else if h.cfg.OnConnect != nil {
+		dev.Debug("calling OnConnect (restore fallback)", "session", sess.id, "endpoint", sess.endpoint)
+		h.cfg.OnConnect(sess)
+	}
+
+	for _, g := range h.cfg.Groups {
+		g.Add(sess)
+	}
+
+	if hb, ok := transport.(heartbeater); ok && !h.cfg.Timeouts.DisableHeartbeat {
+		hb.StartHeartbeat(h.cfg.Timeouts.Heartbeat)
+	}
+
+	// Clean up the store entry now that the session is in memory.
+	if err := h.cfg.SessionStore.Delete(ctx, id); err != nil {
+		dev.Warn("session store delete failed after restore", "session", id, "error", err)
+		h.Diagnostics.Publish(Diagnostic{
+			Kind:      SessionStoreError,
+			SessionID: id,
+			Err:       err,
+			Detail:    "delete",
+		})
+	}
+
+	go sess.readTransport(sess.events)
+	dev.Debug("session restored", "session", sess.id, "endpoint", sess.endpoint)
+
+	<-sess.loopDone
+	return sess, true
 }

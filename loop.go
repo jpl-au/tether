@@ -195,12 +195,12 @@ func (s *LiveSession[S]) exec(ev Event) {
 	s.sendDiff(ev.EventID, patches, change, tree, fx)
 }
 
-// onTransportClose handles transport disconnection. The transport is
-// closed and nilled so send() silently drops updates during the
-// reconnect window. A disconnect timer is started (if reconnection is
-// enabled), differ snapshots are persisted to the DiffStore (if configured),
-// and the onDisconnect callback fires for pool transitions. The store
-// save runs before the pool transition so the data is persisted before
+// onTransportClose runs when the client's transport connection drops.
+// It nils the transport so send() silently discards updates during
+// the reconnect window, then persists session data to any configured
+// stores — DiffStore for differ snapshots (memory optimisation) and
+// SessionStore for application state (crash recovery). Persistence
+// happens before the pool transition so data is safely stored before
 // the session becomes visible as reconnectable.
 func (s *LiveSession[S]) onTransportClose() {
 	dev.Debug("transport closed",
@@ -243,8 +243,63 @@ func (s *LiveSession[S]) onTransportClose() {
 		}
 	}
 
+	// Save session state for crash recovery. The codec serialises S,
+	// the envelope wraps it with metadata, and the store persists the
+	// bytes. TTL matches the reconnect window — if the client never
+	// comes back, the store entry can expire.
+	if s.sessionStore != nil {
+		s.saveSessionState(s.reconnectTimeout)
+	}
+
 	if s.onDisconnect != nil {
 		s.onDisconnect()
+	}
+}
+
+// saveSessionState encodes the session's state and metadata into an
+// envelope and persists it to the SessionStore. Failures are logged
+// and emitted as diagnostics but are non-fatal — the session
+// continues with in-memory state.
+func (s *LiveSession[S]) saveSessionState(ttl time.Duration) {
+	stateBytes, err := s.codec.Marshal(s.state)
+	if err != nil {
+		dev.Warn("session state marshal failed", "session", s.id, "error", err)
+		s.emitDiagnostic(Diagnostic{
+			Kind:      SessionStoreError,
+			SessionID: s.id,
+			Err:       err,
+			Detail:    "marshal",
+		})
+		return
+	}
+
+	env := sessionEnvelope{
+		State:     stateBytes,
+		Endpoint:  s.endpoint,
+		URL:       s.lastURL,
+		Title:     s.lastTitle,
+		UserAgent: s.userAgent,
+	}
+	data, err := marshalEnvelope(env)
+	if err != nil {
+		dev.Warn("session envelope marshal failed", "session", s.id, "error", err)
+		s.emitDiagnostic(Diagnostic{
+			Kind:      SessionStoreError,
+			SessionID: s.id,
+			Err:       err,
+			Detail:    "envelope",
+		})
+		return
+	}
+
+	if err := s.sessionStore.Save(s.ctx, s.id, data, ttl); err != nil {
+		dev.Warn("session store save failed", "session", s.id, "error", err)
+		s.emitDiagnostic(Diagnostic{
+			Kind:      SessionStoreError,
+			SessionID: s.id,
+			Err:       err,
+			Detail:    "save",
+		})
 	}
 }
 
