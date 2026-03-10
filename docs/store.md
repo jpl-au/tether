@@ -1,5 +1,9 @@
 # DiffStore
 
+> For session state persistence (crash recovery, node migration), see
+> [SessionStore](session-store.md). DiffStore and SessionStore are
+> independent concerns — different data, different lifecycles.
+
 ## What it does
 
 Disconnected sessions keep their differ snapshots in process memory while

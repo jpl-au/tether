@@ -151,6 +151,22 @@ Nil by default (opt-in via `Config.DiffStore`). No first-party implementations
 are provided — developers supply their own, backed by whatever storage suits
 their deployment (SQLite, Redis, filesystem, etc.).
 
+### SessionStore
+
+`SessionStore` persists the developer's application state `S` plus session
+metadata for crash recovery and node migration. The framework saves on
+disconnect and graceful shutdown, loads on crash recovery (reconnecting client
+hits a server with no in-memory session), and deletes after successful restore
+or on destroy.
+
+The codec (`SessionCodec[S]`) serialises `S` — CBOR by default, custom codec
+via `Config.Codec`. The framework wraps the codec output in an envelope with
+session metadata (endpoint, URL, title, user-agent) before passing to the
+store.
+
+`OnRestore` fires instead of `OnConnect` for restored sessions. Falls back to
+`OnConnect` when nil. Nil by default (opt-in via `Config.SessionStore`).
+
 ### Component
 
 `Component` is a self-contained rendering unit — `Render() node.Node` builds
@@ -247,10 +263,13 @@ Pending  →  Active  ⇄  Disconnected  →  Destroyed
   `Timeouts.Reconnect` (default 30s). Commands, broadcasts, and timers
   continue. When a DiffStore is configured, differ snapshots are saved to
   external storage and cleared from memory during the reconnect window.
-  On reconnect: transport swapped, store entry deleted (Render re-seeds the
-  differ), full re-render sent, URL and title replayed.
+  When a SessionStore is configured, state `S` and metadata are saved for
+  crash recovery. On same-node reconnect: transport swapped, store entries
+  deleted (Render re-seeds the differ), full re-render sent, URL and title
+  replayed. On crash recovery: session restored from SessionStore, OnRestore
+  fires (or OnConnect as fallback), full update sent.
 - **Destroyed**: context cancelled, loop exits, timers stopped. DiffStore
-  entry deleted if present.
+  and SessionStore entries deleted if present.
 
 ## Event pipeline
 
@@ -365,6 +384,9 @@ Subscriptions are cleaned up automatically when the session is destroyed.
 | `watcher.go` | Watcher interface, WatchValue, WatchBus — declarative Config subscriptions |
 | `transport.go` | Transport interface |
 | `diff_store.go` | DiffStore interface for external snapshot persistence |
+| `session_store.go` | SessionStore interface for session state persistence |
+| `session_codec.go` | SessionCodec[S] interface + default CBOR implementation |
+| `session_envelope.go` | Envelope struct — wraps encoded S with session metadata |
 | `page.go` | PageConfig, stateless page handler |
 | `effects.go` | Effects struct — buffers Toast, Signal, Navigate, etc. |
 | `render.go` | Render helpers, tetherBody (root div with data attributes) |

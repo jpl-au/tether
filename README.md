@@ -90,14 +90,20 @@ tether.New(tether.Config[State]{
 // GET /static/styles.css?v=a1b2c3d4e5f6 → served automatically with immutable cache headers
 ```
 
-## Diff store
+## Persistence
 
-Disconnected sessions keep their differ snapshots in process memory while
-waiting to reconnect. For deployments where this matters, set `Config.DiffStore`
-to offload that data to external storage (Redis, SQLite, filesystem — you
-provide the implementation). The framework saves on disconnect, deletes on
-reconnect, and falls back to in-memory if the store is unavailable. See
-[operations](docs/operations.md#scaling) for details.
+Two independent, opt-in stores handle different concerns:
+
+**Session store** — persists application state `S` for crash recovery and node
+migration. Set `Config.SessionStore` to enable. On disconnect and graceful
+shutdown, the framework serialises `S` (CBOR by default) and saves it. When a
+reconnecting client hits a server with no in-memory session, the framework
+restores from the store. See [session-store](docs/session-store.md) for details.
+
+**Diff store** — offloads differ snapshots to external storage during the
+reconnect window, freeing Go memory. Set `Config.DiffStore` to enable. This is
+a memory optimisation, not a recovery mechanism. See [store](docs/store.md) for
+details.
 
 ## Diagnostics
 
@@ -120,6 +126,7 @@ for details and examples.
 | [Client-side](docs/client-side.md) | Directives, transitions, JS hooks |
 | [Broadcasting](docs/broadcasting.md) | Groups, broadcast, presence |
 | [Extensions](docs/extensions.md) | File uploads, service worker, push notifications |
+| [SessionStore](docs/session-store.md) | Session state persistence for crash recovery and node migration |
 | [DiffStore](docs/store.md) | External snapshot persistence for disconnected sessions |
 | [Transport](docs/transport.md) | WebSocket, SSE, resilience |
 | [Push notifications](docs/push-notifications.md) | Web Push with VAPID |

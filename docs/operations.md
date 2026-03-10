@@ -173,6 +173,7 @@ h.Diagnostics.SubscribeAsync(ctx, func(d tether.Diagnostic) {
 | `UploadError` | Failure in an upload handler callback |
 | `SessionBindingFailed` | A reconnect or session claim was rejected because the User-Agent did not match the original |
 | `StoreError` | Failure saving or deleting differ snapshots from the configured DiffStore. The Detail field indicates the operation ("save" or "delete"). Store failures are non-fatal — the framework falls back to in-memory behaviour |
+| `SessionStoreError` | Failure saving, loading, or deleting session state from the configured SessionStore. The Detail field indicates the operation ("save", "load", "delete", "marshal", "unmarshal", or "envelope"). Non-fatal — the framework continues with in-memory state |
 
 `BufferOverflow` means the system coped (spawned a goroutine). `CommandDropped`
 means data was lost — the session is critically overwhelmed. Sustained overflow
@@ -229,7 +230,9 @@ Each active session consumes:
 Disconnected sessions waiting for reconnect retain all of the above except
 the transport reader goroutine. When a DiffStore is configured, differ snapshot
 data is offloaded to external storage during disconnect, reducing memory
-usage for disconnected sessions.
+usage for disconnected sessions. When a SessionStore is configured, application
+state is also persisted for crash recovery — see
+[session-store](session-store.md).
 
 ### Vertical scaling
 
