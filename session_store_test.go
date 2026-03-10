@@ -275,3 +275,69 @@ func TestSessionStoreDisconnectTTLMatchesReconnect(t *testing.T) {
 		synctest.Wait()
 	})
 }
+
+// TestSessionStoreShutdownPersists verifies that Shutdown saves
+// session state after the command loop exits (no data race) and
+// uses ShutdownGrace as the TTL.
+func TestSessionStoreShutdownPersists(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		store := newSessionFileStore(t)
+		ct := newConnectedTransport()
+		sess := newTestSession(counterState{Count: 7}, ct)
+		sess.sessionStore = store
+		sess.codec = cborCodec[counterState]{}
+
+		go sess.readTransport(sess.events)
+		go sess.run()
+		synctest.Wait()
+
+		grace := 15 * time.Second
+		h := &Handler[counterState]{
+			cfg: Config[counterState]{
+				SessionStore: store,
+				Timeouts:     Timeouts{ShutdownGrace: grace},
+			},
+			pending:      make(map[string]*pendingSession[counterState]),
+			active:       map[string]*LiveSession[counterState]{sess.id: sess},
+			disconnected: make(map[string]*LiveSession[counterState]),
+			done:         make(chan struct{}),
+		}
+		h.Diagnostics = NewBus[Diagnostic]()
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		if err := h.Shutdown(ctx); err != nil {
+			t.Fatalf("Shutdown: %v", err)
+		}
+		synctest.Wait()
+
+		// Verify the store holds the session data.
+		data, err := store.Load(context.Background(), sess.id)
+		if err != nil {
+			t.Fatalf("Load: %v", err)
+		}
+		if data == nil {
+			t.Fatal("expected session data after shutdown, got nil")
+		}
+
+		// Verify the persisted state matches.
+		env, err := unmarshalEnvelope(data)
+		if err != nil {
+			t.Fatalf("unmarshalEnvelope: %v", err)
+		}
+		codec := cborCodec[counterState]{}
+		state, err := codec.Unmarshal(env.State)
+		if err != nil {
+			t.Fatalf("Unmarshal state: %v", err)
+		}
+		if state.Count != 7 {
+			t.Errorf("restored Count = %d, want 7", state.Count)
+		}
+
+		// Verify TTL matches ShutdownGrace.
+		if store.lastTTL != grace {
+			t.Errorf("TTL = %v, want %v", store.lastTTL, grace)
+		}
+	})
+}
