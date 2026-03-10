@@ -163,6 +163,16 @@ type LiveSession[S any] struct {
 	// during the reconnect window.
 	store DiffStore
 
+	// sessionStore is the external state store from
+	// Config.SessionStore. When non-nil, session state S and
+	// metadata are saved here on disconnect and graceful shutdown,
+	// enabling crash recovery and node migration.
+	sessionStore SessionStore
+
+	// codec serialises state S for the session store. Set from
+	// Config.Codec, or defaults to CBOR if nil.
+	codec SessionCodec[S]
+
 	// diagnostics is the handler's diagnostic bus. The session emits
 	// transport errors, encode failures, panics, and buffer overflows.
 	diagnostics *Bus[Diagnostic]

@@ -249,6 +249,34 @@ type Config[S any] struct {
 	// nil (default), snapshots remain in process memory.
 	DiffStore DiffStore
 
+	// SessionStore provides external persistence for session state
+	// S, enabling crash recovery and node migration. When set, the
+	// framework saves state on disconnect and graceful shutdown, and
+	// restores it when a reconnecting client reaches a server with
+	// no in-memory session. When nil (default), sessions live
+	// entirely in memory. See [SessionStore] for the interface
+	// contract.
+	SessionStore SessionStore
+
+	// Codec controls how session state S is serialised for external
+	// storage. When nil, the framework uses CBOR encoding (RFC 8949)
+	// which handles any struct with exported fields. Implement
+	// [SessionCodec] when you need encryption, a specific wire
+	// format, or custom handling of complex types. Only used when
+	// SessionStore is set.
+	Codec SessionCodec[S]
+
+	// OnRestore is called when a session is restored from external
+	// storage (crash recovery or node migration). The session's
+	// state S has been deserialised and is available via State().
+	// Use this to re-establish runtime resources: rejoin groups,
+	// restart timers, re-subscribe to buses.
+	//
+	// OnRestore fires instead of OnConnect for restored sessions.
+	// If nil, OnConnect fires as a fallback — suitable for apps
+	// where setup is identical for new and restored sessions.
+	OnRestore func(session *LiveSession[S])
+
 	// Security groups origin-checking and CSRF protection settings.
 	Security Security
 }

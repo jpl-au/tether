@@ -49,6 +49,13 @@ const (
 	// Store failures are non-fatal — the framework falls back to
 	// in-memory behaviour.
 	StoreError DiagnosticKind = "store_error"
+
+	// SessionStoreError signals a failure saving, loading, or
+	// deleting session state from the configured [SessionStore].
+	// The Detail field indicates the operation. Session store
+	// failures are non-fatal — the framework continues with
+	// in-memory state.
+	SessionStoreError DiagnosticKind = "session_store_error"
 )
 
 // Diagnostic carries a framework-level event from the session lifecycle,
