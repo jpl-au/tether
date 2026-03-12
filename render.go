@@ -8,9 +8,9 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/jpl-au/fluent/node"
 	"github.com/jpl-au/tether/dev"
 	"github.com/jpl-au/tether/mode"
-	"github.com/jpl-au/fluent/node"
 )
 
 // extension maps a data attribute marker to the JS file that handles it.

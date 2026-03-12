@@ -6,12 +6,12 @@ import (
 	"testing/synctest"
 
 	jit "github.com/jpl-au/fluent-jit"
-	"github.com/jpl-au/tether/event"
-	"github.com/jpl-au/tether/push"
-	"github.com/jpl-au/tether/wire"
 	"github.com/jpl-au/fluent/html5/div"
 	"github.com/jpl-au/fluent/html5/span"
 	"github.com/jpl-au/fluent/node"
+	"github.com/jpl-au/tether/event"
+	"github.com/jpl-au/tether/push"
+	"github.com/jpl-au/tether/wire"
 )
 
 type mountState struct {

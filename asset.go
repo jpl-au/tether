@@ -10,11 +10,11 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/jpl-au/tether/dev"
 	"github.com/jpl-au/fluent/html5/attr/rel"
 	"github.com/jpl-au/fluent/html5/link"
 	"github.com/jpl-au/fluent/html5/script"
 	"github.com/jpl-au/fluent/node"
+	"github.com/jpl-au/tether/dev"
 )
 
 // Asset manages an embedded asset filesystem with content-hashed URLs.

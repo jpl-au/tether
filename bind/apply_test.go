@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jpl-au/tether/bind"
 	"github.com/jpl-au/fluent/html5/button"
 	"github.com/jpl-au/fluent/html5/div"
 	"github.com/jpl-au/fluent/html5/input"
+	"github.com/jpl-au/tether/bind"
 )
 
 func TestApplyMultipleOptions(t *testing.T) {

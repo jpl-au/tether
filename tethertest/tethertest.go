@@ -26,10 +26,10 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/jpl-au/fluent/node"
 	tether "github.com/jpl-au/tether"
 	"github.com/jpl-au/tether/event"
 	"github.com/jpl-au/tether/push"
-	"github.com/jpl-au/fluent/node"
 )
 
 // HandleFunc is the handler signature for tethertest. It is identical

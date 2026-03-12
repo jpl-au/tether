@@ -9,11 +9,11 @@ import (
 	"os"
 	"strings"
 
+	"github.com/jpl-au/fluent/node"
 	"github.com/jpl-au/tether/dev"
 	"github.com/jpl-au/tether/event"
 	"github.com/jpl-au/tether/mode"
 	"github.com/jpl-au/tether/wire"
-	"github.com/jpl-au/fluent/node"
 )
 
 // PageConfig wires together a stateless page: how to reconstruct state

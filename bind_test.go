@@ -5,12 +5,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jpl-au/tether/bind"
 	"github.com/jpl-au/fluent/html5/a"
 	"github.com/jpl-au/fluent/html5/button"
 	"github.com/jpl-au/fluent/html5/dropdown"
 	"github.com/jpl-au/fluent/html5/form"
 	"github.com/jpl-au/fluent/html5/input"
+	"github.com/jpl-au/tether/bind"
 )
 
 func TestClickRendersDataAttribute(t *testing.T) {

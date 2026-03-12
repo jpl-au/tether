@@ -8,9 +8,9 @@ import (
 	"time"
 
 	jit "github.com/jpl-au/fluent-jit"
+	"github.com/jpl-au/fluent/node"
 	"github.com/jpl-au/tether/dev"
 	"github.com/jpl-au/tether/wire"
-	"github.com/jpl-au/fluent/node"
 )
 
 // run is the session's command loop. It processes transport events,

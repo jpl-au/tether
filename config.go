@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/jpl-au/fluent/node"
 	"github.com/jpl-au/tether/mode"
 	"github.com/jpl-au/tether/push"
 	"github.com/jpl-au/tether/wire"
-	"github.com/jpl-au/fluent/node"
 )
 
 // Config wires together all the pieces of a tether page: how to create

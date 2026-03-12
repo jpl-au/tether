@@ -7,11 +7,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jpl-au/tether/dev"
-	"github.com/jpl-au/tether/event"
 	"github.com/jpl-au/fluent/html5/div"
 	"github.com/jpl-au/fluent/html5/span"
 	"github.com/jpl-au/fluent/node"
+	"github.com/jpl-au/tether/dev"
+	"github.com/jpl-au/tether/event"
 )
 
 // pageHandleCounter is a stateless handle function for testing.

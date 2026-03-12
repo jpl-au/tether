@@ -9,8 +9,8 @@ import (
 	"github.com/jpl-au/tether/wire"
 
 	jit "github.com/jpl-au/fluent-jit"
-	"github.com/jpl-au/tether/push"
 	"github.com/jpl-au/fluent/node"
+	"github.com/jpl-au/tether/push"
 )
 
 // StructuralChange describes a diff result where the render tree's

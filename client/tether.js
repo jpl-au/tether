@@ -939,7 +939,16 @@ window.Tether.signals = window.Tether.signals || {};
         if (!entries[i].isIntersecting) continue;
         var el = entries[i].target;
         var action = el.getAttribute("data-tether-viewport");
-        if (action) sendEvent("viewport", action, {});
+        if (action) {
+          var data = {};
+          for (var j = 0; j < el.attributes.length; j++) {
+            var attr = el.attributes[j];
+            if (attr.name.indexOf(eventDataPrefix) === 0) {
+              data[attr.name.substring(eventDataPrefix.length)] = attr.value;
+            }
+          }
+          sendEvent("viewport", action, data);
+        }
         viewportObserver.unobserve(el);
       }
     }, {

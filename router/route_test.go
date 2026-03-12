@@ -4,10 +4,10 @@ import (
 	"sync"
 	"testing"
 
-	tether "github.com/jpl-au/tether"
 	"github.com/jpl-au/fluent/html5/div"
 	"github.com/jpl-au/fluent/html5/span"
 	"github.com/jpl-au/fluent/node"
+	tether "github.com/jpl-au/tether"
 )
 
 func TestRouteOverwritesExistingPage(t *testing.T) {

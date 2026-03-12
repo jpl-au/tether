@@ -25,8 +25,8 @@ import (
 	"sync"
 	"sync/atomic"
 
-	tether "github.com/jpl-au/tether"
 	"github.com/jpl-au/fluent/node"
+	tether "github.com/jpl-au/tether"
 )
 
 // Page defines the render and handle logic for a single route.
