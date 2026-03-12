@@ -1,4 +1,4 @@
-// tether.js — client runtime for Fluent Tether reactive UI.
+// tether.js — client runtime for Tether reactive UI.
 //
 // This script is injected automatically by the tether handler. It connects
 // to the server via WebSocket, applies patches to the DOM using idiomorph,
@@ -53,6 +53,7 @@ window.Tether.signals = window.Tether.signals || {};
   var flashDuration = 5000;
   var toastDuration = 5000;
   var pendingCount = 0;
+  var eventDataPrefix = "data-tether-data-";
 
   // Report an error or warning to the Tether.onError callback if set.
   // Falls back to console.warn for non-silent errors.
@@ -1282,8 +1283,8 @@ window.Tether.signals = window.Tether.signals || {};
       // Collect custom data attributes (data-tether-data-*)
       for (var j = 0; j < target.attributes.length; j++) {
         var attr = target.attributes[j];
-        if (attr.name.indexOf("data-tether-data-") === 0) {
-          var key = attr.name.substring(15);
+        if (attr.name.indexOf(eventDataPrefix) === 0) {
+          var key = attr.name.substring(eventDataPrefix.length);
           data[key] = attr.value;
         }
       }

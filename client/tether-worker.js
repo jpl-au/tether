@@ -1,4 +1,4 @@
-// tether-worker.js — service worker for Fluent Tether.
+// tether-worker.js — service worker for Tether.
 //
 // Provides asset caching for faster loads, offline page shells for
 // graceful disconnects, push notification handling, and background
