@@ -48,6 +48,11 @@ type PageConfig[S any] struct {
 	// response so the client can apply them atomically.
 	Handle func(session Session, state S, event Event) S
 
+	// Middleware wraps the Handle function with cross-cutting behaviour
+	// such as logging, authentication, or metrics. Applied
+	// outermost-first, matching [Config].Middleware. Optional.
+	Middleware []Middleware[S]
+
 	// OnNavigate processes URL parameters on every request. Called
 	// after State on both GET and POST. Same signature as
 	// [Config].OnNavigate. Optional.
@@ -135,9 +140,16 @@ func Page[S any](cfg PageConfig[S]) http.Handler {
 		dev.Enable()
 	}
 
+	if len(cfg.Middleware) > 0 {
+		cfg.Handle = chain(cfg.Handle, cfg.Middleware)
+	}
+
 	pageArgs := []any{"transport", "http"}
 	if cfg.Name != "" {
 		pageArgs = append(pageArgs, "name", cfg.Name)
+	}
+	if len(cfg.Middleware) > 0 {
+		pageArgs = append(pageArgs, "middleware", middlewareNames(cfg.Middleware))
 	}
 	if cfg.DevMode {
 		pageArgs = append(pageArgs, "dev", true)

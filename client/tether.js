@@ -884,6 +884,7 @@ window.Tether.signals = window.Tether.signals || {};
       if (oldNode.nodeType !== 1) return;
       callHook(oldNode, "updated");
       reapplySignals(oldNode);
+      observeViewportElements(oldNode);
     },
 
     beforeNodeRemoved: function (oldNode) {
