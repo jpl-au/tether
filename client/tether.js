@@ -577,6 +577,11 @@ window.Tether.signals = window.Tether.signals || {};
           history.replaceState({}, "", msg.url);
         } else {
           history.pushState({}, "", msg.url);
+          // Server-driven navigation: pushState changes the URL but
+          // does not trigger popstate, so the server never learns about
+          // the new URL. Send a navigate event so OnNavigate can update
+          // state and re-render for the target page.
+          sendNavigate(msg.url);
         }
       }
       if (msg.title) {
