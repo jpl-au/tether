@@ -1,6 +1,7 @@
 package tether
 
 import (
+	"fmt"
 	"mime"
 	"mime/multipart"
 	"net/http"
@@ -108,6 +109,12 @@ func (h *Handler[S]) handleUpload(w http.ResponseWriter, r *http.Request) {
 		for _, fh := range headers {
 			ct := fh.Header.Get("Content-Type")
 			if !mimeAllowed(ct, h.cfg.Upload.Accept) {
+				h.Diagnostics.Publish(Diagnostic{
+					Kind:      UploadRejected,
+					SessionID: id,
+					Err:       fmt.Errorf("content type %q not in %v", ct, h.cfg.Upload.Accept),
+					Detail:    fh.Filename,
+				})
 				r.MultipartForm.RemoveAll()
 				http.Error(w, "file type not allowed", http.StatusUnsupportedMediaType)
 				return

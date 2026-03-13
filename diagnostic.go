@@ -29,6 +29,11 @@ const (
 	// UploadError signals a failure in an upload handler callback.
 	UploadError DiagnosticKind = "upload_error"
 
+	// UploadRejected signals that an upload was rejected because its
+	// MIME type did not match the UploadConfig.Accept list. The Detail
+	// field contains the rejected content type.
+	UploadRejected DiagnosticKind = "upload_rejected"
+
 	// CommandDropped signals that a command was discarded because
 	// both the session's command buffer and its overflow goroutine
 	// cap were exhausted. This means data was lost — the command
