@@ -75,8 +75,9 @@ func Upgrade() func(http.ResponseWriter, *http.Request) (tether.Transport, error
 // the writer serialises them onto the wire.
 //
 // ReceiveEvent blocks until the transport is closed. It returns the
-// Compile-time checks: *transport must satisfy tether.Transport and
-// the heartbeater interface (StartHeartbeat).
+// Compile-time check: *transport must satisfy tether.Transport.
+// It also implements the unexported tether.heartbeater interface
+// (StartHeartbeat) but that cannot be guarded across packages.
 var _ tether.Transport = (*transport)(nil)
 
 // write error that caused the closure (if any) so the session can

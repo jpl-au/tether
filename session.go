@@ -223,6 +223,7 @@ type Session interface {
 //	cs := &CaptureSession{SessionID: "my-id"}
 //	// ... pass cs as Session ...
 //	// ... read cs.Effects.Toast, cs.Effects.URL, etc.
+//
 // Compile-time interface satisfaction checks.
 var (
 	_ Session = (*CaptureSession)(nil)
@@ -264,8 +265,8 @@ func (cs *CaptureSession) Go(fn func(context.Context)) {
 func (cs *CaptureSession) enqueue(fn func()) { fn() }
 
 // sessionID satisfies the emitter interface for Bus.Emit sender
-// filtering. During pre-warm the ID is set but enqueue is a no-op,
-// so emissions are effectively discarded.
+// filtering. Subscribers whose sessionID matches the emitter's are
+// skipped to prevent the sender from receiving its own broadcast.
 func (cs *CaptureSession) sessionID() string { return cs.SessionID }
 
 // Toast buffers a toast message into the effects struct. The message
