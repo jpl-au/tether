@@ -237,6 +237,10 @@ func New[S any](cfg Config[S]) *Handler[S] {
 
 	cfg.Logger.Info("tether: ready", handlerAttrs(cfg)...)
 
+	if cfg.DevMode && (cfg.Mode == mode.ServerSentEvents || cfg.Mode == mode.Both) {
+		dev.Debug("SSE compression is handled by the reverse proxy (nginx, Caddy, Cloudflare) — tether does not compress SSE streams")
+	}
+
 	return h
 }
 

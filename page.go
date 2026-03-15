@@ -215,7 +215,7 @@ func (p *pageHandler[S]) serveGET(w http.ResponseWriter, r *http.Request) {
 
 	state := p.cfg.State(r)
 	if p.cfg.OnNavigate != nil {
-		cs := &CaptureSession{}
+		cs := &CaptureSession{PushErr: ErrPushPreWarm}
 		params := Params{Path: r.URL.Path, Query: r.URL.Query()}
 		state = p.cfg.OnNavigate(cs, state, params)
 	}
@@ -273,7 +273,7 @@ func (p *pageHandler[S]) servePOST(w http.ResponseWriter, r *http.Request) {
 
 	state := p.cfg.State(r)
 
-	cs := &CaptureSession{}
+	cs := &CaptureSession{PushErr: ErrPushPreWarm}
 	if ev.Type == event.Navigate && p.cfg.OnNavigate != nil {
 		// Navigate events carry the target path in event data, not
 		// in the request URL (the client always POSTs to its

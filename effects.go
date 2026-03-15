@@ -21,8 +21,8 @@ type Effects struct {
 	Replace  bool // true for replaceState, false for pushState
 }
 
-// any reports whether any side effects have been buffered.
-func (fx *Effects) any() bool {
+// Any reports whether any side effects have been buffered.
+func (fx *Effects) Any() bool {
 	return fx.Announce != "" || fx.Flash != nil || fx.Signals != nil ||
 		fx.Toast != "" || fx.Title != "" || fx.URL != ""
 }

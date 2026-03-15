@@ -179,8 +179,8 @@ func TestSignalMergedIntoEffects(t *testing.T) {
 	fx := &Effects{}
 	fx.Signals = map[string]any{"count": 5}
 
-	if !fx.any() {
-		t.Error("Effects.any() should be true when signals are set")
+	if !fx.Any() {
+		t.Error("Effects.Any() should be true when signals are set")
 	}
 
 	u := &wire.Update{}

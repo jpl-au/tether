@@ -7,7 +7,7 @@ import "github.com/jpl-au/tether/wire"
 // and re-render. This avoids any locking — only the loop touches
 // session state.
 func (h *Handler[S]) reattach(sess *LiveSession[S], transport Transport) {
-	if hb, ok := transport.(heartbeater); ok && !h.cfg.Timeouts.DisableHeartbeat {
+	if hb, ok := transport.(Heartbeater); ok && !h.cfg.Timeouts.DisableHeartbeat {
 		hb.StartHeartbeat(h.cfg.Timeouts.Heartbeat)
 	}
 

@@ -31,11 +31,15 @@ type Transport interface {
 	Close() error
 }
 
-// heartbeater is an optional interface for transports that need
+// Heartbeater is an optional interface for transports that need
 // periodic keep-alive writes to prevent intermediate proxies from
 // closing idle connections. The SSE transport implements this; the
 // WebSocket transport does not need it because the WebSocket protocol
 // has its own ping/pong frames.
-type heartbeater interface {
+//
+// When the handler detects that a transport implements Heartbeater,
+// it calls StartHeartbeat with the configured interval after the
+// session is established.
+type Heartbeater interface {
 	StartHeartbeat(interval time.Duration)
 }

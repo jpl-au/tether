@@ -155,7 +155,7 @@ func (s *LiveSession[S]) exec(ev Event) {
 			"session", s.id,
 			"action", ev.Action,
 		)
-		if fx.any() || ev.EventID != "" {
+		if fx.Any() || ev.EventID != "" {
 			u := wire.Update{EventID: ev.EventID}
 			fx.merge(&u)
 			s.send(u)
@@ -355,7 +355,7 @@ func (s *LiveSession[S]) sendDiff(eventID string, patches []jit.Patch, change *j
 		return
 	}
 
-	if len(patches) > 0 || (fx != nil && fx.any()) {
+	if len(patches) > 0 || (fx != nil && fx.Any()) {
 		wp := make([]wire.Patch, len(patches))
 		for i, p := range patches {
 			wp[i] = wire.Patch{Key: p.Key, HTML: p.HTML}

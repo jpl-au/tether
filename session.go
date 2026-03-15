@@ -428,7 +428,7 @@ func (s *LiveSession[S]) drainFx(fx *Effects) {
 // sendFx sends any accumulated effects as a standalone update.
 // Used by the loop when effects arrive outside of Handle.
 func (s *LiveSession[S]) sendFx(fx *Effects) {
-	if !fx.any() {
+	if !fx.Any() {
 		return
 	}
 	var u wire.Update
