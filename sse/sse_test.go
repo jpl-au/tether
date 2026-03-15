@@ -192,7 +192,7 @@ func TestMultipleSendsOrdered(t *testing.T) {
 	defer tr.Close()
 
 	for i := range 3 {
-		data := []byte(fmt.Sprintf(`{"n":%d}`, i))
+		data := fmt.Appendf(nil, `{"n":%d}`, i)
 		if err := tr.Send(data); err != nil {
 			t.Fatalf("Send(%d): %v", i, err)
 		}

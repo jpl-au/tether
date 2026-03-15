@@ -1,11 +1,9 @@
 // Package tethertest provides a test harness for tether Handle functions.
-// It wraps [tether.Page] internally so developers can test event
-// handling without setting up channels, transports, or goroutines.
+// It invokes the handler directly — no HTTP server, no JSON serialisation,
+// no transport plumbing — so tests see the exact types the handler pushed.
 //
 //	func TestIncrement(t *testing.T) {
 //	    h := tethertest.New(tethertest.Config[State]{
-//	        State:  State{Count: 0},
-//	        Render: render,
 //	        Handle: handle,
 //	    })
 //
@@ -19,10 +17,7 @@ package tethertest
 
 import (
 	"context"
-	"encoding/json"
 	"maps"
-	"net/http"
-	"net/http/httptest"
 	"net/url"
 	"strings"
 
@@ -48,7 +43,9 @@ type Config[S any] struct {
 	// State is the initial state for each test interaction.
 	State S
 
-	// Render builds a node tree from the current state.
+	// Render builds a node tree from the current state. Optional —
+	// only required when calling [Harness.HTML], [Harness.Render],
+	// or [Harness.RenderNode].
 	Render tether.RenderFunc[S]
 
 	// Handle processes a client event and returns the new state.
@@ -77,17 +74,22 @@ type Config[S any] struct {
 	// before Handle runs — mirroring [tether.Config].Components.
 	// Optional.
 	Components []tether.ComponentMount[S]
+
+	// Layout wraps the rendered content for [Harness.Render] and
+	// [Harness.HTML], mirroring [tether.Config].Layout. Optional —
+	// when absent, only the content node is rendered.
+	Layout func(S, node.Node) node.Node
 }
 
-// Harness drives a tether page handler for testing. Create one with
-// [New], send events with [Harness.Send] or [Harness.SendEvent], and
-// inspect the result with the accessor methods.
+// Harness drives a tether handler for testing. Create one with [New],
+// send events with [Harness.Send] or [Harness.SendEvent], and inspect
+// the result with the accessor methods.
 type Harness[S any] struct {
 	state      S
 	render     tether.RenderFunc[S]
 	handle     func(tether.Session, S, tether.Event) S
 	onNavigate func(tether.Session, S, tether.Params) S
-	handler    http.Handler
+	layout     func(S, node.Node) node.Node
 
 	// Lifecycle callbacks stored from Config.
 	onConnect    func(tether.Session)
@@ -100,7 +102,7 @@ type Harness[S any] struct {
 	last response
 }
 
-// response holds the decoded result of the most recent Send call.
+// response holds the captured result of the most recent Send call.
 type response struct {
 	html     string
 	toast    string
@@ -112,24 +114,6 @@ type response struct {
 	announce string
 }
 
-// wireMessage mirrors the JSON update format from the tether wire
-// protocol. Only the fields needed for test assertions are included.
-type wireMessage struct {
-	Morphs   []wireEntry       `json:"morphs,omitempty"`
-	URL      string            `json:"url,omitempty"`
-	Replace  bool              `json:"replace,omitempty"`
-	Title    string            `json:"title,omitempty"`
-	Flash    map[string]string `json:"flash,omitempty"`
-	Signals  map[string]any    `json:"signals,omitempty"`
-	Announce string            `json:"announce,omitempty"`
-	Toast    string            `json:"toast,omitempty"`
-}
-
-type wireEntry struct {
-	Key  string `json:"key"`
-	HTML string `json:"html"`
-}
-
 // testSession implements [tether.Session] for the test harness. Every
 // side effect that a Handle function can produce (toasts, navigation,
 // title changes, signals, flash messages, announcements) is captured
@@ -138,8 +122,8 @@ type wireEntry struct {
 // so tests verify behaviour without a transport layer.
 //
 // Each call to [Harness.Send], [Harness.SendEvent], or [Harness.Navigate]
-// resets the captured state before invoking Handle, so assertions always
-// reflect the most recent event cycle.
+// creates a fresh testSession, so assertions always reflect the most
+// recent event cycle.
 type testSession struct {
 	toast    string
 	url      string
@@ -231,15 +215,14 @@ func chainMiddleware[S any](h HandleFunc[S], mw []Middleware[S]) HandleFunc[S] {
 	return h
 }
 
-// New creates a test harness. The harness uses [tether.Page] internally
-// so each Send call is a stateless HTTP round-trip — no goroutines,
-// no channels, no transport plumbing.
+// New creates a test harness. The harness invokes Handle directly —
+// no HTTP server, no JSON round-trip, no goroutines.
 func New[S any](cfg Config[S]) *Harness[S] {
 	handle := HandleFunc[S](cfg.Handle)
 	if len(cfg.Middleware) > 0 {
 		handle = chainMiddleware(handle, cfg.Middleware)
 	}
-	h := &Harness[S]{
+	return &Harness[S]{
 		state:        cfg.State,
 		render:       cfg.Render,
 		handle:       handle,
@@ -247,20 +230,8 @@ func New[S any](cfg Config[S]) *Harness[S] {
 		onConnect:    cfg.OnConnect,
 		onDisconnect: cfg.OnDisconnect,
 		mounts:       cfg.Components,
+		layout:       cfg.Layout,
 	}
-	h.rebuildHandler()
-	return h
-}
-
-// rebuildHandler constructs a fresh Page handler from the current state.
-func (h *Harness[S]) rebuildHandler() {
-	state := h.state
-	h.handler = tether.Page(tether.PageConfig[S]{
-		State:      func(r *http.Request) S { return state },
-		Render:     h.render,
-		Handle:     h.handle,
-		OnNavigate: h.onNavigate,
-	})
 }
 
 // Send fires a click event with the given action name. This is the
@@ -295,65 +266,49 @@ func (h *Harness[S]) SendSubmit(action string, data map[string]string) {
 // this call, [Harness.State], [Harness.HTML], [Harness.Toast], etc.
 // reflect the result of handling this event.
 func (h *Harness[S]) SendEvent(ev tether.Event) {
-	// Use the navigate path as the request URL so the Page handler's
-	// OnNavigate receives the correct Params.
-	target := "/"
-	if ev.Type == event.Navigate {
-		path := ev.Data["path"]
-		search := ev.Data["search"]
-		if path != "" {
-			target = path + search
-		}
-	}
-
-	// Run through the Page handler to get the wire response (HTML + effects).
-	body, err := json.Marshal(ev)
-	if err != nil {
-		panic("tethertest: failed to marshal event: " + err.Error())
-	}
-	req := httptest.NewRequest("POST", target, strings.NewReader(string(body)))
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-	h.handler.ServeHTTP(w, req)
-
-	var msg wireMessage
-	if err := json.Unmarshal(w.Body.Bytes(), &msg); err != nil {
-		panic("tethertest: failed to unmarshal response: " + err.Error())
-	}
-
-	html := ""
-	if len(msg.Morphs) > 0 {
-		html = msg.Morphs[0].HTML
-	}
+	ts := &testSession{}
+	h.state = h.dispatch(ts, ev)
 
 	h.last = response{
-		html:     html,
-		toast:    msg.Toast,
-		url:      msg.URL,
-		replace:  msg.Replace,
-		title:    msg.Title,
-		flash:    msg.Flash,
-		signals:  msg.Signals,
-		announce: msg.Announce,
+		toast:    ts.toast,
+		url:      ts.url,
+		replace:  ts.replace,
+		title:    ts.title,
+		flash:    ts.flash,
+		signals:  ts.signals,
+		announce: ts.announce,
 	}
 
-	// Re-derive state locally using a testSession that captures effects.
-	// This allows subsequent Send calls to see accumulated state changes.
-	ts := &testSession{}
+	if h.render != nil {
+		h.last.html = string(h.renderHTML(h.state))
+	}
+}
+
+// dispatch routes the event to the correct handler: navigate events go
+// to OnNavigate, component-prefixed events go to RouteMount, and
+// everything else goes to Handle.
+func (h *Harness[S]) dispatch(ts *testSession, ev tether.Event) S {
 	if ev.Type == event.Navigate && h.onNavigate != nil {
 		params := tether.Params{
 			Path:  ev.Data["path"],
 			Query: parseQuery(ev.Data["search"]),
 		}
-		h.state = h.onNavigate(ts, h.state, params)
-	} else if newState, ok := tether.RouteMount(h.mounts, ts, h.state, ev); ok {
-		h.state = newState
-	} else {
-		h.state = h.handle(ts, h.state, ev)
+		return h.onNavigate(ts, h.state, params)
 	}
+	if newState, ok := tether.RouteMount(h.mounts, ts, h.state, ev); ok {
+		return newState
+	}
+	return h.handle(ts, h.state, ev)
+}
 
-	// Rebuild the handler with the updated state.
-	h.rebuildHandler()
+// renderHTML renders the current state to HTML bytes, applying Layout
+// if configured.
+func (h *Harness[S]) renderHTML(s S) []byte {
+	content := h.render(s)
+	if h.layout != nil {
+		return h.layout(s, content).Render()
+	}
+	return content.Render()
 }
 
 // State returns the current accumulated state. Each Send call applies
@@ -363,6 +318,7 @@ func (h *Harness[S]) State() S {
 }
 
 // HTML returns the rendered HTML from the most recent Send call.
+// Returns an empty string if Render was not configured.
 func (h *Harness[S]) HTML() string {
 	return h.last.html
 }
@@ -404,24 +360,25 @@ func (h *Harness[S]) Flash() map[string]string {
 }
 
 // Signals returns the signal values from the most recent Send call.
-// Returns nil if no signals were pushed.
+// Returns nil if no signals were pushed. Values retain their original
+// Go types — no JSON round-tripping.
 func (h *Harness[S]) Signals() map[string]any {
 	return h.last.signals
 }
 
-// Render performs a GET request and returns the full rendered HTML.
-// This is useful for verifying the initial page render without
-// sending any events.
+// Render returns the rendered HTML for the current state. When Layout
+// is configured, the content is wrapped in the layout. Returns an
+// empty string if Render was not configured.
 func (h *Harness[S]) Render() string {
-	req := httptest.NewRequest("GET", "/", nil)
-	w := httptest.NewRecorder()
-	h.handler.ServeHTTP(w, req)
-	return w.Body.String()
+	if h.render == nil {
+		return ""
+	}
+	return string(h.renderHTML(h.state))
 }
 
-// RenderNode returns the node tree for the current state without
-// going through the HTTP layer. Useful for inspecting the tree
-// structure directly.
+// RenderNode returns the node tree for the current state. Useful for
+// inspecting the tree structure directly. Panics if Render was not
+// configured.
 func (h *Harness[S]) RenderNode() node.Node {
 	return h.render(h.state)
 }
@@ -442,7 +399,8 @@ func (h *Harness[S]) Navigate(path string) {
 }
 
 // HasSignal reports whether the most recent Send call pushed a signal
-// matching the given key and value.
+// matching the given key and value. Values are compared with == so
+// the expected type must match exactly (e.g. int, not float64).
 func (h *Harness[S]) HasSignal(key string, value any) bool {
 	v, ok := h.last.signals[key]
 	return ok && v == value

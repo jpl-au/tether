@@ -183,10 +183,10 @@ func TestHasSignal(t *testing.T) {
 	h := newHarness()
 	h.Send("signal")
 
-	if !h.HasSignal("count", float64(0)) {
+	if !h.HasSignal("count", 0) {
 		t.Errorf("HasSignal(count, 0) = false, want true; signals = %v", h.Signals())
 	}
-	if h.HasSignal("count", float64(99)) {
+	if h.HasSignal("count", 99) {
 		t.Error("HasSignal(count, 99) = true, want false")
 	}
 	if h.HasSignal("missing", nil) {
@@ -295,9 +295,8 @@ func TestNavigateWithPath(t *testing.T) {
 }
 
 func TestMiddleware(t *testing.T) {
-	// Encode call order into state so we verify the local re-derivation
-	// path rather than capturing closure side effects from both HTTP and
-	// local paths.
+	// Encode call order into state so we verify middleware wrapping
+	// order directly.
 	outer := func(next tethertest.HandleFunc[state]) tethertest.HandleFunc[state] {
 		return func(sess tether.Session, s state, ev tether.Event) state {
 			s.Name += "A"
