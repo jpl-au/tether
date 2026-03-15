@@ -2,6 +2,9 @@ package tether
 
 import "github.com/fxamacker/cbor/v2"
 
+// Compile-time check: cborCodec must satisfy SessionCodec.
+var _ SessionCodec[struct{}] = cborCodec[struct{}]{}
+
 // SessionCodec controls how session state S is serialised and
 // deserialised for external storage. The framework uses this to
 // convert S to bytes before wrapping it in a session envelope and

@@ -54,7 +54,7 @@ func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 			Path:  r.URL.Path,
 			Query: r.URL.Query(),
 		}
-		cs := &captureSession{id: "pre-warm", fx: &effects{}}
+		cs := &CaptureSession{SessionID: "pre-warm", PushErr: ErrPushPreWarm}
 		state = h.cfg.OnNavigate(cs, state, params)
 	}
 	tree := h.cfg.Render(state)
@@ -234,7 +234,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 				Path:  r.URL.Path,
 				Query: r.URL.Query(),
 			}
-			cs := &captureSession{id: "pre-warm", fx: &effects{}}
+			cs := &CaptureSession{SessionID: "pre-warm", PushErr: ErrPushPreWarm}
 			state = h.cfg.OnNavigate(cs, state, params)
 		}
 		differ = jit.NewDiffer()
@@ -255,7 +255,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		transport:        transport,
 		events:           make(chan Event),
 		cmds:             make(chan func(), h.cfg.Limits.CmdBufferSize),
-		fxCh:             make(chan func(*effects), h.cfg.Limits.CmdBufferSize),
+		fxCh:             make(chan func(*Effects), h.cfg.Limits.CmdBufferSize),
 		overflowSem:      make(chan struct{}, h.cfg.Limits.CmdBufferSize),
 		loopDone:         make(chan struct{}),
 		ctx:              ctx,
@@ -436,7 +436,7 @@ func (h *Handler[S]) restoreSession(id string, r *http.Request, transport Transp
 		transport:        transport,
 		events:           make(chan Event),
 		cmds:             make(chan func(), h.cfg.Limits.CmdBufferSize),
-		fxCh:             make(chan func(*effects), h.cfg.Limits.CmdBufferSize),
+		fxCh:             make(chan func(*Effects), h.cfg.Limits.CmdBufferSize),
 		overflowSem:      make(chan struct{}, h.cfg.Limits.CmdBufferSize),
 		loopDone:         make(chan struct{}),
 		ctx:              ctx,

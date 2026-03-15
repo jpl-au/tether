@@ -69,7 +69,7 @@ type LiveSession[S any] struct {
 	// goroutine. The loop drains it after Handle/Update returns so
 	// effects are sent atomically with the diff. Outside of Handle,
 	// the loop picks them up and sends them as standalone updates.
-	fxCh chan func(*effects)
+	fxCh chan func(*Effects)
 
 	// Session lifetime — cancelled on permanent destruction.
 	ctx  context.Context
@@ -209,109 +209,122 @@ type Session interface {
 	Signals(signals map[string]any)
 	Push(n push.Notification) error
 	// Close terminates the session by closing its transport. In
-	// stateless page mode (captureSession) and tethertest this is a
-	// no-op — there is no persistent connection to close.
+	// stateless page mode ([CaptureSession]) and tethertest this is
+	// a no-op — there is no persistent connection to close.
 	Close()
 }
 
-// captureSession implements [Session] for the pre-warming phase — the
-// window between the initial GET request and the WebSocket/SSE upgrade.
+// CaptureSession implements [Session] by buffering side effects into
+// an [Effects] struct instead of sending them to a client. It is used
+// during pre-warming, stateless page handling, and testing.
 //
-// During pre-warming, OnNavigate, Config.Components (via InitMounts),
-// and Layout all receive a Session. They may call Toast, SetTitle, or
-// Navigate to set up the initial page. There is no transport yet, so
-// these effects are buffered in an [effects] struct. When the real
-// [LiveSession] connects seconds later, sendDiff drains the buffered
-// effects into the first update message — the user sees the toast or
-// title change immediately on connection.
+// Create with a struct literal:
 //
-// Context returns a detached background context because the session's
-// lifecycle context does not exist until the command loop starts. Go
-// spawns a goroutine against this background context — anything
-// launched during pre-warm runs independently and must manage its own
-// cancellation.
-type captureSession struct {
-	id string
-	fx *effects
+//	cs := &CaptureSession{SessionID: "my-id"}
+//	// ... pass cs as Session ...
+//	// ... read cs.Effects.Toast, cs.Effects.URL, etc.
+// Compile-time interface satisfaction checks.
+var (
+	_ Session = (*CaptureSession)(nil)
+	_ Session = (*LiveSession[struct{}])(nil)
+	_ emitter = (*CaptureSession)(nil)
+	_ emitter = (*LiveSession[struct{}])(nil)
+)
+
+type CaptureSession struct {
+	// SessionID is returned by ID().
+	SessionID string
+	// PushErr is returned by Push(). Nil by default (appropriate for
+	// tests); set to [ErrPushPreWarm] for pre-warming contexts.
+	PushErr error
+	// Effects holds the buffered side effects from the most recent
+	// event cycle. Callers read these fields after Handle returns.
+	Effects Effects
 }
 
-// ID returns the session identifier assigned during the initial GET.
-// The same ID is carried over to the LiveSession when the transport
-// connects, so any logging or debugging during pre-warm correlates
-// with the eventual live session.
-func (c *captureSession) ID() string { return c.id }
+// ID returns the session identifier.
+func (cs *CaptureSession) ID() string { return cs.SessionID }
 
 // Context returns a detached background context. The session's real
 // lifecycle context does not exist until the command loop starts, so
 // pre-warm code cannot rely on cancellation propagation.
-func (c *captureSession) Context() context.Context { return context.Background() }
+func (cs *CaptureSession) Context() context.Context { return context.Background() }
 
 // Go spawns a goroutine against a background context. Anything
 // launched during pre-warm runs independently — there is no command
 // loop to synchronise with yet.
-func (c *captureSession) Go(fn func(context.Context)) {
+func (cs *CaptureSession) Go(fn func(context.Context)) {
 	go fn(context.Background())
 }
 
-// enqueue is a no-op during pre-warm. There is no command loop and
-// no live subscribers, so bus emissions have nothing to deliver to.
-// This prevents Bus.Emit calls in OnNavigate from panicking.
-func (c *captureSession) enqueue(fn func()) {}
+// enqueue executes fn synchronously. There is no command loop, so
+// the function runs immediately in the caller's goroutine. This
+// ensures Bus.Emit delivers events to subscribers during tests and
+// pre-warming without requiring a live command loop.
+func (cs *CaptureSession) enqueue(fn func()) { fn() }
 
 // sessionID satisfies the emitter interface for Bus.Emit sender
 // filtering. During pre-warm the ID is set but enqueue is a no-op,
 // so emissions are effectively discarded.
-func (c *captureSession) sessionID() string { return c.id }
+func (cs *CaptureSession) sessionID() string { return cs.SessionID }
 
 // Toast buffers a toast message into the effects struct. The message
 // is delivered to the client in the first update after connection.
-func (c *captureSession) Toast(text string) { c.fx.toast = text }
+func (cs *CaptureSession) Toast(text string) { cs.Effects.Toast = text }
 
 // Navigate buffers a client-side navigation. The redirect is applied
 // in the first update after connection, before the client renders.
-func (c *captureSession) Navigate(rawURL string) { c.fx.url = rawURL; c.fx.replace = false }
+func (cs *CaptureSession) Navigate(rawURL string) {
+	cs.Effects.URL = rawURL
+	cs.Effects.Replace = false
+}
 
 // ReplaceURL buffers a history replacement. Unlike Navigate, this
 // replaces the current URL without adding a history entry.
-func (c *captureSession) ReplaceURL(rawURL string) { c.fx.url = rawURL; c.fx.replace = true }
+func (cs *CaptureSession) ReplaceURL(rawURL string) {
+	cs.Effects.URL = rawURL
+	cs.Effects.Replace = true
+}
 
 // SetTitle buffers a document title change for replay after connection.
-func (c *captureSession) SetTitle(title string) { c.fx.title = title }
+func (cs *CaptureSession) SetTitle(title string) { cs.Effects.Title = title }
 
 // Announce buffers an accessibility announcement (ARIA live region)
 // for replay after connection.
-func (c *captureSession) Announce(text string) { c.fx.announce = text }
+func (cs *CaptureSession) Announce(text string) { cs.Effects.Announce = text }
 
-// Push returns ErrPushPreWarm because no browser push subscription
-// exists during pre-warming — the service worker has not registered
-// yet, so there is nowhere to deliver the notification.
-func (c *captureSession) Push(push.Notification) error {
-	return ErrPushPreWarm
+// Push returns PushErr. Nil by default; set to [ErrPushPreWarm] for
+// pre-warming contexts where no browser subscription exists yet.
+func (cs *CaptureSession) Push(push.Notification) error {
+	return cs.PushErr
 }
 
-// Close is a no-op during pre-warming. There is no transport to shut
-// down and no command loop to stop.
-func (c *captureSession) Close() {}
+// Close is a no-op. There is no transport to shut down and no
+// command loop to stop.
+func (cs *CaptureSession) Close() {}
 
-func (c *captureSession) Flash(selector, text string) {
-	if c.fx.flash == nil {
-		c.fx.flash = make(map[string]string)
+// Flash buffers a targeted flash message keyed by CSS selector.
+func (cs *CaptureSession) Flash(selector, text string) {
+	if cs.Effects.Flash == nil {
+		cs.Effects.Flash = make(map[string]string)
 	}
-	c.fx.flash[selector] = text
+	cs.Effects.Flash[selector] = text
 }
 
-func (c *captureSession) Signal(key string, value any) {
-	if c.fx.signals == nil {
-		c.fx.signals = make(map[string]any)
+// Signal buffers a single reactive value for the client.
+func (cs *CaptureSession) Signal(key string, value any) {
+	if cs.Effects.Signals == nil {
+		cs.Effects.Signals = make(map[string]any)
 	}
-	c.fx.signals[key] = value
+	cs.Effects.Signals[key] = value
 }
 
-func (c *captureSession) Signals(signals map[string]any) {
-	if c.fx.signals == nil {
-		c.fx.signals = make(map[string]any, len(signals))
+// Signals buffers multiple reactive values for the client.
+func (cs *CaptureSession) Signals(signals map[string]any) {
+	if cs.Effects.Signals == nil {
+		cs.Effects.Signals = make(map[string]any, len(signals))
 	}
-	maps.Copy(c.fx.signals, signals)
+	maps.Copy(cs.Effects.Signals, signals)
 }
 
 // ID returns the unique session identifier. This is a cryptographically
@@ -351,7 +364,7 @@ func (s *LiveSession[S]) sessionID() string {
 // normal load the send is non-blocking. When the buffer is full,
 // an overflow goroutine delivers it — same semaphore-bounded
 // pattern as [enqueue].
-func (s *LiveSession[S]) enqueueFx(fn func(*effects)) {
+func (s *LiveSession[S]) enqueueFx(fn func(*Effects)) {
 	select {
 	case s.fxCh <- fn:
 	default:
@@ -398,7 +411,7 @@ func (s *LiveSession[S]) emitDiagnostic(d Diagnostic) {
 // on the loop goroutine after Handle/Update returns, before the
 // render-diff-send pipeline. Pass nil to discard effects (e.g.
 // after a panic).
-func (s *LiveSession[S]) drainFx(fx *effects) {
+func (s *LiveSession[S]) drainFx(fx *Effects) {
 	for {
 		select {
 		case fn := <-s.fxCh:
@@ -413,7 +426,7 @@ func (s *LiveSession[S]) drainFx(fx *effects) {
 
 // sendFx sends any accumulated effects as a standalone update.
 // Used by the loop when effects arrive outside of Handle.
-func (s *LiveSession[S]) sendFx(fx *effects) {
+func (s *LiveSession[S]) sendFx(fx *Effects) {
 	if !fx.any() {
 		return
 	}

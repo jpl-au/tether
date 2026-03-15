@@ -221,3 +221,103 @@ func TestCloseEndsConnection(t *testing.T) {
 		t.Fatal("expected error after server close, got nil")
 	}
 }
+
+// dialWith creates a server/client pair where both sides use the
+// given Options and client-side PermessageDeflate configuration.
+func dialWith(t *testing.T, opts Options, clientDeflate gws.PermessageDeflate) (*transport, *testClient) {
+	t.Helper()
+
+	ready := make(chan *transport, 1)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upgradeFn := Upgrade(opts)
+		tp, err := upgradeFn(w, r)
+		if err != nil {
+			t.Errorf("upgrade failed: %v", err)
+			return
+		}
+		ready <- tp.(*transport)
+	}))
+	t.Cleanup(srv.Close)
+
+	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http")
+	tc := &testClient{
+		messages: make(chan []byte, 16),
+		closed:   make(chan struct{}),
+	}
+	handler := &testClientHandler{client: tc}
+	conn, _, err := gws.NewClient(handler, &gws.ClientOption{
+		Addr:              wsURL,
+		PermessageDeflate: clientDeflate,
+	})
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	tc.conn = conn
+	go conn.ReadLoop()
+	t.Cleanup(func() { tc.close() })
+
+	tp := <-ready
+	return tp, tc
+}
+
+func TestCompressedRoundTrip(t *testing.T) {
+	tp, client := dialWith(t, Options{}, gws.PermessageDeflate{Enabled: true})
+
+	data := []byte(`{"type":"update","patches":[{"key":"content","html":"<div class=\"container\"><p>Hello, world!</p></div>"}]}`)
+	if err := tp.Send(data); err != nil {
+		t.Fatalf("Send: %v", err)
+	}
+
+	received, err := client.readMessage()
+	if err != nil {
+		t.Fatalf("client read: %v", err)
+	}
+	if string(received) != string(data) {
+		t.Errorf("received %q, want %q", received, data)
+	}
+}
+
+func TestCompressionDisabled(t *testing.T) {
+	opts := Options{Compression: Compression{Disabled: true}}
+	tp, client := dialWith(t, opts, gws.PermessageDeflate{Enabled: true})
+
+	data := []byte(`{"type":"update","patches":[{"key":"x","html":"<span>no compression</span>"}]}`)
+	if err := tp.Send(data); err != nil {
+		t.Fatalf("Send: %v", err)
+	}
+
+	received, err := client.readMessage()
+	if err != nil {
+		t.Fatalf("client read: %v", err)
+	}
+	if string(received) != string(data) {
+		t.Errorf("received %q, want %q", received, data)
+	}
+}
+
+func TestContextTakeoverRoundTrip(t *testing.T) {
+	opts := Options{Compression: Compression{ContextTakeover: true}}
+	clientDeflate := gws.PermessageDeflate{
+		Enabled:               true,
+		ServerContextTakeover: true,
+		ClientContextTakeover: true,
+	}
+	tp, client := dialWith(t, opts, clientDeflate)
+
+	// Send several messages to exercise the sliding window across
+	// messages — context takeover means the compressor retains state.
+	for i := range 3 {
+		data := []byte(`{"type":"update","patches":[{"key":"count","html":"<span>` + strings.Repeat("x", 100) + `</span>"}]}`)
+		if err := tp.Send(data); err != nil {
+			t.Fatalf("Send[%d]: %v", i, err)
+		}
+		received, err := client.readMessage()
+		if err != nil {
+			t.Fatalf("client read[%d]: %v", i, err)
+		}
+		if string(received) != string(data) {
+			t.Errorf("message %d: received %q, want %q", i, received, data)
+		}
+	}
+}

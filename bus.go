@@ -15,10 +15,8 @@ import (
 // exists — they pass the Session they already have.
 //
 // [*LiveSession] satisfies emitter via its command-loop enqueue.
-// [captureSession] satisfies emitter with a no-op enqueue — pre-warm
-// has no subscribers so publishing is always a no-op.
-// [tethertest.testSession] does not satisfy emitter and falls through
-// to an immediate synchronous publish, which is correct for tests.
+// [*CaptureSession] satisfies emitter with synchronous enqueue —
+// the function runs immediately in the caller's goroutine.
 type emitter interface {
 	enqueue(fn func())
 	sessionID() string
@@ -69,18 +67,17 @@ func NewBus[E any]() *Bus[E] {
 //   - Live session ([*LiveSession]): the publication is enqueued on the
 //     session's command loop. This preserves ordering — the sender's
 //     diff reaches the client before other subscribers react.
-//   - Pre-warm ([captureSession]): no-op. Pre-warm is stateless
-//     rendering; no real session or subscribers exist yet.
-//   - Test ([tethertest.testSession]): immediate synchronous publish.
-//     This makes test assertions deterministic — subscribe a callback
-//     before calling h.Send(), then assert it was invoked.
+//   - Pre-warm or test ([*CaptureSession]): synchronous publish.
+//     CaptureSession executes enqueue inline, so publish runs
+//     immediately in the caller's goroutine — deterministic in tests,
+//     harmless during pre-warm (no subscribers).
 func (b *Bus[E]) Emit(s Session, event E) {
 	if em, ok := s.(emitter); ok {
 		sid := em.sessionID()
 		em.enqueue(func() { b.publish(event, sid) })
 		return
 	}
-	// testSession (and any future partial session): synchronous publish.
+	// Partial session without emitter: synchronous publish.
 	b.publish(event, s.ID())
 }
 

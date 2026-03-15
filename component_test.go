@@ -30,7 +30,7 @@ func (w testWidget) Handle(sess Session, ev Event) Component {
 
 func TestRouteMatchingPrefix(t *testing.T) {
 	w := testWidget{prefix: "counter", Count: 0}
-	sess := &captureSession{id: "test", fx: &effects{}}
+	sess := &CaptureSession{SessionID: "test"}
 	ev := Event{Action: "counter.inc"}
 
 	result := Route(w, "counter", sess, ev)
@@ -42,7 +42,7 @@ func TestRouteMatchingPrefix(t *testing.T) {
 
 func TestRouteNonMatchingPrefix(t *testing.T) {
 	w := testWidget{prefix: "counter", Count: 5}
-	sess := &captureSession{id: "test", fx: &effects{}}
+	sess := &CaptureSession{SessionID: "test"}
 	ev := Event{Action: "other.inc"}
 
 	result := Route(w, "counter", sess, ev)
@@ -54,7 +54,7 @@ func TestRouteNonMatchingPrefix(t *testing.T) {
 
 func TestRouteStripsPrefix(t *testing.T) {
 	w := testWidget{}
-	sess := &captureSession{id: "test", fx: &effects{}}
+	sess := &CaptureSession{SessionID: "test"}
 	ev := Event{Action: "chat.set", Data: map[string]string{"value": "hello"}}
 
 	result := Route(w, "chat", sess, ev)
@@ -66,7 +66,7 @@ func TestRouteStripsPrefix(t *testing.T) {
 
 func TestRouteTypedPreservesConcreteType(t *testing.T) {
 	w := testWidget{Count: 0}
-	sess := &captureSession{id: "test", fx: &effects{}}
+	sess := &CaptureSession{SessionID: "test"}
 	ev := Event{Action: "w.inc"}
 
 	// RouteTyped returns testWidget, not Component — no type assertion needed.
@@ -80,7 +80,7 @@ func TestRouteTypedPreservesConcreteType(t *testing.T) {
 
 func TestRouteTypedNonMatchingPrefix(t *testing.T) {
 	w := testWidget{Count: 7}
-	sess := &captureSession{id: "test", fx: &effects{}}
+	sess := &CaptureSession{SessionID: "test"}
 	ev := Event{Action: "other.inc"}
 
 	got := RouteTyped(w, "w", sess, ev)
@@ -91,7 +91,7 @@ func TestRouteTypedNonMatchingPrefix(t *testing.T) {
 
 func TestRouteNoPartialPrefixMatch(t *testing.T) {
 	w := testWidget{Count: 0}
-	sess := &captureSession{id: "test", fx: &effects{}}
+	sess := &CaptureSession{SessionID: "test"}
 
 	// "counter_extra.inc" should NOT match prefix "counter" —
 	// Route requires "counter." as the delimiter.
@@ -104,13 +104,13 @@ func TestRouteNoPartialPrefixMatch(t *testing.T) {
 
 func TestRouteSessionSideEffects(t *testing.T) {
 	w := toastWidget{}
-	sess := &captureSession{id: "test", fx: &effects{}}
+	sess := &CaptureSession{SessionID: "test"}
 	ev := Event{Action: "tw.fire"}
 
 	Route(w, "tw", sess, ev)
 
-	if sess.fx.toast != "fired" {
-		t.Errorf("toast = %q, want fired", sess.fx.toast)
+	if sess.Effects.Toast != "fired" {
+		t.Errorf("toast = %q, want fired", sess.Effects.Toast)
 	}
 }
 

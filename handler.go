@@ -149,7 +149,7 @@ func New[S any](cfg Config[S]) *Handler[S] {
 	}
 
 	if len(cfg.Middleware) > 0 {
-		cfg.Handle = chain(cfg.Handle, cfg.Middleware)
+		cfg.Handle = Chain(cfg.Handle, cfg.Middleware)
 	}
 
 	if !cfg.DevMode && os.Getenv("TETHER_DEV") != "" {

@@ -45,7 +45,7 @@ func (s *LiveSession[S]) run() {
 
 		case fn := <-s.fxCh:
 			// Effect arriving outside of Handle — send immediately.
-			fx := &effects{}
+			fx := &Effects{}
 			fn(fx)
 			s.sendFx(fx)
 
@@ -112,7 +112,7 @@ func (s *LiveSession[S]) exec(ev Event) {
 	// that observes handling=true also sees the snapshot.
 	s.stateSnap.Store(s.state)
 	s.handling.Store(true)
-	fx := &effects{}
+	fx := &Effects{}
 	defer func() {
 		if r := recover(); r != nil {
 			err := panicErr(r)
@@ -324,7 +324,7 @@ func (s *LiveSession[S]) cleanup() {
 // Update. It handles patches, structural changes, and the no-diff
 // case where only the eventID needs echoing. fx carries any buffered
 // effects to merge into the update message.
-func (s *LiveSession[S]) sendDiff(eventID string, patches []jit.Patch, change *jit.StructuralChange, tree node.Node, fx *effects) {
+func (s *LiveSession[S]) sendDiff(eventID string, patches []jit.Patch, change *jit.StructuralChange, tree node.Node, fx *Effects) {
 	if change != nil {
 		html := s.differ.Render(tree)
 		sc := StructuralChange{

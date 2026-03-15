@@ -5,6 +5,9 @@ import (
 	"time"
 )
 
+// Compile-time check: *Handler must satisfy Drainable.
+var _ Drainable = (*Handler[struct{}])(nil)
+
 // Drain stops accepting new sessions but lets existing ones finish
 // naturally. It blocks until all sessions have disconnected or ctx
 // is cancelled. Per-session lifecycle timers continue enforcing idle

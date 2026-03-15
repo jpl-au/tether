@@ -12,7 +12,7 @@ var (
 	// browser has not yet registered a push subscription.
 	ErrPushNoSubscription = errors.New("tether: no push subscription for session")
 
-	// ErrPushPreWarm is returned by [captureSession.Push] during
+	// ErrPushPreWarm is returned by [CaptureSession.Push] during
 	// pre-warming because no browser subscription exists yet.
 	ErrPushPreWarm = errors.New("tether: push not available during pre-warming")
 )

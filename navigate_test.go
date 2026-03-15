@@ -74,7 +74,7 @@ func TestSessionNavigateEvent(t *testing.T) {
 			transport: mt,
 			events:    make(chan Event),
 			cmds:      make(chan func(), defaultCmdBufferSize),
-			fxCh:      make(chan func(*effects), defaultCmdBufferSize),
+			fxCh:      make(chan func(*Effects), defaultCmdBufferSize),
 			loopDone:  make(chan struct{}),
 			ctx:       ctx,
 			stop:      cancel,
@@ -139,7 +139,7 @@ func TestSessionNavigateEventWithQuery(t *testing.T) {
 			transport: mt,
 			events:    make(chan Event),
 			cmds:      make(chan func(), defaultCmdBufferSize),
-			fxCh:      make(chan func(*effects), defaultCmdBufferSize),
+			fxCh:      make(chan func(*Effects), defaultCmdBufferSize),
 			loopDone:  make(chan struct{}),
 			ctx:       ctx,
 			stop:      cancel,
@@ -243,7 +243,7 @@ func TestSessionReplaceURLSendsReplace(t *testing.T) {
 }
 
 func TestCaptureSessionBuffersEffects(t *testing.T) {
-	cs := &captureSession{id: "cap-1", fx: &effects{}}
+	cs := &CaptureSession{SessionID: "cap-1"}
 
 	cs.SetTitle("Hello")
 	cs.Toast("saved")
@@ -254,20 +254,20 @@ func TestCaptureSessionBuffersEffects(t *testing.T) {
 	if cs.ID() != "cap-1" {
 		t.Errorf("ID() = %q, want %q", cs.ID(), "cap-1")
 	}
-	if cs.fx.title != "Hello" {
-		t.Errorf("title = %q, want %q", cs.fx.title, "Hello")
+	if cs.Effects.Title != "Hello" {
+		t.Errorf("title = %q, want %q", cs.Effects.Title, "Hello")
 	}
-	if cs.fx.toast != "saved" {
-		t.Errorf("toast = %q, want %q", cs.fx.toast, "saved")
+	if cs.Effects.Toast != "saved" {
+		t.Errorf("toast = %q, want %q", cs.Effects.Toast, "saved")
 	}
-	if cs.fx.url != "/next" || cs.fx.replace {
-		t.Errorf("url = %q replace = %v, want %q false", cs.fx.url, cs.fx.replace, "/next")
+	if cs.Effects.URL != "/next" || cs.Effects.Replace {
+		t.Errorf("url = %q replace = %v, want %q false", cs.Effects.URL, cs.Effects.Replace, "/next")
 	}
-	if cs.fx.flash["#msg"] != "done" {
-		t.Errorf("flash[#msg] = %q, want %q", cs.fx.flash["#msg"], "done")
+	if cs.Effects.Flash["#msg"] != "done" {
+		t.Errorf("flash[#msg] = %q, want %q", cs.Effects.Flash["#msg"], "done")
 	}
-	if cs.fx.announce != "submitted" {
-		t.Errorf("announce = %q, want %q", cs.fx.announce, "submitted")
+	if cs.Effects.Announce != "submitted" {
+		t.Errorf("announce = %q, want %q", cs.Effects.Announce, "submitted")
 	}
 }
 
@@ -283,13 +283,13 @@ func TestOnNavigateWithCaptureSession(t *testing.T) {
 		return st
 	}
 
-	cs := &captureSession{id: "pre", fx: &effects{}}
+	cs := &CaptureSession{SessionID: "pre"}
 	result := onNavigate(cs, state{}, Params{Path: "/about"})
 
 	if result.Page != "/about" {
 		t.Errorf("Page = %q, want %q", result.Page, "/about")
 	}
-	if cs.fx.title != "My App - /about" {
-		t.Errorf("captured title = %q, want %q", cs.fx.title, "My App - /about")
+	if cs.Effects.Title != "My App - /about" {
+		t.Errorf("captured title = %q, want %q", cs.Effects.Title, "My App - /about")
 	}
 }

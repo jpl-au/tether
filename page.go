@@ -141,7 +141,7 @@ func Page[S any](cfg PageConfig[S]) http.Handler {
 	}
 
 	if len(cfg.Middleware) > 0 {
-		cfg.Handle = chain(cfg.Handle, cfg.Middleware)
+		cfg.Handle = Chain(cfg.Handle, cfg.Middleware)
 	}
 
 	pageArgs := []any{"transport", "http"}
@@ -215,7 +215,7 @@ func (p *pageHandler[S]) serveGET(w http.ResponseWriter, r *http.Request) {
 
 	state := p.cfg.State(r)
 	if p.cfg.OnNavigate != nil {
-		cs := &captureSession{id: "", fx: &effects{}}
+		cs := &CaptureSession{}
 		params := Params{Path: r.URL.Path, Query: r.URL.Query()}
 		state = p.cfg.OnNavigate(cs, state, params)
 	}
@@ -273,8 +273,7 @@ func (p *pageHandler[S]) servePOST(w http.ResponseWriter, r *http.Request) {
 
 	state := p.cfg.State(r)
 
-	fx := &effects{}
-	cs := &captureSession{id: "", fx: fx}
+	cs := &CaptureSession{}
 	if ev.Type == event.Navigate && p.cfg.OnNavigate != nil {
 		// Navigate events carry the target path in event data, not
 		// in the request URL (the client always POSTs to its
@@ -311,7 +310,7 @@ func (p *pageHandler[S]) servePOST(w http.ResponseWriter, r *http.Request) {
 		Morphs:  []wire.Morph{{Key: "", HTML: html}},
 		EventID: ev.EventID,
 	}
-	fx.merge(&u)
+	cs.Effects.merge(&u)
 
 	data, err := p.encoder.Encode(u)
 	if err != nil {

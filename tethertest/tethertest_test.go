@@ -297,7 +297,7 @@ func TestNavigateWithPath(t *testing.T) {
 func TestMiddleware(t *testing.T) {
 	// Encode call order into state so we verify middleware wrapping
 	// order directly.
-	outer := func(next tethertest.HandleFunc[state]) tethertest.HandleFunc[state] {
+	outer := func(next tether.HandleFunc[state]) tether.HandleFunc[state] {
 		return func(sess tether.Session, s state, ev tether.Event) state {
 			s.Name += "A"
 			s = next(sess, s, ev)
@@ -306,7 +306,7 @@ func TestMiddleware(t *testing.T) {
 		}
 	}
 
-	inner := func(next tethertest.HandleFunc[state]) tethertest.HandleFunc[state] {
+	inner := func(next tether.HandleFunc[state]) tether.HandleFunc[state] {
 		return func(sess tether.Session, s state, ev tether.Event) state {
 			s.Name += "B"
 			s = next(sess, s, ev)
@@ -323,7 +323,7 @@ func TestMiddleware(t *testing.T) {
 			s.Count++
 			return s
 		},
-		Middleware: []tethertest.Middleware[state]{outer, inner},
+		Middleware: []tether.Middleware[state]{outer, inner},
 	})
 
 	h.Send("anything")
@@ -405,10 +405,10 @@ func TestDisconnectPanicsWithoutCallback(t *testing.T) {
 }
 
 // TestBusEmitFromHandle verifies that a handler calling bus.Emit works
-// correctly inside the test harness. Because testSession does not have
-// a live command loop, Bus.Emit falls back to an immediate synchronous
-// publish — the subscriber callback is invoked before h.Send returns,
-// making assertions straightforward without goroutines or waits.
+// correctly inside the test harness. CaptureSession executes enqueue
+// synchronously, so Bus.Emit publishes immediately — the subscriber
+// callback is invoked before h.Send returns, making assertions
+// straightforward without goroutines or waits.
 func TestBusEmitFromHandle(t *testing.T) {
 	bus := tether.NewBus[string]()
 

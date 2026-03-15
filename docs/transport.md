@@ -43,6 +43,47 @@ ws.Upgrade(ws.Options{
 
 Set `ReadLimit` to match `Config.Limits.MaxEventBytes` for consistent limits across transport modes. Messages exceeding the limit cause the connection to be closed with a protocol error.
 
+### Compression
+
+WebSocket per-message deflate (RFC 7692) is **enabled by default**. The
+browser negotiates the extension during the handshake and handles
+decompression transparently — no client-side code is needed.
+
+Default settings (zero value of `ws.Compression`):
+
+| Setting | Default | Effect |
+|---------|---------|--------|
+| Level | `CompressionFastest` (1) | Lowest CPU, good ratios for HTML |
+| Threshold | 512 bytes | Tiny messages skip compression |
+| ContextTakeover | false | Shared compressor pool, fixed memory |
+
+To disable compression (e.g. when a reverse proxy already compresses):
+
+```go
+ws.Upgrade(ws.Options{
+    Compression: ws.Compression{Disabled: true},
+})
+```
+
+To enable context takeover for better ratios on repetitive HTML
+fragments (costs ~4 KB per connection instead of a fixed pool):
+
+```go
+ws.Upgrade(ws.Options{
+    Compression: ws.Compression{ContextTakeover: true},
+})
+```
+
+Compression levels:
+
+- `ws.CompressionFastest` — least CPU, best for real-time (default)
+- `ws.CompressionBalanced` — middle ground
+- `ws.CompressionSmallest` — smallest payloads, highest CPU
+
+SSE compression is handled by the reverse proxy (nginx, Caddy,
+Cloudflare) via standard `Content-Encoding` negotiation — tether does
+not need any configuration for it.
+
 ### SSE keep-alive
 
 SSE connections send keep-alive comments at `Timeouts.Heartbeat` (default 20s) to prevent proxies from closing idle connections.

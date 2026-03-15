@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 )
 
+// Compile-time check: JSONEncoder must satisfy Encoder.
+var _ Encoder = JSONEncoder{}
+
 // JSONEncoder encodes updates as JSON with HTML escaping disabled.
 // HTML escaping is intentionally off because patches carry
 // pre-rendered HTML from the fluent template engine, which is

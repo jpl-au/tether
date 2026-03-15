@@ -69,7 +69,7 @@ func (s *LiveSession[S]) Update(fn func(S) S) {
 	s.enqueue(func() {
 		s.stateSnap.Store(s.state)
 		s.handling.Store(true)
-		fx := &effects{}
+		fx := &Effects{}
 		defer func() {
 			if r := recover(); r != nil {
 				err := panicErr(r)
@@ -127,16 +127,16 @@ func (s *LiveSession[S]) Close() {
 // toast is buffered and sent atomically with the state diff. Outside
 // Handle it is sent as a standalone update.
 func (s *LiveSession[S]) Toast(text string) {
-	s.enqueueFx(func(fx *effects) { fx.toast = text })
+	s.enqueueFx(func(fx *Effects) { fx.Toast = text })
 }
 
 // Navigate pushes a URL change to the client (history.pushState).
 // Inside Handle the URL is buffered; outside it is sent as a
 // standalone update.
 func (s *LiveSession[S]) Navigate(rawURL string) {
-	s.enqueueFx(func(fx *effects) {
-		fx.url = rawURL
-		fx.replace = false
+	s.enqueueFx(func(fx *Effects) {
+		fx.URL = rawURL
+		fx.Replace = false
 	})
 }
 
@@ -144,23 +144,23 @@ func (s *LiveSession[S]) Navigate(rawURL string) {
 // (history.replaceState). Inside Handle the URL is buffered; outside
 // it is sent as a standalone update.
 func (s *LiveSession[S]) ReplaceURL(rawURL string) {
-	s.enqueueFx(func(fx *effects) {
-		fx.url = rawURL
-		fx.replace = true
+	s.enqueueFx(func(fx *Effects) {
+		fx.URL = rawURL
+		fx.Replace = true
 	})
 }
 
 // SetTitle updates the browser's document title. Inside Handle the
 // title is buffered; outside it is sent as a standalone update.
 func (s *LiveSession[S]) SetTitle(title string) {
-	s.enqueueFx(func(fx *effects) { fx.title = title })
+	s.enqueueFx(func(fx *Effects) { fx.Title = title })
 }
 
 // Announce sends text to a screen-reader-accessible live region on
 // the client. Inside Handle the text is buffered; outside it is sent
 // as a standalone update.
 func (s *LiveSession[S]) Announce(text string) {
-	s.enqueueFx(func(fx *effects) { fx.announce = text })
+	s.enqueueFx(func(fx *Effects) { fx.Announce = text })
 }
 
 // Flash sends a one-time notification to the client. The selector is
@@ -168,11 +168,11 @@ func (s *LiveSession[S]) Announce(text string) {
 // seconds. Inside Handle the flash is buffered; outside it is sent
 // as a standalone update.
 func (s *LiveSession[S]) Flash(selector, text string) {
-	s.enqueueFx(func(fx *effects) {
-		if fx.flash == nil {
-			fx.flash = make(map[string]string)
+	s.enqueueFx(func(fx *Effects) {
+		if fx.Flash == nil {
+			fx.Flash = make(map[string]string)
 		}
-		fx.flash[selector] = text
+		fx.Flash[selector] = text
 	})
 }
 
@@ -189,11 +189,11 @@ func (s *LiveSession[S]) Flash(selector, text string) {
 //	s.Signal("count", 42)
 //	s.Signal("status", "online")
 func (s *LiveSession[S]) Signal(key string, value any) {
-	s.enqueueFx(func(fx *effects) {
-		if fx.signals == nil {
-			fx.signals = make(map[string]any)
+	s.enqueueFx(func(fx *Effects) {
+		if fx.Signals == nil {
+			fx.Signals = make(map[string]any)
 		}
-		fx.signals[key] = value
+		fx.Signals[key] = value
 	})
 }
 
@@ -205,11 +205,11 @@ func (s *LiveSession[S]) Signal(key string, value any) {
 //
 //	s.Signals(map[string]any{"count": 42, "status": "online"})
 func (s *LiveSession[S]) Signals(signals map[string]any) {
-	s.enqueueFx(func(fx *effects) {
-		if fx.signals == nil {
-			fx.signals = make(map[string]any, len(signals))
+	s.enqueueFx(func(fx *Effects) {
+		if fx.Signals == nil {
+			fx.Signals = make(map[string]any, len(signals))
 		}
-		maps.Copy(fx.signals, signals)
+		maps.Copy(fx.Signals, signals)
 	})
 }
 

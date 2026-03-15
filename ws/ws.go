@@ -19,6 +19,59 @@ import (
 	"github.com/lxzan/gws"
 )
 
+// CompressionLevel controls the deflate compression level for
+// per-message compression. Higher levels produce smaller messages
+// at the cost of more CPU. The zero value selects the default
+// (fastest).
+type CompressionLevel int
+
+const (
+	// CompressionFastest uses the least CPU per message. This is
+	// the default and the best choice for real-time updates where
+	// latency matters more than payload size.
+	CompressionFastest CompressionLevel = 1
+
+	// CompressionBalanced trades some CPU for better compression
+	// ratios. Useful when bandwidth is more constrained than CPU.
+	CompressionBalanced CompressionLevel = 6
+
+	// CompressionSmallest produces the smallest possible messages
+	// at the highest CPU cost. Rarely appropriate for real-time
+	// traffic.
+	CompressionSmallest CompressionLevel = 9
+)
+
+// Compression configures WebSocket per-message deflate (RFC 7692).
+// Compression is enabled by default with sensible defaults — set
+// Disabled to opt out. When enabled, the server negotiates the
+// permessage-deflate extension during the WebSocket handshake.
+// Browsers handle decompression transparently.
+type Compression struct {
+	// Disabled turns off per-message deflate. Use this when a
+	// reverse proxy already handles compression, or for debugging.
+	Disabled bool
+
+	// Level sets the deflate compression level. Zero defaults to
+	// [CompressionFastest], which is the best trade-off for
+	// real-time updates.
+	Level CompressionLevel
+
+	// Threshold is the minimum message size in bytes before
+	// compression is applied. Messages smaller than this are sent
+	// uncompressed to avoid the overhead of deflating tiny
+	// payloads. Zero defaults to 512 bytes.
+	Threshold int
+
+	// ContextTakeover enables per-connection compression context.
+	// The compressor retains its sliding window across messages,
+	// producing significantly better ratios for repetitive content
+	// like HTML fragments. The cost is additional memory per
+	// connection (~4 KB at the default window size) instead of a
+	// fixed shared pool. When disabled (default), each message is
+	// compressed independently using a shared pool of compressors.
+	ContextTakeover bool
+}
+
 // Options configures the WebSocket transport.
 type Options struct {
 	// ReadLimit sets the maximum message size in bytes that the server
@@ -28,6 +81,12 @@ type Options struct {
 	// [tether.Config].MaxEventBytes for consistent limits across
 	// transport modes.
 	ReadLimit int64
+
+	// Compression configures per-message deflate (RFC 7692).
+	// The zero value enables compression with sensible defaults:
+	// fastest compression level, 512-byte threshold, and a shared
+	// compressor pool. Set Compression.Disabled to opt out.
+	Compression Compression
 }
 
 // Upgrade returns an upgrade function for use in [tether.Config].Upgrade.
@@ -49,6 +108,15 @@ func Upgrade(opts ...Options) func(http.ResponseWriter, *http.Request) (tether.T
 	}
 	if o.ReadLimit > 0 {
 		serverOpts.ReadMaxPayloadSize = int(o.ReadLimit)
+	}
+	if !o.Compression.Disabled {
+		serverOpts.PermessageDeflate = gws.PermessageDeflate{
+			Enabled:               true,
+			Level:                 int(o.Compression.Level),
+			Threshold:             o.Compression.Threshold,
+			ServerContextTakeover: o.Compression.ContextTakeover,
+			ClientContextTakeover: o.Compression.ContextTakeover,
+		}
 	}
 
 	upgrader := gws.NewUpgrader(&eventHandler{}, serverOpts)
@@ -127,6 +195,9 @@ func isNormalClose(err error) bool {
 	s := err.Error()
 	return strings.Contains(s, "code=1000") || strings.Contains(s, "code=1001")
 }
+
+// Compile-time check: *transport must satisfy tether.Transport.
+var _ tether.Transport = (*transport)(nil)
 
 // transport implements [tether.Transport] over a single WebSocket
 // connection. Reads are driven by gws's ReadLoop goroutine which

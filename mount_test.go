@@ -10,7 +10,6 @@ import (
 	"github.com/jpl-au/fluent/html5/span"
 	"github.com/jpl-au/fluent/node"
 	"github.com/jpl-au/tether/event"
-	"github.com/jpl-au/tether/push"
 	"github.com/jpl-au/tether/wire"
 )
 
@@ -46,7 +45,7 @@ func newMountSession(state mountState, mt Transport, mounts []ComponentMount[mou
 		transport: mt,
 		events:    make(chan Event),
 		cmds:      make(chan func(), defaultCmdBufferSize),
-		fxCh:      make(chan func(*effects), defaultCmdBufferSize),
+		fxCh:      make(chan func(*Effects), defaultCmdBufferSize),
 		loopDone:  make(chan struct{}),
 		ctx:       ctx,
 		stop:      cancel,
@@ -149,7 +148,7 @@ func TestMountRouteSetsEventTarget(t *testing.T) {
 			differ: differ, encoder: wire.JSONEncoder{},
 			transport: mt, events: make(chan Event),
 			cmds:     make(chan func(), defaultCmdBufferSize),
-			fxCh:     make(chan func(*effects), defaultCmdBufferSize),
+			fxCh:     make(chan func(*Effects), defaultCmdBufferSize),
 			loopDone: make(chan struct{}),
 			ctx:      ctx, stop: cancel,
 			mounts: mounts,
@@ -221,14 +220,14 @@ func TestMounterCalledOnInit(t *testing.T) {
 	}
 
 	s := mState{MW: mw}
-	sess := &testSessionForMount{}
+	sess := &CaptureSession{SessionID: "test"}
 	result := InitMounts(mounts, sess, s)
 
 	if !result.MW.Mounted {
 		t.Error("MW.Mounted = false, want true after InitMounts")
 	}
-	if sess.toast != "mounted" {
-		t.Errorf("toast = %q, want %q", sess.toast, "mounted")
+	if sess.Effects.Toast != "mounted" {
+		t.Errorf("toast = %q, want %q", sess.Effects.Toast, "mounted")
 	}
 
 	// Verify non-Mounter components are left unchanged.
@@ -244,31 +243,12 @@ func TestInitMountsSkipsNonMounter(t *testing.T) {
 		),
 	}
 	s := mountState{Widget: testWidget{Count: 5}}
-	result := InitMounts(mounts, &testSessionForMount{}, s)
+	result := InitMounts(mounts, &CaptureSession{SessionID: "test"}, s)
 
 	if result.Widget.Count != 5 {
 		t.Errorf("Widget.Count = %d, want 5 (should be unchanged)", result.Widget.Count)
 	}
 }
-
-// testSessionForMount is a minimal Session for mount tests.
-type testSessionForMount struct {
-	toast string
-}
-
-func (s *testSessionForMount) ID() string                   { return "test" }
-func (s *testSessionForMount) Context() context.Context     { return context.Background() }
-func (s *testSessionForMount) Go(fn func(context.Context))  { go fn(context.Background()) }
-func (s *testSessionForMount) Toast(text string)            { s.toast = text }
-func (s *testSessionForMount) SetTitle(string)              {}
-func (s *testSessionForMount) Announce(string)              {}
-func (s *testSessionForMount) Navigate(string)              {}
-func (s *testSessionForMount) ReplaceURL(string)            {}
-func (s *testSessionForMount) Signal(string, any)           {}
-func (s *testSessionForMount) Signals(map[string]any)       {}
-func (s *testSessionForMount) Flash(string, string)         {}
-func (s *testSessionForMount) Push(push.Notification) error { return nil }
-func (s *testSessionForMount) Close()                       {}
 
 func TestMountNavigateBypassesMounts(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {

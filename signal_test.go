@@ -119,19 +119,19 @@ func TestSignalMultipleKeys(t *testing.T) {
 }
 
 func TestSignalOnSession(t *testing.T) {
-	cs := &captureSession{id: "pre", fx: &effects{}}
+	cs := &CaptureSession{SessionID: "pre"}
 
 	cs.Signal("count", 99)
 	cs.Signal("status", "ready")
 
-	if cs.fx.signals == nil {
-		t.Fatal("captureSession signals is nil")
+	if cs.Effects.Signals == nil {
+		t.Fatal("CaptureSession signals is nil")
 	}
-	if cs.fx.signals["count"] != 99 {
-		t.Errorf("signals[count] = %v, want 99", cs.fx.signals["count"])
+	if cs.Effects.Signals["count"] != 99 {
+		t.Errorf("signals[count] = %v, want 99", cs.Effects.Signals["count"])
 	}
-	if cs.fx.signals["status"] != "ready" {
-		t.Errorf("signals[status] = %v, want ready", cs.fx.signals["status"])
+	if cs.Effects.Signals["status"] != "ready" {
+		t.Errorf("signals[status] = %v, want ready", cs.Effects.Signals["status"])
 	}
 }
 
@@ -176,11 +176,11 @@ func TestSignalWithoutStateChange(t *testing.T) {
 }
 
 func TestSignalMergedIntoEffects(t *testing.T) {
-	fx := &effects{}
-	fx.signals = map[string]any{"count": 5}
+	fx := &Effects{}
+	fx.Signals = map[string]any{"count": 5}
 
 	if !fx.any() {
-		t.Error("effects.any() should be true when signals are set")
+		t.Error("Effects.any() should be true when signals are set")
 	}
 
 	u := &wire.Update{}

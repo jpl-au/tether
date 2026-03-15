@@ -17,10 +17,10 @@ package tether
 // field on [Config] to register middleware for all events.
 type Middleware[S any] func(HandleFunc[S]) HandleFunc[S]
 
-// chain applies a slice of middleware to a handler in outermost-first
+// Chain applies a slice of middleware to a handler in outermost-first
 // order. Given [A, B, C] and handler H, the resulting call order is:
-// A → B → C → H.
-func chain[S any](h HandleFunc[S], mw []Middleware[S]) HandleFunc[S] {
+// A -> B -> C -> H.
+func Chain[S any](h HandleFunc[S], mw []Middleware[S]) HandleFunc[S] {
 	for i := len(mw) - 1; i >= 0; i-- {
 		h = mw[i](h)
 	}

@@ -22,7 +22,7 @@ func TestChainAppliesOutermostFirst(t *testing.T) {
 		return s
 	}
 
-	h := chain(inner, []Middleware[counterState]{a, b})
+	h := Chain(inner, []Middleware[counterState]{a, b})
 	h(nil, counterState{}, Event{})
 
 	if len(order) != 3 || order[0] != "A" || order[1] != "B" || order[2] != "H" {
@@ -37,7 +37,7 @@ func TestChainEmptyMiddleware(t *testing.T) {
 		return s
 	}
 
-	h := chain(inner, nil)
+	h := Chain(inner, nil)
 	h(nil, counterState{}, Event{})
 
 	if !called {

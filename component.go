@@ -22,8 +22,8 @@ import (
 // full compile-time safety via [RouteTyped].
 //
 // Components only receive [Session] (not [*LiveSession]), so they work
-// during SSR pre-warming (captureSession satisfies Session) and in tests
-// (tethertest.NewSession satisfies Session) without special cases.
+// during SSR pre-warming ([CaptureSession] satisfies Session) and in
+// tests without special cases.
 type Component interface {
 	// Render builds the component's node tree. The root node should
 	// have a stable Dynamic key so the diff engine can track it across
