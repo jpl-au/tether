@@ -81,11 +81,19 @@ the correct User-Agent.
 
 ## Cross-origin protection
 
-The handler uses Go 1.25's `http.CrossOriginProtection` to defend against
-CSRF and cross-site WebSocket hijacking. Safe methods (GET, HEAD) are
-always allowed — this includes the initial page render and SSE streams.
-State-changing requests (POST events, WebSocket upgrades, uploads, push
-subscriptions) are checked via `Sec-Fetch-Site` and `Origin` headers.
+The handler defends against two distinct cross-origin threats:
+
+**CSRF on POST requests** — Go 1.25's `http.CrossOriginProtection`
+checks `Sec-Fetch-Site` and `Origin` headers on all state-changing
+methods (POST events, uploads, push subscriptions). Safe methods
+(GET, HEAD) are always allowed — this includes the initial page
+render and SSE streams.
+
+**Cross-site WebSocket hijacking** — WebSocket upgrades are GET
+requests that become bidirectional, so the stdlib's safe-method
+exemption does not apply. The handler checks `Sec-Fetch-Site` first
+(available in all browsers since 2023), then falls back to `Origin`
+header comparison against `TrustedOrigins` or the `Host` header.
 
 Configure trusted origins explicitly for production:
 
@@ -102,17 +110,18 @@ tether.New(tether.Config[State]{
 ```
 
 When `TrustedOrigins` is empty, the handler falls back to same-host
-checking (the Origin header's host must match the request's Host header).
-This is suitable for development but should be replaced with an explicit
-list in production.
+checking (the Origin header's host:port must match the request's Host
+header exactly). This is suitable for development but should be
+replaced with an explicit list in production.
 
 ### Trust model
 
 Cross-origin protection defends against **browser-based cross-origin
 attacks** (CSRF, cross-site WebSocket hijacking). It does not protect
-against non-browser attackers who omit the Origin header entirely — that
-is by design, since same-origin navigations and non-browser clients
-(curl, server-to-server) legitimately omit it.
+against non-browser attackers who omit the `Origin` and
+`Sec-Fetch-Site` headers entirely — that is by design, since
+same-origin navigations and non-browser clients (curl,
+server-to-server) legitimately omit them.
 
 Requests with no Origin header are allowed. The security boundary for
 non-browser attackers is the session ID itself (128-bit random, requiring
@@ -122,12 +131,13 @@ TLS).
 
 The framework uses a layered approach that does not rely on cookies:
 
-1. **Origin header validation** on all entry points.
+1. **Sec-Fetch-Site + Origin validation** on state-changing requests
+   (POST events, WebSocket upgrades, uploads, push subscriptions).
 2. **Custom headers** (`X-Tether-Session`, `X-Tether-Upload`,
-   `X-Tether-Push-Subscribe`) on all state-changing POST requests — these
-   trigger CORS preflight, which browsers enforce.
-3. **No cookies** — the framework does not set or read cookies, eliminating
-   cookie-based CSRF vectors entirely.
+   `X-Tether-Push-Subscribe`) on all POST requests — these trigger
+   CORS preflight, which browsers enforce.
+3. **No cookies** — the framework does not set or read cookies,
+   eliminating cookie-based CSRF vectors entirely.
 
 The custom-header approach is stronger than traditional CSRF tokens because
 it cannot be bypassed by token leakage — the browser's CORS preflight is the

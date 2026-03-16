@@ -418,21 +418,22 @@ type Client struct {
 // Security groups CSRF protection and session binding settings.
 type Security struct {
 	// TrustedOrigins lists origins that are allowed to make
-	// state-changing requests (POST events, WebSocket upgrades,
-	// uploads, push subscriptions). Uses Go 1.25's standard
-	// library [http.CrossOriginProtection] with Sec-Fetch-Site
-	// and Origin header checking.
+	// state-changing requests. POST requests (events, uploads,
+	// push subscriptions) are checked by Go 1.25's
+	// [http.CrossOriginProtection]. WebSocket upgrades use a
+	// dedicated check since they are GET requests that the stdlib
+	// exempts as safe methods. Both use Sec-Fetch-Site as the
+	// primary signal with Origin header comparison as a fallback.
 	//
-	// Safe methods (GET, HEAD) are always allowed regardless of
-	// origin — this includes the initial page render and SSE
-	// streams.
+	// Safe read-only methods (initial page GET, SSE streams) are
+	// always allowed regardless of origin.
 	//
 	// Example: []string{"https://example.com", "https://staging.example.com"}
 	//
 	// When empty, the handler falls back to same-host checking
-	// (the Origin header's host must match the request's Host
-	// header). This is suitable for development but should be
-	// replaced with an explicit list in production.
+	// (the Origin header's host:port must match the request's
+	// Host header exactly). This is suitable for development but
+	// should be replaced with an explicit list in production.
 	TrustedOrigins []string
 
 	// DisableSessionBinding turns off User-Agent verification on
