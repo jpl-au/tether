@@ -167,9 +167,9 @@ func Page[S any](cfg PageConfig[S]) http.Handler {
 	}
 
 	csrf := http.NewCrossOriginProtection()
-	for _, origin := range cfg.Security.AllowedOrigins {
+	for _, origin := range cfg.Security.TrustedOrigins {
 		if err := csrf.AddTrustedOrigin(origin); err != nil {
-			panic("tether: invalid AllowedOrigins entry " + origin + ": " + err.Error())
+			panic("tether: invalid TrustedOrigins entry " + origin + ": " + err.Error())
 		}
 	}
 

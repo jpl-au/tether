@@ -63,7 +63,7 @@ tether.Page(tether.PageConfig[State]{
     Assets:   []*tether.Asset{assets},
     Limits:   tether.Limits{MaxEventBytes: 128 << 10},
     Client:   tether.Client{DefaultDebounce: 200 * time.Millisecond},
-    Security: tether.Security{AllowedOrigins: []string{"https://example.com"}},
+    Security: tether.Security{TrustedOrigins: []string{"https://example.com"}},
     DevMode:  true,
 })
 ```

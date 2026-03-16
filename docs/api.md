@@ -128,7 +128,7 @@ When either callback is configured, the framework's own logging for that event i
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `AllowedOrigins` | `[]string` | Restrict connections to these origins |
+| `TrustedOrigins` | `[]string` | Origins allowed to make state-changing requests |
 | `DisableSessionBinding` | `bool` | Disable User-Agent verification on reconnect (default: enabled) |
 
 ### Other

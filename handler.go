@@ -126,9 +126,9 @@ func New[S any](cfg Config[S]) *Handler[S] {
 	if cfg.Mode != mode.WebSocket && cfg.Fallback == nil {
 		panic("tether: Config.Fallback is required — use sse.Upgrade() or set Mode to mode.WebSocket")
 	}
-	for _, o := range cfg.Security.AllowedOrigins {
+	for _, o := range cfg.Security.TrustedOrigins {
 		if o == "" {
-			panic("tether: Security.AllowedOrigins contains an empty string — remove it or provide a valid origin like \"https://example.com\"")
+			panic("tether: Security.TrustedOrigins contains an empty string — remove it or provide a valid origin like \"https://example.com\"")
 		}
 	}
 
@@ -228,9 +228,9 @@ func New[S any](cfg Config[S]) *Handler[S] {
 	mounts := buildAssetMounts(cfg.Assets)
 
 	csrf := http.NewCrossOriginProtection()
-	for _, origin := range cfg.Security.AllowedOrigins {
+	for _, origin := range cfg.Security.TrustedOrigins {
 		if err := csrf.AddTrustedOrigin(origin); err != nil {
-			panic("tether: invalid AllowedOrigins entry " + origin + ": " + err.Error())
+			panic("tether: invalid TrustedOrigins entry " + origin + ": " + err.Error())
 		}
 	}
 

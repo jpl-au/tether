@@ -4,7 +4,7 @@
 // minimal overhead. This is the default and preferred transport.
 //
 // Pass ws.Upgrade() as the Upgrade field in [tether.Config]. Origin
-// checking is handled by the tether handler via [tether.Config].AllowedOrigins
+// checking is handled by the tether handler via [tether.Config].TrustedOrigins
 // rather than by the websocket library directly.
 package ws
 
@@ -95,7 +95,7 @@ type Options struct {
 // and returns a Transport that the session uses for its entire lifetime.
 //
 // Origin checking is handled by the tether handler via
-// [tether.Config].AllowedOrigins, so the upgrader does not perform its
+// [tether.Config].TrustedOrigins, so the upgrader does not perform its
 // own origin verification.
 func Upgrade(opts ...Options) func(http.ResponseWriter, *http.Request) (tether.Transport, error) {
 	var o Options

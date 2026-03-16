@@ -79,16 +79,20 @@ the correct User-Agent.
   defence-in-depth — even if XSS occurs, inline scripts are blocked, making
   it harder to exfiltrate session IDs from the DOM.
 
-## Origin checking
+## Cross-origin protection
 
-The handler validates the `Origin` header on all entry points — initial GET,
-WebSocket upgrade, SSE stream, and POST events. Configure allowed origins
-explicitly for production:
+The handler uses Go 1.25's `http.CrossOriginProtection` to defend against
+CSRF and cross-site WebSocket hijacking. Safe methods (GET, HEAD) are
+always allowed — this includes the initial page render and SSE streams.
+State-changing requests (POST events, WebSocket upgrades, uploads, push
+subscriptions) are checked via `Sec-Fetch-Site` and `Origin` headers.
+
+Configure trusted origins explicitly for production:
 
 ```go
 tether.New(tether.Config[State]{
     Security: tether.Security{
-        AllowedOrigins: []string{
+        TrustedOrigins: []string{
             "https://example.com",
             "https://staging.example.com",
         },
@@ -97,18 +101,18 @@ tether.New(tether.Config[State]{
 })
 ```
 
-When `AllowedOrigins` is empty, the handler falls back to same-host checking
-(the Origin header's host must match the request's Host header). This is
-suitable for development but should be replaced with an explicit list in
-production.
+When `TrustedOrigins` is empty, the handler falls back to same-host
+checking (the Origin header's host must match the request's Host header).
+This is suitable for development but should be replaced with an explicit
+list in production.
 
 ### Trust model
 
-Origin checking protects against **browser-based cross-origin attacks**
-(CSRF, cross-site WebSocket hijacking). It does not protect against
-non-browser attackers who omit the Origin header entirely — that is by
-design, since same-origin navigations and non-browser clients (curl,
-server-to-server) legitimately omit it.
+Cross-origin protection defends against **browser-based cross-origin
+attacks** (CSRF, cross-site WebSocket hijacking). It does not protect
+against non-browser attackers who omit the Origin header entirely — that
+is by design, since same-origin navigations and non-browser clients
+(curl, server-to-server) legitimately omit it.
 
 Requests with no Origin header are allowed. The security boundary for
 non-browser attackers is the session ID itself (128-bit random, requiring
