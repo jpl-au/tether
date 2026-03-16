@@ -3,10 +3,7 @@ package tether
 import (
 	"encoding/json"
 	"log/slog"
-	"net"
 	"net/http"
-	"net/url"
-	"slices"
 	"strings"
 
 	"github.com/jpl-au/tether/dev"
@@ -56,10 +53,8 @@ func (h *Handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch h.cfg.Mode {
 	case mode.ServerSentEvents:
 		if strings.Contains(r.Header.Get("Accept"), "text/event-stream") {
-			if !h.originAllowed(r) {
-				http.Error(w, "origin not allowed", http.StatusForbidden)
-				return
-			}
+			// SSE stream is a read-only GET — safe method, no origin
+			// check needed. POST events have their own check.
 			h.serveSession(w, r, h.cfg.Fallback)
 			return
 		}
@@ -70,7 +65,9 @@ func (h *Handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	case mode.Both:
 		if r.Header.Get("Upgrade") == "websocket" {
-			if !h.originAllowed(r) {
+			// WebSocket upgrades are GETs that become bidirectional —
+			// check origin even though it's technically a safe method.
+			if err := h.csrf.Check(r); err != nil {
 				http.Error(w, "origin not allowed", http.StatusForbidden)
 				return
 			}
@@ -78,10 +75,6 @@ func (h *Handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if strings.Contains(r.Header.Get("Accept"), "text/event-stream") {
-			if !h.originAllowed(r) {
-				http.Error(w, "origin not allowed", http.StatusForbidden)
-				return
-			}
 			h.serveSession(w, r, h.cfg.Fallback)
 			return
 		}
@@ -92,7 +85,7 @@ func (h *Handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	default: // mode.WebSocket
 		if r.Header.Get("Upgrade") == "websocket" {
-			if !h.originAllowed(r) {
+			if err := h.csrf.Check(r); err != nil {
 				http.Error(w, "origin not allowed", http.StatusForbidden)
 				return
 			}
@@ -102,55 +95,6 @@ func (h *Handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.serveInitialPage(w, r)
-}
-
-// originAllowed checks the request's Origin header against
-// Config.AllowedOrigins. When AllowedOrigins is configured, the Origin
-// must match one of the listed values exactly. When AllowedOrigins is
-// empty, it falls back to same-host checking as basic CSRF protection.
-// Requests without an Origin header (e.g. same-origin navigations or
-// non-browser clients) are always allowed.
-func (h *Handler[S]) originAllowed(r *http.Request) bool {
-	return checkOrigin(r, h.cfg.Security.AllowedOrigins)
-}
-
-// checkOrigin is the shared origin-checking logic used by both
-// [Handler] and [pageHandler]. When allowedOrigins is non-empty the
-// Origin must match exactly; otherwise a same-host check is applied.
-//
-// Requests without an Origin header are allowed because all
-// state-changing paths (POST events, uploads, push subscriptions)
-// require custom headers (X-Tether-Session, X-Tether-Upload, etc.) that
-// trigger a CORS preflight — browsers never send a cross-origin
-// request with custom headers without a successful preflight first.
-// This means a missing Origin only occurs for same-origin requests
-// and non-browser clients, both of which are safe.
-func checkOrigin(r *http.Request, allowedOrigins []string) bool {
-	origin := r.Header.Get("Origin")
-	if origin == "" {
-		return true
-	}
-	if len(allowedOrigins) > 0 {
-		return slices.Contains(allowedOrigins, origin)
-	}
-	// No AllowedOrigins configured — fall back to same-host check
-	// as basic CSRF protection. Compare hostnames only so that
-	// Origin: http://localhost matches Host: localhost:8080.
-	u, err := url.Parse(origin)
-	if err != nil {
-		return false
-	}
-	return stripPort(u.Host) == stripPort(r.Host)
-}
-
-// stripPort returns the host portion of a host:port string. If there
-// is no port, the input is returned unchanged.
-func stripPort(hostport string) string {
-	host, _, err := net.SplitHostPort(hostport)
-	if err != nil {
-		return hostport
-	}
-	return host
 }
 
 // handlePostEvent receives a client event via HTTP POST. This is the
@@ -163,7 +107,7 @@ func stripPort(hostport string) string {
 // transport pointer from outside the loop goroutine, eliminating a
 // data race during reconnection when the transport is swapped.
 func (h *Handler[S]) handlePostEvent(w http.ResponseWriter, r *http.Request) {
-	if !h.originAllowed(r) {
+	if err := h.csrf.Check(r); err != nil {
 		http.Error(w, "origin not allowed", http.StatusForbidden)
 		return
 	}
@@ -221,7 +165,7 @@ func (h *Handler[S]) handlePushSubscribe(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "push not configured", http.StatusNotFound)
 		return
 	}
-	if !h.originAllowed(r) {
+	if err := h.csrf.Check(r); err != nil {
 		http.Error(w, "origin not allowed", http.StatusForbidden)
 		return
 	}

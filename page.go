@@ -166,11 +166,19 @@ func Page[S any](cfg PageConfig[S]) http.Handler {
 		cfg.Client.TransitionTimeout = defaultTransitionTimeout
 	}
 
+	csrf := http.NewCrossOriginProtection()
+	for _, origin := range cfg.Security.AllowedOrigins {
+		if err := csrf.AddTrustedOrigin(origin); err != nil {
+			panic("tether: invalid AllowedOrigins entry " + origin + ": " + err.Error())
+		}
+	}
+
 	return &pageHandler[S]{
 		cfg:           cfg,
 		encoder:       wire.JSONEncoder{},
 		clientHandler: newClientHandler(cfg.Assets),
 		assetMounts:   buildAssetMounts(cfg.Assets),
+		csrf:          csrf,
 	}
 }
 
@@ -180,6 +188,7 @@ type pageHandler[S any] struct {
 	encoder       wire.Encoder
 	clientHandler http.Handler
 	assetMounts   []assetMount
+	csrf          *http.CrossOriginProtection
 }
 
 func (p *pageHandler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -246,7 +255,7 @@ func (p *pageHandler[S]) serveGET(w http.ResponseWriter, r *http.Request) {
 }
 
 func (p *pageHandler[S]) servePOST(w http.ResponseWriter, r *http.Request) {
-	if !checkOrigin(r, p.cfg.Security.AllowedOrigins) {
+	if err := p.csrf.Check(r); err != nil {
 		http.Error(w, "origin not allowed", http.StatusForbidden)
 		return
 	}

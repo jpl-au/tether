@@ -65,7 +65,7 @@ func (h *Handler[S]) handleUpload(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "uploads not configured", http.StatusNotFound)
 		return
 	}
-	if !h.originAllowed(r) {
+	if err := h.csrf.Check(r); err != nil {
 		http.Error(w, "origin not allowed", http.StatusForbidden)
 		return
 	}

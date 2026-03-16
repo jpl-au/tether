@@ -65,16 +65,8 @@ func TestClientWorkerHeader(t *testing.T) {
 		}
 	})
 
-	t.Run("tether-push-worker.js rejects cross-origin", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "http://myapp.com/_tether/tether-push-worker.js", nil)
-		req.Header.Set("Origin", "https://evil.com")
-		w := httptest.NewRecorder()
-		handler.ServeHTTP(w, req)
-
-		if w.Code != http.StatusForbidden {
-			t.Errorf("status = %d, want %d", w.Code, http.StatusForbidden)
-		}
-	})
+	// Cross-origin worker script GETs are no longer rejected server-side.
+	// Browsers enforce same-origin for service worker registration natively.
 
 	t.Run("tether.js does not get Service-Worker-Allowed header", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/_tether/tether.js", nil)
@@ -137,17 +129,6 @@ func TestClientNoPrecache(t *testing.T) {
 
 func TestClientWorkerOriginCheck(t *testing.T) {
 	handler := newTestHandler()
-
-	t.Run("cross-origin request is rejected", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "http://myapp.com/_tether/tether-worker.js", nil)
-		req.Header.Set("Origin", "https://evil.com")
-		w := httptest.NewRecorder()
-		handler.ServeHTTP(w, req)
-
-		if w.Code != http.StatusForbidden {
-			t.Errorf("status = %d, want %d", w.Code, http.StatusForbidden)
-		}
-	})
 
 	t.Run("same-origin request is allowed", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "http://myapp.com/_tether/tether-worker.js", nil)

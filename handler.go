@@ -50,6 +50,12 @@ type Handler[S any] struct {
 	closeOnce    sync.Once
 	draining     atomic.Bool
 
+	// csrf checks cross-origin requests using Go 1.25's standard
+	// library CrossOriginProtection. Safe methods (GET, HEAD) are
+	// always allowed; non-safe methods are checked against
+	// Sec-Fetch-Site and Origin headers.
+	csrf *http.CrossOriginProtection
+
 	// clientHandler serves the embedded JS runtime at /_tether/*.
 	clientHandler http.Handler
 
@@ -221,6 +227,13 @@ func New[S any](cfg Config[S]) *Handler[S] {
 	}
 	mounts := buildAssetMounts(cfg.Assets)
 
+	csrf := http.NewCrossOriginProtection()
+	for _, origin := range cfg.Security.AllowedOrigins {
+		if err := csrf.AddTrustedOrigin(origin); err != nil {
+			panic("tether: invalid AllowedOrigins entry " + origin + ": " + err.Error())
+		}
+	}
+
 	h := &Handler[S]{
 		cfg:           cfg,
 		pending:       make(map[string]*pendingSession[S]),
@@ -230,6 +243,7 @@ func New[S any](cfg Config[S]) *Handler[S] {
 		encoder:       resolveEncoder(cfg.WireFormat),
 		clientHandler: newClientHandler(cfg.Assets),
 		assetMounts:   mounts,
+		csrf:          csrf,
 		Diagnostics:   NewBus[Diagnostic](),
 	}
 

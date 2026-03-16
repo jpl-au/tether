@@ -9,7 +9,6 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
-	"net/url"
 	"sync"
 )
 
@@ -133,15 +132,6 @@ func newClientHandler(assets []*Asset) http.Handler {
 		// injected and the scope header set, so it is served directly
 		// rather than through the static file server.
 		if r.URL.Path == "/tether-worker.js" || r.URL.Path == "tether-worker.js" {
-			// Defence-in-depth: reject cross-origin requests for the
-			// worker script. The browser already prevents cross-origin
-			// registration, but this guards against misconfigured proxies.
-			if origin := r.Header.Get("Origin"); origin != "" {
-				if u, err := url.Parse(origin); err != nil || stripPort(u.Host) != stripPort(r.Host) {
-					http.Error(w, "Forbidden", http.StatusForbidden)
-					return
-				}
-			}
 			workerOnce.Do(func() {
 				workerBody = buildWorkerJS(assets)
 			})
@@ -156,12 +146,6 @@ func newClientHandler(assets []*Asset) http.Handler {
 		// be registered at the handler's endpoint (e.g. /app/) rather
 		// than being restricted to /_tether/.
 		if r.URL.Path == "/tether-push-worker.js" || r.URL.Path == "tether-push-worker.js" {
-			if origin := r.Header.Get("Origin"); origin != "" {
-				if u, err := url.Parse(origin); err != nil || stripPort(u.Host) != stripPort(r.Host) {
-					http.Error(w, "Forbidden", http.StatusForbidden)
-					return
-				}
-			}
 			pushWorkerOnce.Do(func() {
 				raw, err := fs.ReadFile(clientFiles(), "tether-push-worker.js")
 				if err != nil {
