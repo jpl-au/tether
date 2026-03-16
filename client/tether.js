@@ -1262,17 +1262,21 @@ window.Tether.signals = window.Tether.signals || {};
     return sendEvent("navigate", "", { path: path, search: search }) !== null;
   }
 
-  // findPrefix walks up the DOM from el to find the nearest ancestor
-  // with data-tether-prefix, stopping at the tether root. Returns the
-  // prefix string or empty if none found.
+  // findPrefix walks up the DOM from el to the tether root, collecting
+  // all data-tether-prefix values. Nested prefixes are joined with dots
+  // (innermost last) so "group" > "left" produces "group.left". Returns
+  // empty if no prefix ancestors are found.
   function findPrefix(el) {
+    var parts = [];
     var node = el.parentElement;
     while (node && node !== root) {
       var p = node.getAttribute("data-tether-prefix");
-      if (p) return p;
+      if (p) parts.push(p);
       node = node.parentElement;
     }
-    return "";
+    if (parts.length === 0) return "";
+    parts.reverse();
+    return parts.join(".");
   }
 
   function bindEventType(domEvent, dataAttr) {
