@@ -3,7 +3,10 @@ package tether
 import (
 	"encoding/json"
 	"log/slog"
+	"net"
 	"net/http"
+	"net/url"
+	"slices"
 	"strings"
 
 	"github.com/jpl-au/tether/dev"
@@ -65,9 +68,7 @@ func (h *Handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	case mode.Both:
 		if r.Header.Get("Upgrade") == "websocket" {
-			// WebSocket upgrades are GETs that become bidirectional —
-			// check origin even though it's technically a safe method.
-			if err := h.csrf.Check(r); err != nil {
+			if !h.wsOriginAllowed(r) {
 				http.Error(w, "origin not allowed", http.StatusForbidden)
 				return
 			}
@@ -85,7 +86,7 @@ func (h *Handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	default: // mode.WebSocket
 		if r.Header.Get("Upgrade") == "websocket" {
-			if err := h.csrf.Check(r); err != nil {
+			if !h.wsOriginAllowed(r) {
 				http.Error(w, "origin not allowed", http.StatusForbidden)
 				return
 			}
@@ -95,6 +96,44 @@ func (h *Handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.serveInitialPage(w, r)
+}
+
+// wsOriginAllowed checks the Origin header on WebSocket upgrade
+// requests to prevent cross-site WebSocket hijacking. Unlike standard
+// HTTP requests, WebSocket connections are not protected by the
+// browser's Same-Origin Policy — the server must validate the Origin
+// during the handshake.
+//
+// This is separate from CSRF protection (handled by
+// [http.CrossOriginProtection]) because WebSocket upgrades are GET
+// requests that the stdlib correctly exempts as safe methods. The
+// upgrade is the one case where a GET becomes state-changing.
+//
+// Requests without an Origin header are allowed — they come from
+// same-origin navigations or non-browser clients.
+func (h *Handler[S]) wsOriginAllowed(r *http.Request) bool {
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		return true
+	}
+	if len(h.cfg.Security.TrustedOrigins) > 0 {
+		return slices.Contains(h.cfg.Security.TrustedOrigins, origin)
+	}
+	u, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+	return stripPort(u.Host) == stripPort(r.Host)
+}
+
+// stripPort returns the host portion of a host:port string. If there
+// is no port, the input is returned unchanged.
+func stripPort(hostport string) string {
+	host, _, err := net.SplitHostPort(hostport)
+	if err != nil {
+		return hostport
+	}
+	return host
 }
 
 // handlePostEvent receives a client event via HTTP POST. This is the
