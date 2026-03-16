@@ -41,7 +41,10 @@ func Upgrade() func(http.ResponseWriter, *http.Request) (tether.Transport, error
 
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.Header().Set("Cache-Control", "no-cache")
-		w.Header().Set("Connection", "keep-alive")
+		// Connection: keep-alive is not set — it is invalid in HTTP/2
+		// (RFC 7540 §8.1.2.2) and Go's HTTP/2 implementation strips
+		// connection-specific headers. HTTP/1.1 keep-alive is the
+		// default behaviour and does not need an explicit header.
 		w.WriteHeader(http.StatusOK)
 
 		// Set the EventSource reconnection interval so the browser

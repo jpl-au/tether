@@ -133,8 +133,10 @@ func TestUpgradeSetsHeaders(t *testing.T) {
 	if got := w.Header().Get("Cache-Control"); got != "no-cache" {
 		t.Errorf("Cache-Control = %q, want no-cache", got)
 	}
-	if got := w.Header().Get("Connection"); got != "keep-alive" {
-		t.Errorf("Connection = %q, want keep-alive", got)
+	// Connection: keep-alive is no longer set — it is redundant in
+	// HTTP/1.1 (default behaviour) and invalid in HTTP/2.
+	if got := w.Header().Get("Connection"); got != "" {
+		t.Errorf("Connection = %q, want empty (not set)", got)
 	}
 	if w.Code != http.StatusOK {
 		t.Errorf("status = %d, want %d", w.Code, http.StatusOK)
