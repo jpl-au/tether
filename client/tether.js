@@ -94,11 +94,13 @@ window.Tether.signals = window.Tether.signals || {};
 
     if (transportMode === "fetch") {
       connectionMode = "fetch";
+      if (root) root.setAttribute("data-tether-state", "connected");
       bindEvents();
       mountExistingHooks();
       observeViewportElements(root);
     } else {
       connectionMode = (transportMode === "sse") ? "sse" : "ws";
+      if (root) root.setAttribute("data-tether-state", "connecting");
       connect();
       bindEvents();
       observeViewportElements(root);
@@ -183,7 +185,7 @@ window.Tether.signals = window.Tether.signals || {};
       var isReconnect = wsOpened;
       wsOpened = true;
       retryDelay = initialRetryDelay;
-      if (root) root.classList.remove("tether-disconnected");
+      if (root) root.setAttribute("data-tether-state", "connected");
       hideReconnectBar();
       resyncPushSubscription();
       if (isReconnect) {
@@ -207,7 +209,7 @@ window.Tether.signals = window.Tether.signals || {};
     };
 
     ws.onclose = function () {
-      if (root) root.classList.add("tether-disconnected");
+      if (root) root.setAttribute("data-tether-state", "disconnected");
       showReconnectBar();
       // If the WebSocket never connected and the server allows SSE
       // fallback (transportMode "auto"), switch to SSE+POST permanently.
@@ -236,7 +238,7 @@ window.Tether.signals = window.Tether.signals || {};
       var isReconnect = sseOpened;
       sseOpened = true;
       retryDelay = initialRetryDelay;
-      if (root) root.classList.remove("tether-disconnected");
+      if (root) root.setAttribute("data-tether-state", "connected");
       hideReconnectBar();
       resyncPushSubscription();
       if (isReconnect) {
@@ -259,7 +261,7 @@ window.Tether.signals = window.Tether.signals || {};
     };
 
     eventSource.onerror = function () {
-      if (root) root.classList.add("tether-disconnected");
+      if (root) root.setAttribute("data-tether-state", "disconnected");
       showReconnectBar();
       // EventSource reconnects automatically — no manual retry needed.
     };
@@ -267,6 +269,7 @@ window.Tether.signals = window.Tether.signals || {};
 
   function scheduleReconnect() {
     setTimeout(function () {
+      if (root) root.setAttribute("data-tether-state", "connecting");
       retryDelay = Math.min(retryDelay * 2, maxRetryDelay);
       connect();
     }, retryDelay);
