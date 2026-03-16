@@ -106,13 +106,6 @@ Use it in CSS to style elements based on connection state:
 [data-tether-state="disconnected"] .status { color: red; }
 ```
 
-Use it in Playwright or other browser test frameworks to wait for
-the connection before interacting:
-
-```go
-page.Locator("[data-tether-state='connected']").WaitFor()
-```
-
 ### SSE keep-alive
 
 SSE connections send keep-alive comments at `Timeouts.Heartbeat` (default 20s) to prevent proxies from closing idle connections.
