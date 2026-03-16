@@ -35,6 +35,19 @@ func Apply[E Settable[E]](el E, opts ...Option) E {
 // The action string becomes [tether.Event].Action, which Handle switches
 // on to determine what happened.
 
+// Prefix sets the event namespace for a component container. When the
+// client JS sends an event from inside a prefixed container, it
+// automatically prepends the prefix to the action. This allows
+// components to use bare action names (e.g. "send") while the
+// framework routes them via the full prefixed name (e.g.
+// "shoutbox.send").
+//
+// Apply Prefix to the element that wraps a mounted component's
+// Render output:
+//
+//	bind.Apply(div.New(s.Chat.Render()), bind.Prefix("chat")).Dynamic("chat-section")
+func Prefix(name string) Option { return Option{"tether-prefix", name} }
+
 // OnClick forwards click events to the server. The action identifies
 // which click this is (e.g. "delete", "save") so Handle can switch on it.
 func OnClick(action string) Option { return Option{"tether-click", action} }

@@ -1262,6 +1262,19 @@ window.Tether.signals = window.Tether.signals || {};
     return sendEvent("navigate", "", { path: path, search: search }) !== null;
   }
 
+  // findPrefix walks up the DOM from el to find the nearest ancestor
+  // with data-tether-prefix, stopping at the tether root. Returns the
+  // prefix string or empty if none found.
+  function findPrefix(el) {
+    var node = el.parentElement;
+    while (node && node !== root) {
+      var p = node.getAttribute("data-tether-prefix");
+      if (p) return p;
+      node = node.parentElement;
+    }
+    return "";
+  }
+
   function bindEventType(domEvent, dataAttr) {
     root.addEventListener(domEvent, function (e) {
       var target = e.target.closest("[data-" + dataAttr + "]");
@@ -1269,6 +1282,15 @@ window.Tether.signals = window.Tether.signals || {};
 
       var action = target.getAttribute("data-" + dataAttr);
       if (!action) return;
+
+      // Auto-prefix: if the element is inside a data-tether-prefix
+      // container, prepend the prefix so components can use bare
+      // action names (e.g. "send") while the server routes them via
+      // the full prefixed name (e.g. "shoutbox.send").
+      var prefix = findPrefix(target);
+      if (prefix && action.indexOf(prefix + ".") !== 0) {
+        action = prefix + "." + action;
+      }
 
       // Show a confirmation dialog if the element requests one.
       var confirmMsg = target.getAttribute("data-tether-confirm");
