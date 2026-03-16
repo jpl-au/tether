@@ -39,6 +39,12 @@ func Upgrade() func(http.ResponseWriter, *http.Request) (tether.Transport, error
 			return nil, fmt.Errorf("response writer does not support flushing")
 		}
 
+		// Disable write deadlines for the SSE stream. This ensures that
+		// even if the server has a global WriteTimeout, it won't kill our
+		// long-lived SSE connection. Requires Go 1.20+.
+		rc := http.NewResponseController(w)
+		_ = rc.SetWriteDeadline(time.Time{})
+
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.Header().Set("Cache-Control", "no-cache")
 		// Connection: keep-alive is not set — it is invalid in HTTP/2
