@@ -84,6 +84,35 @@ SSE compression is handled by the reverse proxy (nginx, Caddy,
 Cloudflare) via standard `Content-Encoding` negotiation — tether does
 not need any configuration for it.
 
+### Connection state
+
+The tether root element exposes transport lifecycle via
+`data-tether-state`. The attribute is set automatically by the client
+JS — no configuration needed.
+
+| Value | Meaning |
+|-------|---------|
+| `connecting` | Transport is attempting to connect (initial or reconnect) |
+| `connected` | WebSocket or SSE stream is open and ready |
+| `disconnected` | Connection lost, will retry |
+
+Stateless pages (`tether.Page` / `mode.HTTP`) are immediately
+`connected` since there is no persistent transport.
+
+Use it in CSS to style elements based on connection state:
+
+```css
+[data-tether-state="connecting"] .submit-btn { opacity: 0.5; }
+[data-tether-state="disconnected"] .status { color: red; }
+```
+
+Use it in Playwright or other browser test frameworks to wait for
+the connection before interacting:
+
+```go
+page.Locator("[data-tether-state='connected']").WaitFor()
+```
+
 ### SSE keep-alive
 
 SSE connections send keep-alive comments at `Timeouts.Heartbeat` (default 20s) to prevent proxies from closing idle connections.
