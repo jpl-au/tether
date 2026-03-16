@@ -301,9 +301,9 @@ func (h *Harness[S]) Disconnect() {
 	h.onDisconnect(&tether.CaptureSession{SessionID: "tethertest"})
 }
 
-// URLWasReplaced reports whether the most recent URL change used
+// Replaced reports whether the most recent URL change used
 // ReplaceURL rather than Navigate. Returns false if no URL was set.
-func (h *Harness[S]) URLWasReplaced() bool {
+func (h *Harness[S]) Replaced() bool {
 	return h.last.Replace
 }
 

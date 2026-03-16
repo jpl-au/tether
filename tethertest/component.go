@@ -87,9 +87,9 @@ func (h *ComponentHarness[C]) HasToast(text string) bool { return h.last.Toast =
 // URL returns the navigation URL from the most recent event.
 func (h *ComponentHarness[C]) URL() string { return h.last.URL }
 
-// URLWasReplaced reports whether the most recent URL change used
+// Replaced reports whether the most recent URL change used
 // ReplaceURL rather than Navigate.
-func (h *ComponentHarness[C]) URLWasReplaced() bool { return h.last.Replace }
+func (h *ComponentHarness[C]) Replaced() bool { return h.last.Replace }
 
 // Title returns the title from the most recent event.
 func (h *ComponentHarness[C]) Title() string { return h.last.Title }

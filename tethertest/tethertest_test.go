@@ -221,7 +221,7 @@ func TestHasFlash(t *testing.T) {
 	}
 }
 
-func TestURLWasReplaced(t *testing.T) {
+func TestReplaced(t *testing.T) {
 	h := tethertest.New(tethertest.Config[state]{
 		State:  state{},
 		Render: render,
@@ -237,13 +237,13 @@ func TestURLWasReplaced(t *testing.T) {
 	})
 
 	h.Send("nav")
-	if h.URLWasReplaced() {
-		t.Error("URLWasReplaced() = true after Navigate, want false")
+	if h.Replaced() {
+		t.Error("Replaced() = true after Navigate, want false")
 	}
 
 	h.Send("replace")
-	if !h.URLWasReplaced() {
-		t.Error("URLWasReplaced() = false after ReplaceURL, want true")
+	if !h.Replaced() {
+		t.Error("Replaced() = false after ReplaceURL, want true")
 	}
 }
 

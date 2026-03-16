@@ -532,7 +532,7 @@ h.HasToast("Saved")              // toast matches text
 h.HasSignal("count", float64(1)) // signal matches key and value
 h.HasAnnounce("Done")            // announcement matches text
 h.HasFlash("#msg", "Saved")      // flash matches selector and text
-h.URLWasReplaced()               // last URL used ReplaceURL (not Navigate)
+h.Replaced()                     // last URL used ReplaceURL (not Navigate)
 ```
 
 ### Middleware

@@ -114,8 +114,8 @@ func TestComponentNavigate(t *testing.T) {
 	if h.URL() != "/next" {
 		t.Errorf("URL() = %q, want /next", h.URL())
 	}
-	if h.URLWasReplaced() {
-		t.Error("URLWasReplaced() = true, want false")
+	if h.Replaced() {
+		t.Error("Replaced() = true, want false")
 	}
 }
 
