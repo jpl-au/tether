@@ -75,6 +75,68 @@ func TestCrossOriginProtectionSameHostFallback(t *testing.T) {
 	}
 }
 
+// TestWSOriginAllowedSecFetchSite verifies that wsOriginAllowed uses
+// Sec-Fetch-Site as the primary signal for modern browsers.
+func TestWSOriginAllowedSecFetchSite(t *testing.T) {
+	h := &Handler[counterState]{
+		cfg: Config[counterState]{},
+	}
+
+	tests := []struct {
+		name         string
+		secFetchSite string
+		origin       string
+		host         string
+		allowed      bool
+	}{
+		{"same-origin", "same-origin", "https://example.com", "example.com", true},
+		{"none (direct navigation)", "none", "", "example.com", true},
+		{"cross-site blocked", "cross-site", "https://evil.com", "example.com", false},
+		{"same-site blocked", "same-site", "https://sub.example.com", "example.com", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &http.Request{Method: "GET", Header: http.Header{}, Host: tt.host}
+			r.Header.Set("Sec-Fetch-Site", tt.secFetchSite)
+			if tt.origin != "" {
+				r.Header.Set("Origin", tt.origin)
+			}
+			if got := h.wsOriginAllowed(r); got != tt.allowed {
+				t.Errorf("wsOriginAllowed() = %v, want %v", got, tt.allowed)
+			}
+		})
+	}
+}
+
+// TestWSOriginAllowedSecFetchSiteTrusted verifies that a cross-site
+// request is allowed when the origin is in TrustedOrigins.
+func TestWSOriginAllowedSecFetchSiteTrusted(t *testing.T) {
+	h := &Handler[counterState]{
+		cfg: Config[counterState]{
+			Security: Security{
+				TrustedOrigins: []string{"https://trusted.com"},
+			},
+		},
+	}
+
+	r := &http.Request{Method: "GET", Header: http.Header{}, Host: "example.com"}
+	r.Header.Set("Sec-Fetch-Site", "cross-site")
+	r.Header.Set("Origin", "https://trusted.com")
+
+	if !h.wsOriginAllowed(r) {
+		t.Error("trusted origin should be allowed even with cross-site Sec-Fetch-Site")
+	}
+
+	r2 := &http.Request{Method: "GET", Header: http.Header{}, Host: "example.com"}
+	r2.Header.Set("Sec-Fetch-Site", "cross-site")
+	r2.Header.Set("Origin", "https://evil.com")
+
+	if h.wsOriginAllowed(r2) {
+		t.Error("untrusted origin should be blocked with cross-site Sec-Fetch-Site")
+	}
+}
+
 // TestWSOriginAllowedWithTrustedOrigins verifies that the WebSocket-
 // specific origin check blocks cross-origin upgrades even though they
 // are GET requests. This prevents cross-site WebSocket hijacking.
@@ -111,9 +173,11 @@ func TestWSOriginAllowedWithTrustedOrigins(t *testing.T) {
 	}
 }
 
-// TestWSOriginAllowedSameHostFallback verifies that without trusted
-// origins, the WebSocket check falls back to hostname comparison.
-func TestWSOriginAllowedSameHostFallback(t *testing.T) {
+// TestWSOriginAllowedHostFallback verifies that without trusted
+// origins and without Sec-Fetch-Site, the WebSocket check compares
+// Origin host:port against the Host header (matching the stdlib's
+// fallback behaviour).
+func TestWSOriginAllowedHostFallback(t *testing.T) {
 	h := &Handler[counterState]{
 		cfg: Config[counterState]{},
 	}
@@ -124,8 +188,9 @@ func TestWSOriginAllowedSameHostFallback(t *testing.T) {
 		host    string
 		allowed bool
 	}{
-		{"same host", "https://example.com", "example.com", true},
-		{"same host with port", "https://example.com", "example.com:8080", true},
+		{"exact match", "https://example.com", "example.com", true},
+		{"port mismatch rejected", "https://example.com", "example.com:8080", false},
+		{"origin with port matches host with port", "https://example.com:8080", "example.com:8080", true},
 		{"cross origin", "https://evil.com", "example.com", false},
 		{"no origin", "", "example.com", true},
 	}

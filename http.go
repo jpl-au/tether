@@ -3,7 +3,6 @@ package tether
 import (
 	"encoding/json"
 	"log/slog"
-	"net"
 	"net/http"
 	"net/url"
 	"slices"
@@ -104,36 +103,48 @@ func (h *Handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // browser's Same-Origin Policy — the server must validate the Origin
 // during the handshake.
 //
-// This is separate from CSRF protection (handled by
-// [http.CrossOriginProtection]) because WebSocket upgrades are GET
-// requests that the stdlib correctly exempts as safe methods. The
-// upgrade is the one case where a GET becomes state-changing.
+// The check mirrors the logic in [http.CrossOriginProtection] but
+// without the safe-method bypass: Sec-Fetch-Site is checked first
+// (available in all browsers since 2023), then Origin is compared
+// against TrustedOrigins or the Host header as a fallback.
 //
-// Requests without an Origin header are allowed — they come from
-// same-origin navigations or non-browser clients.
+// Requests without Sec-Fetch-Site or Origin headers are allowed —
+// they come from same-origin navigations or non-browser clients.
 func (h *Handler[S]) wsOriginAllowed(r *http.Request) bool {
+	// Sec-Fetch-Site is the primary signal. Modern browsers send it
+	// on all requests including WebSocket upgrades.
+	switch r.Header.Get("Sec-Fetch-Site") {
+	case "same-origin", "none":
+		return true
+	case "":
+		// Header absent — fall through to Origin check.
+	default:
+		// "cross-site", "same-site", or any other value.
+		// Check if the origin is explicitly trusted.
+		origin := r.Header.Get("Origin")
+		return slices.Contains(h.cfg.Security.TrustedOrigins, origin)
+	}
+
+	// No Sec-Fetch-Site header. Check the Origin header.
 	origin := r.Header.Get("Origin")
 	if origin == "" {
+		// Neither header present — same-origin or non-browser client.
 		return true
 	}
+
+	// If TrustedOrigins is configured, match exactly.
 	if len(h.cfg.Security.TrustedOrigins) > 0 {
 		return slices.Contains(h.cfg.Security.TrustedOrigins, origin)
 	}
+
+	// No TrustedOrigins — compare Origin's host:port against the
+	// Host header. This matches the stdlib's fallback behaviour
+	// (see net/http/csrf.go line 161).
 	u, err := url.Parse(origin)
 	if err != nil {
 		return false
 	}
-	return stripPort(u.Host) == stripPort(r.Host)
-}
-
-// stripPort returns the host portion of a host:port string. If there
-// is no port, the input is returned unchanged.
-func stripPort(hostport string) string {
-	host, _, err := net.SplitHostPort(hostport)
-	if err != nil {
-		return hostport
-	}
-	return host
+	return u.Host == r.Host
 }
 
 // handlePostEvent receives a client event via HTTP POST. This is the
