@@ -100,6 +100,7 @@ func TestObserveCrossHandler(t *testing.T) {
 			cmds:      make(chan func(), defaultCmdBufferSize),
 			fxCh:      make(chan func(*Effects), defaultCmdBufferSize),
 			loopDone:  make(chan struct{}),
+			destroyed: make(chan struct{}),
 			ctx:       ctxB,
 			stop:      cancelB,
 		}
@@ -192,6 +193,7 @@ func TestObserveMultipleValues(t *testing.T) {
 			cmds:      make(chan func(), defaultCmdBufferSize),
 			fxCh:      make(chan func(*Effects), defaultCmdBufferSize),
 			loopDone:  make(chan struct{}),
+			destroyed: make(chan struct{}),
 			ctx:       ctx,
 			stop:      cancel,
 		}

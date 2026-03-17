@@ -297,6 +297,24 @@ type LiveConfig[S any] struct {
 	// where setup is identical for new and restored sessions.
 	OnRestore func(session *LiveSession[S])
 
+	// FreezeOnDisconnect enables frozen mode for disconnected
+	// sessions. When true, a session that loses its transport
+	// persists state S to the [SessionStore], releases the state
+	// and differ from memory, and exits the command loop. The
+	// session becomes a lightweight stub holding only its ID and
+	// metadata. On reconnect, the framework loads state from the
+	// store, starts a fresh loop, and fires [OnRestore].
+	//
+	// This dramatically reduces memory for disconnected sessions
+	// at the cost of commands (Update, broadcasts, timer callbacks)
+	// being silently discarded while frozen. Enable this when
+	// sessions do not need background processing during disconnect.
+	//
+	// Requires [SessionStore] to be configured. If SessionStore is
+	// nil and FreezeOnDisconnect is true, the framework logs a
+	// warning at startup and disables freeze.
+	FreezeOnDisconnect bool
+
 	// Security groups origin-checking and CSRF protection settings.
 	Security Security
 }

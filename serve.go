@@ -142,12 +142,14 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 			})
 			return
 		}
+		frozen := Status(sess.status.Load()) == Frozen
 		delete(h.disconnected, id)
 		h.active[id] = sess
 		h.mu.Unlock()
 
 		// Clean up stored data — Render rebuilds differ snapshots,
-		// and state S is already current in memory.
+		// and state S is already current in memory (or will be loaded
+		// from the store for frozen sessions).
 		if h.cfg.DiffStore != nil {
 			if err := h.cfg.DiffStore.Delete(sess.ctx, id); err != nil {
 				dev.Warn("store delete failed on reconnect", "session", id, "error", err)
@@ -159,21 +161,25 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 				})
 			}
 		}
-		if h.cfg.SessionStore != nil {
-			if err := h.cfg.SessionStore.Delete(sess.ctx, id); err != nil {
-				dev.Warn("session store delete failed on reconnect", "session", id, "error", err)
-				h.Diagnostics.Publish(Diagnostic{
-					Kind:      SessionStoreError,
-					SessionID: id,
-					Err:       err,
-					Detail:    "delete",
-				})
-			}
-		}
 
-		dev.Debug("session reattached", "session", id, "endpoint", sess.endpoint, "remote", r.RemoteAddr)
 		started = true
-		h.reattach(sess, transport)
+		if frozen {
+			h.thaw(sess, r, transport)
+		} else {
+			if h.cfg.SessionStore != nil {
+				if err := h.cfg.SessionStore.Delete(sess.ctx, id); err != nil {
+					dev.Warn("session store delete failed on reconnect", "session", id, "error", err)
+					h.Diagnostics.Publish(Diagnostic{
+						Kind:      SessionStoreError,
+						SessionID: id,
+						Err:       err,
+						Detail:    "delete",
+					})
+				}
+			}
+			dev.Debug("session reattached", "session", id, "endpoint", sess.endpoint, "remote", r.RemoteAddr)
+			h.reattach(sess, transport)
+		}
 		return
 	}
 	h.mu.Unlock()
@@ -260,6 +266,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		fxCh:             make(chan func(*Effects), h.cfg.Limits.CmdBufferSize),
 		overflowSem:      make(chan struct{}, h.cfg.Limits.CmdBufferSize),
 		loopDone:         make(chan struct{}),
+		destroyed:        make(chan struct{}),
 		ctx:              ctx,
 		stop:             cancel,
 		createdAt:        now,
@@ -271,6 +278,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		store:            h.cfg.DiffStore,
 		sessionStore:     h.cfg.SessionStore,
 		codec:            h.sessionCodec(),
+		freeze:           h.cfg.FreezeOnDisconnect && h.cfg.SessionStore != nil,
 	}
 	sess.lastActivity.Store(now.UnixNano())
 	if len(h.cfg.Components) > 0 {
@@ -441,6 +449,7 @@ func (h *Handler[S]) restoreSession(id string, r *http.Request, transport Transp
 		fxCh:             make(chan func(*Effects), h.cfg.Limits.CmdBufferSize),
 		overflowSem:      make(chan struct{}, h.cfg.Limits.CmdBufferSize),
 		loopDone:         make(chan struct{}),
+		destroyed:        make(chan struct{}),
 		ctx:              ctx,
 		stop:             cancel,
 		createdAt:        now,
@@ -452,6 +461,7 @@ func (h *Handler[S]) restoreSession(id string, r *http.Request, transport Transp
 		store:            h.cfg.DiffStore,
 		sessionStore:     h.cfg.SessionStore,
 		codec:            codec,
+		freeze:           h.cfg.FreezeOnDisconnect && h.cfg.SessionStore != nil,
 	}
 	sess.lastURL = env.URL
 	sess.lastTitle = env.Title

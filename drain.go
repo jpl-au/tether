@@ -67,7 +67,7 @@ func (h *Handler[S]) Shutdown(ctx context.Context) error {
 	done := make(chan struct{})
 	go func() {
 		for _, sess := range sessions {
-			<-sess.loopDone
+			<-sess.destroyed
 		}
 		close(done)
 	}()

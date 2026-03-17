@@ -96,6 +96,14 @@ func (h *Handler[S]) destroySession(s *LiveSession[S]) {
 		s.stop()
 	}
 
+	// For frozen sessions the loop already exited and cleanup()
+	// skipped closing destroyed. Close it now so Shutdown waiters
+	// are unblocked.
+	if Status(s.status.Load()) == Frozen {
+		s.status.Store(int32(Destroyed))
+		close(s.destroyed)
+	}
+
 	// Remove stored data for sessions that were offloaded during
 	// disconnect. No-op if nothing was stored.
 	if h.cfg.DiffStore != nil {

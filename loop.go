@@ -24,7 +24,7 @@ import (
 // session alive for reconnection.
 func (s *LiveSession[S]) run() {
 	dev.Debug("run loop started", "session", s.id, "endpoint", s.endpoint)
-	s.loopRunning.Store(true)
+	s.status.Store(int32(Active))
 	defer close(s.loopDone)
 	defer s.cleanup()
 
@@ -36,6 +36,12 @@ func (s *LiveSession[S]) run() {
 				// skips it. Session stays alive for reconnection.
 				s.events = nil
 				s.onTransportClose()
+				if s.freeze {
+					// Frozen — exit the loop. State has been
+					// persisted and memory released. A reconnect
+					// will thaw by starting a new run().
+					return
+				}
 				continue
 			}
 			s.exec(ev)
@@ -255,6 +261,17 @@ func (s *LiveSession[S]) onTransportClose() {
 	if s.onDisconnect != nil {
 		s.onDisconnect()
 	}
+
+	// Freeze: release state and differ to reclaim memory. The store
+	// holds everything needed to restore. The loop exits after this
+	// returns (checked by the caller in run).
+	if s.freeze {
+		var zero S
+		s.state = zero
+		s.differ = nil
+		s.status.Store(int32(Frozen))
+		dev.Debug("session frozen", "session", s.id, "endpoint", s.endpoint)
+	}
 }
 
 // saveSessionState encodes the session's state and metadata into an
@@ -306,11 +323,17 @@ func (s *LiveSession[S]) saveSessionState(ctx context.Context, ttl time.Duration
 	}
 }
 
-// cleanup runs when the loop exits. It stops lifecycle timers so
-// their callbacks don't fire on a dead session.
+// cleanup runs when the loop exits. For frozen sessions only the
+// idle timer is stopped — the disconnect timer keeps running so the
+// reaper can destroy the session if it is never thawed. For
+// destroyed sessions, everything is stopped and the destroyed
+// channel is closed.
 func (s *LiveSession[S]) cleanup() {
 	if s.idleTimer != nil {
 		s.idleTimer.Stop()
+	}
+	if Status(s.status.Load()) == Frozen {
+		return
 	}
 	if s.disconnectTimer != nil {
 		s.disconnectTimer.Stop()
@@ -318,6 +341,8 @@ func (s *LiveSession[S]) cleanup() {
 	if s.transport != nil {
 		s.transport.Close()
 	}
+	s.status.Store(int32(Destroyed))
+	close(s.destroyed)
 }
 
 // sendDiff is the render-diff-send pipeline extracted from exec and

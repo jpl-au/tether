@@ -74,18 +74,25 @@ type LiveSession[S any] struct {
 	// Session lifetime — cancelled on permanent destruction.
 	ctx  context.Context
 	stop context.CancelFunc
-	// closed by run() on exit so Shutdown can wait for the loop.
+	// loopDone is closed each time run() exits. The HTTP handler
+	// goroutine blocks on this so it can return when the transport
+	// is no longer needed. A frozen session closes loopDone on
+	// freeze and creates a new one on thaw.
 	loopDone chan struct{}
+	// destroyed is closed when the session reaches the Destroyed
+	// state. Shutdown and Drain block on this to wait for permanent
+	// cleanup — not just a loop exit (which also happens on freeze).
+	destroyed chan struct{}
 
 	// Timestamps. lastActivity is atomic so the idle timer reset
 	// (inside the loop) and external readers (Health) don't conflict.
 	lastActivity atomic.Int64 // UnixNano
 	createdAt    time.Time
 
-	// loopRunning is set to true when run() enters its select loop.
-	// State() checks this to avoid deadlocking when called before
-	// the loop has started (e.g. during OnConnect).
-	loopRunning atomic.Bool
+	// status tracks the session's lifecycle state. Transitions are
+	// Pending → Active → Frozen → Active (thaw) or → Destroyed.
+	// See [Status] for the full state machine.
+	status atomic.Int32
 	// handling is true while the loop goroutine is inside exec() or
 	// Update. Used by State() to choose the fast path (return the
 	// atomic snapshot) instead of routing through the command channel,
@@ -172,6 +179,12 @@ type LiveSession[S any] struct {
 	// codec serialises state S for the session store. Set from
 	// LiveConfig.Codec, or defaults to CBOR if nil.
 	codec SessionCodec[S]
+
+	// freeze is true when FreezeOnDisconnect is enabled and a
+	// SessionStore is configured. When set, the session persists
+	// state to the store on disconnect, releases S and the differ,
+	// and exits the command loop — reducing memory to metadata only.
+	freeze bool
 
 	// diagnostics is the handler's diagnostic bus. The session emits
 	// transport errors, encode failures, panics, and buffer overflows.
@@ -366,6 +379,9 @@ func (s *LiveSession[S]) sessionID() string {
 // an overflow goroutine delivers it — same semaphore-bounded
 // pattern as [enqueue].
 func (s *LiveSession[S]) enqueueFx(fn func(*Effects)) {
+	if Status(s.status.Load()) == Frozen {
+		return
+	}
 	select {
 	case s.fxCh <- fn:
 	default:
@@ -447,6 +463,9 @@ func (s *LiveSession[S]) sendFx(fx *Effects) {
 // CmdBufferSize. If both the buffer and the semaphore are full, the
 // command is dropped and a [CommandDropped] diagnostic is emitted.
 func (s *LiveSession[S]) enqueue(fn func()) {
+	if Status(s.status.Load()) == Frozen {
+		return
+	}
 	select {
 	case s.cmds <- fn:
 	default:

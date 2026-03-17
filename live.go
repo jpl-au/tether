@@ -172,6 +172,10 @@ func Live[S any](cfg LiveConfig[S]) *Handler[S] {
 	if cfg.Limits.MaxSessions == 0 {
 		slog.Warn("tether: Limits.MaxSessions is 0 (unlimited) — set a limit in production to prevent resource exhaustion")
 	}
+	if cfg.FreezeOnDisconnect && cfg.SessionStore == nil {
+		slog.Warn("tether: FreezeOnDisconnect requires a SessionStore — frozen mode disabled because there is nowhere to persist state")
+		cfg.FreezeOnDisconnect = false
+	}
 	mounts := buildAssetMounts(cfg.Assets)
 
 	csrf := http.NewCrossOriginProtection()

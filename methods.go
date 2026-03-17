@@ -23,8 +23,8 @@ func (s *LiveSession[S]) State() S {
 	if s.handling.Load() {
 		return s.stateSnap.Load().(S)
 	}
-	if !s.loopRunning.Load() {
-		// Loop not started — return state directly to avoid
+	if Status(s.status.Load()) != Active {
+		// Loop not running — return state directly to avoid
 		// deadlocking on a channel nobody is draining.
 		return s.state
 	}

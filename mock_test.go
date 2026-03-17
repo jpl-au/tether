@@ -200,6 +200,7 @@ func newTestSession(state counterState, mt Transport) *LiveSession[counterState]
 		cmds:      make(chan func(), defaultCmdBufferSize),
 		fxCh:      make(chan func(*Effects), defaultCmdBufferSize),
 		loopDone:  make(chan struct{}),
+		destroyed: make(chan struct{}),
 		ctx:       ctx,
 		stop:      cancel,
 	}

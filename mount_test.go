@@ -47,6 +47,7 @@ func newMountSession(state mountState, mt Transport, mounts []ComponentMount[mou
 		cmds:      make(chan func(), defaultCmdBufferSize),
 		fxCh:      make(chan func(*Effects), defaultCmdBufferSize),
 		loopDone:  make(chan struct{}),
+		destroyed: make(chan struct{}),
 		ctx:       ctx,
 		stop:      cancel,
 		mounts:    mounts,
@@ -147,10 +148,11 @@ func TestMountRouteSetsEventTarget(t *testing.T) {
 			handle: func(_ Session, s targetState, ev Event) targetState { return s },
 			differ: differ, encoder: wire.JSONEncoder{},
 			transport: mt, events: make(chan Event),
-			cmds:     make(chan func(), defaultCmdBufferSize),
-			fxCh:     make(chan func(*Effects), defaultCmdBufferSize),
-			loopDone: make(chan struct{}),
-			ctx:      ctx, stop: cancel,
+			cmds:      make(chan func(), defaultCmdBufferSize),
+			fxCh:      make(chan func(*Effects), defaultCmdBufferSize),
+			loopDone:  make(chan struct{}),
+			destroyed: make(chan struct{}),
+			ctx:       ctx, stop: cancel,
 			mounts: mounts,
 		}
 		tree := sess.render(sess.state)
