@@ -46,7 +46,7 @@ span.Textf("Count: %d", state.Count)
 span.Textf("Count: %d", state.Count).Dynamic("count")
 ```
 
-Use `Config.OnNoPatch` to detect missing keys in development and production:
+Use `LiveConfig.OnNoPatch` to detect missing keys in development and production:
 
 ```go
 OnNoPatch: func(sess *tether.LiveSession[State], info tether.NoPatch) {
@@ -80,7 +80,7 @@ if len(items) == 0 {
 return div.New(ul.New(nodes...)).Dynamic("list")
 ```
 
-Use `Config.OnStructuralChange` to detect unstable key sets. See [stable key sets](server-updates.md#stable-key-sets).
+Use `LiveConfig.OnStructuralChange` to detect unstable key sets. See [stable key sets](server-updates.md#stable-key-sets).
 
 ## Use signals for high-frequency updates
 
@@ -139,12 +139,12 @@ OnConnect: func(sess *tether.LiveSession[State]) {
 
 `Value`, `Bus`, and `Group` are all internally synchronised. See [broadcasting](broadcasting.md) for when to use each.
 
-## Declare subscriptions on Config
+## Declare subscriptions on LiveConfig
 
-Use `Config.Watchers` to subscribe sessions to shared Values and Buses declaratively. Watchers are subscribed before `OnConnect` runs and cleaned up automatically when the session is destroyed:
+Use `LiveConfig.Watchers` to subscribe sessions to shared Values and Buses declaratively. Watchers are subscribed before `OnConnect` runs and cleaned up automatically when the session is destroyed:
 
 ```go
-tether.Config[State]{
+tether.LiveConfig[State]{
     Watchers: []tether.Watcher[State]{
         tether.WatchValue(onlineCount, func(n int, s State) State {
             s.OnlineUsers = n
@@ -158,7 +158,7 @@ tether.Config[State]{
 }
 ```
 
-This keeps all reactive subscriptions visible in one place — right next to `Config.Groups`. Reserve `OnConnect` for imperative setup: incrementing counters, publishing events, pushing initial signals, starting background tickers.
+This keeps all reactive subscriptions visible in one place — right next to `LiveConfig.Groups`. Reserve `OnConnect` for imperative setup: incrementing counters, publishing events, pushing initial signals, starting background tickers.
 
 Never subscribe inside Handle — it creates a new subscription on every event:
 
@@ -178,9 +178,9 @@ Handle: func(sess tether.Session, s State, ev tether.Event) State {
 
 Subscriptions created in `OnConnect` are cleaned up automatically when the session is destroyed. No manual unsubscribe needed.
 
-## Use Config.Components for self-contained components
+## Use LiveConfig.Components for self-contained components
 
-When a component handles its own events without needing to coordinate with the rest of the page, mount it declaratively via `Config.Components`. The framework dispatches events automatically — the page's `Handle` never sees them:
+When a component handles its own events without needing to coordinate with the rest of the page, mount it declaratively via `LiveConfig.Components`. The framework dispatches events automatically — the page's `Handle` never sees them:
 
 ```go
 Components: []tether.ComponentMount[State]{
@@ -193,7 +193,7 @@ Components: []tether.ComponentMount[State]{
 
 Use `Route`/`RouteTyped` in Handle instead when:
 - The component needs to coordinate with other state changes
-- You are using `tether.Page` (stateless handlers don't support `Config.Components`)
+- You are using `tether.Page` (stateless handlers don't support `LiveConfig.Components`)
 - You need to inspect or transform the event before forwarding
 
 ## Keep component Render roots keyed
@@ -221,7 +221,7 @@ div.New(s.Stars.Render()).Dynamic("stars-section"),
 When many events leave state unchanged — keypresses that don't affect the model, button clicks that only trigger side effects — the render and diff are wasted work. Provide an `Equal` function to skip them:
 
 ```go
-tether.New(tether.Config[State]{
+tether.Live(tether.LiveConfig[State]{
     Equal: func(a, b State) bool {
         return a == b
     },

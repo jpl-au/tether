@@ -13,7 +13,7 @@ Three update modes give you the right tool for every situation:
 ## Quick example
 
 ```go
-mux.Handle("/counter", tether.New(tether.Config[CounterState]{
+mux.Handle("/counter", tether.Live(tether.LiveConfig[CounterState]{
     Upgrade: ws.Upgrade(),
     InitialState: func(r *http.Request) CounterState {
         return CounterState{Count: 0}
@@ -50,7 +50,7 @@ When the handler owns the entire page, `ListenAndServe` handles signal
 trapping, graceful shutdown, and sensible defaults:
 
 ```go
-h := tether.New(tether.Config[State]{
+h := tether.Live(tether.LiveConfig[State]{
     Upgrade:      ws.Upgrade(),
     Fallback:     sse.Upgrade(),
     Mode:         mode.Both,
@@ -69,7 +69,7 @@ exits.
 
 ## Embedded assets
 
-Serve CSS, JS, and images from an `embed.FS` with automatic content-hashed URLs. Add assets to `Config.Assets` and they're auto-served — no extra mux setup needed:
+Serve CSS, JS, and images from an `embed.FS` with automatic content-hashed URLs. Add assets to `LiveConfig.Assets` and they're auto-served — no extra mux setup needed:
 
 ```go
 //go:embed static
@@ -77,7 +77,7 @@ var staticFS embed.FS
 
 var assets = &tether.Asset{FS: staticFS, Prefix: "/static/"}
 
-tether.New(tether.Config[State]{
+tether.Live(tether.LiveConfig[State]{
     Assets: []*tether.Asset{assets},
     Layout: func(state State, content node.Node) node.Node {
         return html.New(
@@ -95,13 +95,13 @@ tether.New(tether.Config[State]{
 Two independent, opt-in stores handle different concerns:
 
 **Session store** — persists application state `S` for crash recovery and node
-migration. Set `Config.SessionStore` to enable. On disconnect and graceful
+migration. Set `LiveConfig.SessionStore` to enable. On disconnect and graceful
 shutdown, the framework serialises `S` (CBOR by default) and saves it. When a
 reconnecting client hits a server with no in-memory session, the framework
 restores from the store. See [session-store](docs/session-store.md) for details.
 
 **Diff store** — offloads differ snapshots to external storage during the
-reconnect window, freeing Go memory. Set `Config.DiffStore` to enable. This is
+reconnect window, freeing Go memory. Set `LiveConfig.DiffStore` to enable. This is
 a memory optimisation, not a recovery mechanism. See [store](docs/store.md) for
 details.
 
@@ -117,7 +117,7 @@ for details and examples.
 | Guide | Description |
 |-------|-------------|
 | [Architecture](docs/architecture.md) | Core concepts, session lifecycle, command loop, transport |
-| [API reference](docs/api.md) | Config, Session, Event, Component, Middleware, tethertest, bind helpers |
+| [API reference](docs/api.md) | LiveConfig, Session, Event, Component, Middleware, tethertest, bind helpers |
 | [Getting started](docs/getting-started.md) | Setup, how updates reach the browser |
 | [Stateless pages](docs/stateless.md) | tether.Page for request/response pages without persistent connections |
 | [Events](docs/events.md) | Event binding, timing, loading states, forms |

@@ -26,7 +26,7 @@ type StructuralChange struct {
 }
 
 // NoPatch describes a render cycle that produced no DOM changes.
-// Passed to [Config.OnNoPatch] so the developer can log, count, or
+// Passed to [LiveConfig.OnNoPatch] so the developer can log, count, or
 // ignore it as appropriate.
 type NoPatch struct {
 	Source string // "update", "navigate", or "event"
@@ -41,7 +41,7 @@ type NoPatch struct {
 type RenderFunc[S any] func(state S) node.Node
 
 // defaultCmdBufferSize is the capacity of the command channel when
-// [Config].CmdBufferSize is zero.
+// [LiveConfig].CmdBufferSize is zero.
 const defaultCmdBufferSize = 64
 
 // LiveSession represents a single connected client. Each browser tab
@@ -132,7 +132,7 @@ type LiveSession[S any] struct {
 	lastURL   string
 	lastTitle string
 
-	// Push — sender is set from Config, subscription arrives at runtime.
+	// Push — sender is set from LiveConfig, subscription arrives at runtime.
 	// pushSub is atomic so Push() can read it safely from any goroutine
 	// without routing through the command channel.
 	pushSender *push.Sender
@@ -157,20 +157,20 @@ type LiveSession[S any] struct {
 	// Optional hook for render cycles that produce no patches.
 	onNoPatch func(*LiveSession[S], NoPatch)
 
-	// store is the external snapshot store from Config.DiffStore.
+	// store is the external snapshot store from LiveConfig.DiffStore.
 	// When non-nil, differ snapshots are saved here on disconnect
 	// and deleted on reconnect or destroy, freeing process memory
 	// during the reconnect window.
 	store DiffStore
 
 	// sessionStore is the external state store from
-	// Config.SessionStore. When non-nil, session state S and
+	// LiveConfig.SessionStore. When non-nil, session state S and
 	// metadata are saved here on disconnect and graceful shutdown,
 	// enabling crash recovery and node migration.
 	sessionStore SessionStore
 
 	// codec serialises state S for the session store. Set from
-	// Config.Codec, or defaults to CBOR if nil.
+	// LiveConfig.Codec, or defaults to CBOR if nil.
 	codec SessionCodec[S]
 
 	// diagnostics is the handler's diagnostic bus. The session emits

@@ -12,8 +12,8 @@ in-memory session.
 This enables crash recovery and node migration without the developer
 writing any persistence plumbing.
 
-By default (`Config.SessionStore` is nil), nothing changes — sessions
-are in-memory only. Set `Config.SessionStore` to opt in.
+By default (`LiveConfig.SessionStore` is nil), nothing changes — sessions
+are in-memory only. Set `LiveConfig.SessionStore` to opt in.
 
 ## How it relates to DiffStore
 
@@ -25,7 +25,7 @@ These are independent concerns:
 | **Purpose** | Memory optimisation | Crash recovery |
 | **Save trigger** | On disconnect | On disconnect + graceful shutdown |
 | **Load trigger** | Not called by framework | On crash recovery |
-| **Config field** | `Config.DiffStore` | `Config.SessionStore` |
+| **LiveConfig field** | `LiveConfig.DiffStore` | `LiveConfig.SessionStore` |
 
 A developer may use one without the other, both, or neither.
 
@@ -133,7 +133,7 @@ type SessionCodec[S any] interface {
 }
 ```
 
-Set `Config.Codec` to use it. The codec only handles `S` — session
+Set `LiveConfig.Codec` to use it. The codec only handles `S` — session
 metadata (URL, title, user-agent) is wrapped separately by the
 framework.
 
@@ -149,7 +149,7 @@ State should be pure data. Runtime handles belong in lifecycle hooks
 ## OnRestore
 
 ```go
-type Config[S any] struct {
+type LiveConfig[S any] struct {
     OnRestore func(session *LiveSession[S])
 }
 ```
@@ -164,7 +164,7 @@ setup is identical for new and restored sessions.
 ## Configuration
 
 ```go
-h := tether.New(tether.Config[State]{
+h := tether.Live(tether.LiveConfig[State]{
     SessionStore: myRedisStore,
     // Codec: myCustomCodec,  // optional, defaults to CBOR
     // OnRestore: func(sess *tether.LiveSession[State]) { ... },

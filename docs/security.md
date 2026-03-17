@@ -32,7 +32,7 @@ alongside TLS and origin checking.
 To disable (e.g. for environments where User-Agents change mid-session):
 
 ```go
-tether.New(tether.Config[State]{
+tether.Live(tether.LiveConfig[State]{
     Security: tether.Security{
         DisableSessionBinding: true,
     },
@@ -98,7 +98,7 @@ header comparison against `TrustedOrigins` or the `Host` header.
 Configure trusted origins explicitly for production:
 
 ```go
-tether.New(tether.Config[State]{
+tether.Live(tether.LiveConfig[State]{
     Security: tether.Security{
         TrustedOrigins: []string{
             "https://example.com",

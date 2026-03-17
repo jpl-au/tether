@@ -89,7 +89,7 @@ func TestClientPrecache(t *testing.T) {
 		Precache: []string{"styles.css", "logo.svg"},
 	}
 
-	handler := New(Config[counterState]{
+	handler := Live(LiveConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -286,7 +286,7 @@ func TestHandlePushSubscribe(t *testing.T) {
 	}
 	ch := make(chan result, 1)
 
-	handler := New(Config[counterState]{
+	handler := Live(LiveConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -353,7 +353,7 @@ func TestHandlePushSubscribe(t *testing.T) {
 }
 
 func TestHandlePushSubscribeNoPush(t *testing.T) {
-	handler := New(Config[counterState]{
+	handler := Live(LiveConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -374,7 +374,7 @@ func TestHandlePushSubscribeNoPush(t *testing.T) {
 }
 
 func TestHandlePushSubscribeMissingSession(t *testing.T) {
-	handler := New(Config[counterState]{
+	handler := Live(LiveConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -399,7 +399,7 @@ func TestHandlePushSubscribeMissingSession(t *testing.T) {
 }
 
 func TestHandlePushSubscribeUnknownSession(t *testing.T) {
-	handler := New(Config[counterState]{
+	handler := Live(LiveConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -464,7 +464,7 @@ func TestDevModeEnvVar(t *testing.T) {
 	t.Setenv("TETHER_DEV", "1")
 	t.Cleanup(dev.Reset)
 
-	New(Config[counterState]{
+	Live(LiveConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -481,7 +481,7 @@ func TestDevModeBoolOverridesEnv(t *testing.T) {
 	t.Setenv("TETHER_DEV", "")
 	t.Cleanup(dev.Reset)
 
-	New(Config[counterState]{
+	Live(LiveConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -498,7 +498,7 @@ func TestDevModeBoolOverridesEnv(t *testing.T) {
 func TestDevModeCacheControl(t *testing.T) {
 	t.Cleanup(dev.Reset)
 
-	handler := New(Config[counterState]{
+	handler := Live(LiveConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -517,7 +517,7 @@ func TestDevModeCacheControl(t *testing.T) {
 }
 
 func TestDevModeNoCacheControlInProduction(t *testing.T) {
-	handler := New(Config[counterState]{
+	handler := Live(LiveConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -537,7 +537,7 @@ func TestDevModeNoCacheControlInProduction(t *testing.T) {
 func TestDevModeInitialPageHasAttribute(t *testing.T) {
 	t.Cleanup(dev.Reset)
 
-	handler := New(Config[counterState]{
+	handler := Live(LiveConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -557,7 +557,7 @@ func TestDevModeInitialPageHasAttribute(t *testing.T) {
 
 // newTestHandler creates a Handler with default test configuration.
 func newTestHandler() *Handler[counterState] {
-	return New(Config[counterState]{
+	return Live(LiveConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },

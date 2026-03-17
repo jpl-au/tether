@@ -31,7 +31,7 @@ import (
 //
 // Target identifies which component handled this event. It is empty for
 // events routed to the application's Handle function, and set by the
-// framework when [Config.Components] dispatches an event to a mounted
+// framework when [LiveConfig.Components] dispatches an event to a mounted
 // component. Middleware and logging can inspect Target to see which
 // component an event was routed to without parsing the Action string.
 //

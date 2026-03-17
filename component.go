@@ -63,7 +63,7 @@ type EqualComponent interface {
 // perform one-time setup when they are first mounted into a session.
 // The framework calls Mount once per component — after the session's
 // command loop starts but before any client events are processed —
-// when the component is registered via [Config.Components].
+// when the component is registered via [LiveConfig.Components].
 //
 // Mount receives the [Session] so the component can fire side effects
 // (Toast, Signal, etc.) or start background work via [Session.Go].

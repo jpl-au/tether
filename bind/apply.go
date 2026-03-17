@@ -60,7 +60,7 @@ func OnSubmit(action string) Option { return Option{"tether-submit", action} }
 // OnInput forwards input events to the server with debouncing. The
 // element's current value is included automatically in
 // [tether.Event].Data["value"]. Debounce delay defaults to 300ms
-// (configurable via [tether.Config].Client.DefaultDebounce or per-element
+// (configurable via [tether.LiveConfig].Client.DefaultDebounce or per-element
 // via [Debounce]).
 func OnInput(action string) Option { return Option{"tether-input", action} }
 
@@ -138,7 +138,7 @@ func FocusTrap() Option { return Option{"tether-focus-trap", ""} }
 // Timing options — control how frequently events reach the server.
 
 // Debounce overrides the default input debounce delay for this element.
-// The default (300ms, configurable via [tether.Config].Client.DefaultDebounce)
+// The default (300ms, configurable via [tether.LiveConfig].Client.DefaultDebounce)
 // groups rapid keystrokes into a single event. Set a shorter duration
 // for search-as-you-type, or a longer one for expensive operations.
 func Debounce(d time.Duration) Option {
@@ -297,7 +297,7 @@ func OptimisticToggle(signal string) Option { return Option{"tether-optimistic-t
 func Collect(selector string) Option { return Option{"tether-collect", selector} }
 
 // Upload options — file upload via the upload extension JS. Requires
-// [tether.UploadConfig] on [tether.Config].
+// [tether.UploadConfig] on [tether.LiveConfig].
 
 // Upload marks the element as a file upload trigger. Clicking it opens
 // the browser's file picker. When files are selected, they are uploaded
@@ -320,7 +320,7 @@ func UploadProgress(action string) Option {
 }
 
 // Push options — Web Push notification subscription. Requires
-// [tether.PushConfig] on [tether.Config].
+// [tether.PushConfig] on [tether.LiveConfig].
 
 // PushSubscribe marks a button for Web Push subscription. On click, the
 // browser requests notification permission from the user and, if

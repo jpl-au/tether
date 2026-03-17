@@ -10,8 +10,8 @@ Disconnected sessions keep their differ snapshots in process memory while
 waiting to reconnect. The `DiffStore` interface lets you move that data to
 external storage during the reconnect window, freeing Go memory.
 
-By default (`Config.DiffStore` is nil), nothing changes — sessions stay in
-memory exactly as they always have. Set `Config.DiffStore` to opt in.
+By default (`LiveConfig.DiffStore` is nil), nothing changes — sessions stay in
+memory exactly as they always have. Set `LiveConfig.DiffStore` to opt in.
 
 ## The interface
 
@@ -107,7 +107,7 @@ whatever suits your deployment.
 ## Configuration
 
 ```go
-h := tether.New(tether.Config[State]{
+h := tether.Live(tether.LiveConfig[State]{
     DiffStore: NewRedisStore(redisClient),
     // ...
 })

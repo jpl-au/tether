@@ -112,7 +112,7 @@ func handleDualTodo(_ Session, s dualTodoState, ev Event) dualTodoState {
 }
 
 // TestComponentIntegrationMultiInstance validates multi-instance
-// component dispatch through Config.Components. Two todo lists
+// component dispatch through LiveConfig.Components. Two todo lists
 // mounted with different prefixes receive events independently.
 func TestComponentIntegrationMultiInstance(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
@@ -339,7 +339,7 @@ func TestComponentIntegrationToggleAndClear(t *testing.T) {
 }
 
 // TestComponentManualRouteTyped validates that RouteTyped works correctly
-// for manual routing in a Handle function (the non-Config.Components path).
+// for manual routing in a Handle function (the non-LiveConfig.Components path).
 func TestComponentManualRouteTyped(t *testing.T) {
 	type appState struct {
 		Todo todoList

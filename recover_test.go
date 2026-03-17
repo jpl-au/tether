@@ -73,7 +73,7 @@ func TestSessionUpdatePanicDoesNotCrashCaller(t *testing.T) {
 }
 
 func TestServeInitialPagePanicDoesNotCrashProcess(t *testing.T) {
-	handler := New(Config[counterState]{
+	handler := Live(LiveConfig[counterState]{
 		Mode:    mode.WebSocket,
 		Upgrade: stubUpgrade,
 		InitialState: func(r *http.Request) counterState {

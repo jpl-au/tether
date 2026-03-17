@@ -1,11 +1,11 @@
 # API reference
 
-## Config
+## LiveConfig
 
-`tether.Config[S]` configures a handler. Only `Render` is required — everything else has sensible defaults.
+`tether.LiveConfig[S]` configures a handler. Only `Render` is required — everything else has sensible defaults.
 
 ```go
-tether.New(tether.Config[State]{
+tether.Live(tether.LiveConfig[State]{
     Upgrade:      ws.Upgrade(),
     InitialState: func(r *http.Request) State { return State{} },
     Render:       render,
@@ -67,7 +67,7 @@ When either callback is configured, the framework's own logging for that event i
 
 ### Timeouts
 
-`Config.Timeouts` groups duration-based settings:
+`LiveConfig.Timeouts` groups duration-based settings:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
@@ -84,7 +84,7 @@ When either callback is configured, the framework's own logging for that event i
 
 ### Limits
 
-`Config.Limits` groups capacity constraints:
+`LiveConfig.Limits` groups capacity constraints:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
@@ -96,7 +96,7 @@ When either callback is configured, the framework's own logging for that event i
 
 ### Client
 
-`Config.Client` groups browser-side settings:
+`LiveConfig.Client` groups browser-side settings:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
@@ -124,7 +124,7 @@ When either callback is configured, the framework's own logging for that event i
 
 ### Security
 
-`Config.Security` groups CSRF protection and session binding:
+`LiveConfig.Security` groups CSRF protection and session binding:
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -201,7 +201,7 @@ type Event struct {
     Action  string            // application-defined action name
     Data    map[string]string // event-specific key-value pairs
     EventID string            // monotonic counter for correlation
-    Target  string            // set by Config.Components to the mount prefix
+    Target  string            // set by LiveConfig.Components to the mount prefix
 }
 
 // Accessors
@@ -275,7 +275,7 @@ p.Float64s("v")         // ([]float64, error)
 `*tether.Handler[S]` implements `http.Handler`.
 
 ```go
-h := tether.New(cfg)
+h := tether.Live(cfg)
 mux.Handle("/app", h)
 
 h.Health()          // HealthStatus{Pending, Active, Disconnected}
@@ -330,7 +330,7 @@ group.BroadcastOthers(sender, func(target *tether.LiveSession[State], s State) S
 
 Optional callbacks: `group.OnJoin`, `group.OnLeave`.
 
-For auto-registration, pass groups via `Config.Groups`.
+For auto-registration, pass groups via `LiveConfig.Groups`.
 
 ---
 
@@ -344,7 +344,7 @@ r.Route("/", router.Page[State]{Render: homeRender, Handle: homeHandle})
 r.Route("/settings", router.Page[State]{Render: settingsRender})
 r.NotFound(router.Page[State]{Render: notFoundRender})
 
-tether.New(tether.Config[State]{
+tether.Live(tether.LiveConfig[State]{
     Render:       r.Render,
     Handle:       r.Handle,
     OnNavigate: r.OnNavigate(func(s *State, p tether.Params) { s.Page = p.Path }),
@@ -448,7 +448,7 @@ Wraps `Handle` for cross-cutting concerns. Applied outermost-first:
 ```go
 type Middleware[S any] func(HandleFunc[S]) HandleFunc[S]
 
-tether.New(tether.Config[State]{
+tether.Live(tether.LiveConfig[State]{
     Middleware: []tether.Middleware[State]{withLogging, withAuth},
 })
 ```
@@ -594,7 +594,7 @@ Key behaviours:
 - **Auto-cleanup** — the subscription is removed when the session is destroyed (context cancelled)
 - **Thread-safe** — the callback runs on the session's command loop, never concurrently with Handle or other Updates
 
-Preferred usage is via `Config.Watchers` for declarative subscription:
+Preferred usage is via `LiveConfig.Watchers` for declarative subscription:
 
 ```go
 Watchers: []tether.Watcher[State]{
@@ -647,7 +647,7 @@ Key behaviours:
 - **Auto-cleanup** — removed when the session is destroyed
 - **Thread-safe** — runs on the session's command loop
 
-Preferred usage is via `Config.Watchers` for declarative subscription:
+Preferred usage is via `LiveConfig.Watchers` for declarative subscription:
 
 ```go
 Watchers: []tether.Watcher[State]{
@@ -704,12 +704,12 @@ s.Chat = tether.RouteTyped(s.Chat, "chat", sess, ev)
 
 `RouteTyped` is the common choice. It preserves compile-time type safety — the parent stores the concrete component type in its state struct with direct field access, no type assertions needed.
 
-### Config.Components
+### LiveConfig.Components
 
 Declarative component mounting. The framework intercepts events matching each mount's prefix and dispatches them to the component's `Handle` — the page's `Handle` function never sees these events:
 
 ```go
-tether.Config[State]{
+tether.LiveConfig[State]{
     Components: []tether.ComponentMount[State]{
         tether.Mount("likes",
             func(s State) counter.Counter { return s.Likes },
@@ -723,13 +723,13 @@ tether.Config[State]{
 }
 ```
 
-`Mount` follows the same pattern as `WatchValue` and `WatchBus`: a generic constructor that returns a non-generic interface, so `Config.Components` can hold mounts for different component types.
+`Mount` follows the same pattern as `WatchValue` and `WatchBus`: a generic constructor that returns a non-generic interface, so `LiveConfig.Components` can hold mounts for different component types.
 
 Navigate events bypass mounts — they always reach `OnNavigate`.
 
 ### Event.Target
 
-When `Config.Components` dispatches an event, the framework sets `Event.Target` to the mount's prefix (e.g. `"likes"` or `"stars"`). Middleware and logging can inspect this field to identify which component handled the event without parsing the action string.
+When `LiveConfig.Components` dispatches an event, the framework sets `Event.Target` to the mount's prefix (e.g. `"likes"` or `"stars"`). Middleware and logging can inspect this field to identify which component handled the event without parsing the action string.
 
 ### Event.WithAction
 
@@ -737,7 +737,7 @@ Returns a copy of the event with a different `Action`. Used by `Route`, `RouteTy
 
 ### Mounter
 
-Optional interface for one-time component setup. The framework calls `Mount` once per component during session startup (after the command loop starts, before any client events arrive) for components registered via `Config.Components`:
+Optional interface for one-time component setup. The framework calls `Mount` once per component during session startup (after the command loop starts, before any client events arrive) for components registered via `LiveConfig.Components`:
 
 ```go
 type Mounter interface {
@@ -748,9 +748,9 @@ type Mounter interface {
 
 Use Mount for initial side effects — `sess.Toast("Ready")`, `sess.Signal(...)`, `sess.Go(...)` — that a component needs when it first appears. Components that don't need setup simply implement `Component` without `Mounter`.
 
-### Route vs Config.Components
+### Route vs LiveConfig.Components
 
-Use `Config.Components` when the component is self-contained and the page's `Handle` never needs to see its events. Use `Route`/`RouteTyped` in Handle when you need to coordinate component events with other state changes.
+Use `LiveConfig.Components` when the component is self-contained and the page's `Handle` never needs to see its events. Use `Route`/`RouteTyped` in Handle when you need to coordinate component events with other state changes.
 
 ### RouteMount
 

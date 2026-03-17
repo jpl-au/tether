@@ -22,7 +22,7 @@ lifecycle.
 ## Package structure
 
 ```
-tether/              Root package — Config, Handler, Session, Bus, Group, Value, Observe, On
+tether/              Root package — LiveConfig, Handler, Session, Bus, Group, Value, Observe, On
 ├── bind/            Event binding and signal binding via Apply + composable Options (OnClick, BindText, Confirm, etc.)
 ├── client/          Embedded JS runtime (tether.js, idiomorph, service worker, upload, push worker)
 ├── dev/             Debug logging — dev.Enable() activates, dev.Debug() is a no-op when disabled
@@ -39,11 +39,11 @@ tether/              Root package — Config, Handler, Session, Bus, Group, Valu
 
 ## Key types
 
-### Config[S] and Handler[S]
+### LiveConfig[S] and Handler[S]
 
-`Config[S]` wires everything together: `InitialState`, `Render`, `Handle`,
+`LiveConfig[S]` wires everything together: `InitialState`, `Render`, `Handle`,
 transport upgraders, middleware, lifecycle callbacks, timeouts, and limits.
-`New(cfg)` returns a `*Handler[S]` which is an `http.Handler`.
+`Live(cfg)` returns a `*Handler[S]` which is an `http.Handler`.
 
 Required fields: `InitialState`, `Render`, `Handle`, and at least one of
 `Upgrade` or `Fallback` (depending on `Mode`).
@@ -70,7 +70,7 @@ in `OnConnect`/`OnDisconnect`, not in `Handle`.
 
 Client event: `Type` (click, input, submit, navigate, etc.), `Action`
 (the `data-tether-*` value), `Data` (form fields), `EventID` (for
-client-side de-duplication), `Target` (set by `Config.Components` to
+client-side de-duplication), `Target` (set by `LiveConfig.Components` to
 the mount prefix). Typed extraction helpers: `Value`, `Key`, `Get`,
 `Int`, `Float64`, `Bool`, `Bind`. `WithAction` returns a copy with a
 different Action (used by Route, RouteTyped, and mounts for prefix
@@ -78,7 +78,7 @@ stripping).
 
 ### Params
 
-Navigation context passed to `Config.OnNavigate` and
+Navigation context passed to `LiveConfig.OnNavigate` and
 `router.OnNavigate`. Carries `Path` (URL path) and `Query`
 (`url.Values`). Provides typed extraction helpers that mirror `Event`'s
 API for consistency — `Get`, `Int`, `Float64`, `Bool`. Also provides
@@ -119,7 +119,7 @@ Lock-free reads via `atomic.Value`, copy-on-write for writes.
 ### Group[S]
 
 Session pool for broadcasting. `Add`/`Remove` in `OnConnect`/`OnDisconnect`
-(or use `Config.Groups` for automatic membership). `Broadcast(fn)` calls
+(or use `LiveConfig.Groups` for automatic membership). `Broadcast(fn)` calls
 `Update` on every member — non-blocking. `BroadcastOthers` skips the
 sender. Lock-free reads, copy-on-write writes.
 
@@ -133,9 +133,9 @@ stale overwrites.
 
 ### Watcher[S]
 
-Declarative reactive subscription for Config. `WatchValue(val, mapper)`
+Declarative reactive subscription for LiveConfig. `WatchValue(val, mapper)`
 creates a watcher that observes a Value; `WatchBus(bus, mapper)` creates
-one that subscribes to a Bus. Listed in `Config.Watchers`, they are
+one that subscribes to a Bus. Listed in `LiveConfig.Watchers`, they are
 subscribed automatically before `OnConnect` runs.
 
 ### DiffStore
@@ -147,7 +147,7 @@ destroyed. `Load` is included for tooling and debugging but is not called by
 the framework today — reconnecting sessions re-render from state, which
 re-seeds the differ.
 
-Nil by default (opt-in via `Config.DiffStore`). No first-party implementations
+Nil by default (opt-in via `LiveConfig.DiffStore`). No first-party implementations
 are provided — developers supply their own, backed by whatever storage suits
 their deployment (SQLite, Redis, filesystem, etc.).
 
@@ -160,12 +160,12 @@ hits a server with no in-memory session), and deletes after successful restore
 or on destroy.
 
 The codec (`SessionCodec[S]`) serialises `S` — CBOR by default, custom codec
-via `Config.Codec`. The framework wraps the codec output in an envelope with
+via `LiveConfig.Codec`. The framework wraps the codec output in an envelope with
 session metadata (endpoint, URL, title, user-agent) before passing to the
 store.
 
 `OnRestore` fires instead of `OnConnect` for restored sessions. Falls back to
-`OnConnect` when nil. Nil by default (opt-in via `Config.SessionStore`).
+`OnConnect` when nil. Nil by default (opt-in via `LiveConfig.SessionStore`).
 
 ### Component
 
@@ -180,7 +180,7 @@ tests without special cases.
 `Route` and `RouteTyped` dispatch events by prefix in Handle. `RouteTyped`
 preserves the concrete type for compile-time safety.
 
-`Config.Components` with `Mount` wires components declaratively — the framework
+`LiveConfig.Components` with `Mount` wires components declaratively — the framework
 intercepts events by prefix and dispatches them before Handle runs. Navigate
 events bypass mounts.
 
@@ -188,10 +188,10 @@ events bypass mounts.
 creates event copies with a different action for prefix stripping.
 
 `Mounter` is an optional interface (`Mount(Session) Component`) for one-time
-setup. The framework calls it during session startup for Config.Components
+setup. The framework calls it during session startup for LiveConfig.Components
 mounts. Components that don't need setup omit it.
 
-`PageConfig.Components` mirrors `Config.Components` for stateless pages —
+`PageConfig.Components` mirrors `LiveConfig.Components` for stateless pages —
 same `RouteMount` dispatch before Handle, same `Mount` constructor.
 
 ### Router[S] (router package)
@@ -277,7 +277,7 @@ When a client event arrives, `exec()` in `loop.go` runs:
 
 1. Track activity — update timestamp, reset idle timer
 2. Snapshot state — store atomically for concurrent `State()` readers
-3. Component dispatch — if Config.Components matches the event prefix, route to the component
+3. Component dispatch — if LiveConfig.Components matches the event prefix, route to the component
 4. Handle — if no component matched, call the page handler
 5. Drain effects — collect buffered Toast/Signal/Navigate calls
 6. Equality check — skip render if `Equal` says state unchanged
@@ -357,7 +357,7 @@ the diagnostic bus. `DiagnosticKind` constants: `TransportError`,
 `UploadError`, `SessionBindingFailed`, `StoreError`. See [operations](docs/operations.md#diagnostics-bus) for
 details.
 
-Prefer `Config.Watchers` for declarative subscriptions (`WatchValue`,
+Prefer `LiveConfig.Watchers` for declarative subscriptions (`WatchValue`,
 `WatchBus`). Use `OnConnect` for imperative setup (incrementing counters,
 publishing events, starting tickers). Do not subscribe in Handle.
 Subscriptions are cleaned up automatically when the session is destroyed.
@@ -366,7 +366,7 @@ Subscriptions are cleaned up automatically when the session is destroyed.
 
 | File | Purpose |
 |------|---------|
-| `config.go` | Config, Timeouts, Limits, Client, Security structs |
+| `config.go` | Timeouts, Limits, Client, Security structs (shared) |
 | `handler.go` | Handler — session pools, routing, transport upgrade |
 | `diagnostic.go` | Diagnostic struct, DiagnosticKind constants, panicErr helper |
 | `session.go` | Session struct, enqueue, enqueueFx, drainFx, emitDiagnostic |
@@ -381,7 +381,7 @@ Subscriptions are cleaned up automatically when the session is destroyed.
 | `value.go` | Value — shared observable state with Bus internally |
 | `observe.go` | Observe — atomic subscribe + initial value delivery |
 | `emit.go` | On — subscribe a session to a Bus with sender filtering |
-| `watcher.go` | Watcher interface, WatchValue, WatchBus — declarative Config subscriptions |
+| `watcher.go` | Watcher interface, WatchValue, WatchBus — declarative LiveConfig subscriptions |
 | `transport.go` | Transport interface |
 | `diff_store.go` | DiffStore interface for external snapshot persistence |
 | `session_store.go` | SessionStore interface for session state persistence |
@@ -430,6 +430,6 @@ full model.
 - `atomic.Value` + copy-on-write for lock-free reads on shared collections
 - Effects are buffered during Handle and merged atomically with the diff
 - `dev.Debug` for debug-only logging; `slog` only for panics; all other signals flow through `Handler.Diagnostics`
-- `New` logs one `tether: ready` line at INFO with `transport`, optional `name`, `worker`, `middleware` count, and `dev`; no other startup noise
-- `Config.Name` / `PageConfig.Name` — optional label included in startup logs to distinguish handlers that share a transport
+- `Live` logs one `tether: ready` line at INFO with `transport`, optional `name`, `worker`, `middleware` count, and `dev`; no other startup noise
+- `LiveConfig.Name` / `PageConfig.Name` — optional label included in startup logs to distinguish handlers that share a transport
 - `context.AfterFunc` for automatic cleanup on context cancellation

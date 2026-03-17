@@ -154,7 +154,7 @@ func TestAssetAutoMount(t *testing.T) {
 		Prefix: "/static/",
 	}
 
-	handler := New(Config[counterState]{
+	handler := Live(LiveConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -210,7 +210,7 @@ func TestAssetCacheHeadersProduction(t *testing.T) {
 		Prefix: "/static/",
 	}
 
-	handler := New(Config[counterState]{
+	handler := Live(LiveConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -243,7 +243,7 @@ func TestAssetCacheHeadersDevMode(t *testing.T) {
 		Prefix: "/static/",
 	}
 
-	handler := New(Config[counterState]{
+	handler := Live(LiveConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -279,7 +279,7 @@ func TestMultipleAssets(t *testing.T) {
 		Prefix: "/js/",
 	}
 
-	handler := New(Config[counterState]{
+	handler := Live(LiveConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },

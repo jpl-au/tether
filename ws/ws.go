@@ -3,8 +3,8 @@
 // server updates and client events travel on the same channel with
 // minimal overhead. This is the default and preferred transport.
 //
-// Pass ws.Upgrade() as the Upgrade field in [tether.Config]. Origin
-// checking is handled by the tether handler via [tether.Config].TrustedOrigins
+// Pass ws.Upgrade() as the Upgrade field in [tether.LiveConfig]. Origin
+// checking is handled by the tether handler via [tether.LiveConfig].TrustedOrigins
 // rather than by the websocket library directly.
 package ws
 
@@ -78,7 +78,7 @@ type Options struct {
 	// will accept from a client. Messages exceeding this limit cause
 	// the connection to be closed with a protocol error. When zero,
 	// the library default is used. Set this to match
-	// [tether.Config].MaxEventBytes for consistent limits across
+	// [tether.LiveConfig].MaxEventBytes for consistent limits across
 	// transport modes.
 	ReadLimit int64
 
@@ -89,13 +89,13 @@ type Options struct {
 	Compression Compression
 }
 
-// Upgrade returns an upgrade function for use in [tether.Config].Upgrade.
+// Upgrade returns an upgrade function for use in [tether.LiveConfig].Upgrade.
 // The returned function is called by the tether handler when it receives
 // a WebSocket upgrade request. It negotiates the WebSocket handshake
 // and returns a Transport that the session uses for its entire lifetime.
 //
 // Origin checking is handled by the tether handler via
-// [tether.Config].TrustedOrigins, so the upgrader does not perform its
+// [tether.LiveConfig].TrustedOrigins, so the upgrader does not perform its
 // own origin verification.
 func Upgrade(opts ...Options) func(http.ResponseWriter, *http.Request) (tether.Transport, error) {
 	var o Options

@@ -1,33 +1,53 @@
 // Package tether is a reactive UI layer for Go. The server owns
 // application state and renders HTML; the client owns ephemeral UI
 // state — toggling drawers, binding text to signals, showing and hiding
-// elements — without a round-trip. A persistent transport (WebSocket or
-// SSE) keeps the two in sync: the server pushes targeted DOM patches and
-// reactive signal updates, the client forwards user events back.
+// elements — without a round-trip.
 //
-// The lifecycle of a page visit is:
+// Tether provides two handler modes:
+//
+// [Live] handlers maintain a persistent connection (WebSocket or SSE)
+// between browser and server. State survives across interactions —
+// when the user clicks a button, the server updates state and pushes
+// the change without a page reload. Use Live for interactive
+// applications: dashboards, forms, chat, real-time collaboration.
+//
+// [Page] handlers reconstruct state from each HTTP request. No
+// persistent connection — every interaction is a standard
+// request/response cycle. Use Page for content-focused pages that
+// don't need real-time updates.
+//
+// Both modes share the same rendering engine (Fluent), the same event
+// system, and the same component model. The difference is whether
+// state persists between interactions.
+//
+// # Live mode
+//
+// The lifecycle of a live page visit is:
 //
 //  1. The browser GETs the page. The handler renders the initial HTML
-//     from [Config].InitialState and [Config].Render, pre-warms a
-//     session with the diff state, and embeds the session ID in the
+//     from [LiveConfig].InitialState and [LiveConfig].Render, pre-warms
+//     a session with the diff state, and embeds the session ID in the
 //     root element.
 //  2. The client JS opens a persistent transport and reclaims the
 //     pre-warmed session. Pre-warming avoids a second render on connect
 //     and ensures the diff baseline matches the HTML the browser
 //     already has.
 //  3. When the user interacts with the page, the client sends an
-//     [Event]. The server calls [Config].Handle to produce new state,
-//     diffs the old and new render trees, and sends only the changed
-//     fragments back as targeted patches or structural morphs.
+//     [Event]. The server calls [LiveConfig].Handle to produce new
+//     state, diffs the old and new render trees, and sends only the
+//     changed fragments back as targeted patches or structural morphs.
 //  4. For lightweight updates that don't need a full render cycle, the
 //     server pushes signals via [Session.Signal]. Bound elements
 //     ([bind.BindText], [bind.BindShow], [bind.BindClass],
 //     [bind.BindAttr]) update instantly on the client — no diff, no
 //     HTML.
 //
-// The central type is [Config], which wires together state, rendering,
-// and event handling. Pass it to [New] to get an [http.Handler] that
-// manages the full session lifecycle.
+// # Page mode
+//
+// GET requests render the full HTML page. POST requests handle a
+// client event, render the new state, and return a JSON update with
+// the new HTML and any side effects. The client applies the update
+// without a full page reload.
 //
 // Event binding helpers ([bind.Click], [bind.Submit], [bind.Input],
 // etc.) attach data-tether-* attributes to Fluent elements so the client

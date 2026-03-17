@@ -1,7 +1,7 @@
 // Package mode selects the wire protocol between server and browser.
-// Pass one of the constants to [tether.Config].Mode.
+// Pass one of the constants to [tether.LiveConfig].Mode.
 //
-//	tether.Config[State]{
+//	tether.LiveConfig[State]{
 //	    Mode: mode.Both,
 //	    // ...
 //	}

@@ -11,7 +11,7 @@ import (
 // defaultMaxUploadSize is used when UploadConfig.MaxSize is zero.
 const defaultMaxUploadSize = 10 << 20 // 10 MB
 
-// UploadConfig enables file upload support. When set on [Config], the
+// UploadConfig enables file upload support. When set on [LiveConfig], the
 // handler accepts multipart POST requests from the upload extension JS
 // and delivers each file to the Handle callback.
 type UploadConfig[S any] struct {

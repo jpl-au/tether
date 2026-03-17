@@ -54,7 +54,7 @@ tether.Page(tether.PageConfig[State]{
     // Optional: wrap page content in a full HTML document.
     Layout: func(s State, content node.Node) node.Node { ... },
 
-    // Optional: declarative component mounts (same as Config.Components).
+    // Optional: declarative component mounts (same as LiveConfig.Components).
     Components: []tether.ComponentMount[State]{
         tether.Mount("widget", getWidget, setWidget),
     },
@@ -68,9 +68,9 @@ tether.Page(tether.PageConfig[State]{
 })
 ```
 
-### Fields compared to Config
+### Fields compared to LiveConfig
 
-| Feature | `tether.Page` | `tether.New` |
+| Feature | `tether.Page` | `tether.Live` |
 |---------|-------------|------------|
 | State creation | `State(r)` — every request | `InitialState(r)` — once per session |
 | Transport | HTTP POST/response | WebSocket or SSE |
@@ -154,7 +154,7 @@ Note: `Session.ID()` returns an empty string in stateless mode — there is no p
 
 ## When to upgrade to live mode
 
-Start with `tether.Page` and upgrade to `tether.New` when you need:
+Start with `tether.Page` and upgrade to `tether.Live` when you need:
 
 - **Server push** — the server initiating updates without a client event (timers, database changes, external webhooks)
 - **Broadcasting** — pushing updates to multiple users simultaneously
@@ -162,4 +162,4 @@ Start with `tether.Page` and upgrade to `tether.New` when you need:
 - **File uploads** — streaming files via the upload extension
 - **Push notifications** — Web Push via the service worker
 
-The `Render` function, `HandleFunc` signature, `OnNavigate`, `Layout`, event bindings, `Config.Components`, and the `router` package all work identically in both modes. Upgrading typically means changing `tether.Page(PageConfig{...})` to `tether.New(Config{...})` and adding transport configuration.
+The `Render` function, `HandleFunc` signature, `OnNavigate`, `Layout`, event bindings, `LiveConfig.Components`, and the `router` package all work identically in both modes. Upgrading typically means changing `tether.Page(PageConfig{...})` to `tether.Live(LiveConfig{...})` and adding transport configuration.

@@ -3,8 +3,8 @@ package tether
 // Watcher subscribes a session to a reactive source when it connects.
 // Create watchers with [WatchValue] and [WatchBus].
 //
-// Watchers listed in [Config.Watchers] are subscribed automatically
-// before [Config.OnConnect] runs, so the session receives updates from
+// Watchers listed in [LiveConfig.Watchers] are subscribed automatically
+// before [LiveConfig.OnConnect] runs, so the session receives updates from
 // the moment it connects. The subscriptions are cleaned up when the
 // session is destroyed.
 type Watcher[S any] interface {

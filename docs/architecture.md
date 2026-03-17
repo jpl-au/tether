@@ -101,7 +101,7 @@ When a client event arrives, `exec()` runs the full pipeline:
 ```
 1. Track activity      — update timestamp, reset idle timer
 2. Snapshot state      — capture s.state atomically for concurrent readers
-3. Component dispatch  — if Config.Components matches the event prefix, route to the component
+3. Component dispatch  — if LiveConfig.Components matches the event prefix, route to the component
 4. Handle              — if no component matched, call the page handler
 5. Drain effects       — collect buffered Toast/Signal/Navigate calls
 6. Equality check      — skip render if Equal says state is unchanged
@@ -173,7 +173,7 @@ Two implementations ship with the framework:
 | **WebSocket** (`ws` package) | Text frames | Text frames | Protocol ping/pong |
 | **SSE + POST** (`sse` package) | `text/event-stream` | Individual HTTP POST requests | Heartbeat comments |
 
-The client JS tries WebSocket first and falls back to SSE automatically. Set `Config.Mode` to force one or the other.
+The client JS tries WebSocket first and falls back to SSE automatically. Set `LiveConfig.Mode` to force one or the other.
 
 SSE heartbeats (`:\n\n` comment lines) are sent at `Timeouts.Heartbeat` (default 20s) to prevent intermediate proxies from closing idle connections.
 

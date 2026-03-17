@@ -11,9 +11,9 @@ import (
 // the framework checks the SessionStore before rejecting the
 // reconnect — allowing sessions to survive server restarts.
 //
-// This is an opt-in capability. By default (nil on [Config]),
+// This is an opt-in capability. By default (nil on [LiveConfig]),
 // sessions live entirely in memory and a server restart loses all
-// state. Set Config.SessionStore to enable persistence.
+// state. Set LiveConfig.SessionStore to enable persistence.
 //
 // This interface is distinct from [DiffStore], which persists opaque
 // differ snapshots as a memory optimisation. The two stores handle

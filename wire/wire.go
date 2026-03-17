@@ -7,7 +7,7 @@
 package wire
 
 // Format selects the encoding used for updates sent from server to
-// client. Pass one of the constants to [tether.Config].WireFormat.
+// client. Pass one of the constants to [tether.LiveConfig].WireFormat.
 type Format int
 
 const (

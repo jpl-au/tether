@@ -11,9 +11,9 @@
 //	r.Route("/settings", router.Page[State]{Render: settingsRender, Handle: settingsHandle})
 //	r.NotFound(router.Page[State]{Render: notFoundRender})
 //
-// Pass r.Render and r.Handle to [tether.Config]:
+// Pass r.Render and r.Handle to [tether.LiveConfig]:
 //
-//	tether.New(tether.Config[State]{
+//	tether.Live(tether.LiveConfig[State]{
 //	    Render: r.Render,
 //	    Handle: r.Handle,
 //	    OnNavigate: r.OnNavigate(func(s *State, p tether.Params) { s.Page = p.Path }),
@@ -121,9 +121,9 @@ func (r *Router[S]) loadNotFound() Page[S] {
 	return r.notFound.Load().(Page[S])
 }
 
-// OnNavigate is a convenience helper for [tether.Config].OnNavigate.
+// OnNavigate is a convenience helper for [tether.LiveConfig].OnNavigate.
 // It wraps a simple setter function in the full OnNavigate signature
-// that Config expects (func(Session, S, Params) S), handling the
+// that LiveConfig expects (func(Session, S, Params) S), handling the
 // pointer-to-value dance and return plumbing so the caller only writes
 // the state mutation logic. Without this helper, every router user
 // would have to write the same boilerplate closure manually.

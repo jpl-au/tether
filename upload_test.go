@@ -27,7 +27,7 @@ func TestHandleUploadNotConfigured(t *testing.T) {
 }
 
 func TestHandleUploadMissingSession(t *testing.T) {
-	handler := New(Config[counterState]{
+	handler := Live(LiveConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -50,7 +50,7 @@ func TestHandleUploadMissingSession(t *testing.T) {
 }
 
 func TestHandleUploadUnknownSession(t *testing.T) {
-	handler := New(Config[counterState]{
+	handler := Live(LiveConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -77,7 +77,7 @@ func TestHandleUploadSuccess(t *testing.T) {
 	var received Upload
 	done := make(chan struct{})
 
-	handler := New(Config[counterState]{
+	handler := Live(LiveConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -131,7 +131,7 @@ func TestHandleUploadSuccess(t *testing.T) {
 }
 
 func TestHandleUploadMIMEReject(t *testing.T) {
-	handler := New(Config[counterState]{
+	handler := Live(LiveConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -168,7 +168,7 @@ func TestHandleUploadMIMEReject(t *testing.T) {
 func TestHandleUploadMIMEAcceptWildcard(t *testing.T) {
 	done := make(chan struct{})
 
-	handler := New(Config[counterState]{
+	handler := Live(LiveConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },

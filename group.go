@@ -11,7 +11,7 @@ import (
 
 // Group tracks a set of sessions for broadcasting state updates.
 // Add sessions in OnConnect and remove them in OnDisconnect, or use
-// [Config].Groups for automatic membership:
+// [LiveConfig].Groups for automatic membership:
 //
 //	group := tether.NewGroup[State]()
 //

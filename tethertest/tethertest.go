@@ -57,12 +57,12 @@ type Config[S any] struct {
 
 	// Components declares component mounts for automatic event routing.
 	// Events matching a mount's prefix are dispatched to the component
-	// before Handle runs — mirroring [tether.Config].Components.
+	// before Handle runs — mirroring [tether.LiveConfig].Components.
 	// Optional.
 	Components []tether.ComponentMount[S]
 
 	// Layout wraps the rendered content for [Harness.Render] and
-	// [Harness.HTML], mirroring [tether.Config].Layout. Optional —
+	// [Harness.HTML], mirroring [tether.LiveConfig].Layout. Optional —
 	// when absent, only the content node is rendered.
 	Layout func(S, node.Node) node.Node
 }

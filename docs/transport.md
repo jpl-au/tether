@@ -7,21 +7,21 @@ When `Mode` is not set, it defaults to `mode.Both`.
 
 ```go
 // Default (mode.Both) — WebSocket with SSE fallback
-tether.New(tether.Config[State]{
+tether.Live(tether.LiveConfig[State]{
     Upgrade:  ws.Upgrade(),
     Fallback: sse.Upgrade(),
     // ...
 })
 
 // WebSocket only
-tether.New(tether.Config[State]{
+tether.Live(tether.LiveConfig[State]{
     Mode:    mode.WebSocket,
     Upgrade: ws.Upgrade(),
     // ...
 })
 
 // SSE only
-tether.New(tether.Config[State]{
+tether.Live(tether.LiveConfig[State]{
     Mode:     mode.ServerSentEvents,
     Fallback: sse.Upgrade(),
     // ...
@@ -29,7 +29,7 @@ tether.New(tether.Config[State]{
 ```
 
 Same wire format, same API regardless of transport. The encoding is
-selected via `Config.WireFormat` (default `wire.JSON`).
+selected via `LiveConfig.WireFormat` (default `wire.JSON`).
 
 ### WebSocket options
 
@@ -41,7 +41,7 @@ ws.Upgrade(ws.Options{
 })
 ```
 
-Set `ReadLimit` to match `Config.Limits.MaxEventBytes` for consistent limits across transport modes. Messages exceeding the limit cause the connection to be closed with a protocol error.
+Set `ReadLimit` to match `LiveConfig.Limits.MaxEventBytes` for consistent limits across transport modes. Messages exceeding the limit cause the connection to be closed with a protocol error.
 
 ### Compression
 
@@ -115,7 +115,7 @@ SSE connections send keep-alive comments at `Timeouts.Heartbeat` (default 20s) t
 Enable the service worker for asset caching and offline page shells:
 
 ```go
-tether.New(tether.Config[State]{
+tether.Live(tether.LiveConfig[State]{
     Worker: true,
     // ...
 })
@@ -132,7 +132,7 @@ var assets = &tether.Asset{
     Precache: []string{"styles.css", "logo.svg"},
 }
 
-tether.New(tether.Config[State]{
+tether.Live(tether.LiveConfig[State]{
     Assets: []*tether.Asset{assets},
     Worker: true,
     // ...
@@ -144,12 +144,12 @@ A reconnecting indicator bar appears automatically when the connection drops and
 ## Wire format
 
 Server-to-client updates are encoded by a `wire.Encoder`. The encoder
-is selected at handler construction time via `Config.WireFormat`:
+is selected at handler construction time via `LiveConfig.WireFormat`:
 
 ```go
 import "github.com/jpl-au/tether/wire"
 
-tether.New(tether.Config[State]{
+tether.Live(tether.LiveConfig[State]{
     WireFormat: wire.JSON, // default — currently the only format
     // ...
 })

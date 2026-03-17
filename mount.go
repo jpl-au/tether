@@ -3,7 +3,7 @@ package tether
 import "strings"
 
 // ComponentMount wires a [Component] into the session's event dispatch.
-// Create mounts with [Mount] and list them in [Config.Components].
+// Create mounts with [Mount] and list them in [LiveConfig.Components].
 //
 // ComponentMount has unexported methods so the framework controls
 // dispatch — callers cannot implement this interface directly.
@@ -24,9 +24,9 @@ type ComponentMount[S any] interface {
 //
 // This follows the same pattern as [WatchValue] and [WatchBus]: a
 // generic constructor that returns a non-generic interface, allowing
-// Config.Components to hold mounts for different component types.
+// LiveConfig.Components to hold mounts for different component types.
 //
-//	tether.Config[State]{
+//	tether.LiveConfig[State]{
 //	    Components: []tether.ComponentMount[State]{
 //	        tether.Mount("chat",
 //	            func(s State) chatwidget.Widget { return s.Chat },

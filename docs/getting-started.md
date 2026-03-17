@@ -20,7 +20,7 @@ import (
     "github.com/jpl-au/fluent/node"
 )
 
-mux.Handle("/counter", tether.New(tether.Config[CounterState]{
+mux.Handle("/counter", tether.Live(tether.LiveConfig[CounterState]{
     Upgrade: ws.Upgrade(),
     InitialState: func(r *http.Request) CounterState {
         return CounterState{Count: 0}
@@ -64,7 +64,7 @@ tether uses a unified update protocol. Every message sent to the client is a sin
 
 When only content changes (the common case), patches target specific keyed elements. When the structure changes — keys added, removed, or reordered — the server sends a root morph and the client uses [idiomorph](https://github.com/bigskysoftware/idiomorph) to update the entire root while preserving focus, scroll position, and form state.
 
-The wire format is configurable via `Config.WireFormat`. See the [transport docs](transport.md#wire-format) for details.
+The wire format is configurable via `LiveConfig.WireFormat`. See the [transport docs](transport.md#wire-format) for details.
 
 ## Running the server
 
@@ -72,7 +72,7 @@ For a full-page application, `ListenAndServe` handles startup, signal
 trapping, and graceful shutdown:
 
 ```go
-h := tether.New(tether.Config[State]{
+h := tether.Live(tether.LiveConfig[State]{
     Upgrade:      ws.Upgrade(),
     Fallback:     sse.Upgrade(),
     Mode:         mode.Both,

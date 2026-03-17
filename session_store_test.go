@@ -293,7 +293,7 @@ func TestSessionStoreShutdownPersists(t *testing.T) {
 
 		grace := 15 * time.Second
 		h := &Handler[counterState]{
-			cfg: Config[counterState]{
+			cfg: LiveConfig[counterState]{
 				SessionStore: store,
 				Timeouts:     Timeouts{ShutdownGrace: grace},
 			},

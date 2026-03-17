@@ -25,7 +25,7 @@ mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 on SIGINT or SIGTERM, then force-closing after the grace period:
 
 ```go
-h := tether.New(tether.Config[State]{
+h := tether.Live(tether.LiveConfig[State]{
     // ...
     Timeouts: tether.Timeouts{
         ShutdownGrace: 15 * time.Second, // default: 10s
@@ -73,7 +73,7 @@ handler.Shutdown(ctx) // stops the reaper and releases resources
 During development, enable dev mode for fast iteration:
 
 ```go
-tether.New(tether.Config[State]{
+tether.Live(tether.LiveConfig[State]{
     DevMode: true,
     // ...
 })
@@ -96,7 +96,7 @@ Dev mode does the following:
 7. **Per-session diagnostics** — all session-level debug logging (events, diffs, reconnections, group membership, etc.) is gated behind dev mode via `dev.Debug`. In production with dev mode off, none of this output fires. For structured observability, use `OnStructuralChange` and `OnNoPatch` callbacks instead
 8. **Discarded effect warnings** — logs a warning when a handler panic discards buffered side effects (Toast, Signal, Navigate, etc.)
 
-Diagnostics are centralised in the `dev` package. During handler construction, `Config.DevMode` (or `TETHER_DEV`) calls `dev.Enable()` once. After that, all runtime checks — cache headers, the `data-tether-dev` attribute, diagnostic logging — use `dev.Enabled()`. No code threads the `DevMode` bool downstream; everything goes through the `dev` package.
+Diagnostics are centralised in the `dev` package. During handler construction, `LiveConfig.DevMode` (or `TETHER_DEV`) calls `dev.Enable()` once. After that, all runtime checks — cache headers, the `data-tether-dev` attribute, diagnostic logging — use `dev.Enabled()`. No code threads the `DevMode` bool downstream; everything goes through the `dev` package.
 
 Call sites use `dev.Warn()`, `dev.Debug()`, and `dev.Error()` which silently no-op outside dev mode.
 
@@ -107,7 +107,7 @@ The `DevMode` bool takes precedence. When it's false (the default), the `TETHER_
 By default the framework creates a text logger. Set `LogJSON: true` for structured JSON output:
 
 ```go
-tether.New(tether.Config[State]{
+tether.Live(tether.LiveConfig[State]{
     LogJSON: true,
     // ...
 })
@@ -189,7 +189,7 @@ preventing unbounded goroutine growth under sustained pressure.
 When the diff engine detects a structural change (Dynamic keys added, removed, or reordered), it falls back to a full root morph. The `OnStructuralChange` callback lets you observe these for logging, metrics, or debugging:
 
 ```go
-tether.New(tether.Config[State]{
+tether.Live(tether.LiveConfig[State]{
     OnStructuralChange: func(s *tether.LiveSession[State], c tether.StructuralChange) {
         slog.Warn("structural change",
             "session", s.ID(),
