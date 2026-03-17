@@ -31,6 +31,40 @@ tether.Live(tether.LiveConfig[State]{
 Same wire format, same API regardless of transport. The encoding is
 selected via `LiveConfig.WireFormat` (default `wire.JSON`).
 
+## Protocol awareness
+
+The framework detects whether each request arrives over HTTP/1.1 or
+HTTP/2 and adapts accordingly. By default (`protocol.Auto`), detection
+is automatic — the developer does nothing and it works correctly.
+
+```go
+import "github.com/jpl-au/tether/protocol"
+
+// Explicit: tell the framework the environment is HTTP/2.
+tether.Live(tether.LiveConfig[State]{
+    Protocol: protocol.HTTP2,
+    // ...
+})
+```
+
+When set explicitly, the framework trusts the configuration and emits
+a warning on every request where the wire protocol doesn't match:
+
+```
+WARN tether: protocol mismatch  configured=HTTP/2 detected=HTTP/1.1
+```
+
+This catches misconfigurations — e.g. setting `protocol.HTTP2` when a
+reverse proxy downgrades to HTTP/1.1 — without rejecting the request.
+
+The protocol can also be set via the `TETHER_PROTO` environment
+variable (`HTTP1`, `HTTP2`, `HTTP3`, `AUTO`). Explicit
+`LiveConfig.Protocol` takes precedence over the env var.
+
+Protocol awareness applies to live sessions only — `tether.Page` is
+stateless request/response and does not benefit from protocol-specific
+behaviour.
+
 ### WebSocket options
 
 Pass `ws.Options` to configure the WebSocket transport:

@@ -7,6 +7,7 @@ import (
 
 	"github.com/jpl-au/fluent/node"
 	"github.com/jpl-au/tether/mode"
+	"github.com/jpl-au/tether/protocol"
 	"github.com/jpl-au/tether/push"
 	"github.com/jpl-au/tether/wire"
 )
@@ -40,6 +41,21 @@ type LiveConfig[S any] struct {
 	// Mode selects which transports the handler accepts. Defaults to
 	// [mode.Both] when not set. See [mode] package for options.
 	Mode mode.Transport
+
+	// Protocol sets the HTTP protocol the server uses. When set to
+	// [protocol.Auto] (the default), the framework detects the
+	// protocol from each request. Set explicitly when you know your
+	// environment — e.g. [protocol.HTTP2] when serving HTTPS
+	// directly, or [protocol.HTTP1] behind a downgrading proxy.
+	// Mismatches between the configured and detected protocol emit
+	// a warning on every affected request.
+	//
+	// Can also be set via the TETHER_PROTO environment variable
+	// (HTTP1, HTTP2, HTTP3, AUTO). Explicit config takes precedence.
+	//
+	// Protocol awareness applies to live sessions only — [Page] is
+	// stateless and does not benefit from protocol-specific behaviour.
+	Protocol protocol.Protocol
 
 	// InitialState returns the starting state for a new session.
 	// Called once per connection to create the initial state.

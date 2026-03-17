@@ -107,6 +107,12 @@ func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 // path after a page load), and finally creates a fresh session as a
 // fallback for direct transport connections without a prior GET.
 func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrade func(http.ResponseWriter, *http.Request) (Transport, error)) {
+	// Resolve the effective protocol for this request. In Auto mode,
+	// detect from the wire; in explicit mode, trust the config and
+	// warn on mismatch.
+	proto := resolveProtocol(h.cfg.Protocol, r, h.cfg.Logger)
+	dev.Debug("session transport", "protocol", proto.String(), "remote", r.RemoteAddr)
+
 	transport, err := upgrade(w, r)
 	if err != nil {
 		http.Error(w, "connection upgrade failed", http.StatusInternalServerError)

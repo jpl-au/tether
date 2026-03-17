@@ -12,6 +12,7 @@ import (
 	"github.com/jpl-au/tether/dev"
 	"github.com/jpl-au/tether/event"
 	"github.com/jpl-au/tether/mode"
+	"github.com/jpl-au/tether/protocol"
 	"github.com/jpl-au/tether/wire"
 )
 
@@ -90,6 +91,22 @@ func Live[S any](cfg LiveConfig[S]) *Handler[S] {
 
 	if !cfg.DevMode && os.Getenv("TETHER_DEV") != "" {
 		cfg.DevMode = true
+	}
+	if cfg.Protocol == 0 {
+		switch os.Getenv("TETHER_PROTO") {
+		case "HTTP1":
+			cfg.Protocol = protocol.HTTP1
+		case "HTTP2":
+			cfg.Protocol = protocol.HTTP2
+		case "HTTP3":
+			cfg.Protocol = protocol.HTTP3
+		case "", "AUTO":
+			cfg.Protocol = protocol.Auto
+		default:
+			slog.Warn("tether: unrecognised TETHER_PROTO value — using Auto",
+				"value", os.Getenv("TETHER_PROTO"))
+			cfg.Protocol = protocol.Auto
+		}
 	}
 	if cfg.Logger == nil {
 		level := slog.LevelInfo
@@ -201,7 +218,7 @@ func resolveEncoder(f wire.Format) wire.Encoder {
 // startup log. Transport is always present; name, worker, middleware,
 // and dev are included only when set, to keep the line uncluttered.
 func handlerAttrs[S any](cfg LiveConfig[S]) []any {
-	args := []any{"transport", transportLabel(cfg.Mode)}
+	args := []any{"transport", transportLabel(cfg.Mode), "protocol", cfg.Protocol.String()}
 	if cfg.Name != "" {
 		args = append(args, "name", cfg.Name)
 	}
