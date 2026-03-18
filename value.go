@@ -49,9 +49,15 @@ func NewValue[V any](initial V) *Value[V] {
 	return v
 }
 
-// Load returns the current value. Lock-free.
+// Load returns the current value. Lock-free. Returns the zero value
+// of V if the Value was not created via [NewValue].
 func (v *Value[V]) Load() V {
-	return v.val.Load().(valueBox[V]).v
+	raw := v.val.Load()
+	if raw == nil {
+		var zero V
+		return zero
+	}
+	return raw.(valueBox[V]).v
 }
 
 // Store writes a new value and publishes it to all observers.

@@ -206,6 +206,11 @@ func (b *Bus[E]) publish(event E, senderID string) {
 }
 
 // loadSubs returns the current subscriber map from the atomic.Value.
+// Returns an empty map if the Bus was not created via [NewBus].
 func (b *Bus[E]) loadSubs() map[uint64]subscriber[E] {
-	return b.subs.Load().(map[uint64]subscriber[E])
+	v := b.subs.Load()
+	if v == nil {
+		return nil
+	}
+	return v.(map[uint64]subscriber[E])
 }

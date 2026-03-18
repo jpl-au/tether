@@ -174,6 +174,11 @@ func (g *Group[S]) BroadcastOthers(exclude Session, fn func(target *LiveSession[
 }
 
 // loadSessions returns the current session map from the atomic.Value.
+// Returns nil if the Group was not created via [NewGroup].
 func (g *Group[S]) loadSessions() map[string]*LiveSession[S] {
-	return g.sessions.Load().(map[string]*LiveSession[S])
+	v := g.sessions.Load()
+	if v == nil {
+		return nil
+	}
+	return v.(map[string]*LiveSession[S])
 }
