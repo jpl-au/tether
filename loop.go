@@ -51,6 +51,12 @@ func (s *LiveSession[S]) run() {
 
 		case fn := <-s.fxCh:
 			// Effect arriving outside of Handle — send immediately.
+			// Reset idle timer: the server is actively communicating
+			// with the client, so the session is not idle.
+			s.lastActivity.Store(time.Now().UnixNano())
+			if s.idleTimer != nil {
+				s.idleTimer.Reset(s.idleTimeout)
+			}
 			fx := &Effects{}
 			fn(fx)
 			s.sendFx(fx)
