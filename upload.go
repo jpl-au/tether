@@ -2,6 +2,7 @@ package tether
 
 import (
 	"fmt"
+	"log/slog"
 	"mime"
 	"mime/multipart"
 	"net/http"
@@ -138,6 +139,18 @@ func (h *Handler[S]) handleUpload(w http.ResponseWriter, r *http.Request) {
 	diag := h.Diagnostics
 	go func() {
 		defer form.RemoveAll()
+		defer func() {
+			if r := recover(); r != nil {
+				err := panicErr(r)
+				slog.Error("panic in upload handler", "session", sessionID, "panic", r)
+				diag.Publish(Diagnostic{
+					Kind:      UploadError,
+					SessionID: sessionID,
+					Err:       err,
+					Detail:    "panic",
+				})
+			}
+		}()
 		for _, u := range uploads {
 			if err := handler(sess, u); err != nil {
 				diag.Publish(Diagnostic{
