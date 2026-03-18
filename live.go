@@ -3,7 +3,6 @@ package tether
 import (
 	"log/slog"
 	"net/http"
-	"net/url"
 	"os"
 	"reflect"
 	"runtime"
@@ -71,15 +70,7 @@ func Live[S any](cfg LiveConfig[S]) *Handler[S] {
 		appNav := cfg.OnNavigate
 		cfg.Handle = func(sess Session, s S, ev Event) S {
 			if ev.Type == event.Navigate {
-				params := Params{Path: ev.Data["path"]}
-				if search := ev.Data["search"]; search != "" {
-					var err error
-					params.Query, err = url.ParseQuery(search)
-					if err != nil {
-						slog.Warn("malformed query string in navigate event", "search", search, "err", err)
-					}
-				}
-				return appNav(sess, s, params)
+				return appNav(sess, s, paramsFromEvent(ev))
 			}
 			return appHandle(sess, s, ev)
 		}

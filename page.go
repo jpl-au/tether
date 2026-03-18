@@ -5,7 +5,6 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"net/url"
 	"os"
 	"strings"
 
@@ -208,17 +207,8 @@ func (p *pageHandler[S]) servePOST(w http.ResponseWriter, r *http.Request) {
 	if ev.Type == event.Navigate && p.cfg.OnNavigate != nil {
 		// Navigate events carry the target path in event data, not
 		// in the request URL (the client always POSTs to its
-		// endpoint). Read path and search from ev.Data to match
-		// the live handler in handler.go.
-		params := Params{Path: ev.Data["path"]}
-		if search := ev.Data["search"]; search != "" {
-			var err error
-			params.Query, err = url.ParseQuery(strings.TrimPrefix(search, "?"))
-			if err != nil {
-				slog.Warn("malformed query string in navigate event", "search", search, "err", err)
-			}
-		}
-		state = p.cfg.OnNavigate(cs, state, params)
+		// endpoint). Read path and search from ev.Data.
+		state = p.cfg.OnNavigate(cs, state, paramsFromEvent(ev))
 	} else {
 		// For all other events, derive state from the URL first
 		// (stateless mode reconstructs state each request), then

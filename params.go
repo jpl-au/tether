@@ -1,8 +1,10 @@
 package tether
 
 import (
+	"log/slog"
 	"net/url"
 	"strconv"
+	"strings"
 )
 
 // Params carries URL information from a navigation event. The handler
@@ -48,6 +50,22 @@ type Params struct {
 	// defaults without panicking, because url.Values is a map type and
 	// nil map reads return zero values in Go.
 	Query url.Values
+}
+
+// paramsFromEvent builds Params from a navigate event's data map.
+// The client JS sends "path" and "search" keys; search is the query
+// string without the leading "?". The prefix is trimmed defensively
+// in case a future client change includes it.
+func paramsFromEvent(ev Event) Params {
+	p := Params{Path: ev.Data["path"]}
+	if search := ev.Data["search"]; search != "" {
+		var err error
+		p.Query, err = url.ParseQuery(strings.TrimPrefix(search, "?"))
+		if err != nil {
+			slog.Warn("malformed query string in navigate event", "search", search, "err", err)
+		}
+	}
+	return p
 }
 
 // --- Single-value helpers ---
