@@ -35,9 +35,9 @@ func pageHandleCounter(sess Session, state counterState, ev Event) counterState 
 
 func newTestPageHandler() http.Handler {
 	return Page(PageConfig[counterState]{
-		State:  func(r *http.Request) counterState { return counterState{} },
-		Render: renderCounter,
-		Handle: pageHandleCounter,
+		InitialState: func(r *http.Request) counterState { return counterState{} },
+		Render:       renderCounter,
+		Handle:       pageHandleCounter,
 	})
 }
 
@@ -93,9 +93,9 @@ func TestPageGETNoRetryDelayAttributes(t *testing.T) {
 
 func TestPageGETWithOnNavigate(t *testing.T) {
 	handler := Page(PageConfig[counterState]{
-		State:  func(r *http.Request) counterState { return counterState{} },
-		Render: renderCounter,
-		Handle: pageHandleCounter,
+		InitialState: func(r *http.Request) counterState { return counterState{} },
+		Render:       renderCounter,
+		Handle:       pageHandleCounter,
 		OnNavigate: func(_ Session, state counterState, p Params) counterState {
 			if p.Query.Get("count") == "5" {
 				state.Count = 5
@@ -117,10 +117,10 @@ func TestPageGETDevMode(t *testing.T) {
 	t.Cleanup(dev.Reset)
 
 	handler := Page(PageConfig[counterState]{
-		State:   func(r *http.Request) counterState { return counterState{} },
-		Render:  renderCounter,
-		Handle:  pageHandleCounter,
-		DevMode: true,
+		InitialState: func(r *http.Request) counterState { return counterState{} },
+		Render:       renderCounter,
+		Handle:       pageHandleCounter,
+		DevMode:      true,
 	})
 
 	req := httptest.NewRequest("GET", "/app", nil)
@@ -301,9 +301,9 @@ func TestPagePOSTPanicRecovery(t *testing.T) {
 
 func TestPageGETPanicRecovery(t *testing.T) {
 	handler := Page(PageConfig[counterState]{
-		State:  func(r *http.Request) counterState { panic("render panic") },
-		Render: renderCounter,
-		Handle: pageHandleCounter,
+		InitialState: func(r *http.Request) counterState { panic("render panic") },
+		Render:       renderCounter,
+		Handle:       pageHandleCounter,
 	})
 
 	req := httptest.NewRequest("GET", "/app", nil)
@@ -349,8 +349,8 @@ func TestPagePanicsOnMissingRender(t *testing.T) {
 		}
 	}()
 	Page(PageConfig[counterState]{
-		State:  func(r *http.Request) counterState { return counterState{} },
-		Handle: pageHandleCounter,
+		InitialState: func(r *http.Request) counterState { return counterState{} },
+		Handle:       pageHandleCounter,
 	})
 }
 
@@ -361,16 +361,16 @@ func TestPagePanicsOnMissingHandle(t *testing.T) {
 		}
 	}()
 	Page(PageConfig[counterState]{
-		State:  func(r *http.Request) counterState { return counterState{} },
-		Render: renderCounter,
+		InitialState: func(r *http.Request) counterState { return counterState{} },
+		Render:       renderCounter,
 	})
 }
 
 func TestPagePOSTWithOnNavigate(t *testing.T) {
 	handler := Page(PageConfig[counterState]{
-		State:  func(r *http.Request) counterState { return counterState{} },
-		Render: renderCounter,
-		Handle: pageHandleCounter,
+		InitialState: func(r *http.Request) counterState { return counterState{} },
+		Render:       renderCounter,
+		Handle:       pageHandleCounter,
 		OnNavigate: func(_ Session, state counterState, p Params) counterState {
 			if p.Query.Get("count") == "5" {
 				state.Count = 5
@@ -401,9 +401,9 @@ func TestPageDevModeFromEnv(t *testing.T) {
 	t.Cleanup(dev.Reset)
 
 	handler := Page(PageConfig[counterState]{
-		State:  func(r *http.Request) counterState { return counterState{} },
-		Render: renderCounter,
-		Handle: pageHandleCounter,
+		InitialState: func(r *http.Request) counterState { return counterState{} },
+		Render:       renderCounter,
+		Handle:       pageHandleCounter,
 	})
 
 	req := httptest.NewRequest("GET", "/app", nil)
@@ -417,8 +417,8 @@ func TestPageDevModeFromEnv(t *testing.T) {
 
 func TestPagePOSTNavigateSkipsHandle(t *testing.T) {
 	handler := Page(PageConfig[counterState]{
-		State:  func(r *http.Request) counterState { return counterState{} },
-		Render: renderCounter,
+		InitialState: func(r *http.Request) counterState { return counterState{} },
+		Render:       renderCounter,
 		Handle: func(_ Session, state counterState, _ Event) counterState {
 			// Handle should NOT run for navigate events when
 			// OnNavigate is set — this matches live session behaviour.
@@ -457,7 +457,7 @@ func TestPagePOSTComponentsDispatch(t *testing.T) {
 	}
 
 	handler := Page(PageConfig[pageState]{
-		State: func(r *http.Request) pageState { return pageState{} },
+		InitialState: func(r *http.Request) pageState { return pageState{} },
 		Render: func(s pageState) node.Node {
 			return div.New(
 				span.Textf("count:%d", s.Widget.Count).Dynamic("count"),

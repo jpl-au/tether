@@ -12,7 +12,7 @@ Use `tether.Page` when you don't need server push, live updates, or broadcasting
 
 ```go
 mux.Handle("/", tether.Page(tether.PageConfig[State]{
-    State: func(r *http.Request) State {
+    InitialState: func(r *http.Request) State {
         return State{User: getUserFromSession(r)}
     },
     Render: render,
@@ -37,7 +37,7 @@ tether.Page(tether.PageConfig[State]{
     // Required: reconstruct state from the HTTP request.
     // Called on every request (GET and POST). Derive state from
     // the URL, cookies, headers, or a database — not from r.Body.
-    State: func(r *http.Request) State { ... },
+    InitialState: func(r *http.Request) State { ... },
 
     // Required: build a node tree from the current state.
     Render: func(s State) node.Node { ... },
@@ -123,7 +123,7 @@ r.Route("/settings", router.Page[State]{Render: settingsRender, Handle: settings
 r.NotFound(router.Page[State]{Render: notFoundRender})
 
 tether.Page(tether.PageConfig[State]{
-    State:      func(r *http.Request) State { return State{} },
+    InitialState:      func(r *http.Request) State { return State{} },
     Render:     r.Render,
     Handle:     r.Handle,
     OnNavigate: r.OnNavigate(func(s *State, p tether.Params) { s.Page = p.Path }),

@@ -179,10 +179,10 @@ func TestAssetAutoMountPage(t *testing.T) {
 	}
 
 	handler := Page(PageConfig[counterState]{
-		State:  func(r *http.Request) counterState { return counterState{} },
-		Render: renderCounter,
-		Handle: func(_ Session, s counterState, _ Event) counterState { return s },
-		Assets: []*Asset{assets},
+		InitialState: func(r *http.Request) counterState { return counterState{} },
+		Render:       renderCounter,
+		Handle:       func(_ Session, s counterState, _ Event) counterState { return s },
+		Assets:       []*Asset{assets},
 	})
 
 	req := httptest.NewRequest("GET", "/assets/app.js", nil)
