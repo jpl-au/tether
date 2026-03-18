@@ -25,11 +25,11 @@ import (
 // At minimum, set State, Render, and Handle. Everything else is
 // optional and has sensible defaults.
 type PageConfig[S any] struct {
-	// State reconstructs the page state from the HTTP request. Called
+	// InitialState returns the starting state for each request. Called
 	// on every request (GET and POST). Derive state from the URL,
 	// cookies, headers, or a database — not from r.Body, which
 	// contains the event JSON on POST requests.
-	State func(r *http.Request) S
+	InitialState func(r *http.Request) S
 
 	// Render builds a node tree from the current state. Same type as
 	// [LiveConfig].Render — a pure function that returns a Fluent node

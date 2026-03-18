@@ -23,8 +23,8 @@ import (
 // For live pages with persistent connections and session state, use
 // [Live] instead.
 func Page[S any](cfg PageConfig[S]) http.Handler {
-	if cfg.State == nil {
-		panic("tether: PageConfig.State is required")
+	if cfg.InitialState == nil {
+		panic("tether: PageConfig.InitialState is required")
 	}
 	if cfg.Render == nil {
 		panic("tether: PageConfig.Render is required")
@@ -141,7 +141,7 @@ func (p *pageHandler[S]) serveGET(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	state := p.cfg.State(r)
+	state := p.cfg.InitialState(r)
 	if p.cfg.OnNavigate != nil {
 		cs := &CaptureSession{PushErr: ErrPushPreWarm}
 		params := Params{Path: r.URL.Path, Query: r.URL.Query()}
@@ -201,7 +201,7 @@ func (p *pageHandler[S]) servePOST(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	state := p.cfg.State(r)
+	state := p.cfg.InitialState(r)
 
 	cs := &CaptureSession{PushErr: ErrPushPreWarm}
 	if ev.Type == event.Navigate && p.cfg.OnNavigate != nil {
