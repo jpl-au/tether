@@ -285,3 +285,76 @@ func TestThawStatusTransition(t *testing.T) {
 		synctest.Wait()
 	})
 }
+
+// TestThawMultipleCycles exercises freeze→thaw→freeze→thaw to verify
+// that the destroyed channel is properly recreated on each thaw. A
+// double-close would panic.
+func TestThawMultipleCycles(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		store := newSessionFileStore(t)
+		h := newThawHandler(store)
+
+		// First cycle: freeze with Count=1.
+		sess := freezeSession(t, h, counterState{Count: 1}, nil)
+
+		// Thaw — mockTransport delivers one increment then disconnects,
+		// re-freezing the session.
+		thawMT := &mockTransport{
+			events: []Event{{Type: "event", Action: "increment"}},
+		}
+		req, _ := http.NewRequest("GET", "/", nil)
+
+		h.mu.Lock()
+		h.active[sess.id] = sess
+		h.mu.Unlock()
+
+		go h.thaw(sess, req, thawMT)
+		synctest.Wait()
+
+		// Session should be re-frozen with Count=2 (1 restored + 1).
+		if Status(sess.status.Load()) != Frozen {
+			t.Fatalf("after first thaw: status = %d, want Frozen", sess.status.Load())
+		}
+
+		// Second cycle: thaw again with another increment.
+		thawMT2 := &mockTransport{
+			events: []Event{{Type: "event", Action: "increment"}},
+		}
+		req2, _ := http.NewRequest("GET", "/", nil)
+
+		h.mu.Lock()
+		h.active[sess.id] = sess
+		h.mu.Unlock()
+
+		go h.thaw(sess, req2, thawMT2)
+		synctest.Wait()
+
+		// Should be re-frozen with Count=3 (2 restored + 1).
+		if Status(sess.status.Load()) != Frozen {
+			t.Fatalf("after second thaw: status = %d, want Frozen", sess.status.Load())
+		}
+
+		data, err := store.Load(context.Background(), sess.id)
+		if err != nil {
+			t.Fatalf("Load: %v", err)
+		}
+		if data == nil {
+			t.Fatal("expected session data after second re-freeze")
+		}
+		env, err := unmarshalEnvelope(data)
+		if err != nil {
+			t.Fatalf("unmarshalEnvelope: %v", err)
+		}
+		codec := cborCodec[counterState]{}
+		state, err := codec.Unmarshal(env.State)
+		if err != nil {
+			t.Fatalf("Unmarshal: %v", err)
+		}
+		if state.Count != 3 {
+			t.Errorf("Count after two cycles = %d, want 3", state.Count)
+		}
+
+		sess.stop()
+		synctest.Wait()
+	})
+}

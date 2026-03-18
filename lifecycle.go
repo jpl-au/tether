@@ -138,6 +138,7 @@ func (h *Handler[S]) thaw(sess *LiveSession[S], r *http.Request, transport Trans
 	sess.fxCh = make(chan func(*Effects), h.cfg.Limits.CmdBufferSize)
 	sess.overflowSem = make(chan struct{}, h.cfg.Limits.CmdBufferSize)
 	sess.loopDone = make(chan struct{})
+	sess.destroyed = make(chan struct{})
 	sess.lastURL = env.URL
 	sess.lastTitle = env.Title
 
