@@ -156,10 +156,14 @@ func serve(srv *http.Server, start func() error, url string, grace time.Duration
 	slog.Info("shutting down")
 
 	// A second signal during shutdown forces an immediate exit.
+	// The channel is closed after clean shutdown to release this
+	// goroutine — the ok check prevents a force-exit on close.
 	go func() {
-		<-sigCh
-		slog.Warn("forced exit", "reason", "second signal during shutdown")
-		os.Exit(1)
+		_, ok := <-sigCh
+		if ok {
+			slog.Warn("forced exit", "reason", "second signal during shutdown")
+			os.Exit(1)
+		}
 	}()
 
 	ctx, cancel := context.WithTimeout(context.Background(), grace)
@@ -189,6 +193,7 @@ func serve(srv *http.Server, start func() error, url string, grace time.Duration
 
 	slog.Info("shutdown complete")
 	signal.Stop(sigCh)
+	close(sigCh) // unblock the second-signal goroutine
 	return nil
 }
 

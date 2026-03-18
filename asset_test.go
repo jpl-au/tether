@@ -38,21 +38,16 @@ func TestAssetURL(t *testing.T) {
 	}
 }
 
-func TestAssetURLPanicsOnMissing(t *testing.T) {
+// TestAssetURLMissingReturnsUnhashed verifies that URL returns an
+// unhashed path when the asset is not found, rather than panicking.
+func TestAssetURLMissingReturnsUnhashed(t *testing.T) {
 	a := testAssetFS()
 
-	defer func() {
-		r := recover()
-		if r == nil {
-			t.Fatal("expected panic for missing asset")
-		}
-		msg, ok := r.(string)
-		if !ok || !strings.Contains(msg, "not-here.css") {
-			t.Errorf("panic = %v, want message mentioning not-here.css", r)
-		}
-	}()
-
-	a.URL("not-here.css")
+	got := a.URL("not-here.css")
+	want := "/static/not-here.css"
+	if got != want {
+		t.Errorf("URL(missing) = %q, want %q", got, want)
+	}
 }
 
 func TestAssetStylesheet(t *testing.T) {

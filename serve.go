@@ -194,7 +194,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 	if h.cfg.SessionStore != nil {
 		if restored, ok := h.restoreSession(id, r, transport); ok {
 			started = true
-			_ = restored // session is running; block on loopDone below
+			_ = restored // restoreSession blocked until the loop exited
 			return
 		}
 	}

@@ -3,7 +3,6 @@ package tether
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"fmt"
 	"io/fs"
 	"log/slog"
 	"maps"
@@ -98,13 +97,16 @@ func (a *Asset) init() {
 //
 //	assets.URL("styles.css") // "/static/styles.css?v=a1b2c3d4e5f6"
 //
-// Panics if the path does not exist in the filesystem — this catches
-// typos at startup rather than serving broken links at runtime.
+// If the path is not found in the filesystem (typo, read failure),
+// the unhashed URL is returned and an error is logged. The asset
+// file server will still serve the file — only cache-busting is
+// lost.
 func (a *Asset) URL(path string) string {
 	a.init()
 	h, ok := a.hashes[path]
 	if !ok {
-		panic(fmt.Sprintf("tether: asset %q not found in filesystem", path))
+		slog.Error("tether: asset not found — check the path and look for earlier read errors", "path", path)
+		return a.prefix + path
 	}
 	return a.prefix + path + "?v=" + h
 }
