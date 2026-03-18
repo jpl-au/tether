@@ -52,6 +52,11 @@ func (p *tetherBody) Render(w ...io.Writer) []byte {
 	var buf bytes.Buffer
 	p.RenderBuilder(&buf)
 	if len(w) > 0 && w[0] != nil {
+		// Write error is intentionally not checked. This writes to
+		// an http.ResponseWriter during the initial GET. A failure
+		// means the client disconnected — a normal condition that
+		// requires no action. The node.Node interface does not
+		// return an error.
 		buf.WriteTo(w[0])
 		return nil
 	}

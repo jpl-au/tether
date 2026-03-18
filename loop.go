@@ -343,6 +343,9 @@ func (s *LiveSession[S]) cleanup() {
 	if s.disconnectTimer != nil {
 		s.disconnectTimer.Stop()
 	}
+	if s.lifetimeTimer != nil {
+		s.lifetimeTimer.Stop()
+	}
 	if s.transport != nil {
 		s.transport.Close()
 	}

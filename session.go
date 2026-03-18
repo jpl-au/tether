@@ -116,6 +116,10 @@ type LiveSession[S any] struct {
 	// stopped on reattach. If it fires, the session is destroyed.
 	disconnectTimer  *time.Timer
 	reconnectTimeout time.Duration
+	// lifetimeTimer caps the session's total duration. Stopped in
+	// cleanup to avoid a leaked goroutine when the session is
+	// destroyed before MaxLifetime fires.
+	lifetimeTimer *time.Timer
 
 	// endpoint is the URL path the session was created on (from the
 	// initial GET or direct transport connect). Used in log messages

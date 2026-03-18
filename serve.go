@@ -302,7 +302,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		sess.onNoPatch = h.cfg.OnNoPatch
 	}
 	if h.cfg.Timeouts.MaxLifetime > 0 {
-		time.AfterFunc(h.cfg.Timeouts.MaxLifetime, func() {
+		sess.lifetimeTimer = time.AfterFunc(h.cfg.Timeouts.MaxLifetime, func() {
 			sess.stop()
 		})
 	}
@@ -486,7 +486,7 @@ func (h *Handler[S]) restoreSession(id string, r *http.Request, transport Transp
 		sess.onNoPatch = h.cfg.OnNoPatch
 	}
 	if h.cfg.Timeouts.MaxLifetime > 0 {
-		time.AfterFunc(h.cfg.Timeouts.MaxLifetime, func() {
+		sess.lifetimeTimer = time.AfterFunc(h.cfg.Timeouts.MaxLifetime, func() {
 			sess.stop()
 		})
 	}
