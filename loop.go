@@ -24,6 +24,7 @@ import (
 // session alive for reconnection.
 func (s *LiveSession[S]) run() {
 	dev.Debug("run loop started", "session", s.id, "endpoint", s.endpoint)
+	s.stateSnap.Store(s.state)
 	s.status.Store(int32(Active))
 	defer close(s.loopDone)
 	defer s.cleanup()
@@ -117,13 +118,7 @@ func (s *LiveSession[S]) exec(ev Event) {
 		s.idleTimer.Reset(s.idleTimeout)
 	}
 
-	// Snapshot the state before entering Handle so that concurrent
-	// callers of State() can read it safely via the atomic Value.
-	// The snapshot is stored before handling is set to true —
-	// sequential consistency of atomics guarantees any goroutine
-	// that observes handling=true also sees the snapshot.
 	s.stateSnap.Store(s.state)
-	s.handling.Store(true)
 	fx := &Effects{}
 	defer func() {
 		if r := recover(); r != nil {
@@ -137,7 +132,6 @@ func (s *LiveSession[S]) exec(ev Event) {
 			})
 			s.drainFx(nil)
 		}
-		s.handling.Store(false)
 	}()
 
 	dev.Debug("event received",
@@ -175,6 +169,7 @@ func (s *LiveSession[S]) exec(ev Event) {
 		return
 	}
 	s.state = newState
+	s.stateSnap.Store(s.state)
 
 	tree := s.render(s.state)
 	patches, change := s.differ.Diff(tree)

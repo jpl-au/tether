@@ -93,15 +93,10 @@ type LiveSession[S any] struct {
 	// Pending → Active → Frozen → Active (thaw) or → Destroyed.
 	// See [Status] for the full state machine.
 	status atomic.Int32
-	// handling is true while the loop goroutine is inside exec() or
-	// Update. Used by State() to choose the fast path (return the
-	// atomic snapshot) instead of routing through the command channel,
-	// which would deadlock because the loop is busy in Handle.
-	handling atomic.Bool
-	// stateSnap holds the state value captured at the start of each
-	// exec/Update cycle. It is stored atomically before handling is
-	// set to true, so any goroutine that sees handling=true can safely
-	// read the snapshot without a data race on s.state.
+	// stateSnap holds the most recently completed state, updated
+	// atomically after every mutation in exec() and Update(). State()
+	// returns this value when the loop is active — no channel
+	// round-trip, no blocking.
 	stateSnap atomic.Value
 
 	// overflows counts how many times the command or effect buffer

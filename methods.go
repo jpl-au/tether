@@ -9,34 +9,22 @@ import (
 	"github.com/jpl-au/tether/push"
 )
 
-// State returns the current session state. When called from inside
-// Handle (or a goroutine it spawned) it returns an atomic snapshot
-// captured at the start of the exec cycle — no channel hop, no race.
-// When called from outside Handle, it performs a synchronous read
-// through the command channel so the value reflects any prior queued
-// updates.
+// State returns the current session state. Never blocks.
 //
-// If the command loop has not started yet (e.g. during OnConnect),
-// the state is returned directly. This is safe because no concurrent
-// mutations can occur before the loop is running.
+// When the loop is active, State returns an atomic snapshot updated
+// after every state mutation (Handle return, Update callback). During
+// Handle, the snapshot is the pre-Handle state; outside Handle, it is
+// the most recently completed state. This is lock-free and safe to
+// call from any goroutine at any time.
+//
+// When the loop is not active (before startup, after destruction, or
+// while frozen), the state field is returned directly — no concurrent
+// mutations are possible.
 func (s *LiveSession[S]) State() S {
-	if s.handling.Load() {
-		return s.stateSnap.Load().(S)
-	}
 	if Status(s.status.Load()) != Active {
-		// Loop not running — return state directly to avoid
-		// deadlocking on a channel nobody is draining.
 		return s.state
 	}
-	ch := make(chan S, 1)
-	select {
-	case s.cmds <- func() { ch <- s.state }:
-		return <-ch
-	case <-s.ctx.Done():
-		// Session destroyed — return last known state rather than
-		// blocking forever on a channel nobody will drain.
-		return s.state
-	}
+	return s.stateSnap.Load().(S)
 }
 
 // Update applies a state change and pushes the resulting diff to the
@@ -68,7 +56,6 @@ func (s *LiveSession[S]) State() S {
 func (s *LiveSession[S]) Update(fn func(S) S) {
 	s.enqueue(func() {
 		s.stateSnap.Store(s.state)
-		s.handling.Store(true)
 		fx := &Effects{}
 		defer func() {
 			if r := recover(); r != nil {
@@ -82,7 +69,6 @@ func (s *LiveSession[S]) Update(fn func(S) S) {
 				})
 				s.drainFx(nil)
 			}
-			s.handling.Store(false)
 		}()
 
 		s.lastActivity.Store(time.Now().UnixNano())
@@ -90,6 +76,7 @@ func (s *LiveSession[S]) Update(fn func(S) S) {
 			s.idleTimer.Reset(s.idleTimeout)
 		}
 		s.state = fn(s.state)
+		s.stateSnap.Store(s.state)
 
 		// Collect effects enqueued during fn.
 		s.drainFx(fx)
