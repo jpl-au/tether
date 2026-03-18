@@ -79,6 +79,12 @@ func Page[S any](cfg PageConfig[S]) http.Handler {
 	if cfg.Client.TransitionTimeout == 0 {
 		cfg.Client.TransitionTimeout = defaultTransitionTimeout
 	}
+	if cfg.Client.FlashDuration == 0 {
+		cfg.Client.FlashDuration = defaultFlashDuration
+	}
+	if cfg.Client.ToastDuration == 0 {
+		cfg.Client.ToastDuration = defaultToastDuration
+	}
 
 	csrf := http.NewCrossOriginProtection()
 	for _, origin := range cfg.Security.TrustedOrigins {
@@ -152,6 +158,8 @@ func (p *pageHandler[S]) serveGET(w http.ResponseWriter, r *http.Request) {
 		transport:         mode.HTTP,
 		defaultDebounce:   p.cfg.Client.DefaultDebounce,
 		transitionTimeout: p.cfg.Client.TransitionTimeout,
+		flashDuration:     p.cfg.Client.FlashDuration,
+		toastDuration:     p.cfg.Client.ToastDuration,
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
