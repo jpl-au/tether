@@ -170,7 +170,7 @@ h.Diagnostics.SubscribeAsync(ctx, func(d tether.Diagnostic) {
 | `BufferOverflow` | Command channel was full; an overflow goroutine was spawned to deliver the command |
 | `CommandDropped` | Both the command buffer and the overflow goroutine cap were exhausted — data was lost |
 | `HandlerPanic` | Recovered panic inside Handle, Update, or a command callback |
-| `UploadError` | Failure in an upload handler callback |
+| `UploadError` | Failure or recovered panic in an upload handler callback |
 | `SessionBindingFailed` | A reconnect or session claim was rejected because the User-Agent did not match the original |
 | `StoreError` | Failure saving or deleting differ snapshots from the configured DiffStore. The Detail field indicates the operation ("save" or "delete"). Store failures are non-fatal — the framework falls back to in-memory behaviour |
 | `SessionStoreError` | Failure saving, loading, or deleting session state from the configured SessionStore. The Detail field indicates the operation ("save", "load", "delete", "marshal", "unmarshal", or "envelope"). Non-fatal — the framework continues with in-memory state |

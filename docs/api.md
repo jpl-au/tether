@@ -71,7 +71,7 @@ When either callback is configured, the framework's own logging for that event i
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `Idle` | `time.Duration` | 0 (disabled) | Close sessions inactive for this long |
+| `Idle` | `time.Duration` | 0 (disabled) | Close sessions with no activity for this long. Activity includes client events, Update calls, and server-push effects (Signal, Toast, etc.) |
 | `MaxLifetime` | `time.Duration` | 0 (disabled) | Close sessions after this long regardless |
 | `Reconnect` | `time.Duration` | 30s | Keep disconnected sessions alive for reconnection |
 | `DisableReconnect` | `bool` | false | Destroy sessions immediately on disconnect |
