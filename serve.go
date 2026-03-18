@@ -179,6 +179,9 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 			}
 			dev.Debug("session reattached", "session", id, "endpoint", sess.endpoint, "remote", r.RemoteAddr)
 			h.reattach(sess, transport)
+			// Block so the HTTP goroutine stays alive — SSE
+			// transports need r.Context() to remain valid.
+			<-sess.loopDone
 		}
 		return
 	}
