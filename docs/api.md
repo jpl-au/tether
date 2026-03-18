@@ -137,7 +137,7 @@ When either callback is configured, the framework's own logging for that event i
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `Logger` | `*slog.Logger` | Logger set as the process default via `slog.SetDefault`. When nil, creates a text handler at INFO level (DEBUG in DevMode) |
+| `Logger` | `*slog.Logger` | When nil, creates a text handler at INFO level (DEBUG in DevMode) and sets it as the process default once. When provided, used for this handler without touching the global default |
 
 ---
 

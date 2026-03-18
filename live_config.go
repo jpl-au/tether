@@ -173,9 +173,13 @@ type LiveConfig[S any] struct {
 	// lines and any other structured log output that includes it. Optional.
 	Name string
 
-	// Logger is set as the slog default via slog.SetDefault. When nil,
-	// the framework creates a text (or JSON, see LogJSON) handler at
-	// INFO level (DEBUG in DevMode).
+	// Logger used for framework log output. When nil, the framework
+	// creates a text (or JSON, see LogJSON) handler at INFO level
+	// (DEBUG in DevMode) and sets it as the process-wide slog default.
+	// The default is set only once — the first handler without an
+	// explicit Logger configures it; subsequent handlers leave it
+	// alone. When provided, the framework uses it for this handler
+	// without touching the global default.
 	Logger *slog.Logger
 
 	// Worker enables the full service worker for asset caching, offline

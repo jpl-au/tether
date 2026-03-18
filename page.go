@@ -47,8 +47,8 @@ func Page[S any](cfg PageConfig[S]) http.Handler {
 		} else {
 			cfg.Logger = slog.New(slog.NewTextHandler(os.Stderr, opts))
 		}
+		setDefaultLogger(cfg.Logger)
 	}
-	slog.SetDefault(cfg.Logger)
 	if cfg.DevMode {
 		dev.Enable()
 	}

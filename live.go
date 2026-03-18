@@ -110,8 +110,11 @@ func Live[S any](cfg LiveConfig[S]) *Handler[S] {
 		} else {
 			cfg.Logger = slog.New(slog.NewTextHandler(os.Stderr, opts))
 		}
+		// Set the process default once. The first handler without an
+		// explicit Logger configures the global; subsequent handlers
+		// create their own logger but leave the default alone.
+		setDefaultLogger(cfg.Logger)
 	}
-	slog.SetDefault(cfg.Logger)
 	if cfg.DevMode {
 		dev.Enable()
 	}
