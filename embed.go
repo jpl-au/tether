@@ -44,19 +44,21 @@ var (
 func clientVersion() string {
 	clientVersionOnce.Do(func() {
 		h := sha256.New()
-		fs.WalkDir(clientFS, ".", func(path string, d fs.DirEntry, err error) error {
+		err := fs.WalkDir(clientFS, ".", func(path string, d fs.DirEntry, err error) error {
 			if err != nil || d.IsDir() {
 				return err
 			}
 			data, err := fs.ReadFile(clientFS, path)
 			if err != nil {
-				// Embedded files should always be readable; a failure
-				// here indicates a corrupted binary.
-				panic("tether: failed to read embedded file " + path + ": " + err.Error())
+				slog.Error("tether: failed to read embedded file", "path", path, "error", err)
+				return nil
 			}
 			h.Write(data)
 			return nil
 		})
+		if err != nil {
+			slog.Error("tether: failed to walk embedded client files", "error", err)
+		}
 		clientVersionVal = hex.EncodeToString(h.Sum(nil))[:12]
 	})
 	return clientVersionVal
