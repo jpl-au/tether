@@ -119,6 +119,7 @@ When either callback is configured, the framework's own logging for that event i
 | `SessionStore` | `SessionStore` | External persistence for session state — enables crash recovery and node migration (opt-in, nil by default). See [session-store](session-store.md) |
 | `Codec` | `SessionCodec[S]` | Custom serialisation for state `S` (nil = CBOR). Only used when SessionStore is set |
 | `OnRestore` | `func(*LiveSession[S])` | Called instead of OnConnect when a session is restored from the SessionStore. Falls back to OnConnect when nil |
+| `FreezeOnDisconnect` | `bool` | When true, disconnected sessions persist state to the SessionStore, release memory, and exit the command loop. Requires SessionStore. See [frozen mode](frozen-mode.md) |
 | `Protocol` | `protocol.Protocol` | HTTP protocol (default `protocol.Auto` — detects per request). See [transport](transport.md#protocol-awareness) |
 | `DevMode` | `bool` | Development mode (or set `TETHER_DEV=1`). See [operations](operations.md#dev-mode) |
 | `WireFormat` | `wire.Format` | Encoding for server-to-client updates (default `wire.JSON`) |

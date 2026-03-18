@@ -106,6 +106,17 @@ window.Tether.signals = window.Tether.signals || {};
       observeViewportElements(root);
     }
 
+    // Dev mode: expose a disconnect helper for integration testing.
+    // Closes the transport so the server sees a clean disconnect.
+    // Not available in production — devMode is only set when the
+    // server includes data-tether-dev on the root element.
+    if (devMode) {
+      window.Tether.disconnect = function () {
+        if (ws) ws.close();
+        if (eventSource) eventSource.close();
+      };
+    }
+
     // Dev mode: unregister the service worker scoped to this handler so
     // cached assets are never served stale during development. Only the
     // worker matching this endpoint's scope is removed — workers
