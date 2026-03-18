@@ -74,7 +74,7 @@ func buildWorkerJS(assets []*Asset) []byte {
 	h.Write([]byte(clientVersion()))
 	var precache []string
 	for _, a := range assets {
-		h.Write([]byte(a.contentHash()))
+		h.Write([]byte(a.hash()))
 		precache = append(precache, a.precacheURLs()...)
 	}
 	version := hex.EncodeToString(h.Sum(nil))[:12]

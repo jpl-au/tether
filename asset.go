@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io/fs"
 	"log/slog"
+	"maps"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 
@@ -125,14 +127,15 @@ func (a *Asset) Script(path string) node.Node {
 	return script.New().Src(a.URL(path))
 }
 
-// contentHash returns a single hash representing all files in the
-// asset filesystem. Used to mix into the service worker CACHE_VERSION.
-func (a *Asset) contentHash() string {
+// hash returns a single hash representing all files in the asset
+// filesystem. Used to mix into the service worker CACHE_VERSION.
+// Keys are sorted so the result is deterministic across restarts.
+func (a *Asset) hash() string {
 	a.init()
 	h := sha256.New()
-	for path, hash := range a.hashes {
+	for _, path := range slices.Sorted(maps.Keys(a.hashes)) {
 		h.Write([]byte(path))
-		h.Write([]byte(hash))
+		h.Write([]byte(a.hashes[path]))
 	}
 	return hex.EncodeToString(h.Sum(nil))[:12]
 }

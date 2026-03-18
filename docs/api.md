@@ -2,7 +2,7 @@
 
 ## LiveConfig
 
-`tether.LiveConfig[S]` configures a handler. Only `Render` is required — everything else has sensible defaults.
+`tether.LiveConfig[S]` configures a handler. `InitialState`, `Render`, and `Handle` are required, plus a transport (`Upgrade` and/or `Fallback` depending on `Mode`). Everything else has sensible defaults.
 
 ```go
 tether.Live(tether.LiveConfig[State]{
@@ -40,7 +40,7 @@ Mode constants: `mode.HTTP`, `mode.WebSocket`, `mode.ServerSentEvents`, `mode.Bo
 | Field | Type | Description |
 |-------|------|-------------|
 | `OnConnect` | `func(*LiveSession[S])` | Called when a session connects |
-| `OnDisconnect` | `func(*LiveSession[S])` | Called when a session is permanently destroyed |
+| `OnDisconnect` | `func(*LiveSession[S])` | Called when the transport closes (temporary disconnect or permanent destruction) |
 | `OnStructuralChange` | `func(*LiveSession[S], StructuralChange)` | Called when Dynamic keys change between renders |
 | `OnNoPatch` | `func(*LiveSession[S], NoPatch)` | Called when a render cycle produces no patches |
 | `Groups` | `[]*Group[S]` | Groups the session auto-joins on connect |
@@ -137,7 +137,7 @@ When either callback is configured, the framework's own logging for that event i
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `Logger` | `*slog.Logger` | Session error logger (default `slog.Default()`) |
+| `Logger` | `*slog.Logger` | Logger set as the process default via `slog.SetDefault`. When nil, creates a text handler at INFO level (DEBUG in DevMode) |
 
 ---
 
