@@ -211,4 +211,11 @@ func (h *Handler[S]) wireDisconnect(sess *LiveSession[S]) {
 			h.cfg.OnDisconnect(sess)
 		}
 	}
+
+	sess.onTimeout = func() {
+		h.mu.Lock()
+		delete(h.disconnected, sess.id)
+		h.mu.Unlock()
+		h.destroySession(sess)
+	}
 }

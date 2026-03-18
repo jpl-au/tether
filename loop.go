@@ -225,7 +225,11 @@ func (s *LiveSession[S]) onTransportClose() {
 			"timeout", s.reconnectTimeout,
 		)
 		s.disconnectTimer = time.AfterFunc(s.reconnectTimeout, func() {
-			s.stop()
+			if s.onTimeout != nil {
+				s.onTimeout()
+			} else {
+				s.stop()
+			}
 		})
 	}
 

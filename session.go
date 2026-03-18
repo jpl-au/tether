@@ -150,6 +150,11 @@ type LiveSession[S any] struct {
 	// (active → disconnected or destroy).
 	onDisconnect func()
 
+	// Installed by the Handler. Called when the reconnect timer
+	// fires. Removes the session from the disconnected pool and
+	// calls destroySession.
+	onTimeout func()
+
 	// Component mounts for automatic event routing. Events matching
 	// a mount's prefix are dispatched to the component before the
 	// user's Handle function runs.
