@@ -13,6 +13,15 @@ import (
 // and re-render. This avoids any locking — only the loop touches
 // session state.
 func (h *Handler[S]) reattach(sess *LiveSession[S], transport Transport) {
+	// Stop the disconnect timer before writing callback fields
+	// to avoid a data race between wireDisconnect (this goroutine)
+	// and the timer callback (timer goroutine). Timer.Stop is
+	// goroutine-safe; the field read is safe via h.mu happens-before.
+	if sess.disconnectTimer != nil {
+		sess.disconnectTimer.Stop()
+		sess.disconnectTimer = nil
+	}
+
 	if hb, ok := transport.(Heartbeater); ok && !h.cfg.Timeouts.DisableHeartbeat {
 		hb.StartHeartbeat(h.cfg.Timeouts.Heartbeat)
 	}
@@ -21,11 +30,6 @@ func (h *Handler[S]) reattach(sess *LiveSession[S], transport Transport) {
 
 	select {
 	case sess.cmds <- func() {
-		// Stop the disconnect timer — we're reconnecting.
-		if sess.disconnectTimer != nil {
-			sess.disconnectTimer.Stop()
-			sess.disconnectTimer = nil
-		}
 
 		sess.transport = transport
 		sess.events = make(chan Event)
