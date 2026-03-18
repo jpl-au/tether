@@ -57,9 +57,11 @@ func (h *Handler[S]) Shutdown(ctx context.Context) error {
 	clear(h.disconnected)
 	h.mu.Unlock()
 
-	// Cancel all sessions and close their transports.
+	// Destroy all sessions. destroySession cancels the context,
+	// handles frozen sessions (closes destroyed), and cleans up
+	// store entries and group memberships.
 	for _, sess := range sessions {
-		sess.stop()
+		h.destroySession(sess)
 	}
 
 	// Wait for every loop goroutine to exit (or the caller's
