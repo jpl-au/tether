@@ -178,7 +178,9 @@ func serve(srv *http.Server, start func() error, url string, grace time.Duration
 	wg.Wait()
 
 	// Stop accepting new HTTP requests.
-	srv.Shutdown(ctx)
+	if err := srv.Shutdown(ctx); err != nil {
+		slog.Warn("tether: HTTP server shutdown error", "error", err)
+	}
 
 	// Force-close any sessions that didn't drain in time.
 	for _, d := range drainers {

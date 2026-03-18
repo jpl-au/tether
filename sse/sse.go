@@ -16,6 +16,7 @@ package sse
 import (
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"sync"
 	"time"
@@ -41,9 +42,12 @@ func Upgrade() func(http.ResponseWriter, *http.Request) (tether.Transport, error
 
 		// Disable write deadlines for the SSE stream. This ensures that
 		// even if the server has a global WriteTimeout, it won't kill our
-		// long-lived SSE connection. Requires Go 1.20+.
+		// long-lived SSE connection. Requires Go 1.20+. Not all
+		// ResponseWriters support this — the error is non-fatal.
 		rc := http.NewResponseController(w)
-		_ = rc.SetWriteDeadline(time.Time{})
+		if err := rc.SetWriteDeadline(time.Time{}); err != nil {
+			slog.Debug("sse: SetWriteDeadline not supported", "error", err)
+		}
 
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.Header().Set("Cache-Control", "no-cache")
