@@ -138,3 +138,7 @@ The `SessionCodec` (default CBOR) serialises state `S` for the
 store. The same codec is used for freeze, crash recovery, and
 graceful shutdown persistence. See [session-store](session-store.md)
 for codec details.
+
+---
+
+[← Back to documentation](../README.md#documentation)

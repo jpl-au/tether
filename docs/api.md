@@ -795,3 +795,7 @@ pub, priv, err := push.GenerateVAPIDKeys()
 | `tether.ErrPushNoSubscription` | Browser has not registered a push subscription |
 | `tether.ErrPushPreWarm` | Push called during pre-warming (no browser yet) |
 | `push.ErrSubscriptionExpired` | Push service returned HTTP 410 |
+
+---
+
+[← Back to documentation](../README.md#documentation)

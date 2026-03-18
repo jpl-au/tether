@@ -141,3 +141,7 @@ sess.Push(push.Notification{
     URL:   "/messages",
 })
 ```
+
+---
+
+[← Back to documentation](../README.md#documentation)

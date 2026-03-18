@@ -62,3 +62,7 @@ Tether.hooks.chart = {
 ```
 
 The JS runtime calls `mounted` when the element is added to the DOM, `updated` when it is morphed in place, and `destroyed` when it is about to be removed.
+
+---
+
+[← Back to documentation](../README.md#documentation)

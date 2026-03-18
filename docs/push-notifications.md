@@ -85,3 +85,7 @@ Check with `errors.Is()`:
 | `push.ErrSubscriptionExpired` | Push service returned HTTP 410 |
 
 The `push` subpackage implements the Web Push protocol (RFC 8291 + RFC 8292) with VAPID JWT signing and aes128gcm payload encryption. It depends on `golang.org/x/crypto` for HKDF key derivation.
+
+---
+
+[← Back to documentation](../README.md#documentation)

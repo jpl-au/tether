@@ -205,3 +205,7 @@ A failure at the fluent render step (e.g. raw user input inserted via
 `UnsafeRaw` without escaping) would result in XSS. The fluent engine is
 the single point of responsibility for escaping — audit it if you use
 `UnsafeRaw` or similar bypass functions.
+
+---
+
+[← Back to documentation](../README.md#documentation)

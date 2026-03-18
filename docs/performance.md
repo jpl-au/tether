@@ -22,3 +22,7 @@ Applications using tether benefit from [Profile-Guided Optimisation](https://go.
 3. `go build` — PGO is applied automatically
 
 Both generic helpers and direct `SetData` paths benefit from PGO.
+
+---
+
+[← Back to documentation](../README.md#documentation)

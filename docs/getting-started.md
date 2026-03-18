@@ -133,3 +133,7 @@ runtime separately:
 mux.Handle("/app", h)
 mux.Handle("/_tether/", http.StripPrefix("/_tether/", tether.ServeClient()))
 ```
+
+---
+
+[← Back to documentation](../README.md#documentation)

@@ -353,3 +353,7 @@ tether.Live(tether.LiveConfig[State]{
     // ...
 })
 ```
+
+---
+
+[← Back to documentation](../README.md#documentation)

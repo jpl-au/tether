@@ -137,3 +137,7 @@ Pick one update path per element. Use signals for high-frequency updates that by
 | **Signal directives** | None | Tab selection, menu state with server override |
 | **Optimistic updates** | Yes (with instant preview) | Like buttons, checkboxes, toggles |
 | **Client directives** | None | Drawer open/close, modal visibility |
+
+---
+
+[← Back to documentation](../README.md#documentation)

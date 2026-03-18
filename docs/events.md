@@ -237,3 +237,7 @@ Returns a copy of the event with a different `Action`. Used internally by the mo
 ```go
 stripped := ev.WithAction(strings.TrimPrefix(ev.Action, "prefix."))
 ```
+
+---
+
+[← Back to documentation](../README.md#documentation)

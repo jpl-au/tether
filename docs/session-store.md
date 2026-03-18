@@ -211,3 +211,7 @@ common case of deploying new code while sessions are stored.
 For applications that need explicit version control, the
 `SessionCodec` is the escape hatch. A codec can embed a version
 number in its output and handle migration in `Unmarshal`.
+
+---
+
+[← Back to documentation](../README.md#documentation)

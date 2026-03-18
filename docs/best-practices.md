@@ -232,3 +232,7 @@ tether.Live(tether.LiveConfig[State]{
 When `Equal` returns true, the render, diff, and send are skipped entirely. Side effects (Toast, Signal, etc.) are still sent.
 
 For struct types with slice or map fields, `a == b` does not compile — use `reflect.DeepEqual` or write a field-by-field comparison. A manual comparison is faster and avoids reflecting over fields that don't affect rendering.
+
+---
+
+[← Back to documentation](../README.md#documentation)

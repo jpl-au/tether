@@ -218,3 +218,7 @@ Client: tether.Client{
 ```
 
 When the service worker is active and the browser supports Background Sync (Chromium), queued events are replayed even if the tab was closed. On other browsers, replay occurs when the tab reopens and the SSE connection restores.
+
+---
+
+[← Back to documentation](../README.md#documentation)

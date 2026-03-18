@@ -216,3 +216,7 @@ Three primitives for sharing state across sessions, covered in detail in the [br
 | **Value** | Value type | Shared observable state all sessions should track (online count, config) |
 
 All three use lock-free reads (atomic.Value) and copy-on-write for writes, so broadcasting never blocks the command loop.
+
+---
+
+[← Back to documentation](../README.md#documentation)

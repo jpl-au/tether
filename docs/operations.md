@@ -278,3 +278,7 @@ func bridgeBus(ctx context.Context, bus *tether.Bus[Message]) {
 
 Use the [health check](#health-check) endpoint to monitor pool sizes and
 feed them into your load balancer's readiness probe.
+
+---
+
+[← Back to documentation](../README.md#documentation)

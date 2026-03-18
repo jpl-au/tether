@@ -150,3 +150,7 @@ The blob size depends on the number of Dynamic keys and the size of the
 rendered HTML per key. Pages with many Dynamic regions or large fragments
 can produce multi-megabyte blobs. Account for this when choosing storage
 backends and setting size limits.
+
+---
+
+[← Back to documentation](../README.md#documentation)

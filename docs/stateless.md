@@ -163,3 +163,7 @@ Start with `tether.Page` and upgrade to `tether.Live` when you need:
 - **Push notifications** — Web Push via the service worker
 
 The `Render` function, `HandleFunc` signature, `OnNavigate`, `Layout`, event bindings, `LiveConfig.Components`, and the `router` package all work identically in both modes. Upgrading typically means changing `tether.Page(PageConfig{...})` to `tether.Live(LiveConfig{...})` and adding transport configuration.
+
+---
+
+[← Back to documentation](../README.md#documentation)

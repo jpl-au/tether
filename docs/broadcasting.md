@@ -234,3 +234,7 @@ Use Value for state that multiple sessions need to stay in sync with (online cou
 | **Group** | State type | Broadcasting state mutations to sessions of the same handler |
 | **Bus** | Event type | Discrete events across handlers (chat messages, activity feeds) |
 | **Value** | Value type | Shared state all sessions should track (online count, config) |
+
+---
+
+[← Back to documentation](../README.md#documentation)
