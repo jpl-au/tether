@@ -53,18 +53,7 @@ func Page[S any](app App, cfg PageConfig[S]) http.Handler {
 	if cfg.Limits.MaxEventBytes == 0 {
 		cfg.Limits.MaxEventBytes = defaultMaxEventBytes
 	}
-	if app.Client.DefaultDebounce == 0 {
-		app.Client.DefaultDebounce = defaultDefaultDebounce
-	}
-	if app.Client.TransitionTimeout == 0 {
-		app.Client.TransitionTimeout = defaultTransitionTimeout
-	}
-	if app.Client.FlashDuration == 0 {
-		app.Client.FlashDuration = defaultFlashDuration
-	}
-	if app.Client.ToastDuration == 0 {
-		app.Client.ToastDuration = defaultToastDuration
-	}
+	app.Client.applyDefaults()
 
 	csrf := http.NewCrossOriginProtection()
 	for _, origin := range app.Security.TrustedOrigins {

@@ -136,6 +136,22 @@ type Client struct {
 	SyncRetention time.Duration
 }
 
+// applyDefaults fills zero-valued fields with sensible defaults.
+func (c *Client) applyDefaults() {
+	if c.DefaultDebounce == 0 {
+		c.DefaultDebounce = defaultDefaultDebounce
+	}
+	if c.TransitionTimeout == 0 {
+		c.TransitionTimeout = defaultTransitionTimeout
+	}
+	if c.FlashDuration == 0 {
+		c.FlashDuration = defaultFlashDuration
+	}
+	if c.ToastDuration == 0 {
+		c.ToastDuration = defaultToastDuration
+	}
+}
+
 // Security groups CSRF protection and session binding settings.
 type Security struct {
 	// TrustedOrigins lists origins that are allowed to make
