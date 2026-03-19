@@ -73,7 +73,7 @@ func Live[S any](app App, cfg LiveConfig[S]) *Handler[S] {
 		cfg.Handle = Chain(cfg.Handle, cfg.Middleware)
 	}
 
-	setupLogging(&app)
+	app.initLog()
 	if cfg.Protocol == 0 {
 		switch os.Getenv("TETHER_PROTO") {
 		case "HTTP1":

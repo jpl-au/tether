@@ -32,7 +32,7 @@ func Page[S any](app App, cfg PageConfig[S]) http.Handler {
 		panic("tether: PageConfig.Handle is required")
 	}
 
-	setupLogging(&app)
+	app.initLog()
 
 	if len(cfg.Middleware) > 0 {
 		cfg.Handle = Chain(cfg.Handle, cfg.Middleware)
