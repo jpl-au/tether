@@ -123,7 +123,7 @@ func Live[S any](app App, cfg LiveConfig[S]) *Handler[S] {
 	if cfg.Limits.CmdBufferSize == 0 {
 		cfg.Limits.CmdBufferSize = defaultCmdBufferSize
 	}
-	if cfg.Limits.MaxSessions == 0 {
+	if cfg.Limits.MaxSessions == 0 && !app.DevMode {
 		slog.Warn("tether: Limits.MaxSessions is 0 (unlimited) — set a limit in production to prevent resource exhaustion")
 	}
 	if cfg.FreezeOnDisconnect && cfg.SessionStore == nil {
@@ -176,9 +176,6 @@ func handlerAttrs[S any](app App, cfg LiveConfig[S]) []any {
 	}
 	if len(cfg.Middleware) > 0 {
 		args = append(args, "middleware", middlewareNames(cfg.Middleware))
-	}
-	if app.DevMode {
-		args = append(args, "dev", true)
 	}
 	return args
 }

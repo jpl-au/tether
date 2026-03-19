@@ -5,8 +5,6 @@ import (
 	"maps"
 	"sync"
 	"sync/atomic"
-
-	"github.com/jpl-au/tether/dev"
 )
 
 // emitter is the internal capability marker that [Bus.Emit] uses to
@@ -159,8 +157,6 @@ func (b *Bus[E]) add(ctx context.Context, fn func(E), sessionID string, async bo
 	b.subs.Store(subs)
 	b.wmu.Unlock()
 
-	dev.Debug("bus.subscribe", "session", sessionID, "async", async, "subscribers", len(subs))
-
 	unsub := func() { b.remove(id) }
 	context.AfterFunc(ctx, unsub)
 	return unsub
@@ -189,7 +185,6 @@ func (b *Bus[E]) remove(id uint64) {
 // returns a consistent snapshot. Subscribers whose sessionID matches
 // senderID are skipped. Async subscribers run in their own goroutine.
 func (b *Bus[E]) publish(event E, senderID string) {
-	dev.Debug("bus.publish", "sender", senderID, "subscribers", b.Len())
 	for _, s := range b.loadSubs() {
 		if s.ctx.Err() != nil {
 			continue // dead subscriber, skip

@@ -45,9 +45,6 @@ func Page[S any](app App, cfg PageConfig[S]) http.Handler {
 	if len(cfg.Middleware) > 0 {
 		pageArgs = append(pageArgs, "middleware", middlewareNames(cfg.Middleware))
 	}
-	if app.DevMode {
-		pageArgs = append(pageArgs, "dev", true)
-	}
 	app.Logger.Info("tether: ready", pageArgs...)
 
 	if cfg.Limits.MaxEventBytes == 0 {
