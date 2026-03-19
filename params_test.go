@@ -86,73 +86,73 @@ func TestParamsBool(t *testing.T) {
 	}
 }
 
-func TestParamsIntOr(t *testing.T) {
+func TestParamsIntDefault(t *testing.T) {
 	p := Params{Query: url.Values{"page": {"5"}}}
-	if got := p.IntOr("page", 1); got != 5 {
-		t.Errorf("IntOr(page, 1) = %d, want 5", got)
+	if got := p.IntDefault("page", 1); got != 5 {
+		t.Errorf("IntDefault(page, 1) = %d, want 5", got)
 	}
 }
 
-func TestParamsIntOrMissing(t *testing.T) {
+func TestParamsIntDefaultMissing(t *testing.T) {
 	p := Params{Query: url.Values{}}
-	if got := p.IntOr("page", 1); got != 1 {
-		t.Errorf("IntOr(missing, 1) = %d, want 1", got)
+	if got := p.IntDefault("page", 1); got != 1 {
+		t.Errorf("IntDefault(missing, 1) = %d, want 1", got)
 	}
 }
 
-func TestParamsIntOrInvalid(t *testing.T) {
+func TestParamsIntDefaultInvalid(t *testing.T) {
 	p := Params{Query: url.Values{"page": {"abc"}}}
-	if got := p.IntOr("page", 1); got != 1 {
-		t.Errorf("IntOr(abc, 1) = %d, want 1", got)
+	if got := p.IntDefault("page", 1); got != 1 {
+		t.Errorf("IntDefault(abc, 1) = %d, want 1", got)
 	}
 }
 
-func TestParamsFloat64Or(t *testing.T) {
+func TestParamsFloat64Default(t *testing.T) {
 	p := Params{Query: url.Values{"min": {"3.5"}}}
-	if got := p.Float64Or("min", 0.0); got != 3.5 {
-		t.Errorf("Float64Or(min, 0) = %f, want 3.5", got)
+	if got := p.Float64Default("min", 0.0); got != 3.5 {
+		t.Errorf("Float64Default(min, 0) = %f, want 3.5", got)
 	}
 }
 
-func TestParamsFloat64OrMissing(t *testing.T) {
+func TestParamsFloat64DefaultMissing(t *testing.T) {
 	p := Params{Query: url.Values{}}
-	if got := p.Float64Or("min", 0.0); got != 0.0 {
-		t.Errorf("Float64Or(missing, 0) = %f, want 0", got)
+	if got := p.Float64Default("min", 0.0); got != 0.0 {
+		t.Errorf("Float64Default(missing, 0) = %f, want 0", got)
 	}
 }
 
-func TestParamsFloat64OrInvalid(t *testing.T) {
+func TestParamsFloat64DefaultInvalid(t *testing.T) {
 	p := Params{Query: url.Values{"min": {"abc"}}}
-	if got := p.Float64Or("min", 1.5); got != 1.5 {
-		t.Errorf("Float64Or(abc, 1.5) = %f, want 1.5", got)
+	if got := p.Float64Default("min", 1.5); got != 1.5 {
+		t.Errorf("Float64Default(abc, 1.5) = %f, want 1.5", got)
 	}
 }
 
-func TestParamsBoolOr(t *testing.T) {
+func TestParamsBoolDefault(t *testing.T) {
 	p := Params{Query: url.Values{"drafts": {"true"}}}
-	if got := p.BoolOr("drafts", false); !got {
-		t.Error("BoolOr(drafts=true, false) = false, want true")
+	if got := p.BoolDefault("drafts", false); !got {
+		t.Error("BoolDefault(drafts=true, false) = false, want true")
 	}
 }
 
-func TestParamsBoolOrFalseValue(t *testing.T) {
+func TestParamsBoolDefaultFalseValue(t *testing.T) {
 	p := Params{Query: url.Values{"drafts": {"false"}}}
-	if got := p.BoolOr("drafts", true); got {
-		t.Error("BoolOr(drafts=false, true) = true, want false")
+	if got := p.BoolDefault("drafts", true); got {
+		t.Error("BoolDefault(drafts=false, true) = true, want false")
 	}
 }
 
-func TestParamsBoolOrMissing(t *testing.T) {
+func TestParamsBoolDefaultMissing(t *testing.T) {
 	p := Params{Query: url.Values{}}
-	if got := p.BoolOr("drafts", true); !got {
-		t.Error("BoolOr(missing, true) = false, want true")
+	if got := p.BoolDefault("drafts", true); !got {
+		t.Error("BoolDefault(missing, true) = false, want true")
 	}
 }
 
-func TestParamsBoolOrMissingDefaultFalse(t *testing.T) {
+func TestParamsBoolDefaultMissingDefaultFalse(t *testing.T) {
 	p := Params{Query: url.Values{}}
-	if got := p.BoolOr("drafts", false); got {
-		t.Error("BoolOr(missing, false) = true, want false")
+	if got := p.BoolDefault("drafts", false); got {
+		t.Error("BoolDefault(missing, false) = true, want false")
 	}
 }
 
@@ -239,14 +239,14 @@ func TestParamsNilQuery(t *testing.T) {
 	if got := p.Get("x"); got != "" {
 		t.Errorf("Get on nil Query = %q, want empty", got)
 	}
-	if got := p.IntOr("x", 5); got != 5 {
-		t.Errorf("IntOr on nil Query = %d, want 5", got)
+	if got := p.IntDefault("x", 5); got != 5 {
+		t.Errorf("IntDefault on nil Query = %d, want 5", got)
 	}
-	if got := p.BoolOr("x", true); !got {
-		t.Error("BoolOr on nil Query = false, want true")
+	if got := p.BoolDefault("x", true); !got {
+		t.Error("BoolDefault on nil Query = false, want true")
 	}
-	if got := p.Float64Or("x", 1.0); got != 1.0 {
-		t.Errorf("Float64Or on nil Query = %f, want 1.0", got)
+	if got := p.Float64Default("x", 1.0); got != 1.0 {
+		t.Errorf("Float64Default on nil Query = %f, want 1.0", got)
 	}
 	if got := p.Strings("x"); got != nil {
 		t.Errorf("Strings on nil Query = %v, want nil", got)

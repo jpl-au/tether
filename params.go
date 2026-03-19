@@ -26,8 +26,8 @@ import (
 // extraction pattern for the whole framework. Use these when a missing
 // or malformed value is a hard error (e.g. a required resource ID).
 //
-// Soft getters with default — [Params.IntOr], [Params.BoolOr],
-// [Params.Float64Or]. These exist because URL parameters are
+// Soft getters with default — [Params.IntDefault], [Params.BoolDefault],
+// [Params.Float64Default]. These exist because URL parameters are
 // fundamentally different from event data: event data is developer-
 // controlled wire protocol where a missing field signals a bug, but
 // URL parameters are user-supplied and routinely absent. Soft getters
@@ -46,7 +46,7 @@ type Params struct {
 
 	// Query holds the parsed URL query parameters. It is nil when the
 	// URL has no query string. All extraction methods are nil-safe —
-	// calling Get, IntOr, etc. on a nil Query returns zero values or
+	// calling Get, IntDefault, etc. on a nil Query returns zero values or
 	// defaults without panicking, because url.Values is a map type and
 	// nil map reads return zero values in Go.
 	Query url.Values
@@ -85,7 +85,7 @@ func (p Params) Get(key string) string {
 
 // Int returns the first query value for key parsed as an integer. If
 // the key is missing or the value is not a valid integer, it returns 0
-// and an error. Most navigation handlers should prefer [Params.IntOr]
+// and an error. Most navigation handlers should prefer [Params.IntDefault]
 // because URL parameters are typically optional — Int is here for the
 // rare case where absence genuinely means something is wrong.
 func (p Params) Int(key string) (int, error) {
@@ -94,7 +94,7 @@ func (p Params) Int(key string) (int, error) {
 
 // Float64 returns the first query value for key parsed as a float. If
 // the key is missing or the value is not a valid number, it returns 0
-// and an error. For optional parameters prefer [Params.Float64Or].
+// and an error. For optional parameters prefer [Params.Float64Default].
 func (p Params) Float64(key string) (float64, error) {
 	return strconv.ParseFloat(p.Query.Get(key), 64)
 }
@@ -117,14 +117,14 @@ func (p Params) Bool(key string) bool {
 // Event does not have these because event data is developer-controlled
 // wire protocol where a missing field signals a bug.
 
-// IntOr returns the first query value for key parsed as an integer. If
+// IntDefault returns the first query value for key parsed as an integer. If
 // the key is missing or the value is not a valid integer, it returns
 // the provided default instead of an error. This is the idiomatic way
 // to read optional numeric URL parameters:
 //
-//	s.PageNum = p.IntOr("page", 1)
-//	s.Limit   = p.IntOr("limit", 20)
-func (p Params) IntOr(key string, def int) int {
+//	s.PageNum = p.IntDefault("page", 1)
+//	s.Limit   = p.IntDefault("limit", 20)
+func (p Params) IntDefault(key string, def int) int {
 	n, err := strconv.Atoi(p.Query.Get(key))
 	if err != nil {
 		return def
@@ -132,12 +132,12 @@ func (p Params) IntOr(key string, def int) int {
 	return n
 }
 
-// Float64Or returns the first query value for key parsed as a float. If
+// Float64Default returns the first query value for key parsed as a float. If
 // the key is missing or the value is not a valid number, it returns the
 // provided default instead of an error.
 //
-//	s.MinPrice = p.Float64Or("min", 0.0)
-func (p Params) Float64Or(key string, def float64) float64 {
+//	s.MinPrice = p.Float64Default("min", 0.0)
+func (p Params) Float64Default(key string, def float64) float64 {
 	n, err := strconv.ParseFloat(p.Query.Get(key), 64)
 	if err != nil {
 		return def
@@ -145,15 +145,15 @@ func (p Params) Float64Or(key string, def float64) float64 {
 	return n
 }
 
-// BoolOr returns the first query value for key parsed as a boolean. If
+// BoolDefault returns the first query value for key parsed as a boolean. If
 // the key is missing (empty string from url.Values.Get), it returns
 // the provided default — this distinguishes "user didn't specify" from
 // "user explicitly set to false". When the key is present, any value
 // other than the literal string "true" evaluates to false, matching
 // [Params.Bool] and [Event.Bool] semantics.
 //
-//	s.ShowDrafts = p.BoolOr("drafts", false)
-func (p Params) BoolOr(key string, def bool) bool {
+//	s.ShowDrafts = p.BoolDefault("drafts", false)
+func (p Params) BoolDefault(key string, def bool) bool {
 	v := p.Query.Get(key)
 	// Empty means the key was absent — return the caller's default so
 	// they can distinguish "not specified" from "explicitly false".

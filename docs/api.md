@@ -273,9 +273,9 @@ p.Bool("active")        // true only for "true"
 URL parameters):
 
 ```go
-p.IntOr("page", 1)      // int — returns 1 if missing or invalid
-p.Float64Or("min", 0.0) // float64
-p.BoolOr("drafts", false) // bool — returns default if key absent
+p.IntDefault("page", 1)      // int — returns 1 if missing or invalid
+p.Float64Default("min", 0.0) // float64
+p.BoolDefault("drafts", false) // bool — returns default if key absent
 ```
 
 **Multi-value helpers** (for repeated keys like `?tag=go&tag=web`):
