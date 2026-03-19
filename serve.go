@@ -256,7 +256,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 
 	now := time.Now()
 	ctx, cancel := context.WithCancel(context.Background())
-	sess := &LiveSession[S]{
+	sess := &StatefulSession[S]{
 		id:               id,
 		state:            state,
 		render:           h.cfg.Render,
@@ -381,7 +381,7 @@ func (h *Handler[S]) sessionCodec() SessionCodec[S] {
 // if the store has no data for this ID or restoration fails. The
 // caller should treat a false return as "no session to restore" and
 // continue with normal session creation.
-func (h *Handler[S]) restoreSession(id string, r *http.Request, transport Transport) (*LiveSession[S], bool) {
+func (h *Handler[S]) restoreSession(id string, r *http.Request, transport Transport) (*StatefulSession[S], bool) {
 	data, err := h.cfg.SessionStore.Load(r.Context(), id)
 	if err != nil {
 		dev.Warn("session store load failed", "session", id, "error", err)
@@ -439,7 +439,7 @@ func (h *Handler[S]) restoreSession(id string, r *http.Request, transport Transp
 
 	now := time.Now()
 	ctx, cancel := context.WithCancel(context.Background())
-	sess := &LiveSession[S]{
+	sess := &StatefulSession[S]{
 		id:               id,
 		state:            state,
 		render:           h.cfg.Render,

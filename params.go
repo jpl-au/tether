@@ -8,7 +8,7 @@ import (
 )
 
 // Params carries URL information from a navigation event. The handler
-// passes this to [LiveConfig].OnNavigate on the initial page load (so the
+// passes this to [StatefulConfig].OnNavigate on the initial page load (so the
 // application can derive state from the URL) and whenever the browser
 // navigates via a tether link click or the back/forward buttons.
 //

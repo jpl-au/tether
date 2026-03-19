@@ -7,8 +7,8 @@ import (
 func TestGroupOnJoinFires(t *testing.T) {
 	g := NewGroup[counterState]()
 
-	var joined *LiveSession[counterState]
-	g.OnJoin = func(s *LiveSession[counterState]) {
+	var joined *StatefulSession[counterState]
+	g.OnJoin = func(s *StatefulSession[counterState]) {
 		joined = s
 	}
 
@@ -26,7 +26,7 @@ func TestGroupOnJoinDoesNotFireForDuplicate(t *testing.T) {
 	g := NewGroup[counterState]()
 
 	callCount := 0
-	g.OnJoin = func(s *LiveSession[counterState]) {
+	g.OnJoin = func(s *StatefulSession[counterState]) {
 		callCount++
 	}
 
@@ -44,8 +44,8 @@ func TestGroupOnJoinDoesNotFireForDuplicate(t *testing.T) {
 func TestGroupOnLeaveFires(t *testing.T) {
 	g := NewGroup[counterState]()
 
-	var left *LiveSession[counterState]
-	g.OnLeave = func(s *LiveSession[counterState]) {
+	var left *StatefulSession[counterState]
+	g.OnLeave = func(s *StatefulSession[counterState]) {
 		left = s
 	}
 
@@ -64,7 +64,7 @@ func TestGroupOnLeaveDoesNotFireForAbsent(t *testing.T) {
 	g := NewGroup[counterState]()
 
 	callCount := 0
-	g.OnLeave = func(s *LiveSession[counterState]) {
+	g.OnLeave = func(s *StatefulSession[counterState]) {
 		callCount++
 	}
 

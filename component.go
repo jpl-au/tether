@@ -21,7 +21,7 @@ import (
 // satisfy Component — callers store the concrete type in their state for
 // full compile-time safety via [RouteTyped].
 //
-// Components only receive [Session] (not [*LiveSession]), so they work
+// Components only receive [Session] (not [*StatefulSession]), so they work
 // during SSR pre-warming ([CaptureSession] satisfies Session) and in
 // tests without special cases.
 type Component interface {
@@ -63,7 +63,7 @@ type EqualComponent interface {
 // perform one-time setup when they are first mounted into a session.
 // The framework calls Mount once per component — after the session's
 // command loop starts but before any client events are processed —
-// when the component is registered via [LiveConfig.Components].
+// when the component is registered via [StatefulConfig.Components].
 //
 // Mount receives the [Session] so the component can fire side effects
 // (Toast, Signal, etc.) or start background work via [Session.Go].

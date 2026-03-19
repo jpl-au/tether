@@ -185,10 +185,10 @@ func handleCounter(_ Session, state counterState, ev Event) counterState {
 //
 //	go sess.readTransport(sess.events)
 //	go sess.run()
-func newTestSession(state counterState, mt Transport) *LiveSession[counterState] {
+func newTestSession(state counterState, mt Transport) *StatefulSession[counterState] {
 	differ := jit.NewDiffer()
 	ctx, cancel := context.WithCancel(context.Background())
-	sess := &LiveSession[counterState]{
+	sess := &StatefulSession[counterState]{
 		id:          "test",
 		state:       state,
 		render:      renderCounter,

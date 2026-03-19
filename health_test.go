@@ -8,7 +8,7 @@ import (
 )
 
 func TestHealthEmpty(t *testing.T) {
-	handler := Live(App{}, LiveConfig[counterState]{
+	handler := Stateful(App{}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -24,7 +24,7 @@ func TestHealthEmpty(t *testing.T) {
 }
 
 func TestHealthCountsPending(t *testing.T) {
-	handler := Live(App{}, LiveConfig[counterState]{
+	handler := Stateful(App{}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -44,7 +44,7 @@ func TestHealthCountsPending(t *testing.T) {
 }
 
 func TestHealthCountsActive(t *testing.T) {
-	handler := Live(App{}, LiveConfig[counterState]{
+	handler := Stateful(App{}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -53,8 +53,8 @@ func TestHealthCountsActive(t *testing.T) {
 	})
 
 	handler.mu.Lock()
-	handler.active["a"] = &LiveSession[counterState]{}
-	handler.active["b"] = &LiveSession[counterState]{}
+	handler.active["a"] = &StatefulSession[counterState]{}
+	handler.active["b"] = &StatefulSession[counterState]{}
 	handler.mu.Unlock()
 
 	h := handler.Health()
@@ -64,7 +64,7 @@ func TestHealthCountsActive(t *testing.T) {
 }
 
 func TestHealthCountsDisconnected(t *testing.T) {
-	handler := Live(App{}, LiveConfig[counterState]{
+	handler := Stateful(App{}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -73,7 +73,7 @@ func TestHealthCountsDisconnected(t *testing.T) {
 	})
 
 	handler.mu.Lock()
-	handler.disconnected["a"] = &LiveSession[counterState]{}
+	handler.disconnected["a"] = &StatefulSession[counterState]{}
 	handler.mu.Unlock()
 
 	h := handler.Health()

@@ -22,7 +22,7 @@ import (
 // When the transport closes, the events channel is nilled so the loop
 // continues processing commands and shutdown signals. This keeps the
 // session alive for reconnection.
-func (s *LiveSession[S]) run() {
+func (s *StatefulSession[S]) run() {
 	dev.Debug("run loop started", "session", s.id, "endpoint", s.endpoint)
 	s.stateSnap.Store(s.state)
 	s.status.Store(int32(Active))
@@ -70,7 +70,7 @@ func (s *LiveSession[S]) run() {
 
 // runCmd executes a command with panic recovery so a misbehaving
 // command cannot crash the entire process.
-func (s *LiveSession[S]) runCmd(cmd func()) {
+func (s *StatefulSession[S]) runCmd(cmd func()) {
 	defer func() {
 		if r := recover(); r != nil {
 			err := panicErr(r)
@@ -89,7 +89,7 @@ func (s *LiveSession[S]) runCmd(cmd func()) {
 // readTransport bridges the blocking ReceiveEvent call into the
 // events channel. Its only job is to read and forward — it closes
 // the output channel on exit so the loop knows the transport is gone.
-func (s *LiveSession[S]) readTransport(out chan<- Event) {
+func (s *StatefulSession[S]) readTransport(out chan<- Event) {
 	dev.Debug("readTransport started", "session", s.id, "endpoint", s.endpoint)
 	defer close(out)
 	for {
@@ -111,7 +111,7 @@ func (s *LiveSession[S]) readTransport(out chan<- Event) {
 
 // exec processes a single client event: handle it, re-render, diff,
 // and send patches to the transport.
-func (s *LiveSession[S]) exec(ev Event) {
+func (s *StatefulSession[S]) exec(ev Event) {
 	now := time.Now()
 	s.lastActivity.Store(now.UnixNano())
 	if s.idleTimer != nil {
@@ -210,7 +210,7 @@ func (s *LiveSession[S]) exec(ev Event) {
 // SessionStore for application state (crash recovery). Persistence
 // happens before the pool transition so data is safely stored before
 // the session becomes visible as reconnectable.
-func (s *LiveSession[S]) onTransportClose() {
+func (s *StatefulSession[S]) onTransportClose() {
 	dev.Debug("transport closed",
 		"session", s.id,
 		"endpoint", s.endpoint,
@@ -285,7 +285,7 @@ func (s *LiveSession[S]) onTransportClose() {
 // disconnect), Shutdown passes context.Background() (s.ctx is
 // cancelled after the loop exits). Failures are logged and emitted
 // as diagnostics but are non-fatal.
-func (s *LiveSession[S]) saveSessionState(ctx context.Context, ttl time.Duration) {
+func (s *StatefulSession[S]) saveSessionState(ctx context.Context, ttl time.Duration) {
 	stateBytes, err := s.codec.Marshal(s.state)
 	if err != nil {
 		dev.Warn("session state marshal failed", "session", s.id, "error", err)
@@ -333,7 +333,7 @@ func (s *LiveSession[S]) saveSessionState(ctx context.Context, ttl time.Duration
 // reaper can destroy the session if it is never thawed. For
 // destroyed sessions, everything is stopped and the destroyed
 // channel is closed.
-func (s *LiveSession[S]) cleanup() {
+func (s *StatefulSession[S]) cleanup() {
 	if s.idleTimer != nil {
 		s.idleTimer.Stop()
 	}
@@ -357,7 +357,7 @@ func (s *LiveSession[S]) cleanup() {
 // Update. It handles patches, structural changes, and the no-diff
 // case where only the eventID needs echoing. fx carries any buffered
 // effects to merge into the update message.
-func (s *LiveSession[S]) sendDiff(eventID string, patches []jit.Patch, change *jit.StructuralChange, tree node.Node, fx *Effects) {
+func (s *StatefulSession[S]) sendDiff(eventID string, patches []jit.Patch, change *jit.StructuralChange, tree node.Node, fx *Effects) {
 	if change != nil {
 		html := s.differ.Render(tree)
 		sc := StructuralChange{
@@ -411,7 +411,7 @@ func (s *LiveSession[S]) sendDiff(eventID string, patches []jit.Patch, change *j
 // send encodes an update and writes the bytes to the transport. URL
 // and title are captured before the nil-transport guard so reattach
 // can replay them after a disconnect.
-func (s *LiveSession[S]) send(u wire.Update) {
+func (s *StatefulSession[S]) send(u wire.Update) {
 	if u.URL != "" {
 		s.lastURL = u.URL
 	}
@@ -444,7 +444,7 @@ func (s *LiveSession[S]) send(u wire.Update) {
 // startTimers sets up per-session lifecycle timers. Called once during
 // session creation in serve.go. Timer cleanup happens in [cleanup],
 // which runs as a defer in [run] when the loop exits.
-func (s *LiveSession[S]) startTimers() {
+func (s *StatefulSession[S]) startTimers() {
 	if s.idleTimeout > 0 {
 		s.idleTimer = time.AfterFunc(s.idleTimeout, func() {
 			s.stop()

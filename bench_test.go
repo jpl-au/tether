@@ -156,7 +156,7 @@ func BenchmarkEventCycle(b *testing.B) {
 	differ := jit.NewDiffer()
 	ctx, cancel := context.WithCancel(context.Background())
 
-	sess := &LiveSession[benchState]{
+	sess := &StatefulSession[benchState]{
 		id:        "bench",
 		state:     benchState{Count: 0},
 		render:    benchRender,

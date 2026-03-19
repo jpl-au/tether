@@ -64,7 +64,7 @@ func TestSessionGoReceivesCancellation(t *testing.T) {
 func TestSessionContextNilFallsBackToBackground(t *testing.T) {
 	// A session without an initialised context (e.g. built manually
 	// in tests) should return context.Background, not panic.
-	sess := &LiveSession[counterState]{}
+	sess := &StatefulSession[counterState]{}
 	ctx := sess.Context()
 	if ctx == nil {
 		t.Fatal("Context() should never return nil")

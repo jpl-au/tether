@@ -12,7 +12,7 @@ import (
 )
 
 func TestDrainRejectsNewPages(t *testing.T) {
-	handler := Live(App{}, LiveConfig[counterState]{
+	handler := Stateful(App{}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -32,7 +32,7 @@ func TestDrainRejectsNewPages(t *testing.T) {
 }
 
 func TestDrainAllowsReconnect(t *testing.T) {
-	handler := Live(App{}, LiveConfig[counterState]{
+	handler := Stateful(App{}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -64,10 +64,10 @@ func TestDrainReturnsWhenEmpty(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		handler := &Handler[counterState]{
 			app:          App{},
-			cfg:          LiveConfig[counterState]{},
+			cfg:          StatefulConfig[counterState]{},
 			pending:      make(map[string]*pendingSession[counterState]),
-			active:       make(map[string]*LiveSession[counterState]),
-			disconnected: make(map[string]*LiveSession[counterState]),
+			active:       make(map[string]*StatefulSession[counterState]),
+			disconnected: make(map[string]*StatefulSession[counterState]),
 			done:         make(chan struct{}),
 		}
 
@@ -82,10 +82,10 @@ func TestDrainReturnsWhenEmpty(t *testing.T) {
 func TestDrainReturnsWhenContextCancelled(t *testing.T) {
 	handler := &Handler[counterState]{
 		app:          App{},
-		cfg:          LiveConfig[counterState]{},
+		cfg:          StatefulConfig[counterState]{},
 		pending:      make(map[string]*pendingSession[counterState]),
-		active:       map[string]*LiveSession[counterState]{"a": {}},
-		disconnected: make(map[string]*LiveSession[counterState]),
+		active:       map[string]*StatefulSession[counterState]{"a": {}},
+		disconnected: make(map[string]*StatefulSession[counterState]),
 		done:         make(chan struct{}),
 	}
 

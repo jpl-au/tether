@@ -34,11 +34,11 @@ const defaultPendingTimeout = 30 * time.Second
 // is no need to mount a separate file server for the JS assets.
 type Handler[S any] struct {
 	app          App
-	cfg          LiveConfig[S]
+	cfg          StatefulConfig[S]
 	mu           sync.Mutex
 	pending      map[string]*pendingSession[S]
-	active       map[string]*LiveSession[S]
-	disconnected map[string]*LiveSession[S]
+	active       map[string]*StatefulSession[S]
+	disconnected map[string]*StatefulSession[S]
 	done         chan struct{}
 	closeOnce    sync.Once
 	draining     atomic.Bool
@@ -53,11 +53,11 @@ type Handler[S any] struct {
 	clientHandler http.Handler
 
 	// encoder serialises updates for the wire format selected by
-	// LiveConfig.WireFormat. All sessions inherit this encoder.
+	// StatefulConfig.WireFormat. All sessions inherit this encoder.
 	encoder wire.Encoder
 
 	// assetMounts serves embedded application assets at their
-	// configured URL prefixes, one per [Asset] in LiveConfig.Assets.
+	// configured URL prefixes, one per [Asset] in StatefulConfig.Assets.
 	assetMounts []assetMount
 
 	// Diagnostics emits framework-level events so application code
@@ -92,7 +92,7 @@ type assetMount struct {
 // destroySession performs permanent cleanup for a session that is no
 // longer reachable (reaped, shutdown, or disconnected with timeout -1).
 // Cancelling the context causes the session loop to exit.
-func (h *Handler[S]) destroySession(s *LiveSession[S]) {
+func (h *Handler[S]) destroySession(s *StatefulSession[S]) {
 	if s.stop != nil {
 		s.stop()
 	}

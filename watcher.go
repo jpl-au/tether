@@ -3,12 +3,12 @@ package tether
 // Watcher subscribes a session to a reactive source when it connects.
 // Create watchers with [WatchValue] and [WatchBus].
 //
-// Watchers listed in [LiveConfig.Watchers] are subscribed automatically
-// before [LiveConfig.OnConnect] runs, so the session receives updates from
+// Watchers listed in [StatefulConfig.Watchers] are subscribed automatically
+// before [StatefulConfig.OnConnect] runs, so the session receives updates from
 // the moment it connects. The subscriptions are cleaned up when the
 // session is destroyed.
 type Watcher[S any] interface {
-	subscribe(sess *LiveSession[S])
+	subscribe(sess *StatefulSession[S])
 }
 
 // WatchValue creates a [Watcher] that observes a [Value]. The current
@@ -41,7 +41,7 @@ type valueWatcher[S any, V any] struct {
 	mapper func(V, S) S
 }
 
-func (w *valueWatcher[S, V]) subscribe(sess *LiveSession[S]) {
+func (w *valueWatcher[S, V]) subscribe(sess *StatefulSession[S]) {
 	Observe(sess, w.val, w.mapper)
 }
 
@@ -50,6 +50,6 @@ type busWatcher[S any, E any] struct {
 	mapper func(E, S) S
 }
 
-func (w *busWatcher[S, E]) subscribe(sess *LiveSession[S]) {
+func (w *busWatcher[S, E]) subscribe(sess *StatefulSession[S]) {
 	On(sess, w.bus, w.mapper)
 }

@@ -88,7 +88,7 @@ func TestObserveCrossHandler(t *testing.T) {
 			return div.New(span.Text("dash").Dynamic("d"))
 		}
 		ctxB, cancelB := newTestContext()
-		sessB := &LiveSession[dashState]{
+		sessB := &StatefulSession[dashState]{
 			id:        "B",
 			state:     dashState{},
 			render:    renderDash,
@@ -181,7 +181,7 @@ func TestObserveMultipleValues(t *testing.T) {
 		differ := jit.NewDiffer()
 		ctx, cancel := newTestContext()
 		ct := newConnectedTransport()
-		sess := &LiveSession[state]{
+		sess := &StatefulSession[state]{
 			id:        "multi",
 			state:     state{},
 			render:    render,

@@ -112,7 +112,7 @@ func handleDualTodo(_ Session, s dualTodoState, ev Event) dualTodoState {
 }
 
 // TestComponentIntegrationMultiInstance validates multi-instance
-// component dispatch through LiveConfig.Components. Two todo lists
+// component dispatch through StatefulConfig.Components. Two todo lists
 // mounted with different prefixes receive events independently.
 func TestComponentIntegrationMultiInstance(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
@@ -148,7 +148,7 @@ func TestComponentIntegrationMultiInstance(t *testing.T) {
 
 		differ := jit.NewDiffer()
 		ctx, cancel := context.WithCancel(context.Background())
-		sess := &LiveSession[dualTodoState]{
+		sess := &StatefulSession[dualTodoState]{
 			id:        "test",
 			state:     initial,
 			render:    renderDualTodo,
@@ -225,7 +225,7 @@ func TestComponentIntegrationSideEffects(t *testing.T) {
 
 		differ := jit.NewDiffer()
 		ctx, cancel := context.WithCancel(context.Background())
-		sess := &LiveSession[dualTodoState]{
+		sess := &StatefulSession[dualTodoState]{
 			id:        "test",
 			state:     initial,
 			render:    renderDualTodo,
@@ -306,7 +306,7 @@ func TestComponentIntegrationToggleAndClear(t *testing.T) {
 
 		differ := jit.NewDiffer()
 		ctx, cancel := context.WithCancel(context.Background())
-		sess := &LiveSession[dualTodoState]{
+		sess := &StatefulSession[dualTodoState]{
 			id:        "test",
 			state:     initial,
 			render:    renderDualTodo,
@@ -342,7 +342,7 @@ func TestComponentIntegrationToggleAndClear(t *testing.T) {
 }
 
 // TestComponentManualRouteTyped validates that RouteTyped works correctly
-// for manual routing in a Handle function (the non-LiveConfig.Components path).
+// for manual routing in a Handle function (the non-StatefulConfig.Components path).
 func TestComponentManualRouteTyped(t *testing.T) {
 	type appState struct {
 		Todo todoList
@@ -367,7 +367,7 @@ func TestComponentManualRouteTyped(t *testing.T) {
 
 		differ := jit.NewDiffer()
 		ctx, cancel := context.WithCancel(context.Background())
-		sess := &LiveSession[appState]{
+		sess := &StatefulSession[appState]{
 			id:        "test",
 			state:     appState{Todo: todoList{prefix: "todo"}},
 			render:    render,
@@ -428,7 +428,7 @@ func TestComponentEqualComponentSkipsRender(t *testing.T) {
 
 		differ := jit.NewDiffer()
 		ctx, cancel := context.WithCancel(context.Background())
-		sess := &LiveSession[appState]{
+		sess := &StatefulSession[appState]{
 			id:     "test",
 			state:  appState{Todo: todoList{prefix: "todo"}},
 			render: render,

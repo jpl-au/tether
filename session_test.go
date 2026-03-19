@@ -161,7 +161,7 @@ func TestSessionStructuralChange(t *testing.T) {
 
 		differ := jit.NewDiffer()
 		ctx, cancel := context.WithCancel(context.Background())
-		sess := &LiveSession[state]{
+		sess := &StatefulSession[state]{
 			id:        "test",
 			state:     state{Count: 0, ShowHelp: false},
 			render:    render,

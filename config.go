@@ -82,7 +82,7 @@ type Limits struct {
 	// [BufferOverflow] diagnostic. Sustained overflow usually
 	// indicates a blocking [HandleFunc] or a broadcast rate that
 	// exceeds the session's processing speed — increase the buffer
-	// or move slow work into [LiveSession.Go]. Zero defaults to 64.
+	// or move slow work into [StatefulSession.Go]. Zero defaults to 64.
 	CmdBufferSize int
 
 	// MaxEventBytes limits the size of a POST event body. Events carry

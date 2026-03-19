@@ -149,7 +149,7 @@ func TestAssetAutoMount(t *testing.T) {
 		Prefix: "/static/",
 	}
 
-	handler := Live(App{Assets: []*Asset{assets}}, LiveConfig[counterState]{
+	handler := Stateful(App{Assets: []*Asset{assets}}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -177,7 +177,7 @@ func TestAssetAutoMountPage(t *testing.T) {
 		Prefix: "/assets/",
 	}
 
-	handler := Page(App{Assets: []*Asset{assets}}, PageConfig[counterState]{
+	handler := Stateless(App{Assets: []*Asset{assets}}, StatelessConfig[counterState]{
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
 		Handle:       func(_ Session, s counterState, _ Event) counterState { return s },
@@ -203,7 +203,7 @@ func TestAssetCacheHeadersProduction(t *testing.T) {
 		Prefix: "/static/",
 	}
 
-	handler := Live(App{Assets: []*Asset{assets}}, LiveConfig[counterState]{
+	handler := Stateful(App{Assets: []*Asset{assets}}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -235,7 +235,7 @@ func TestAssetCacheHeadersDevMode(t *testing.T) {
 		Prefix: "/static/",
 	}
 
-	handler := Live(App{DevMode: true, Assets: []*Asset{assets}}, LiveConfig[counterState]{
+	handler := Stateful(App{DevMode: true, Assets: []*Asset{assets}}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -269,7 +269,7 @@ func TestMultipleAssets(t *testing.T) {
 		Prefix: "/js/",
 	}
 
-	handler := Live(App{Assets: []*Asset{css, js}}, LiveConfig[counterState]{
+	handler := Stateful(App{Assets: []*Asset{css, js}}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },

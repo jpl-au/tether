@@ -22,7 +22,7 @@ import "github.com/jpl-au/tether/dev"
 //	    state.OnlineUsers = count
 //	    return state
 //	})
-func Observe[V any, S any](s *LiveSession[S], val *Value[V], fn func(V, S) S) {
+func Observe[V any, S any](s *StatefulSession[S], val *Value[V], fn func(V, S) S) {
 	dev.Debug("observe.subscribe", "session", s.ID(), "endpoint", s.endpoint)
 	// Subscribe, read, and apply the current value inside a single
 	// Update so there is no gap between "subscribed" and "initial

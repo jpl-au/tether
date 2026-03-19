@@ -12,7 +12,7 @@ import (
 // A command is sent to the session's loop to swap in the new transport
 // and re-render. This avoids any locking — only the loop touches
 // session state.
-func (h *Handler[S]) reattach(sess *LiveSession[S], transport Transport) {
+func (h *Handler[S]) reattach(sess *StatefulSession[S], transport Transport) {
 	// Stop the disconnect timer before writing callback fields
 	// to avoid a data race between wireDisconnect (this goroutine)
 	// and the timer callback (timer goroutine). Timer.Stop is
@@ -62,7 +62,7 @@ func (h *Handler[S]) reattach(sess *LiveSession[S], transport Transport) {
 // new command loop. The session's state, differ, channels, and timers
 // are rebuilt from scratch — the only things carried over from the
 // frozen stub are the ID, endpoint, user-agent, and metadata.
-func (h *Handler[S]) thaw(sess *LiveSession[S], r *http.Request, transport Transport) {
+func (h *Handler[S]) thaw(sess *StatefulSession[S], r *http.Request, transport Transport) {
 	// Stop the disconnect timer — the client is back.
 	if sess.disconnectTimer != nil {
 		sess.disconnectTimer.Stop()
@@ -195,7 +195,7 @@ func (h *Handler[S]) thaw(sess *LiveSession[S], r *http.Request, transport Trans
 // disconnected pool (when reconnection is enabled) or removes it
 // entirely. Called each time a transport is attached because the
 // callback captures the handler's pool references.
-func (h *Handler[S]) wireDisconnect(sess *LiveSession[S]) {
+func (h *Handler[S]) wireDisconnect(sess *StatefulSession[S]) {
 	sess.onDisconnect = func() {
 		h.mu.Lock()
 		delete(h.active, sess.id)

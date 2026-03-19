@@ -13,9 +13,9 @@ package tether
 // background goroutine and feed results back via [Session.Update].
 //
 // The session parameter is a [Session] so that the same handler
-// can be used in live mode, stateless page mode, and tethertest without
-// changing its signature. In live mode the underlying value is a
-// [*LiveSession] which provides additional methods (Update, Go, Context,
+// can be used in stateful mode, stateless mode, and tethertest without
+// changing its signature. In stateful mode the underlying value is a
+// [*StatefulSession] which provides additional methods (Update, Go, Context,
 // Close) via type assertion when needed.
 //
 // Returning the original state unchanged is valid and will produce no

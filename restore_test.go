@@ -11,8 +11,8 @@ import (
 )
 
 // newRestoreHandler builds a Handler with a SessionStore configured.
-func newRestoreHandler(store SessionStore, opts ...func(*LiveConfig[counterState])) *Handler[counterState] {
-	cfg := LiveConfig[counterState]{
+func newRestoreHandler(store SessionStore, opts ...func(*StatefulConfig[counterState])) *Handler[counterState] {
+	cfg := StatefulConfig[counterState]{
 		Render:       renderCounter,
 		Handle:       handleCounter,
 		SessionStore: store,
@@ -26,8 +26,8 @@ func newRestoreHandler(store SessionStore, opts ...func(*LiveConfig[counterState
 		app:          App{},
 		cfg:          cfg,
 		pending:      make(map[string]*pendingSession[counterState]),
-		active:       make(map[string]*LiveSession[counterState]),
-		disconnected: make(map[string]*LiveSession[counterState]),
+		active:       make(map[string]*StatefulSession[counterState]),
+		disconnected: make(map[string]*StatefulSession[counterState]),
 		done:         make(chan struct{}),
 		encoder:      wire.JSONEncoder{},
 	}
@@ -132,8 +132,8 @@ func TestRestoreSessionFiresOnRestore(t *testing.T) {
 		store := newSessionFileStore(t)
 		var called bool
 
-		h := newRestoreHandler(store, func(cfg *LiveConfig[counterState]) {
-			cfg.OnRestore = func(_ *LiveSession[counterState]) {
+		h := newRestoreHandler(store, func(cfg *StatefulConfig[counterState]) {
+			cfg.OnRestore = func(_ *StatefulSession[counterState]) {
 				called = true
 			}
 		})
@@ -164,8 +164,8 @@ func TestRestoreSessionFallsBackToOnConnect(t *testing.T) {
 		store := newSessionFileStore(t)
 		var called bool
 
-		h := newRestoreHandler(store, func(cfg *LiveConfig[counterState]) {
-			cfg.OnConnect = func(_ *LiveSession[counterState]) {
+		h := newRestoreHandler(store, func(cfg *StatefulConfig[counterState]) {
+			cfg.OnConnect = func(_ *StatefulSession[counterState]) {
 				called = true
 			}
 		})

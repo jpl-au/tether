@@ -64,7 +64,7 @@ func TestSessionNavigateEvent(t *testing.T) {
 
 		differ := jit.NewDiffer()
 		ctx, cancel := context.WithCancel(context.Background())
-		sess := &LiveSession[state]{
+		sess := &StatefulSession[state]{
 			id:        "test",
 			state:     state{Page: "/"},
 			render:    render,
@@ -130,7 +130,7 @@ func TestSessionNavigateEventWithQuery(t *testing.T) {
 
 		differ := jit.NewDiffer()
 		ctx, cancel := context.WithCancel(context.Background())
-		sess := &LiveSession[state]{
+		sess := &StatefulSession[state]{
 			id:        "test",
 			state:     state{Page: "/"},
 			render:    func(s state) node.Node { return div.New(span.Text(s.Page).Dynamic("page")) },

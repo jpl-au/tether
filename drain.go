@@ -45,7 +45,7 @@ func (h *Handler[S]) Shutdown(ctx context.Context) error {
 	h.closeOnce.Do(func() { close(h.done) })
 
 	h.mu.Lock()
-	sessions := make([]*LiveSession[S], 0, len(h.active)+len(h.disconnected))
+	sessions := make([]*StatefulSession[S], 0, len(h.active)+len(h.disconnected))
 	for _, sess := range h.active {
 		sessions = append(sessions, sess)
 	}

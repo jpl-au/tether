@@ -8,7 +8,7 @@ import "github.com/jpl-au/tether/wire"
 // into the same Update message as the state diff so the client
 // receives everything atomically in one frame.
 //
-// In live mode the framework manages Effects internally. In testing
+// In stateful mode the framework manages Effects internally. In testing
 // and pre-warming, [CaptureSession] exposes Effects directly so
 // callers can read the buffered side effects after Handle returns.
 type Effects struct {

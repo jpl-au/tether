@@ -27,14 +27,14 @@ func TestHandleUploadNotConfigured(t *testing.T) {
 }
 
 func TestHandleUploadMissingSession(t *testing.T) {
-	handler := Live(App{}, LiveConfig[counterState]{
+	handler := Stateful(App{}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
 		Handle:       handleCounter,
 		Upload: &UploadConfig[counterState]{
-			Handle: func(*LiveSession[counterState], Upload) error { return nil },
+			Handle: func(*StatefulSession[counterState], Upload) error { return nil },
 		},
 	})
 
@@ -50,14 +50,14 @@ func TestHandleUploadMissingSession(t *testing.T) {
 }
 
 func TestHandleUploadUnknownSession(t *testing.T) {
-	handler := Live(App{}, LiveConfig[counterState]{
+	handler := Stateful(App{}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
 		Handle:       handleCounter,
 		Upload: &UploadConfig[counterState]{
-			Handle: func(*LiveSession[counterState], Upload) error { return nil },
+			Handle: func(*StatefulSession[counterState], Upload) error { return nil },
 		},
 	})
 
@@ -77,14 +77,14 @@ func TestHandleUploadSuccess(t *testing.T) {
 	var received Upload
 	done := make(chan struct{})
 
-	handler := Live(App{}, LiveConfig[counterState]{
+	handler := Stateful(App{}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
 		Handle:       handleCounter,
 		Upload: &UploadConfig[counterState]{
-			Handle: func(_ *LiveSession[counterState], u Upload) error {
+			Handle: func(_ *StatefulSession[counterState], u Upload) error {
 				received = u
 				close(done)
 				return nil
@@ -131,14 +131,14 @@ func TestHandleUploadSuccess(t *testing.T) {
 }
 
 func TestHandleUploadMIMEReject(t *testing.T) {
-	handler := Live(App{}, LiveConfig[counterState]{
+	handler := Stateful(App{}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
 		Handle:       handleCounter,
 		Upload: &UploadConfig[counterState]{
-			Handle: func(*LiveSession[counterState], Upload) error { return nil },
+			Handle: func(*StatefulSession[counterState], Upload) error { return nil },
 			Accept: []string{"image/*"},
 		},
 	})
@@ -168,14 +168,14 @@ func TestHandleUploadMIMEReject(t *testing.T) {
 func TestHandleUploadMIMEAcceptWildcard(t *testing.T) {
 	done := make(chan struct{})
 
-	handler := Live(App{}, LiveConfig[counterState]{
+	handler := Stateful(App{}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
 		Handle:       handleCounter,
 		Upload: &UploadConfig[counterState]{
-			Handle: func(*LiveSession[counterState], Upload) error {
+			Handle: func(*StatefulSession[counterState], Upload) error {
 				close(done)
 				return nil
 			},

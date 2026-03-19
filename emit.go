@@ -4,7 +4,7 @@ import "github.com/jpl-au/tether/dev"
 
 // On subscribes a session to a typed event bus. When the bus publishes
 // an event, fn is called inside the session's command loop (via
-// [LiveSession.Update]) with the event and the current state. The
+// [StatefulSession.Update]) with the event and the current state. The
 // callback returns the new state — same pattern as Update.
 //
 // Sender filtering is automatic: if the event was emitted by this
@@ -23,7 +23,7 @@ import "github.com/jpl-au/tether/dev"
 //	    state.Messages = append(state.Messages, ev.Text)
 //	    return state
 //	})
-func On[E any, S any](s *LiveSession[S], bus *Bus[E], fn func(E, S) S) {
+func On[E any, S any](s *StatefulSession[S], bus *Bus[E], fn func(E, S) S) {
 	dev.Debug("bus.on", "session", s.ID(), "endpoint", s.endpoint)
 	bus.subscribe(s.Context(), func(ev E) {
 		s.Update(func(state S) S {

@@ -13,17 +13,17 @@ import (
 	"github.com/jpl-au/tether/wire"
 )
 
-// Live creates a [Handler] that maintains a persistent connection
+// Stateful creates a [Handler] that maintains a persistent connection
 // (WebSocket or SSE) between browser and server. State survives
 // across interactions — when the user triggers an event, the server
 // updates state and pushes the change without a page reload.
 //
-// Use Live for interactive applications: dashboards, forms, chat,
+// Use Stateful for interactive applications: dashboards, forms, chat,
 // real-time collaboration — anything where the server needs to push
 // updates or maintain session state between interactions.
 //
 // For traditional request/response pages that reconstruct state from
-// each HTTP request, use [Page] instead.
+// each HTTP request, use [Stateless] instead.
 //
 // Session lifecycle is managed by per-session timers (idle, lifetime,
 // disconnect) — there is no centralised reaper goroutine. A
@@ -32,15 +32,15 @@ import (
 //
 // Call [Handler.Shutdown] to cancel all sessions before the process
 // exits.
-func Live[S any](app App, cfg LiveConfig[S]) *Handler[S] {
+func Stateful[S any](app App, cfg StatefulConfig[S]) *Handler[S] {
 	if cfg.InitialState == nil {
-		panic("tether: LiveConfig.InitialState is required")
+		panic("tether: StatefulConfig.InitialState is required")
 	}
 	if cfg.Render == nil {
-		panic("tether: LiveConfig.Render is required")
+		panic("tether: StatefulConfig.Render is required")
 	}
 	if cfg.Handle == nil {
-		panic("tether: LiveConfig.Handle is required")
+		panic("tether: StatefulConfig.Handle is required")
 	}
 	if cfg.Mode == mode.HTTP {
 		panic("tether: mode.HTTP is for tether.Page — use mode.WebSocket, mode.ServerSentEvents, or mode.Both")
@@ -49,10 +49,10 @@ func Live[S any](app App, cfg LiveConfig[S]) *Handler[S] {
 		cfg.Mode = mode.Both
 	}
 	if cfg.Mode != mode.ServerSentEvents && cfg.Upgrade == nil {
-		panic("tether: LiveConfig.Upgrade is required — use ws.Upgrade() or set Mode to mode.ServerSentEvents")
+		panic("tether: StatefulConfig.Upgrade is required — use ws.Upgrade() or set Mode to mode.ServerSentEvents")
 	}
 	if cfg.Mode != mode.WebSocket && cfg.Fallback == nil {
-		panic("tether: LiveConfig.Fallback is required — use sse.Upgrade() or set Mode to mode.WebSocket")
+		panic("tether: StatefulConfig.Fallback is required — use sse.Upgrade() or set Mode to mode.WebSocket")
 	}
 	// Compose OnNavigate into Handle so the middleware chain applies
 	// to navigate events. Without this, navigate events bypass
@@ -137,8 +137,8 @@ func Live[S any](app App, cfg LiveConfig[S]) *Handler[S] {
 		app:           app,
 		cfg:           cfg,
 		pending:       make(map[string]*pendingSession[S]),
-		active:        make(map[string]*LiveSession[S]),
-		disconnected:  make(map[string]*LiveSession[S]),
+		active:        make(map[string]*StatefulSession[S]),
+		disconnected:  make(map[string]*StatefulSession[S]),
 		done:          make(chan struct{}),
 		encoder:       resolveEncoder(cfg.WireFormat),
 		clientHandler: app.jsHandler(),
@@ -166,7 +166,7 @@ func resolveEncoder(f wire.Format) wire.Encoder {
 // handlerAttrs builds the slog attribute list for the "tether: ready"
 // startup log. Transport is always present; name, worker, middleware,
 // and dev are included only when set, to keep the line uncluttered.
-func handlerAttrs[S any](app App, cfg LiveConfig[S]) []any {
+func handlerAttrs[S any](app App, cfg StatefulConfig[S]) []any {
 	args := []any{"transport", transportLabel(cfg.Mode), "protocol", cfg.Protocol.String()}
 	if cfg.Name != "" {
 		args = append(args, "name", cfg.Name)

@@ -14,7 +14,7 @@ package tether
 //
 // Middleware is applied outermost-first: the first middleware in the
 // slice wraps the outermost layer of the chain. Use the Middleware
-// field on [LiveConfig] to register middleware for all events.
+// field on [StatefulConfig] to register middleware for all events.
 type Middleware[S any] func(HandleFunc[S]) HandleFunc[S]
 
 // Chain applies a slice of middleware to a handler in outermost-first

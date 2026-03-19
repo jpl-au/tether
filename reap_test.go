@@ -13,7 +13,7 @@ func TestPendingSessionRemovedAfterTimeout(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		h := &Handler[counterState]{
 			app: App{Logger: slog.Default()},
-			cfg: LiveConfig[counterState]{
+			cfg: StatefulConfig[counterState]{
 				Timeouts: Timeouts{Pending: 100 * time.Millisecond},
 			},
 			pending: map[string]*pendingSession[counterState]{
@@ -23,8 +23,8 @@ func TestPendingSessionRemovedAfterTimeout(t *testing.T) {
 					createdAt: time.Now(),
 				},
 			},
-			active:       make(map[string]*LiveSession[counterState]),
-			disconnected: make(map[string]*LiveSession[counterState]),
+			active:       make(map[string]*StatefulSession[counterState]),
+			disconnected: make(map[string]*StatefulSession[counterState]),
 			done:         make(chan struct{}),
 		}
 

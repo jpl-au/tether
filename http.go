@@ -17,7 +17,7 @@ import (
 // initial HTML page (GET without upgrade headers), the transport
 // connection (WebSocket upgrade or SSE stream), POST events (SSE mode
 // only), and the embedded client JS runtime at /_tether/. The Mode field
-// in LiveConfig determines which transport paths are active. Requests that
+// in StatefulConfig determines which transport paths are active. Requests that
 // don't match any transport path fall through to the initial page render.
 func (h *Handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Serve the embedded client runtime (JS, idiomorph, service worker).

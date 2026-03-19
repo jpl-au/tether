@@ -19,7 +19,7 @@ import (
 )
 
 // Asset manages an embedded asset filesystem with content-hashed URLs.
-// Construct one as a struct literal and pass it to [LiveConfig].Assets.
+// Construct one as a struct literal and pass it to [StatefulConfig].Assets.
 // The first call to [Asset.URL], [Asset.Stylesheet], or [Asset.Script]
 // (or handler startup) walks the filesystem and hashes every file.
 //

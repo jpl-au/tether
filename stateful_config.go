@@ -11,22 +11,23 @@ import (
 	"github.com/jpl-au/tether/wire"
 )
 
-// LiveConfig wires together all the pieces of a live page: how to
-// create initial state, how to render it, and how to handle events.
-// The type parameter S is the session state — typically a struct, but
-// it can be any type. Each connected browser tab gets its own
-// independent copy of S, so state is never shared across sessions
+// StatefulConfig wires together all the pieces of a stateful page:
+// how to create initial state, how to render it, and how to handle
+// events. The type parameter S is the session state — typically a
+// struct, but it can be any type. Each connected browser tab gets its
+// own independent copy of S, so state is never shared across sessions
 // unless you explicitly coordinate via [Group] or external storage.
 //
-// A live page maintains a persistent connection (WebSocket or SSE)
+// A stateful page maintains a persistent connection (WebSocket or SSE)
 // between browser and server. State survives across interactions and
 // the server can push updates at any time. For traditional
-// request/response pages, use [PageConfig] with [Page] instead.
+// request/response pages, use [StatelessConfig] with [Stateless]
+// instead.
 //
 // At minimum, set InitialState, Render, Handle, and either Upgrade or
 // Fallback (depending on Mode). Everything else is optional and has
 // sensible defaults.
-type LiveConfig[S any] struct {
+type StatefulConfig[S any] struct {
 	// Upgrade converts an HTTP request into a Transport connection.
 	// Use ws.Upgrade for WebSocket connections. Required unless Mode
 	// is [mode.ServerSentEvents].
@@ -52,7 +53,7 @@ type LiveConfig[S any] struct {
 	// Can also be set via the TETHER_PROTO environment variable
 	// (HTTP1, HTTP2, HTTP3, AUTO). Explicit config takes precedence.
 	//
-	// Protocol awareness applies to live sessions only — [Page] is
+	// Protocol awareness applies to stateful sessions only — [Stateless] is
 	// stateless and does not benefit from protocol-specific behaviour.
 	Protocol protocol.Protocol
 
@@ -65,8 +66,8 @@ type LiveConfig[S any] struct {
 
 	// Handle processes a client event and returns the new state. Side
 	// effects (toast, navigate, title, etc.) are expressed as imperative
-	// calls on the session parameter. In live mode the session is a
-	// [*LiveSession] which can be type-asserted for Update, Go, and Close.
+	// calls on the session parameter. In stateful mode the session is a
+	// [*StatefulSession] which can be type-asserted for Update, Go, and Close.
 	// See [HandleFunc] for concurrency constraints — Handle runs inside
 	// the session's command loop and must not block.
 	Handle HandleFunc[S]
@@ -91,25 +92,25 @@ type LiveConfig[S any] struct {
 	OnNavigate func(session Session, state S, params Params) S
 
 	// OnConnect is called after a new session is created, its transport
-	// is ready, and any [LiveConfig.Watchers] have been subscribed. Use
+	// is ready, and any [StatefulConfig.Watchers] have been subscribed. Use
 	// this for imperative setup: incrementing counters, publishing
 	// events, starting background goroutines, or logging. For reactive
-	// subscriptions, prefer [LiveConfig.Watchers] which are declarative
-	// and visible on LiveConfig. Optional.
+	// subscriptions, prefer [StatefulConfig.Watchers] which are declarative
+	// and visible on StatefulConfig. Optional.
 	//
 	// OnConnect runs on the HTTP handler goroutine after the session's
 	// command loop has started but before the transport begins reading
 	// client events. This means State, Update, On, Observe, and all
 	// side-effect methods are safe to call. However, any blocking work
 	// (slow database queries, HTTP calls) delays the session becoming
-	// fully interactive — move heavy initialisation into [LiveSession.Go].
-	OnConnect func(session *LiveSession[S])
+	// fully interactive — move heavy initialisation into [StatefulSession.Go].
+	OnConnect func(session *StatefulSession[S])
 
 	// OnDisconnect is called after a session's transport closes (either
 	// because the client disconnected or the session was reaped). Use
 	// this to remove the session from a [Group] and clean up any
 	// resources started in OnConnect. Optional.
-	OnDisconnect func(session *LiveSession[S])
+	OnDisconnect func(session *StatefulSession[S])
 
 	// Equal compares two states. When provided and the old and new state
 	// are equal, the render and diff are skipped entirely — no work is
@@ -131,7 +132,7 @@ type LiveConfig[S any] struct {
 	//
 	// The callback runs inside the session's command loop — keep it
 	// fast and offload any expensive work to a goroutine. Optional.
-	OnStructuralChange func(session *LiveSession[S], change StructuralChange)
+	OnStructuralChange func(session *StatefulSession[S], change StructuralChange)
 
 	// OnNoPatch is called when a render cycle produces no patches and
 	// no structural change. This usually indicates a missing .Dynamic()
@@ -145,7 +146,7 @@ type LiveConfig[S any] struct {
 	//
 	// The callback runs inside the session's command loop — keep it
 	// fast and offload any expensive work to a goroutine. Optional.
-	OnNoPatch func(session *LiveSession[S], info NoPatch)
+	OnNoPatch func(session *StatefulSession[S], info NoPatch)
 
 	// Layout wraps the tether content in a full HTML document. The state
 	// parameter is the session's initial state, which can be used to set
@@ -195,14 +196,14 @@ type LiveConfig[S any] struct {
 
 	// Groups are collections that the session will automatically join
 	// when its transport is ready and leave when the session is
-	// permanently destroyed. Using Groups on LiveConfig avoids repetitive
+	// permanently destroyed. Using Groups on StatefulConfig avoids repetitive
 	// Add/Remove boilerplate in OnConnect/OnDisconnect. Optional.
 	Groups []*Group[S]
 
 	// Watchers are reactive sources that sessions automatically
 	// subscribe to when connected. Each watcher maps external changes
 	// into the session's state. Watchers are subscribed before
-	// [LiveConfig.OnConnect] runs, so the session receives updates from
+	// [StatefulConfig.OnConnect] runs, so the session receives updates from
 	// the moment it connects. Create watchers with [WatchValue] and
 	// [WatchBus]. Optional.
 	Watchers []Watcher[S]
@@ -213,8 +214,8 @@ type LiveConfig[S any] struct {
 	// event action, the component handles the event and the user's
 	// Handle function never sees it. Create mounts with [Mount].
 	//
-	// This follows the same declarative pattern as [LiveConfig.Watchers]
-	// and [LiveConfig.Groups]: wired once at LiveConfig time, automatically
+	// This follows the same declarative pattern as [StatefulConfig.Watchers]
+	// and [StatefulConfig.Groups]: wired once at StatefulConfig time, automatically
 	// managed by the framework.
 	Components []ComponentMount[S]
 
@@ -264,7 +265,7 @@ type LiveConfig[S any] struct {
 	// OnRestore fires instead of OnConnect for restored sessions.
 	// If nil, OnConnect fires as a fallback — suitable for apps
 	// where setup is identical for new and restored sessions.
-	OnRestore func(session *LiveSession[S])
+	OnRestore func(session *StatefulSession[S])
 
 	// FreezeOnDisconnect enables frozen mode for disconnected
 	// sessions. When true, a session that loses its transport
@@ -305,5 +306,5 @@ type PushConfig[S any] struct {
 	// requests to avoid leaking goroutines. The subscription is passed
 	// as a parameter; do not read it from the session object as the
 	// store may not have completed yet. Optional.
-	OnSubscribe func(ctx context.Context, session *LiveSession[S], sub push.Subscription)
+	OnSubscribe func(ctx context.Context, session *StatefulSession[S], sub push.Subscription)
 }

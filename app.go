@@ -4,7 +4,7 @@ import "log/slog"
 
 // App holds configuration shared across all handlers in an
 // application: logging, client-side behaviour, security, and
-// assets. Create one App and pass it to [Live] and [Page] — each
+// assets. Create one App and pass it to [Stateful] and [Stateless] — each
 // handler gets its own copy, so shared settings are defined once.
 //
 //	app := tether.App{
@@ -12,8 +12,8 @@ import "log/slog"
 //	    Assets:  []*tether.Asset{assets},
 //	}
 //
-//	live := tether.Live(app, tether.LiveConfig[State]{...})
-//	page := tether.Page(app, tether.PageConfig[State]{...})
+//	live := tether.Stateful(app, tether.StatefulConfig[State]{...})
+//	page := tether.Stateless(app, tether.StatelessConfig[State]{...})
 type App struct {
 	// DevMode enables development conveniences: debug logging by
 	// default, Cache-Control: no-store on all responses, service

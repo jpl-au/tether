@@ -32,10 +32,10 @@ func handleMountState(_ Session, s mountState, ev Event) mountState {
 	return s
 }
 
-func newMountSession(state mountState, mt Transport, mounts []ComponentMount[mountState]) *LiveSession[mountState] {
+func newMountSession(state mountState, mt Transport, mounts []ComponentMount[mountState]) *StatefulSession[mountState] {
 	differ := jit.NewDiffer()
 	ctx, cancel := context.WithCancel(context.Background())
-	sess := &LiveSession[mountState]{
+	sess := &StatefulSession[mountState]{
 		id:        "test",
 		state:     state,
 		render:    renderMountState,
@@ -141,7 +141,7 @@ func TestMountRouteSetsEventTarget(t *testing.T) {
 
 		differ := jit.NewDiffer()
 		ctx, cancel := context.WithCancel(context.Background())
-		sess := &LiveSession[targetState]{
+		sess := &StatefulSession[targetState]{
 			id:     "test",
 			state:  targetState{Widget: targetWidget{onHandle: func(ev Event) { captured = ev.Target }}},
 			render: func(s targetState) node.Node { return div.New(span.Text("x").Dynamic("x")) },

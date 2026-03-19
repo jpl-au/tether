@@ -25,7 +25,7 @@ import "context"
 // The framework does not ship any DiffStore implementations.
 // Developers provide their own, backed by whatever storage suits
 // their deployment (SQLite, Redis, filesystem, etc.). The default
-// (nil on [LiveConfig]) keeps everything in memory.
+// (nil on [StatefulConfig]) keeps everything in memory.
 //
 // Implementations must be safe for concurrent use.
 type DiffStore interface {

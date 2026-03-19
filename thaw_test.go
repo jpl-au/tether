@@ -12,8 +12,8 @@ import (
 
 // newThawHandler builds a Handler with freeze enabled and the given
 // store. Shared setup for thaw tests.
-func newThawHandler(store SessionStore, opts ...func(*LiveConfig[counterState])) *Handler[counterState] {
-	cfg := LiveConfig[counterState]{
+func newThawHandler(store SessionStore, opts ...func(*StatefulConfig[counterState])) *Handler[counterState] {
+	cfg := StatefulConfig[counterState]{
 		Render:             renderCounter,
 		Handle:             handleCounter,
 		SessionStore:       store,
@@ -28,8 +28,8 @@ func newThawHandler(store SessionStore, opts ...func(*LiveConfig[counterState]))
 		app:          App{},
 		cfg:          cfg,
 		pending:      make(map[string]*pendingSession[counterState]),
-		active:       make(map[string]*LiveSession[counterState]),
-		disconnected: make(map[string]*LiveSession[counterState]),
+		active:       make(map[string]*StatefulSession[counterState]),
+		disconnected: make(map[string]*StatefulSession[counterState]),
 		done:         make(chan struct{}),
 		encoder:      wire.JSONEncoder{},
 	}
@@ -40,7 +40,7 @@ func newThawHandler(store SessionStore, opts ...func(*LiveConfig[counterState]))
 // freezeSession creates a session, wires it into the handler, runs
 // the transport to completion (freeze on disconnect), and returns
 // the frozen session. The caller can then thaw it.
-func freezeSession(t *testing.T, h *Handler[counterState], initial counterState, events []Event) *LiveSession[counterState] {
+func freezeSession(t *testing.T, h *Handler[counterState], initial counterState, events []Event) *StatefulSession[counterState] {
 	t.Helper()
 	mt := &mockTransport{events: events}
 	sess := newTestSession(initial, mt)
@@ -186,8 +186,8 @@ func TestThawFiresOnRestore(t *testing.T) {
 		store := newSessionFileStore(t)
 		var called bool
 
-		h := newThawHandler(store, func(cfg *LiveConfig[counterState]) {
-			cfg.OnRestore = func(_ *LiveSession[counterState]) {
+		h := newThawHandler(store, func(cfg *StatefulConfig[counterState]) {
+			cfg.OnRestore = func(_ *StatefulSession[counterState]) {
 				called = true
 			}
 		})
@@ -220,8 +220,8 @@ func TestThawFallsBackToOnConnect(t *testing.T) {
 		store := newSessionFileStore(t)
 		var called bool
 
-		h := newThawHandler(store, func(cfg *LiveConfig[counterState]) {
-			cfg.OnConnect = func(_ *LiveSession[counterState]) {
+		h := newThawHandler(store, func(cfg *StatefulConfig[counterState]) {
+			cfg.OnConnect = func(_ *StatefulSession[counterState]) {
 				called = true
 			}
 		})

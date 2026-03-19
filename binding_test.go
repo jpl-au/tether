@@ -12,7 +12,7 @@ import (
 )
 
 func TestSessionBindingRejectsReattachWithMismatchedUA(t *testing.T) {
-	h := Live(App{}, LiveConfig[counterState]{
+	h := Stateful(App{}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -59,7 +59,7 @@ func TestSessionBindingRejectsReattachWithMismatchedUA(t *testing.T) {
 }
 
 func TestSessionBindingRejectsPendingClaimWithMismatchedUA(t *testing.T) {
-	h := Live(App{}, LiveConfig[counterState]{
+	h := Stateful(App{}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -103,15 +103,15 @@ func TestSessionBindingRejectsPendingClaimWithMismatchedUA(t *testing.T) {
 
 func TestSessionBindingDisabledAllowsMismatchedUA(t *testing.T) {
 	connected := make(chan struct{}, 1)
-	h := Live(App{Security: Security{
+	h := Stateful(App{Security: Security{
 		DisableSessionBinding: true,
-	}}, LiveConfig[counterState]{
+	}}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
 		Handle:       handleCounter,
-		OnConnect: func(sess *LiveSession[counterState]) {
+		OnConnect: func(sess *StatefulSession[counterState]) {
 			connected <- struct{}{}
 		},
 	})
@@ -147,7 +147,7 @@ func TestSessionBindingDisabledAllowsMismatchedUA(t *testing.T) {
 }
 
 func TestSessionBindingCapturesUAOnInitialPage(t *testing.T) {
-	h := Live(App{}, LiveConfig[counterState]{
+	h := Stateful(App{}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },

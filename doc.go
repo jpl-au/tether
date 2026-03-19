@@ -5,27 +5,27 @@
 //
 // Tether provides two handler modes:
 //
-// [Live] handlers maintain a persistent connection (WebSocket or SSE)
+// [Stateful] handlers maintain a persistent connection (WebSocket or SSE)
 // between browser and server. State survives across interactions —
 // when the user clicks a button, the server updates state and pushes
-// the change without a page reload. Use Live for interactive
+// the change without a page reload. Use Stateful for interactive
 // applications: dashboards, forms, chat, real-time collaboration.
 //
-// [Page] handlers reconstruct state from each HTTP request. No
+// [Stateless] handlers reconstruct state from each HTTP request. No
 // persistent connection — every interaction is a standard
-// request/response cycle. Use Page for content-focused pages that
+// request/response cycle. Use Stateless for content-focused pages that
 // don't need real-time updates.
 //
 // Both modes share the same rendering engine (Fluent), the same event
 // system, and the same component model. The difference is whether
 // state persists between interactions.
 //
-// # Live mode
+// # Stateful mode
 //
-// The lifecycle of a live page visit is:
+// The lifecycle of a stateful page visit is:
 //
 //  1. The browser GETs the page. The handler renders the initial HTML
-//     from [LiveConfig].InitialState and [LiveConfig].Render, pre-warms
+//     from [StatefulConfig].InitialState and [StatefulConfig].Render, pre-warms
 //     a session with the diff state, and embeds the session ID in the
 //     root element.
 //  2. The client JS opens a persistent transport and reclaims the
@@ -33,7 +33,7 @@
 //     and ensures the diff baseline matches the HTML the browser
 //     already has.
 //  3. When the user interacts with the page, the client sends an
-//     [Event]. The server calls [LiveConfig].Handle to produce new
+//     [Event]. The server calls [StatefulConfig].Handle to produce new
 //     state, diffs the old and new render trees, and sends only the
 //     changed fragments back as targeted patches or structural morphs.
 //  4. For lightweight updates that don't need a full render cycle, the
@@ -42,7 +42,7 @@
 //     [bind.BindAttr]) update instantly on the client — no diff, no
 //     HTML.
 //
-// # Page mode
+// # Stateless mode
 //
 // GET requests render the full HTML page. POST requests handle a
 // client event, render the new state, and return a JSON update with

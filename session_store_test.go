@@ -294,13 +294,13 @@ func TestSessionStoreShutdownPersists(t *testing.T) {
 		grace := 15 * time.Second
 		h := &Handler[counterState]{
 			app: App{},
-			cfg: LiveConfig[counterState]{
+			cfg: StatefulConfig[counterState]{
 				SessionStore: store,
 				Timeouts:     Timeouts{ShutdownGrace: grace},
 			},
 			pending:      make(map[string]*pendingSession[counterState]),
-			active:       map[string]*LiveSession[counterState]{sess.id: sess},
-			disconnected: make(map[string]*LiveSession[counterState]),
+			active:       map[string]*StatefulSession[counterState]{sess.id: sess},
+			disconnected: make(map[string]*StatefulSession[counterState]),
 			done:         make(chan struct{}),
 		}
 		h.Diagnostics = NewBus[Diagnostic]()

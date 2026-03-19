@@ -10,7 +10,7 @@ var _ SessionCodec[struct{}] = cborCodec[struct{}]{}
 // convert S to bytes before wrapping it in a session envelope and
 // passing it to [SessionStore].
 //
-// When nil on [LiveConfig], the framework uses CBOR encoding (RFC 8949),
+// When nil on [StatefulConfig], the framework uses CBOR encoding (RFC 8949),
 // which handles any struct with exported fields — no configuration,
 // no struct tags, no boilerplate.
 //

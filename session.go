@@ -26,7 +26,7 @@ type StructuralChange struct {
 }
 
 // NoPatch describes a render cycle that produced no DOM changes.
-// Passed to [LiveConfig.OnNoPatch] so the developer can log, count, or
+// Passed to [StatefulConfig.OnNoPatch] so the developer can log, count, or
 // ignore it as appropriate.
 type NoPatch struct {
 	Source string // "update", "navigate", or "event"
@@ -41,18 +41,18 @@ type NoPatch struct {
 type RenderFunc[S any] func(state S) node.Node
 
 // defaultCmdBufferSize is the capacity of the command channel when
-// [LiveConfig].CmdBufferSize is zero.
+// [StatefulConfig].CmdBufferSize is zero.
 const defaultCmdBufferSize = 64
 
-// LiveSession represents a single connected client. Each browser tab
-// gets its own LiveSession with independent state, a dedicated diff
+// StatefulSession represents a single connected client. Each browser tab
+// gets its own StatefulSession with independent state, a dedicated diff
 // engine, and a command-loop goroutine that serialises all state
 // mutations.
 //
 // All exported methods are safe to call from any goroutine — including
 // from within Handle. The command loop processes them in order; there
 // is no mutex and no deadlock risk.
-type LiveSession[S any] struct {
+type StatefulSession[S any] struct {
 	id    string
 	state S
 
@@ -138,7 +138,7 @@ type LiveSession[S any] struct {
 	lastURL   string
 	lastTitle string
 
-	// Push — sender is set from LiveConfig, subscription arrives at runtime.
+	// Push — sender is set from StatefulConfig, subscription arrives at runtime.
 	// pushSub is atomic so Push() can read it safely from any goroutine
 	// without routing through the command channel.
 	pushSender *push.Sender
@@ -163,25 +163,25 @@ type LiveSession[S any] struct {
 	equal func(a, b S) bool
 
 	// Optional telemetry hook for structural diff changes.
-	onStructuralChange func(*LiveSession[S], StructuralChange)
+	onStructuralChange func(*StatefulSession[S], StructuralChange)
 
 	// Optional hook for render cycles that produce no patches.
-	onNoPatch func(*LiveSession[S], NoPatch)
+	onNoPatch func(*StatefulSession[S], NoPatch)
 
-	// store is the external snapshot store from LiveConfig.DiffStore.
+	// store is the external snapshot store from StatefulConfig.DiffStore.
 	// When non-nil, differ snapshots are saved here on disconnect
 	// and deleted on reconnect or destroy, freeing process memory
 	// during the reconnect window.
 	store DiffStore
 
 	// sessionStore is the external state store from
-	// LiveConfig.SessionStore. When non-nil, session state S and
+	// StatefulConfig.SessionStore. When non-nil, session state S and
 	// metadata are saved here on disconnect and graceful shutdown,
 	// enabling crash recovery and node migration.
 	sessionStore SessionStore
 
 	// codec serialises state S for the session store. Set from
-	// LiveConfig.Codec, or defaults to CBOR if nil.
+	// StatefulConfig.Codec, or defaults to CBOR if nil.
 	codec SessionCodec[S]
 
 	// freeze is true when FreezeOnDisconnect is enabled and a
@@ -197,9 +197,9 @@ type LiveSession[S any] struct {
 
 // Session is the interface every handler receives. It provides
 // side-effect methods (Toast, Navigate, Signal, etc.) that work
-// identically in live mode, stateless page mode, and tests.
+// identically in stateful mode, stateless mode, and tests.
 //
-// In live mode the underlying value is a [*LiveSession] which
+// In stateful mode the underlying value is a [*StatefulSession] which
 // provides additional methods (Update, State, Close) via type
 // assertion when needed. During pre-warming (initial GET) a
 // capture implementation buffers side effects. In tethertest a
@@ -209,9 +209,9 @@ type LiveSession[S any] struct {
 // accept it without inheriting the application's state type
 // parameter, making them reusable across different page states.
 type Session interface {
-	// ID returns the session identifier. In live mode this is the
-	// unique, cryptographically random session ID. In stateless page
-	// mode (PageConfig) this returns an empty string because there is
+	// ID returns the session identifier. In stateful mode this is the
+	// unique, cryptographically random session ID. In stateless
+	// mode (StatelessConfig) this returns an empty string because there is
 	// no persistent session. In tethertest it returns "tethertest".
 	ID() string
 	Context() context.Context
@@ -226,7 +226,7 @@ type Session interface {
 	Signals(signals map[string]any)
 	Push(n push.Notification) error
 	// Close terminates the session by closing its transport. In
-	// stateless page mode ([CaptureSession]) and tethertest this is
+	// stateless mode ([CaptureSession]) and tethertest this is
 	// a no-op — there is no persistent connection to close.
 	Close()
 }
@@ -244,9 +244,9 @@ type Session interface {
 // Compile-time interface satisfaction checks.
 var (
 	_ Session = (*CaptureSession)(nil)
-	_ Session = (*LiveSession[struct{}])(nil)
+	_ Session = (*StatefulSession[struct{}])(nil)
 	_ emitter = (*CaptureSession)(nil)
-	_ emitter = (*LiveSession[struct{}])(nil)
+	_ emitter = (*StatefulSession[struct{}])(nil)
 )
 
 type CaptureSession struct {
@@ -348,7 +348,7 @@ func (cs *CaptureSession) Signals(signals map[string]any) {
 // ID returns the unique session identifier. This is a cryptographically
 // random string generated when the session is created. It can be used
 // for logging, metrics, or as a key in external storage.
-func (s *LiveSession[S]) ID() string {
+func (s *StatefulSession[S]) ID() string {
 	return s.id
 }
 
@@ -356,7 +356,7 @@ func (s *LiveSession[S]) ID() string {
 // permanently destroyed (reaped or shutdown). The context survives
 // temporary disconnects and reconnects — use it for background
 // goroutines that should keep running while the client is away.
-func (s *LiveSession[S]) Context() context.Context {
+func (s *StatefulSession[S]) Context() context.Context {
 	if s.ctx != nil {
 		return s.ctx
 	}
@@ -368,13 +368,13 @@ func (s *LiveSession[S]) Context() context.Context {
 // destroyed (reaped or shutdown). Use this in OnConnect for background
 // work like tickers, watchers, or change listeners that should stop
 // when the session is gone.
-func (s *LiveSession[S]) Go(fn func(ctx context.Context)) {
+func (s *StatefulSession[S]) Go(fn func(ctx context.Context)) {
 	go fn(s.Context())
 }
 
 // sessionID returns the session's unique identifier. Used by
 // Bus.Emit to record the sender for subscriber filtering.
-func (s *LiveSession[S]) sessionID() string {
+func (s *StatefulSession[S]) sessionID() string {
 	return s.id
 }
 
@@ -382,7 +382,7 @@ func (s *LiveSession[S]) sessionID() string {
 // normal load the send is non-blocking. When the buffer is full,
 // an overflow goroutine delivers it — same semaphore-bounded
 // pattern as [enqueue].
-func (s *LiveSession[S]) enqueueFx(fn func(*Effects)) {
+func (s *StatefulSession[S]) enqueueFx(fn func(*Effects)) {
 	if Status(s.status.Load()) == Frozen {
 		return
 	}
@@ -410,7 +410,7 @@ func (s *LiveSession[S]) enqueueFx(fn func(*Effects)) {
 }
 
 // logOverflow increments the overflow counter and emits a diagnostic.
-func (s *LiveSession[S]) logOverflow() {
+func (s *StatefulSession[S]) logOverflow() {
 	s.overflows.Add(1)
 	s.emitDiagnostic(Diagnostic{
 		Kind:      BufferOverflow,
@@ -422,7 +422,7 @@ func (s *LiveSession[S]) logOverflow() {
 // emitDiagnostic publishes a diagnostic event to the handler's bus.
 // No-op if the bus is nil (e.g. in tests that construct sessions
 // directly without a handler).
-func (s *LiveSession[S]) emitDiagnostic(d Diagnostic) {
+func (s *StatefulSession[S]) emitDiagnostic(d Diagnostic) {
 	if s.diagnostics != nil {
 		s.diagnostics.Publish(d)
 	}
@@ -432,7 +432,7 @@ func (s *LiveSession[S]) emitDiagnostic(d Diagnostic) {
 // on the loop goroutine after Handle/Update returns, before the
 // render-diff-send pipeline. Pass nil to discard effects (e.g.
 // after a panic).
-func (s *LiveSession[S]) drainFx(fx *Effects) {
+func (s *StatefulSession[S]) drainFx(fx *Effects) {
 	for {
 		select {
 		case fn := <-s.fxCh:
@@ -447,7 +447,7 @@ func (s *LiveSession[S]) drainFx(fx *Effects) {
 
 // sendFx sends any accumulated effects as a standalone update.
 // Used by the loop when effects arrive outside of Handle.
-func (s *LiveSession[S]) sendFx(fx *Effects) {
+func (s *StatefulSession[S]) sendFx(fx *Effects) {
 	if !fx.Any() {
 		return
 	}
@@ -466,7 +466,7 @@ func (s *LiveSession[S]) sendFx(fx *Effects) {
 // The number of overflow goroutines is capped by a semaphore sized to
 // CmdBufferSize. If both the buffer and the semaphore are full, the
 // command is dropped and a [CommandDropped] diagnostic is emitted.
-func (s *LiveSession[S]) enqueue(fn func()) {
+func (s *StatefulSession[S]) enqueue(fn func()) {
 	if Status(s.status.Load()) == Frozen {
 		return
 	}

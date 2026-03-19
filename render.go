@@ -27,7 +27,7 @@ var extensions = []extension{
 }
 
 // tetherBody implements node.Node for the tether root div and client
-// scripts. It exists so the Layout function in LiveConfig can receive a
+// scripts. It exists so the Layout function in StatefulConfig can receive a
 // composable node and wrap it in a full HTML document (head, body, etc.)
 // rather than dealing with raw bytes. When Layout is nil, tetherBody
 // renders directly into the response as a bare fragment.

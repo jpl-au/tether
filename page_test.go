@@ -34,7 +34,7 @@ func pageHandleCounter(sess Session, state counterState, ev Event) counterState 
 }
 
 func newTestPageHandler() http.Handler {
-	return Page(App{}, PageConfig[counterState]{
+	return Stateless(App{}, StatelessConfig[counterState]{
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
 		Handle:       pageHandleCounter,
@@ -92,7 +92,7 @@ func TestPageGETNoRetryDelayAttributes(t *testing.T) {
 }
 
 func TestPageGETWithOnNavigate(t *testing.T) {
-	handler := Page(App{}, PageConfig[counterState]{
+	handler := Stateless(App{}, StatelessConfig[counterState]{
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
 		Handle:       pageHandleCounter,
@@ -116,7 +116,7 @@ func TestPageGETWithOnNavigate(t *testing.T) {
 func TestPageGETDevMode(t *testing.T) {
 	t.Cleanup(dev.Reset)
 
-	handler := Page(App{DevMode: true}, PageConfig[counterState]{
+	handler := Stateless(App{DevMode: true}, StatelessConfig[counterState]{
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
 		Handle:       pageHandleCounter,
@@ -299,7 +299,7 @@ func TestPagePOSTPanicRecovery(t *testing.T) {
 }
 
 func TestPageGETPanicRecovery(t *testing.T) {
-	handler := Page(App{}, PageConfig[counterState]{
+	handler := Stateless(App{}, StatelessConfig[counterState]{
 		InitialState: func(r *http.Request) counterState { panic("render panic") },
 		Render:       renderCounter,
 		Handle:       pageHandleCounter,
@@ -335,7 +335,7 @@ func TestPagePanicsOnMissingState(t *testing.T) {
 			t.Error("expected panic for missing State")
 		}
 	}()
-	Page(App{}, PageConfig[counterState]{
+	Stateless(App{}, StatelessConfig[counterState]{
 		Render: renderCounter,
 		Handle: pageHandleCounter,
 	})
@@ -347,7 +347,7 @@ func TestPagePanicsOnMissingRender(t *testing.T) {
 			t.Error("expected panic for missing Render")
 		}
 	}()
-	Page(App{}, PageConfig[counterState]{
+	Stateless(App{}, StatelessConfig[counterState]{
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Handle:       pageHandleCounter,
 	})
@@ -359,14 +359,14 @@ func TestPagePanicsOnMissingHandle(t *testing.T) {
 			t.Error("expected panic for missing Handle")
 		}
 	}()
-	Page(App{}, PageConfig[counterState]{
+	Stateless(App{}, StatelessConfig[counterState]{
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
 	})
 }
 
 func TestPagePOSTWithOnNavigate(t *testing.T) {
-	handler := Page(App{}, PageConfig[counterState]{
+	handler := Stateless(App{}, StatelessConfig[counterState]{
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
 		Handle:       pageHandleCounter,
@@ -399,7 +399,7 @@ func TestPageDevModeFromEnv(t *testing.T) {
 	t.Setenv("TETHER_DEV", "1")
 	t.Cleanup(dev.Reset)
 
-	handler := Page(App{}, PageConfig[counterState]{
+	handler := Stateless(App{}, StatelessConfig[counterState]{
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
 		Handle:       pageHandleCounter,
@@ -407,7 +407,7 @@ func TestPageDevModeFromEnv(t *testing.T) {
 
 	req := httptest.NewRequest("GET", "/app", nil)
 	w := httptest.NewRecorder()
-	handler.(*pageHandler[counterState]).ServeHTTP(w, req)
+	handler.(*statelessHandler[counterState]).ServeHTTP(w, req)
 
 	if !strings.Contains(w.Body.String(), "data-tether-dev") {
 		t.Error("expected data-tether-dev from TETHER_DEV env var")
@@ -415,7 +415,7 @@ func TestPageDevModeFromEnv(t *testing.T) {
 }
 
 func TestPagePOSTNavigateSkipsHandle(t *testing.T) {
-	handler := Page(App{}, PageConfig[counterState]{
+	handler := Stateless(App{}, StatelessConfig[counterState]{
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
 		Handle: func(_ Session, state counterState, _ Event) counterState {
@@ -455,7 +455,7 @@ func TestPagePOSTComponentsDispatch(t *testing.T) {
 		Other  string
 	}
 
-	handler := Page(App{}, PageConfig[pageState]{
+	handler := Stateless(App{}, StatelessConfig[pageState]{
 		InitialState: func(r *http.Request) pageState { return pageState{} },
 		Render: func(s pageState) node.Node {
 			return div.New(

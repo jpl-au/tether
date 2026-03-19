@@ -19,17 +19,17 @@ import (
 // handle a client event and return a JSON update with the new HTML
 // and any side effects.
 //
-// For live pages with persistent connections and session state, use
-// [Live] instead.
-func Page[S any](app App, cfg PageConfig[S]) http.Handler {
+// For stateful pages with persistent connections and session state, use
+// [Stateful] instead.
+func Stateless[S any](app App, cfg StatelessConfig[S]) http.Handler {
 	if cfg.InitialState == nil {
-		panic("tether: PageConfig.InitialState is required")
+		panic("tether: StatelessConfig.InitialState is required")
 	}
 	if cfg.Render == nil {
-		panic("tether: PageConfig.Render is required")
+		panic("tether: StatelessConfig.Render is required")
 	}
 	if cfg.Handle == nil {
-		panic("tether: PageConfig.Handle is required")
+		panic("tether: StatelessConfig.Handle is required")
 	}
 
 	app.initLog()
@@ -57,7 +57,7 @@ func Page[S any](app App, cfg PageConfig[S]) http.Handler {
 
 	csrf := app.Security.csrf()
 
-	return &pageHandler[S]{
+	return &statelessHandler[S]{
 		app:           app,
 		cfg:           cfg,
 		encoder:       resolveEncoder(0),
@@ -67,17 +67,17 @@ func Page[S any](app App, cfg PageConfig[S]) http.Handler {
 	}
 }
 
-// pageHandler serves stateless pages via plain HTTP request/response.
-type pageHandler[S any] struct {
+// statelessHandler serves stateless pages via plain HTTP request/response.
+type statelessHandler[S any] struct {
 	app           App
-	cfg           PageConfig[S]
+	cfg           StatelessConfig[S]
 	encoder       wire.Encoder
 	clientHandler http.Handler
 	assetMounts   []assetMount
 	csrf          *http.CrossOriginProtection
 }
 
-func (p *pageHandler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (p *statelessHandler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if strings.HasPrefix(r.URL.Path, "/_tether/") {
 		http.StripPrefix("/_tether", p.clientHandler).ServeHTTP(w, r)
 		return
@@ -100,7 +100,7 @@ func (p *pageHandler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (p *pageHandler[S]) serveGET(w http.ResponseWriter, r *http.Request) {
+func (p *statelessHandler[S]) serveGET(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		if v := recover(); v != nil {
 			slog.Error("panic in page render", "panic", v, "path", r.URL.Path, "remote", r.RemoteAddr)
@@ -142,7 +142,7 @@ func (p *pageHandler[S]) serveGET(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (p *pageHandler[S]) servePOST(w http.ResponseWriter, r *http.Request) {
+func (p *statelessHandler[S]) servePOST(w http.ResponseWriter, r *http.Request) {
 	if err := p.csrf.Check(r); err != nil {
 		http.Error(w, "origin not allowed", http.StatusForbidden)
 		return

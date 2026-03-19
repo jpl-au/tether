@@ -20,7 +20,7 @@ import (
 // When the loop is not active (before startup, after destruction, or
 // while frozen), the state field is returned directly — no concurrent
 // mutations are possible.
-func (s *LiveSession[S]) State() S {
+func (s *StatefulSession[S]) State() S {
 	if Status(s.status.Load()) != Active {
 		return s.state
 	}
@@ -53,7 +53,7 @@ func (s *LiveSession[S]) State() S {
 // where the caller does not control Handle's return value.
 //
 // Safe to call from any goroutine, including from within Handle.
-func (s *LiveSession[S]) Update(fn func(S) S) {
+func (s *StatefulSession[S]) Update(fn func(S) S) {
 	s.enqueue(func() {
 		s.stateSnap.Store(s.state)
 		fx := &Effects{}
@@ -102,7 +102,7 @@ func (s *LiveSession[S]) Update(fn func(S) S) {
 // goroutine exits, which closes the events channel, which the loop
 // handles via onTransportClose. Safe to call from any goroutine;
 // safe to call more than once.
-func (s *LiveSession[S]) Close() {
+func (s *StatefulSession[S]) Close() {
 	s.enqueue(func() {
 		if s.transport != nil {
 			s.transport.Close()
@@ -113,14 +113,14 @@ func (s *LiveSession[S]) Close() {
 // Toast sends a global notification to the client. Inside Handle the
 // toast is buffered and sent atomically with the state diff. Outside
 // Handle it is sent as a standalone update.
-func (s *LiveSession[S]) Toast(text string) {
+func (s *StatefulSession[S]) Toast(text string) {
 	s.enqueueFx(func(fx *Effects) { fx.Toast = text })
 }
 
 // Navigate pushes a URL change to the client (history.pushState).
 // Inside Handle the URL is buffered; outside it is sent as a
 // standalone update.
-func (s *LiveSession[S]) Navigate(rawURL string) {
+func (s *StatefulSession[S]) Navigate(rawURL string) {
 	s.enqueueFx(func(fx *Effects) {
 		fx.URL = rawURL
 		fx.Replace = false
@@ -130,7 +130,7 @@ func (s *LiveSession[S]) Navigate(rawURL string) {
 // ReplaceURL updates the browser URL without a history entry
 // (history.replaceState). Inside Handle the URL is buffered; outside
 // it is sent as a standalone update.
-func (s *LiveSession[S]) ReplaceURL(rawURL string) {
+func (s *StatefulSession[S]) ReplaceURL(rawURL string) {
 	s.enqueueFx(func(fx *Effects) {
 		fx.URL = rawURL
 		fx.Replace = true
@@ -139,14 +139,14 @@ func (s *LiveSession[S]) ReplaceURL(rawURL string) {
 
 // SetTitle updates the browser's document title. Inside Handle the
 // title is buffered; outside it is sent as a standalone update.
-func (s *LiveSession[S]) SetTitle(title string) {
+func (s *StatefulSession[S]) SetTitle(title string) {
 	s.enqueueFx(func(fx *Effects) { fx.Title = title })
 }
 
 // Announce sends text to a screen-reader-accessible live region on
 // the client. Inside Handle the text is buffered; outside it is sent
 // as a standalone update.
-func (s *LiveSession[S]) Announce(text string) {
+func (s *StatefulSession[S]) Announce(text string) {
 	s.enqueueFx(func(fx *Effects) { fx.Announce = text })
 }
 
@@ -154,7 +154,7 @@ func (s *LiveSession[S]) Announce(text string) {
 // a CSS selector for the target element; the text is displayed for 5
 // seconds. Inside Handle the flash is buffered; outside it is sent
 // as a standalone update.
-func (s *LiveSession[S]) Flash(selector, text string) {
+func (s *StatefulSession[S]) Flash(selector, text string) {
 	s.enqueueFx(func(fx *Effects) {
 		if fx.Flash == nil {
 			fx.Flash = make(map[string]string)
@@ -175,7 +175,7 @@ func (s *LiveSession[S]) Flash(selector, text string) {
 //
 //	s.Signal("count", 42)
 //	s.Signal("status", "online")
-func (s *LiveSession[S]) Signal(key string, value any) {
+func (s *StatefulSession[S]) Signal(key string, value any) {
 	s.enqueueFx(func(fx *Effects) {
 		if fx.Signals == nil {
 			fx.Signals = make(map[string]any)
@@ -191,7 +191,7 @@ func (s *LiveSession[S]) Signal(key string, value any) {
 // Outside Handle a single update is sent with all keys.
 //
 //	s.Signals(map[string]any{"count": 42, "status": "online"})
-func (s *LiveSession[S]) Signals(signals map[string]any) {
+func (s *StatefulSession[S]) Signals(signals map[string]any) {
 	s.enqueueFx(func(fx *Effects) {
 		if fx.Signals == nil {
 			fx.Signals = make(map[string]any, len(signals))
@@ -207,7 +207,7 @@ func (s *LiveSession[S]) Signals(signals map[string]any) {
 // Safe to call from any goroutine — pushSender is immutable and
 // pushSub is an atomic pointer, so no command-channel round-trip is
 // needed.
-func (s *LiveSession[S]) Push(n push.Notification) error {
+func (s *StatefulSession[S]) Push(n push.Notification) error {
 	if s.pushSender == nil {
 		return ErrPushNotConfigured
 	}

@@ -80,7 +80,7 @@ func TestCrossOriginProtectionSameHostFallback(t *testing.T) {
 func TestWSOriginAllowedSecFetchSite(t *testing.T) {
 	h := &Handler[counterState]{
 		app: App{},
-		cfg: LiveConfig[counterState]{},
+		cfg: StatefulConfig[counterState]{},
 	}
 
 	tests := []struct {
@@ -117,7 +117,7 @@ func TestWSOriginAllowedSecFetchSiteTrusted(t *testing.T) {
 		app: App{Security: Security{
 			TrustedOrigins: []string{"https://trusted.com"},
 		}},
-		cfg: LiveConfig[counterState]{},
+		cfg: StatefulConfig[counterState]{},
 	}
 
 	r := &http.Request{Method: "GET", Header: http.Header{}, Host: "example.com"}
@@ -145,7 +145,7 @@ func TestWSOriginAllowedWithTrustedOrigins(t *testing.T) {
 		app: App{Security: Security{
 			TrustedOrigins: []string{"https://example.com", "https://staging.example.com"},
 		}},
-		cfg: LiveConfig[counterState]{},
+		cfg: StatefulConfig[counterState]{},
 	}
 
 	tests := []struct {
@@ -179,7 +179,7 @@ func TestWSOriginAllowedWithTrustedOrigins(t *testing.T) {
 func TestWSOriginAllowedHostFallback(t *testing.T) {
 	h := &Handler[counterState]{
 		app: App{},
-		cfg: LiveConfig[counterState]{},
+		cfg: StatefulConfig[counterState]{},
 	}
 
 	tests := []struct {

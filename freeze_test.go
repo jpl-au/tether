@@ -186,7 +186,7 @@ func TestNoFreezeWithoutStore(t *testing.T) {
 		sess := newTestSession(counterState{Count: 0}, mt)
 		// freeze is true but no sessionStore — simulates the config
 		// validation catching this at startup.
-		sess.freeze = false // would have been disabled by Live()
+		sess.freeze = false // would have been disabled by Stateful()
 
 		go sess.readTransport(sess.events)
 		go sess.run()

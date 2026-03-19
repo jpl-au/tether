@@ -12,7 +12,7 @@ import (
 // implementations. It is unexported so developers never need to know it
 // exists — they pass the Session they already have.
 //
-// [*LiveSession] satisfies emitter via its command-loop enqueue.
+// [*StatefulSession] satisfies emitter via its command-loop enqueue.
 // [*CaptureSession] satisfies emitter with synchronous enqueue —
 // the function runs immediately in the caller's goroutine.
 type emitter interface {
@@ -62,7 +62,7 @@ func NewBus[E any]() *Bus[E] {
 // are skipped — the sender's Handle already updated its own state.
 //
 // Behaviour varies by context:
-//   - Live session ([*LiveSession]): the publication is enqueued on the
+//   - Stateful session ([*StatefulSession]): the publication is enqueued on the
 //     session's command loop. This preserves ordering — the sender's
 //     diff reaches the client before other subscribers react.
 //   - Pre-warm or test ([*CaptureSession]): synchronous publish.
