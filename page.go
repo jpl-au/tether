@@ -60,7 +60,7 @@ func Page[S any](app App, cfg PageConfig[S]) http.Handler {
 	return &pageHandler[S]{
 		app:           app,
 		cfg:           cfg,
-		encoder:       wire.JSONEncoder{},
+		encoder:       resolveEncoder(0),
 		clientHandler: app.jsHandler(),
 		assetMounts:   app.mountAssets(),
 		csrf:          csrf,
