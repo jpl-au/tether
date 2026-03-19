@@ -177,6 +177,9 @@ func handlerAttrs[S any](app App, cfg LiveConfig[S]) []any {
 	if len(cfg.Middleware) > 0 {
 		args = append(args, "middleware", middlewareNames(cfg.Middleware))
 	}
+	if app.DevMode {
+		args = append(args, "dev", true)
+	}
 	return args
 }
 
