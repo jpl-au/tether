@@ -2,7 +2,6 @@ package tether
 
 import (
 	"log/slog"
-	"net/http"
 	"os"
 	"reflect"
 	"runtime"
@@ -56,12 +55,6 @@ func Live[S any](app App, cfg LiveConfig[S]) *Handler[S] {
 	if cfg.Mode != mode.WebSocket && cfg.Fallback == nil {
 		panic("tether: LiveConfig.Fallback is required — use sse.Upgrade() or set Mode to mode.WebSocket")
 	}
-	for _, o := range app.Security.TrustedOrigins {
-		if o == "" {
-			panic("tether: Security.TrustedOrigins contains an empty string — remove it or provide a valid origin like \"https://example.com\"")
-		}
-	}
-
 	// Compose OnNavigate into Handle so the middleware chain applies
 	// to navigate events. Without this, navigate events bypass
 	// middleware entirely because exec dispatches them directly.
@@ -139,13 +132,7 @@ func Live[S any](app App, cfg LiveConfig[S]) *Handler[S] {
 		cfg.FreezeOnDisconnect = false
 	}
 	mounts := buildAssetMounts(app.Assets)
-
-	csrf := http.NewCrossOriginProtection()
-	for _, origin := range app.Security.TrustedOrigins {
-		if err := csrf.AddTrustedOrigin(origin); err != nil {
-			panic("tether: invalid TrustedOrigins entry " + origin + ": " + err.Error())
-		}
-	}
+	csrf := app.Security.csrf()
 
 	h := &Handler[S]{
 		app:           app,

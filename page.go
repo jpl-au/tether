@@ -55,12 +55,7 @@ func Page[S any](app App, cfg PageConfig[S]) http.Handler {
 	}
 	app.Client.applyDefaults()
 
-	csrf := http.NewCrossOriginProtection()
-	for _, origin := range app.Security.TrustedOrigins {
-		if err := csrf.AddTrustedOrigin(origin); err != nil {
-			panic("tether: invalid TrustedOrigins entry " + origin + ": " + err.Error())
-		}
-	}
+	csrf := app.Security.csrf()
 
 	return &pageHandler[S]{
 		app:           app,
