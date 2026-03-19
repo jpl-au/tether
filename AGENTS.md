@@ -43,7 +43,7 @@ tether/              Root package — StatefulConfig, Handler, Session, Bus, Gro
 
 `StatefulConfig[S]` wires everything together: `InitialState`, `Render`, `Handle`,
 transport upgraders, middleware, lifecycle callbacks, timeouts, and limits.
-`Stateful(cfg)` returns a `*Handler[S]` which is an `http.Handler`.
+`Stateful(app, cfg)` returns a `*Handler[S]` which is an `http.Handler`.
 
 Required fields: `InitialState`, `Render`, `Handle`, and at least one of
 `Upgrade` or `Fallback` (depending on `Mode`).
@@ -82,7 +82,7 @@ Navigation context passed to `StatefulConfig.OnNavigate` and
 `router.OnNavigate`. Carries `Path` (URL path) and `Query`
 (`url.Values`). Provides typed extraction helpers that mirror `Event`'s
 API for consistency — `Get`, `Int`, `Float64`, `Bool`. Also provides
-soft getters — `IntOr`, `Float64Or`, `BoolOr` — that return a default
+soft getters — `IntDefault`, `Float64Default`, `BoolDefault` — that return a default
 when the key is missing or the value is malformed, which is the common
 case for optional URL parameters. Multi-value helpers — `Strings`,
 `Ints`, `Float64s` — handle repeated query keys. Defined in
@@ -312,7 +312,7 @@ renders (keys added, removed, or reordered).
 
 ## Stateless pages
 
-`tether.Stateless(StatelessConfig[S])` creates an `http.Handler` for pages without
+`tether.Stateless(app, StatelessConfig[S])` creates an `http.Handler` for pages without
 persistent connections. GET renders HTML, POST handles an event and returns
 a JSON update. Same wire format as stateful mode. Same `Handle` signature. No
 session pool, no command loop, no goroutines.
