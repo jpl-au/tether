@@ -111,17 +111,18 @@ func buildWorkerJS(assets []*Asset) []byte {
 // When the tether handler IS mounted at "/" the client runtime is
 // served automatically and this function is not needed.
 func ServeClient() http.Handler {
-	return newClientHandler(nil)
+	a := &App{}
+	return a.jsHandler()
 }
 
-// newClientHandler builds an http.Handler that serves the embedded
+// jsHandler builds an http.Handler that serves the embedded
 // client runtime. The Handler mounts this at /_tether/ so the HTML page
 // can load tether.js and idiomorph. The service worker script
 // gets special treatment: its CACHE_VERSION is set to a content hash
 // of the embedded files, and a Service-Worker-Allowed header permits
 // the client to register the worker at any scope (the client scopes
 // to the handler's endpoint via data-tether-endpoint).
-func newClientHandler(assets []*Asset) http.Handler {
+func (app *App) jsHandler() http.Handler {
 	fileServer := http.FileServer(http.FS(clientFiles()))
 
 	var workerOnce sync.Once
@@ -135,7 +136,7 @@ func newClientHandler(assets []*Asset) http.Handler {
 		// rather than through the static file server.
 		if r.URL.Path == "/tether-worker.js" || r.URL.Path == "tether-worker.js" {
 			workerOnce.Do(func() {
-				workerBody = buildWorkerJS(assets)
+				workerBody = buildWorkerJS(app.Assets)
 			})
 			w.Header().Set("Service-Worker-Allowed", "/")
 			w.Header().Set("Content-Type", "application/javascript")

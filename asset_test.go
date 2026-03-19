@@ -300,7 +300,8 @@ func TestMultipleAssets(t *testing.T) {
 
 func TestAssetChangesWorkerVersion(t *testing.T) {
 	workerBody := func(assets []*Asset) string {
-		h := newClientHandler(assets)
+		a := &App{Assets: assets}
+		h := a.jsHandler()
 		req := httptest.NewRequest("GET", "/tether-worker.js", nil)
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, req)

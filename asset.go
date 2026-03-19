@@ -152,12 +152,12 @@ func (a *Asset) precacheURLs() []string {
 	return urls
 }
 
-// buildAssetMounts creates an [assetMount] for each [Asset], wrapping
+// mountAssets creates an [assetMount] for each [Asset], wrapping
 // the file server with cache headers that respect [dev.Enabled] at
 // request time.
-func buildAssetMounts(assets []*Asset) []assetMount {
-	mounts := make([]assetMount, len(assets))
-	for i, a := range assets {
+func (app *App) mountAssets() []assetMount {
+	mounts := make([]assetMount, len(app.Assets))
+	for i, a := range app.Assets {
 		a.init()
 		handler := http.StripPrefix(a.prefix, a.handler)
 		handler = cacheHandler(handler)

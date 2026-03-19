@@ -131,7 +131,7 @@ func Live[S any](app App, cfg LiveConfig[S]) *Handler[S] {
 		slog.Warn("tether: FreezeOnDisconnect requires a SessionStore — frozen mode disabled because there is nowhere to persist state")
 		cfg.FreezeOnDisconnect = false
 	}
-	mounts := buildAssetMounts(app.Assets)
+	mounts := app.mountAssets()
 	csrf := app.Security.csrf()
 
 	h := &Handler[S]{
@@ -142,7 +142,7 @@ func Live[S any](app App, cfg LiveConfig[S]) *Handler[S] {
 		disconnected:  make(map[string]*LiveSession[S]),
 		done:          make(chan struct{}),
 		encoder:       resolveEncoder(cfg.WireFormat),
-		clientHandler: newClientHandler(app.Assets),
+		clientHandler: app.jsHandler(),
 		assetMounts:   mounts,
 		csrf:          csrf,
 		Diagnostics:   NewBus[Diagnostic](),
