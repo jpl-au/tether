@@ -80,9 +80,7 @@ func Live[S any](app App, cfg LiveConfig[S]) *Handler[S] {
 		cfg.Handle = Chain(cfg.Handle, cfg.Middleware)
 	}
 
-	if !app.DevMode && os.Getenv("TETHER_DEV") != "" {
-		app.DevMode = true
-	}
+	setupLogging(&app)
 	if cfg.Protocol == 0 {
 		switch os.Getenv("TETHER_PROTO") {
 		case "HTTP1":
@@ -98,18 +96,6 @@ func Live[S any](app App, cfg LiveConfig[S]) *Handler[S] {
 				"value", os.Getenv("TETHER_PROTO"))
 			cfg.Protocol = protocol.Auto
 		}
-	}
-	if app.Logger == nil {
-		level := slog.LevelInfo
-		if app.DevMode {
-			level = slog.LevelDebug
-		}
-		opts := &slog.HandlerOptions{Level: level}
-		app.Logger = slog.New(slog.NewTextHandler(os.Stderr, opts))
-		setDefaultLogger(app.Logger)
-	}
-	if app.DevMode {
-		dev.Enable()
 	}
 	if cfg.Timeouts.Reconnect == 0 {
 		cfg.Timeouts.Reconnect = defaultReconnectTimeout

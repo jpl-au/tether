@@ -5,7 +5,6 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/jpl-au/tether/dev"
@@ -33,21 +32,7 @@ func Page[S any](app App, cfg PageConfig[S]) http.Handler {
 		panic("tether: PageConfig.Handle is required")
 	}
 
-	if !app.DevMode && os.Getenv("TETHER_DEV") != "" {
-		app.DevMode = true
-	}
-	if app.Logger == nil {
-		level := slog.LevelInfo
-		if app.DevMode {
-			level = slog.LevelDebug
-		}
-		opts := &slog.HandlerOptions{Level: level}
-		app.Logger = slog.New(slog.NewTextHandler(os.Stderr, opts))
-		setDefaultLogger(app.Logger)
-	}
-	if app.DevMode {
-		dev.Enable()
-	}
+	setupLogging(&app)
 
 	if len(cfg.Middleware) > 0 {
 		cfg.Handle = Chain(cfg.Handle, cfg.Middleware)

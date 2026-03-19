@@ -1,21 +1,6 @@
 package tether
 
-import (
-	"log/slog"
-	"sync"
-	"time"
-)
-
-// loggerOnce ensures the process-wide slog default is set only once.
-// The first handler created without an explicit Logger configures the
-// global; subsequent handlers leave it alone.
-var loggerOnce sync.Once
-
-// setDefaultLogger sets the process-wide slog default, but only on
-// the first call. Safe to call from multiple goroutines.
-func setDefaultLogger(l *slog.Logger) {
-	loggerOnce.Do(func() { slog.SetDefault(l) })
-}
+import "time"
 
 // Timeouts groups duration-based settings for session lifecycle,
 // reconnection, and transport keep-alive.
