@@ -7,7 +7,6 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/jpl-au/tether/dev"
 	"github.com/jpl-au/tether/event"
 	"github.com/jpl-au/tether/mode"
 	"github.com/jpl-au/tether/protocol"
@@ -151,10 +150,6 @@ func Live[S any](app App, cfg LiveConfig[S]) *Handler[S] {
 	go h.reapPending()
 
 	app.Logger.Info("tether: ready", handlerAttrs(app, cfg)...)
-
-	if app.DevMode && (cfg.Mode == mode.ServerSentEvents || cfg.Mode == mode.Both) {
-		dev.Debug("SSE compression is handled by the reverse proxy (nginx, Caddy, Cloudflare) — tether does not compress SSE streams")
-	}
 
 	return h
 }
