@@ -142,7 +142,7 @@ func (r *Router[S]) loadNotFound() Page[S] {
 //	r.OnNavigate(func(s *State, p tether.Params) {
 //	    s.Page   = p.Path
 //	    s.Filter = p.Get("f")
-//	    s.Limit  = p.IntOr("limit", 20)
+//	    s.Limit  = p.IntDefault("limit", 20)
 //	})
 func (r *Router[S]) OnNavigate(setter func(*S, tether.Params)) func(tether.Session, S, tether.Params) S {
 	return func(_ tether.Session, s S, p tether.Params) S {

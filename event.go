@@ -16,7 +16,7 @@ import (
 // submits); Params represents URL navigation context (path and query
 // string). Both share a similar helper API (Get, Int, Float64, Bool)
 // so developers learn one extraction pattern. Params additionally has
-// soft getters (IntOr, BoolOr, Float64Or) because URL parameters are
+// soft getters (IntDefault, BoolDefault, Float64Default) because URL parameters are
 // user-supplied and routinely absent, whereas event data is developer-
 // controlled wire protocol where absence signals a bug. Params lives
 // in params.go.

@@ -9,7 +9,7 @@
 // by the tether handler.
 //
 // Wire up by passing sse.Upgrade() as the Fallback (or Upgrade) field
-// in [tether.LiveConfig] and setting Mode to [mode.ServerSentEvents] or
+// in [tether.StatefulConfig] and setting Mode to [mode.ServerSentEvents] or
 // [mode.Both].
 package sse
 
@@ -28,7 +28,7 @@ import (
 // Allocated once and shared across all transports — read-only.
 var heartbeatMsg = []byte(": heartbeat\n\n")
 
-// Upgrade returns an upgrade function for use in [tether.LiveConfig].Fallback
+// Upgrade returns an upgrade function for use in [tether.StatefulConfig].Fallback
 // (or Upgrade when Mode is mode.ServerSentEvents). When the tether handler receives a
 // GET with Accept: text/event-stream, it calls this function to
 // establish the SSE stream. The stream stays open for the lifetime of

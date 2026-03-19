@@ -1,7 +1,7 @@
 // Package protocol selects the HTTP protocol the server uses.
-// Pass one of the constants to [tether.LiveConfig].Protocol.
+// Pass one of the constants to [tether.StatefulConfig].Protocol.
 //
-//	tether.Live(tether.LiveConfig[State]{
+//	tether.Stateful(app, tether.StatefulConfig[State]{
 //	    Protocol: protocol.HTTP2,
 //	    // ...
 //	})
