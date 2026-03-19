@@ -23,6 +23,7 @@ func newRestoreHandler(store SessionStore, opts ...func(*LiveConfig[counterState
 		opt(&cfg)
 	}
 	h := &Handler[counterState]{
+		app:          App{},
 		cfg:          cfg,
 		pending:      make(map[string]*pendingSession[counterState]),
 		active:       make(map[string]*LiveSession[counterState]),

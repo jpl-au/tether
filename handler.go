@@ -33,6 +33,7 @@ const defaultPendingTimeout = 30 * time.Second
 // The handler also serves the embedded client runtime at /_tether/ — there
 // is no need to mount a separate file server for the JS assets.
 type Handler[S any] struct {
+	app          App
 	cfg          LiveConfig[S]
 	mu           sync.Mutex
 	pending      map[string]*pendingSession[S]

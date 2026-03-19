@@ -149,13 +149,12 @@ func TestAssetAutoMount(t *testing.T) {
 		Prefix: "/static/",
 	}
 
-	handler := Live(LiveConfig[counterState]{
+	handler := Live(App{Assets: []*Asset{assets}}, LiveConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
 		Handle:       handleCounter,
-		Assets:       []*Asset{assets},
 	})
 
 	req := httptest.NewRequest("GET", "/static/styles.css", nil)
@@ -178,11 +177,10 @@ func TestAssetAutoMountPage(t *testing.T) {
 		Prefix: "/assets/",
 	}
 
-	handler := Page(PageConfig[counterState]{
+	handler := Page(App{Assets: []*Asset{assets}}, PageConfig[counterState]{
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
 		Handle:       func(_ Session, s counterState, _ Event) counterState { return s },
-		Assets:       []*Asset{assets},
 	})
 
 	req := httptest.NewRequest("GET", "/assets/app.js", nil)
@@ -205,13 +203,12 @@ func TestAssetCacheHeadersProduction(t *testing.T) {
 		Prefix: "/static/",
 	}
 
-	handler := Live(LiveConfig[counterState]{
+	handler := Live(App{Assets: []*Asset{assets}}, LiveConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
 		Handle:       handleCounter,
-		Assets:       []*Asset{assets},
 	})
 
 	// Request with ?v= hash should get immutable cache headers.
@@ -238,14 +235,12 @@ func TestAssetCacheHeadersDevMode(t *testing.T) {
 		Prefix: "/static/",
 	}
 
-	handler := Live(LiveConfig[counterState]{
+	handler := Live(App{DevMode: true, Assets: []*Asset{assets}}, LiveConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
 		Handle:       handleCounter,
-		Assets:       []*Asset{assets},
-		DevMode:      true,
 	})
 
 	req := httptest.NewRequest("GET", "/static/styles.css", nil)
@@ -274,13 +269,12 @@ func TestMultipleAssets(t *testing.T) {
 		Prefix: "/js/",
 	}
 
-	handler := Live(LiveConfig[counterState]{
+	handler := Live(App{Assets: []*Asset{css, js}}, LiveConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
 		Handle:       handleCounter,
-		Assets:       []*Asset{css, js},
 	})
 
 	// Both prefixes should be served.

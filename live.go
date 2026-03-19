@@ -34,7 +34,7 @@ import (
 //
 // Call [Handler.Shutdown] to cancel all sessions before the process
 // exits.
-func Live[S any](cfg LiveConfig[S]) *Handler[S] {
+func Live[S any](app App, cfg LiveConfig[S]) *Handler[S] {
 	if cfg.InitialState == nil {
 		panic("tether: LiveConfig.InitialState is required")
 	}
@@ -56,7 +56,7 @@ func Live[S any](cfg LiveConfig[S]) *Handler[S] {
 	if cfg.Mode != mode.WebSocket && cfg.Fallback == nil {
 		panic("tether: LiveConfig.Fallback is required — use sse.Upgrade() or set Mode to mode.WebSocket")
 	}
-	for _, o := range cfg.Security.TrustedOrigins {
+	for _, o := range app.Security.TrustedOrigins {
 		if o == "" {
 			panic("tether: Security.TrustedOrigins contains an empty string — remove it or provide a valid origin like \"https://example.com\"")
 		}
@@ -80,8 +80,8 @@ func Live[S any](cfg LiveConfig[S]) *Handler[S] {
 		cfg.Handle = Chain(cfg.Handle, cfg.Middleware)
 	}
 
-	if !cfg.DevMode && os.Getenv("TETHER_DEV") != "" {
-		cfg.DevMode = true
+	if !app.DevMode && os.Getenv("TETHER_DEV") != "" {
+		app.DevMode = true
 	}
 	if cfg.Protocol == 0 {
 		switch os.Getenv("TETHER_PROTO") {
@@ -99,23 +99,16 @@ func Live[S any](cfg LiveConfig[S]) *Handler[S] {
 			cfg.Protocol = protocol.Auto
 		}
 	}
-	if cfg.Logger == nil {
+	if app.Logger == nil {
 		level := slog.LevelInfo
-		if cfg.DevMode {
+		if app.DevMode {
 			level = slog.LevelDebug
 		}
 		opts := &slog.HandlerOptions{Level: level}
-		if cfg.LogJSON {
-			cfg.Logger = slog.New(slog.NewJSONHandler(os.Stderr, opts))
-		} else {
-			cfg.Logger = slog.New(slog.NewTextHandler(os.Stderr, opts))
-		}
-		// Set the process default once. The first handler without an
-		// explicit Logger configures the global; subsequent handlers
-		// create their own logger but leave the default alone.
-		setDefaultLogger(cfg.Logger)
+		app.Logger = slog.New(slog.NewTextHandler(os.Stderr, opts))
+		setDefaultLogger(app.Logger)
 	}
-	if cfg.DevMode {
+	if app.DevMode {
 		dev.Enable()
 	}
 	if cfg.Timeouts.Reconnect == 0 {
@@ -142,20 +135,20 @@ func Live[S any](cfg LiveConfig[S]) *Handler[S] {
 	if cfg.Timeouts.MaxRetry == 0 {
 		cfg.Timeouts.MaxRetry = defaultMaxRetryDelay
 	}
-	if cfg.Client.DefaultDebounce == 0 {
-		cfg.Client.DefaultDebounce = defaultDefaultDebounce
+	if app.Client.DefaultDebounce == 0 {
+		app.Client.DefaultDebounce = defaultDefaultDebounce
 	}
-	if cfg.Client.TransitionTimeout == 0 {
-		cfg.Client.TransitionTimeout = defaultTransitionTimeout
+	if app.Client.TransitionTimeout == 0 {
+		app.Client.TransitionTimeout = defaultTransitionTimeout
 	}
-	if cfg.Client.FlashDuration == 0 {
-		cfg.Client.FlashDuration = defaultFlashDuration
+	if app.Client.FlashDuration == 0 {
+		app.Client.FlashDuration = defaultFlashDuration
 	}
-	if cfg.Client.ToastDuration == 0 {
-		cfg.Client.ToastDuration = defaultToastDuration
+	if app.Client.ToastDuration == 0 {
+		app.Client.ToastDuration = defaultToastDuration
 	}
-	if cfg.Client.SyncRetention == 0 {
-		cfg.Client.SyncRetention = defaultSyncRetention
+	if app.Client.SyncRetention == 0 {
+		app.Client.SyncRetention = defaultSyncRetention
 	}
 	if cfg.Timeouts.Heartbeat == 0 {
 		cfg.Timeouts.Heartbeat = defaultHeartbeatInterval
@@ -170,23 +163,24 @@ func Live[S any](cfg LiveConfig[S]) *Handler[S] {
 		slog.Warn("tether: FreezeOnDisconnect requires a SessionStore — frozen mode disabled because there is nowhere to persist state")
 		cfg.FreezeOnDisconnect = false
 	}
-	mounts := buildAssetMounts(cfg.Assets)
+	mounts := buildAssetMounts(app.Assets)
 
 	csrf := http.NewCrossOriginProtection()
-	for _, origin := range cfg.Security.TrustedOrigins {
+	for _, origin := range app.Security.TrustedOrigins {
 		if err := csrf.AddTrustedOrigin(origin); err != nil {
 			panic("tether: invalid TrustedOrigins entry " + origin + ": " + err.Error())
 		}
 	}
 
 	h := &Handler[S]{
+		app:           app,
 		cfg:           cfg,
 		pending:       make(map[string]*pendingSession[S]),
 		active:        make(map[string]*LiveSession[S]),
 		disconnected:  make(map[string]*LiveSession[S]),
 		done:          make(chan struct{}),
 		encoder:       resolveEncoder(cfg.WireFormat),
-		clientHandler: newClientHandler(cfg.Assets),
+		clientHandler: newClientHandler(app.Assets),
 		assetMounts:   mounts,
 		csrf:          csrf,
 		Diagnostics:   NewBus[Diagnostic](),
@@ -194,9 +188,9 @@ func Live[S any](cfg LiveConfig[S]) *Handler[S] {
 
 	go h.reapPending()
 
-	cfg.Logger.Info("tether: ready", handlerAttrs(cfg)...)
+	app.Logger.Info("tether: ready", handlerAttrs(app, cfg)...)
 
-	if cfg.DevMode && (cfg.Mode == mode.ServerSentEvents || cfg.Mode == mode.Both) {
+	if app.DevMode && (cfg.Mode == mode.ServerSentEvents || cfg.Mode == mode.Both) {
 		dev.Debug("SSE compression is handled by the reverse proxy (nginx, Caddy, Cloudflare) — tether does not compress SSE streams")
 	}
 
@@ -215,7 +209,7 @@ func resolveEncoder(f wire.Format) wire.Encoder {
 // handlerAttrs builds the slog attribute list for the "tether: ready"
 // startup log. Transport is always present; name, worker, middleware,
 // and dev are included only when set, to keep the line uncluttered.
-func handlerAttrs[S any](cfg LiveConfig[S]) []any {
+func handlerAttrs[S any](app App, cfg LiveConfig[S]) []any {
 	args := []any{"transport", transportLabel(cfg.Mode), "protocol", cfg.Protocol.String()}
 	if cfg.Name != "" {
 		args = append(args, "name", cfg.Name)
@@ -226,7 +220,7 @@ func handlerAttrs[S any](cfg LiveConfig[S]) []any {
 	if len(cfg.Middleware) > 0 {
 		args = append(args, "middleware", middlewareNames(cfg.Middleware))
 	}
-	if cfg.DevMode {
+	if app.DevMode {
 		args = append(args, "dev", true)
 	}
 	return args

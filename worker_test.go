@@ -89,13 +89,12 @@ func TestClientPrecache(t *testing.T) {
 		Precache: []string{"styles.css", "logo.svg"},
 	}
 
-	handler := Live(LiveConfig[counterState]{
+	handler := Live(App{Assets: []*Asset{assets}}, LiveConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
 		Handle:       handleCounter,
-		Assets:       []*Asset{assets},
 	})
 
 	req := httptest.NewRequest("GET", "/_tether/tether-worker.js", nil)
@@ -286,7 +285,7 @@ func TestHandlePushSubscribe(t *testing.T) {
 	}
 	ch := make(chan result, 1)
 
-	handler := Live(LiveConfig[counterState]{
+	handler := Live(App{}, LiveConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -353,7 +352,7 @@ func TestHandlePushSubscribe(t *testing.T) {
 }
 
 func TestHandlePushSubscribeNoPush(t *testing.T) {
-	handler := Live(LiveConfig[counterState]{
+	handler := Live(App{}, LiveConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -374,7 +373,7 @@ func TestHandlePushSubscribeNoPush(t *testing.T) {
 }
 
 func TestHandlePushSubscribeMissingSession(t *testing.T) {
-	handler := Live(LiveConfig[counterState]{
+	handler := Live(App{}, LiveConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -399,7 +398,7 @@ func TestHandlePushSubscribeMissingSession(t *testing.T) {
 }
 
 func TestHandlePushSubscribeUnknownSession(t *testing.T) {
-	handler := Live(LiveConfig[counterState]{
+	handler := Live(App{}, LiveConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -464,7 +463,7 @@ func TestDevModeEnvVar(t *testing.T) {
 	t.Setenv("TETHER_DEV", "1")
 	t.Cleanup(dev.Reset)
 
-	Live(LiveConfig[counterState]{
+	Live(App{}, LiveConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -481,13 +480,12 @@ func TestDevModeBoolOverridesEnv(t *testing.T) {
 	t.Setenv("TETHER_DEV", "")
 	t.Cleanup(dev.Reset)
 
-	Live(LiveConfig[counterState]{
+	Live(App{DevMode: true}, LiveConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
 		Handle:       handleCounter,
-		DevMode:      true,
 	})
 
 	if !dev.Enabled() {
@@ -498,13 +496,12 @@ func TestDevModeBoolOverridesEnv(t *testing.T) {
 func TestDevModeCacheControl(t *testing.T) {
 	t.Cleanup(dev.Reset)
 
-	handler := Live(LiveConfig[counterState]{
+	handler := Live(App{DevMode: true}, LiveConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
 		Handle:       handleCounter,
-		DevMode:      true,
 	})
 
 	req := httptest.NewRequest("GET", "/app", nil)
@@ -517,7 +514,7 @@ func TestDevModeCacheControl(t *testing.T) {
 }
 
 func TestDevModeNoCacheControlInProduction(t *testing.T) {
-	handler := Live(LiveConfig[counterState]{
+	handler := Live(App{}, LiveConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -537,13 +534,12 @@ func TestDevModeNoCacheControlInProduction(t *testing.T) {
 func TestDevModeInitialPageHasAttribute(t *testing.T) {
 	t.Cleanup(dev.Reset)
 
-	handler := Live(LiveConfig[counterState]{
+	handler := Live(App{DevMode: true}, LiveConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
 		Handle:       handleCounter,
-		DevMode:      true,
 	})
 
 	req := httptest.NewRequest("GET", "/app", nil)
@@ -557,7 +553,7 @@ func TestDevModeInitialPageHasAttribute(t *testing.T) {
 
 // newTestHandler creates a Handler with default test configuration.
 func newTestHandler() *Handler[counterState] {
-	return Live(LiveConfig[counterState]{
+	return Live(App{}, LiveConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },

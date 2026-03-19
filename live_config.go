@@ -2,7 +2,6 @@ package tether
 
 import (
 	"context"
-	"log/slog"
 	"net/http"
 
 	"github.com/jpl-au/fluent/node"
@@ -173,15 +172,6 @@ type LiveConfig[S any] struct {
 	// lines and any other structured log output that includes it. Optional.
 	Name string
 
-	// Logger used for framework log output. When nil, the framework
-	// creates a text (or JSON, see LogJSON) handler at INFO level
-	// (DEBUG in DevMode) and sets it as the process-wide slog default.
-	// The default is set only once — the first handler without an
-	// explicit Logger configures it; subsequent handlers leave it
-	// alone. When provided, the framework uses it for this handler
-	// without touching the global default.
-	Logger *slog.Logger
-
 	// Worker enables the full service worker for asset caching, offline
 	// page shells, and background sync. When true, the client JS
 	// registers /_tether/tether-worker.js as a service worker with
@@ -190,27 +180,6 @@ type LiveConfig[S any] struct {
 	// events without intercepting fetch requests or caching. Default
 	// false.
 	Worker bool
-
-	// DevMode enables development conveniences: service workers are
-	// unregistered (so assets are always fresh), the page reloads
-	// automatically when the server comes back after a restart, debug
-	// logging is enabled by default, and Cache-Control: no-store is
-	// set on all responses. Enable via this field or set the TETHER_DEV
-	// environment variable to any non-empty value.
-	DevMode bool
-
-	// LogJSON selects JSON output for the default logger instead of
-	// text. Only applies when Logger is nil — if you provide your own
-	// Logger, this field is ignored.
-	LogJSON bool
-
-	// Assets lists embedded asset collections to auto-serve. Each
-	// [Asset] provides content-hashed
-	// URLs for cache-busting. Assets are served at their configured
-	// prefix (default "/assets/") with appropriate cache headers —
-	// immutable in production, no-store in DevMode. Precache entries
-	// are automatically injected into the service worker. Optional.
-	Assets []*Asset
 
 	// Upload enables file upload support. When set, the handler accepts
 	// multipart POST requests from the upload extension JS and delivers
@@ -256,10 +225,6 @@ type LiveConfig[S any] struct {
 	// Limits groups capacity constraints: session counts, channel
 	// buffer sizes, and request body limits.
 	Limits Limits
-
-	// Client groups settings that are passed to the browser as data
-	// attributes on the tether root element.
-	Client Client
 
 	// WireFormat selects the encoding for server-to-client updates.
 	// Defaults to [wire.JSON]. Currently the only supported format;
@@ -318,9 +283,6 @@ type LiveConfig[S any] struct {
 	// nil and FreezeOnDisconnect is true, the framework logs a
 	// warning at startup and disables freeze.
 	FreezeOnDisconnect bool
-
-	// Security groups origin-checking and CSRF protection settings.
-	Security Security
 }
 
 // PushConfig enables Web Push notifications for the page. The VAPID

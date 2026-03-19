@@ -34,7 +34,7 @@ func pageHandleCounter(sess Session, state counterState, ev Event) counterState 
 }
 
 func newTestPageHandler() http.Handler {
-	return Page(PageConfig[counterState]{
+	return Page(App{}, PageConfig[counterState]{
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
 		Handle:       pageHandleCounter,
@@ -92,7 +92,7 @@ func TestPageGETNoRetryDelayAttributes(t *testing.T) {
 }
 
 func TestPageGETWithOnNavigate(t *testing.T) {
-	handler := Page(PageConfig[counterState]{
+	handler := Page(App{}, PageConfig[counterState]{
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
 		Handle:       pageHandleCounter,
@@ -116,11 +116,10 @@ func TestPageGETWithOnNavigate(t *testing.T) {
 func TestPageGETDevMode(t *testing.T) {
 	t.Cleanup(dev.Reset)
 
-	handler := Page(PageConfig[counterState]{
+	handler := Page(App{DevMode: true}, PageConfig[counterState]{
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
 		Handle:       pageHandleCounter,
-		DevMode:      true,
 	})
 
 	req := httptest.NewRequest("GET", "/app", nil)
@@ -300,7 +299,7 @@ func TestPagePOSTPanicRecovery(t *testing.T) {
 }
 
 func TestPageGETPanicRecovery(t *testing.T) {
-	handler := Page(PageConfig[counterState]{
+	handler := Page(App{}, PageConfig[counterState]{
 		InitialState: func(r *http.Request) counterState { panic("render panic") },
 		Render:       renderCounter,
 		Handle:       pageHandleCounter,
@@ -336,7 +335,7 @@ func TestPagePanicsOnMissingState(t *testing.T) {
 			t.Error("expected panic for missing State")
 		}
 	}()
-	Page(PageConfig[counterState]{
+	Page(App{}, PageConfig[counterState]{
 		Render: renderCounter,
 		Handle: pageHandleCounter,
 	})
@@ -348,7 +347,7 @@ func TestPagePanicsOnMissingRender(t *testing.T) {
 			t.Error("expected panic for missing Render")
 		}
 	}()
-	Page(PageConfig[counterState]{
+	Page(App{}, PageConfig[counterState]{
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Handle:       pageHandleCounter,
 	})
@@ -360,14 +359,14 @@ func TestPagePanicsOnMissingHandle(t *testing.T) {
 			t.Error("expected panic for missing Handle")
 		}
 	}()
-	Page(PageConfig[counterState]{
+	Page(App{}, PageConfig[counterState]{
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
 	})
 }
 
 func TestPagePOSTWithOnNavigate(t *testing.T) {
-	handler := Page(PageConfig[counterState]{
+	handler := Page(App{}, PageConfig[counterState]{
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
 		Handle:       pageHandleCounter,
@@ -400,7 +399,7 @@ func TestPageDevModeFromEnv(t *testing.T) {
 	t.Setenv("TETHER_DEV", "1")
 	t.Cleanup(dev.Reset)
 
-	handler := Page(PageConfig[counterState]{
+	handler := Page(App{}, PageConfig[counterState]{
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
 		Handle:       pageHandleCounter,
@@ -416,7 +415,7 @@ func TestPageDevModeFromEnv(t *testing.T) {
 }
 
 func TestPagePOSTNavigateSkipsHandle(t *testing.T) {
-	handler := Page(PageConfig[counterState]{
+	handler := Page(App{}, PageConfig[counterState]{
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
 		Handle: func(_ Session, state counterState, _ Event) counterState {
@@ -456,7 +455,7 @@ func TestPagePOSTComponentsDispatch(t *testing.T) {
 		Other  string
 	}
 
-	handler := Page(PageConfig[pageState]{
+	handler := Page(App{}, PageConfig[pageState]{
 		InitialState: func(r *http.Request) pageState { return pageState{} },
 		Render: func(s pageState) node.Node {
 			return div.New(

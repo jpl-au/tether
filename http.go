@@ -122,7 +122,7 @@ func (h *Handler[S]) wsOriginAllowed(r *http.Request) bool {
 		// "cross-site", "same-site", or any other value.
 		// Check if the origin is explicitly trusted.
 		origin := r.Header.Get("Origin")
-		return slices.Contains(h.cfg.Security.TrustedOrigins, origin)
+		return slices.Contains(h.app.Security.TrustedOrigins, origin)
 	}
 
 	// No Sec-Fetch-Site header. Check the Origin header.
@@ -133,8 +133,8 @@ func (h *Handler[S]) wsOriginAllowed(r *http.Request) bool {
 	}
 
 	// If TrustedOrigins is configured, match exactly.
-	if len(h.cfg.Security.TrustedOrigins) > 0 {
-		return slices.Contains(h.cfg.Security.TrustedOrigins, origin)
+	if len(h.app.Security.TrustedOrigins) > 0 {
+		return slices.Contains(h.app.Security.TrustedOrigins, origin)
 	}
 
 	// No TrustedOrigins — compare Origin's host:port against the

@@ -79,6 +79,7 @@ func TestCrossOriginProtectionSameHostFallback(t *testing.T) {
 // Sec-Fetch-Site as the primary signal for modern browsers.
 func TestWSOriginAllowedSecFetchSite(t *testing.T) {
 	h := &Handler[counterState]{
+		app: App{},
 		cfg: LiveConfig[counterState]{},
 	}
 
@@ -113,11 +114,10 @@ func TestWSOriginAllowedSecFetchSite(t *testing.T) {
 // request is allowed when the origin is in TrustedOrigins.
 func TestWSOriginAllowedSecFetchSiteTrusted(t *testing.T) {
 	h := &Handler[counterState]{
-		cfg: LiveConfig[counterState]{
-			Security: Security{
-				TrustedOrigins: []string{"https://trusted.com"},
-			},
-		},
+		app: App{Security: Security{
+			TrustedOrigins: []string{"https://trusted.com"},
+		}},
+		cfg: LiveConfig[counterState]{},
 	}
 
 	r := &http.Request{Method: "GET", Header: http.Header{}, Host: "example.com"}
@@ -142,11 +142,10 @@ func TestWSOriginAllowedSecFetchSiteTrusted(t *testing.T) {
 // are GET requests. This prevents cross-site WebSocket hijacking.
 func TestWSOriginAllowedWithTrustedOrigins(t *testing.T) {
 	h := &Handler[counterState]{
-		cfg: LiveConfig[counterState]{
-			Security: Security{
-				TrustedOrigins: []string{"https://example.com", "https://staging.example.com"},
-			},
-		},
+		app: App{Security: Security{
+			TrustedOrigins: []string{"https://example.com", "https://staging.example.com"},
+		}},
+		cfg: LiveConfig[counterState]{},
 	}
 
 	tests := []struct {
@@ -179,6 +178,7 @@ func TestWSOriginAllowedWithTrustedOrigins(t *testing.T) {
 // fallback behaviour).
 func TestWSOriginAllowedHostFallback(t *testing.T) {
 	h := &Handler[counterState]{
+		app: App{},
 		cfg: LiveConfig[counterState]{},
 	}
 

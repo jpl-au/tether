@@ -22,7 +22,7 @@ import (
 //
 // For live pages with persistent connections and session state, use
 // [Live] instead.
-func Page[S any](cfg PageConfig[S]) http.Handler {
+func Page[S any](app App, cfg PageConfig[S]) http.Handler {
 	if cfg.InitialState == nil {
 		panic("tether: PageConfig.InitialState is required")
 	}
@@ -33,23 +33,19 @@ func Page[S any](cfg PageConfig[S]) http.Handler {
 		panic("tether: PageConfig.Handle is required")
 	}
 
-	if !cfg.DevMode && os.Getenv("TETHER_DEV") != "" {
-		cfg.DevMode = true
+	if !app.DevMode && os.Getenv("TETHER_DEV") != "" {
+		app.DevMode = true
 	}
-	if cfg.Logger == nil {
+	if app.Logger == nil {
 		level := slog.LevelInfo
-		if cfg.DevMode {
+		if app.DevMode {
 			level = slog.LevelDebug
 		}
 		opts := &slog.HandlerOptions{Level: level}
-		if cfg.LogJSON {
-			cfg.Logger = slog.New(slog.NewJSONHandler(os.Stderr, opts))
-		} else {
-			cfg.Logger = slog.New(slog.NewTextHandler(os.Stderr, opts))
-		}
-		setDefaultLogger(cfg.Logger)
+		app.Logger = slog.New(slog.NewTextHandler(os.Stderr, opts))
+		setDefaultLogger(app.Logger)
 	}
-	if cfg.DevMode {
+	if app.DevMode {
 		dev.Enable()
 	}
 
@@ -64,45 +60,47 @@ func Page[S any](cfg PageConfig[S]) http.Handler {
 	if len(cfg.Middleware) > 0 {
 		pageArgs = append(pageArgs, "middleware", middlewareNames(cfg.Middleware))
 	}
-	if cfg.DevMode {
+	if app.DevMode {
 		pageArgs = append(pageArgs, "dev", true)
 	}
-	cfg.Logger.Info("tether: ready", pageArgs...)
+	app.Logger.Info("tether: ready", pageArgs...)
 
 	if cfg.Limits.MaxEventBytes == 0 {
 		cfg.Limits.MaxEventBytes = defaultMaxEventBytes
 	}
-	if cfg.Client.DefaultDebounce == 0 {
-		cfg.Client.DefaultDebounce = defaultDefaultDebounce
+	if app.Client.DefaultDebounce == 0 {
+		app.Client.DefaultDebounce = defaultDefaultDebounce
 	}
-	if cfg.Client.TransitionTimeout == 0 {
-		cfg.Client.TransitionTimeout = defaultTransitionTimeout
+	if app.Client.TransitionTimeout == 0 {
+		app.Client.TransitionTimeout = defaultTransitionTimeout
 	}
-	if cfg.Client.FlashDuration == 0 {
-		cfg.Client.FlashDuration = defaultFlashDuration
+	if app.Client.FlashDuration == 0 {
+		app.Client.FlashDuration = defaultFlashDuration
 	}
-	if cfg.Client.ToastDuration == 0 {
-		cfg.Client.ToastDuration = defaultToastDuration
+	if app.Client.ToastDuration == 0 {
+		app.Client.ToastDuration = defaultToastDuration
 	}
 
 	csrf := http.NewCrossOriginProtection()
-	for _, origin := range cfg.Security.TrustedOrigins {
+	for _, origin := range app.Security.TrustedOrigins {
 		if err := csrf.AddTrustedOrigin(origin); err != nil {
 			panic("tether: invalid TrustedOrigins entry " + origin + ": " + err.Error())
 		}
 	}
 
 	return &pageHandler[S]{
+		app:           app,
 		cfg:           cfg,
 		encoder:       wire.JSONEncoder{},
-		clientHandler: newClientHandler(cfg.Assets),
-		assetMounts:   buildAssetMounts(cfg.Assets),
+		clientHandler: newClientHandler(app.Assets),
+		assetMounts:   buildAssetMounts(app.Assets),
 		csrf:          csrf,
 	}
 }
 
 // pageHandler serves stateless pages via plain HTTP request/response.
 type pageHandler[S any] struct {
+	app           App
 	cfg           PageConfig[S]
 	encoder       wire.Encoder
 	clientHandler http.Handler
@@ -155,10 +153,10 @@ func (p *pageHandler[S]) serveGET(w http.ResponseWriter, r *http.Request) {
 		html:              html,
 		endpoint:          r.URL.Path,
 		transport:         mode.HTTP,
-		defaultDebounce:   p.cfg.Client.DefaultDebounce,
-		transitionTimeout: p.cfg.Client.TransitionTimeout,
-		flashDuration:     p.cfg.Client.FlashDuration,
-		toastDuration:     p.cfg.Client.ToastDuration,
+		defaultDebounce:   p.app.Client.DefaultDebounce,
+		transitionTimeout: p.app.Client.TransitionTimeout,
+		flashDuration:     p.app.Client.FlashDuration,
+		toastDuration:     p.app.Client.ToastDuration,
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

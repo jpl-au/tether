@@ -8,7 +8,7 @@ import (
 )
 
 func TestHealthEmpty(t *testing.T) {
-	handler := Live(LiveConfig[counterState]{
+	handler := Live(App{}, LiveConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -24,7 +24,7 @@ func TestHealthEmpty(t *testing.T) {
 }
 
 func TestHealthCountsPending(t *testing.T) {
-	handler := Live(LiveConfig[counterState]{
+	handler := Live(App{}, LiveConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -44,7 +44,7 @@ func TestHealthCountsPending(t *testing.T) {
 }
 
 func TestHealthCountsActive(t *testing.T) {
-	handler := Live(LiveConfig[counterState]{
+	handler := Live(App{}, LiveConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -64,7 +64,7 @@ func TestHealthCountsActive(t *testing.T) {
 }
 
 func TestHealthCountsDisconnected(t *testing.T) {
-	handler := Live(LiveConfig[counterState]{
+	handler := Live(App{}, LiveConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },

@@ -16,6 +16,7 @@ func TestShutdownClosesActiveSessions(t *testing.T) {
 		go sess.run()
 
 		h := &Handler[counterState]{
+			app:          App{},
 			cfg:          LiveConfig[counterState]{},
 			pending:      make(map[string]*pendingSession[counterState]),
 			active:       map[string]*LiveSession[counterState]{"test": sess},
@@ -44,6 +45,7 @@ func TestShutdownClosesActiveSessions(t *testing.T) {
 func TestShutdownStopsPendingCleanup(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		h := &Handler[counterState]{
+			app:          App{},
 			cfg:          LiveConfig[counterState]{Timeouts: Timeouts{Pending: 30 * time.Second}},
 			pending:      make(map[string]*pendingSession[counterState]),
 			active:       make(map[string]*LiveSession[counterState]),

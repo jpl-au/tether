@@ -1,7 +1,6 @@
 package tether
 
 import (
-	"log/slog"
 	"net/http"
 
 	"github.com/jpl-au/fluent/node"
@@ -22,8 +21,9 @@ import (
 // event, render the new state, and return a JSON update (the same wire
 // format as live mode) with a root morph and any side effects.
 //
-// At minimum, set State, Render, and Handle. Everything else is
-// optional and has sensible defaults.
+// At minimum, set InitialState, Render, and Handle. Everything else
+// is optional and has sensible defaults. Shared settings (DevMode,
+// Logger, Client, Security, Assets) live on [App].
 type PageConfig[S any] struct {
 	// InitialState returns the starting state for each request. Called
 	// on every request (GET and POST). Derive state from the URL,
@@ -64,41 +64,13 @@ type PageConfig[S any] struct {
 	// relevant for stateless pages.
 	Limits Limits
 
-	// Client groups browser-side settings (debounce, transitions).
-	Client Client
-
 	// Components declares component mounts for automatic event
 	// routing, matching [LiveConfig].Components. Events whose action
 	// matches a mount's prefix are dispatched to the component
 	// before Handle runs. Optional.
 	Components []ComponentMount[S]
 
-	// Security groups origin-checking settings.
-	Security Security
-
-	// Assets lists embedded asset collections to auto-serve. See
-	// [LiveConfig].Assets for details. Optional.
-	Assets []*Asset
-
-	// DevMode enables development conveniences: debug logging by
-	// default and Cache-Control: no-store on all responses. Enable
-	// via this field or the TETHER_DEV environment variable.
-	DevMode bool
-
-	// LogJSON selects JSON output for the default logger instead of
-	// text. Only applies when Logger is nil.
-	LogJSON bool
-
 	// Name identifies this page handler in log output. Appears in the
 	// "tether: ready" startup line. Optional.
 	Name string
-
-	// Logger used for framework log output. When nil, the framework
-	// creates a text (or JSON, see LogJSON) handler at INFO level
-	// (DEBUG in DevMode) and sets it as the process-wide slog
-	// default. The default is set only once — the first handler
-	// without an explicit Logger configures it; subsequent handlers
-	// leave it alone. When provided, the framework uses it for this
-	// handler without touching the global default.
-	Logger *slog.Logger
 }

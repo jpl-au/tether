@@ -76,14 +76,14 @@ func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 		transport:         h.cfg.Mode,
 		retryDelay:        h.cfg.Timeouts.Retry,
 		maxRetryDelay:     h.cfg.Timeouts.MaxRetry,
-		defaultDebounce:   h.cfg.Client.DefaultDebounce,
-		transitionTimeout: h.cfg.Client.TransitionTimeout,
-		flashDuration:     h.cfg.Client.FlashDuration,
-		toastDuration:     h.cfg.Client.ToastDuration,
+		defaultDebounce:   h.app.Client.DefaultDebounce,
+		transitionTimeout: h.app.Client.TransitionTimeout,
+		flashDuration:     h.app.Client.FlashDuration,
+		toastDuration:     h.app.Client.ToastDuration,
 		worker:            h.cfg.Worker,
 		pushKey:           pushKey,
-		backgroundSync:    h.cfg.Client.BackgroundSync,
-		syncRetention:     h.cfg.Client.SyncRetention,
+		backgroundSync:    h.app.Client.BackgroundSync,
+		syncRetention:     h.app.Client.SyncRetention,
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -110,7 +110,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 	// Resolve the effective protocol for this request. In Auto mode,
 	// detect from the wire; in explicit mode, trust the config and
 	// warn on mismatch.
-	proto := resolveProtocol(h.cfg.Protocol, r, h.cfg.Logger)
+	proto := resolveProtocol(h.cfg.Protocol, r, h.app.Logger)
 	dev.Debug("session transport", "protocol", proto.String(), "remote", r.RemoteAddr)
 
 	transport, err := upgrade(w, r)
@@ -133,7 +133,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 	// Try to reattach to a disconnected session.
 	h.mu.Lock()
 	if sess, ok := h.disconnected[id]; ok {
-		if !h.cfg.Security.DisableSessionBinding && r.UserAgent() != sess.userAgent {
+		if !h.app.Security.DisableSessionBinding && r.UserAgent() != sess.userAgent {
 			h.mu.Unlock()
 			h.Diagnostics.Publish(Diagnostic{
 				Kind:      SessionBindingFailed,
@@ -205,7 +205,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 
 	h.mu.Lock()
 	if ps, ok := h.pending[id]; ok {
-		if !h.cfg.Security.DisableSessionBinding && r.UserAgent() != ps.userAgent {
+		if !h.app.Security.DisableSessionBinding && r.UserAgent() != ps.userAgent {
 			delete(h.pending, id)
 			h.mu.Unlock()
 			h.Diagnostics.Publish(Diagnostic{
@@ -410,7 +410,7 @@ func (h *Handler[S]) restoreSession(id string, r *http.Request, transport Transp
 	}
 
 	// Verify the reconnecting client matches the original session.
-	if !h.cfg.Security.DisableSessionBinding && r.UserAgent() != env.UserAgent {
+	if !h.app.Security.DisableSessionBinding && r.UserAgent() != env.UserAgent {
 		h.Diagnostics.Publish(Diagnostic{
 			Kind:      SessionBindingFailed,
 			SessionID: id,
