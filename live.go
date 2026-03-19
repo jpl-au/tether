@@ -114,7 +114,7 @@ func Live[S any](app App, cfg LiveConfig[S]) *Handler[S] {
 	if cfg.Timeouts.MaxRetry == 0 {
 		cfg.Timeouts.MaxRetry = defaultMaxRetryDelay
 	}
-	app.Client.applyDefaults()
+	app.Client.defaults()
 	if app.Client.SyncRetention == 0 {
 		app.Client.SyncRetention = defaultSyncRetention
 	}

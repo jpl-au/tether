@@ -53,7 +53,7 @@ func Page[S any](app App, cfg PageConfig[S]) http.Handler {
 	if cfg.Limits.MaxEventBytes == 0 {
 		cfg.Limits.MaxEventBytes = defaultMaxEventBytes
 	}
-	app.Client.applyDefaults()
+	app.Client.defaults()
 
 	csrf := app.Security.csrf()
 

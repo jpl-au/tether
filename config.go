@@ -136,8 +136,8 @@ type Client struct {
 	SyncRetention time.Duration
 }
 
-// applyDefaults fills zero-valued fields with sensible defaults.
-func (c *Client) applyDefaults() {
+// defaults fills zero-valued fields with sensible defaults.
+func (c *Client) defaults() {
 	if c.DefaultDebounce == 0 {
 		c.DefaultDebounce = defaultDefaultDebounce
 	}
