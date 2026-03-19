@@ -1,4 +1,4 @@
-# tether
+# Tether
 
 Reactive server-driven UI for [Fluent](https://github.com/jpl-au/fluent). Write Go, get live updates.
 
@@ -44,10 +44,30 @@ mux.Handle("/_tether/", http.StripPrefix("/_tether/", tether.ServeClient()))
 
 No WebSocket boilerplate. No JavaScript to write. No diff algorithm to understand.
 
-## Full-page app
+## Stateful vs Stateless
 
-When the handler owns the entire page, `ListenAndServe` handles signal
-trapping, graceful shutdown, and sensible defaults:
+Tether offers two handler modes:
+
+**Stateful** (`tether.Stateful`) — maintains a persistent connection
+(WebSocket or SSE) between browser and server. State lives in memory
+across interactions. The server can push updates at any time. Use this
+for dashboards, chat, real-time collaboration — anything where the
+server needs to push updates or maintain session state.
+
+**Stateless** (`tether.Stateless`) — traditional HTTP request/response.
+State is reconstructed from each request. No persistent connection, no
+session pool. Use this for forms, navigation, and pages where each
+interaction is independent. See [stateless pages](docs/stateless.md)
+for details.
+
+Both modes share the same rendering engine, event system, and bind
+helpers. The difference is how state is managed — persistent or
+per-request.
+
+## Standalone server
+
+When your application is a single handler, `ListenAndServe` handles
+signal trapping, graceful shutdown, and sensible defaults:
 
 ```go
 h := tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
@@ -122,7 +142,7 @@ for details and examples.
 | [Architecture](docs/architecture.md) | Core concepts, session lifecycle, command loop, transport |
 | [API reference](docs/api.md) | App, StatefulConfig, Session, Event, Component, Middleware, tethertest, bind helpers |
 | [Getting started](docs/getting-started.md) | Setup, how updates reach the browser |
-| [Stateless pages](docs/stateless.md) | tether.Stateless for request/response pages without persistent connections |
+| [Stateless pages](docs/stateless.md) | `tether.Stateless` for request/response pages without persistent connections |
 | [Events](docs/events.md) | Event binding, timing, loading states, forms |
 | [Signals](docs/signals.md) | Reactive signals, client directives, optimistic updates |
 | [Server updates](docs/server-updates.md) | Update, Navigate, SetTitle, Flash, Announce, Dynamic keys |
@@ -145,3 +165,5 @@ for details and examples.
 |---------|---------|---------|
 | [idiomorph](https://github.com/bigskysoftware/idiomorph) 0.3.0 | [0BSD](https://opensource.org/license/0bsd) | DOM morphing (bundled JS) |
 | [lxzan/gws](https://github.com/lxzan/gws) | [Apache-2.0](https://github.com/lxzan/gws/blob/main/LICENSE) | WebSocket transport |
+| [fxamacker/cbor](https://github.com/fxamacker/cbor) | [MIT](https://github.com/fxamacker/cbor/blob/master/LICENSE) | CBOR encoding for session state persistence |
+| [golang.org/x/crypto](https://pkg.go.dev/golang.org/x/crypto) | [BSD-3-Clause](https://cs.opensource.google/go/x/crypto/+/master:LICENSE) | VAPID push notification encryption |

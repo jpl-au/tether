@@ -1,4 +1,4 @@
-# tether — Agent Guide
+# Tether — Agent Guide
 
 ## What this is
 
