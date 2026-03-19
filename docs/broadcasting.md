@@ -7,7 +7,7 @@ Push updates to multiple sessions at once:
 ```go
 group := tether.NewGroup[State]()
 
-tether.Live(tether.LiveConfig[State]{
+tether.Live(tether.App{}, tether.LiveConfig[State]{
     OnConnect:    func(s *tether.LiveSession[State]) { group.Add(s) },
     OnDisconnect: func(s *tether.LiveSession[State]) { group.Remove(s) },
     // ...
@@ -28,7 +28,7 @@ For convenience, use `LiveConfig.Groups` to auto-register sessions without `OnCo
 ```go
 group := tether.NewGroup[State]()
 
-tether.Live(tether.LiveConfig[State]{
+tether.Live(tether.App{}, tether.LiveConfig[State]{
     Groups: []*tether.Group[State]{group},
     // ...
 })

@@ -168,7 +168,7 @@ setup is identical for new and restored sessions.
 ## Configuration
 
 ```go
-h := tether.Live(tether.LiveConfig[State]{
+h := tether.Live(tether.App{}, tether.LiveConfig[State]{
     SessionStore: myRedisStore,
     // Codec: myCustomCodec,  // optional, defaults to CBOR
     // OnRestore: func(sess *tether.LiveSession[State]) { ... },

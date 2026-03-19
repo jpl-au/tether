@@ -7,7 +7,7 @@ Extensions are opt-in features that add capabilities beyond the core render/hand
 Enable uploads by setting `LiveConfig.Upload`:
 
 ```go
-tether.Live(tether.LiveConfig[State]{
+tether.Live(tether.App{}, tether.LiveConfig[State]{
     Upload: &tether.UploadConfig[State]{
         Handle: func(sess *tether.LiveSession[State], upload tether.Upload) error {
             file, err := upload.Open()
@@ -79,7 +79,7 @@ bind.Apply(
 Enable asset caching and offline page shells:
 
 ```go
-tether.Live(tether.LiveConfig[State]{
+tether.Live(tether.App{}, tether.LiveConfig[State]{
     Worker: true,
     // ...
 })
@@ -98,8 +98,11 @@ var assets = &tether.Asset{
     Precache: []string{"styles.css", "logo.svg"},
 }
 
-tether.Live(tether.LiveConfig[State]{
+app := tether.App{
     Assets: []*tether.Asset{assets},
+}
+
+tether.Live(app, tether.LiveConfig[State]{
     Worker: true,
     // ...
 })
@@ -109,14 +112,14 @@ The cache version is derived from a content hash of all embedded files and appli
 
 ### Dev mode
 
-In dev mode (`LiveConfig.DevMode` or `TETHER_DEV=1`), the service worker is not registered to ensure fresh assets during development.
+In dev mode (`App.DevMode` or `TETHER_DEV=1`), the service worker is not registered to ensure fresh assets during development.
 
 ## Push notifications
 
 Push notifications are covered in detail in [push notifications](push-notifications.md). Brief setup:
 
 ```go
-tether.Live(tether.LiveConfig[State]{
+tether.Live(tether.App{}, tether.LiveConfig[State]{
     Push: &tether.PushConfig[State]{
         Sender: push.NewSender(push.Config{
             VAPIDPublicKey:  publicKey,

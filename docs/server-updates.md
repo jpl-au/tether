@@ -136,7 +136,7 @@ Without this key, navigating between pages changes the rendered HTML but the dif
 When the diff engine detects a structural change, it falls back to a full root morph. The `LiveConfig.OnStructuralChange` callback lets you observe these occurrences for telemetry, metrics, or debugging:
 
 ```go
-tether.Live(tether.LiveConfig[State]{
+tether.Live(tether.App{}, tether.LiveConfig[State]{
     OnStructuralChange: func(sess *tether.LiveSession[State], change tether.StructuralChange) {
         slog.Warn("structural change",
             "session", sess.ID(),
@@ -158,7 +158,7 @@ When `OnStructuralChange` is nil and DevMode is active, the framework logs a deb
 When a render cycle produces no patches and no structural change, the framework calls `LiveConfig.OnNoPatch` if set. This lets you decide how to handle it — log, count, or ignore:
 
 ```go
-tether.Live(tether.LiveConfig[State]{
+tether.Live(tether.App{}, tether.LiveConfig[State]{
     OnNoPatch: func(sess *tether.LiveSession[State], info tether.NoPatch) {
         // Signal-only updates (e.g. a ticker) intentionally produce
         // no patches — log at debug. Navigate and event sources that
@@ -326,7 +326,7 @@ The framework calls `Mount` once per component during session startup for compon
 Bidirectional sync between Go state and the browser URL:
 
 ```go
-tether.Live(tether.LiveConfig[State]{
+tether.Live(tether.App{}, tether.LiveConfig[State]{
     OnNavigate: func(_ tether.Session, s State, p tether.Params) State {
         s.Page = p.Path
         return s
@@ -346,7 +346,7 @@ r.Route("/", router.Page[State]{Render: homeRender, Handle: homeHandle})
 r.Route("/settings", router.Page[State]{Render: settingsRender})
 r.NotFound(router.Page[State]{Render: notFoundRender})
 
-tether.Live(tether.LiveConfig[State]{
+tether.Live(tether.App{}, tether.LiveConfig[State]{
     Render:       r.Render,
     Handle:       r.Handle,
     OnNavigate: r.OnNavigate(func(s *State, p tether.Params) { s.Page = p.Path }),

@@ -20,7 +20,7 @@ import (
     "github.com/jpl-au/fluent/node"
 )
 
-mux.Handle("/counter", tether.Live(tether.LiveConfig[CounterState]{
+mux.Handle("/counter", tether.Live(tether.App{}, tether.LiveConfig[CounterState]{
     Upgrade: ws.Upgrade(),
     InitialState: func(r *http.Request) CounterState {
         return CounterState{Count: 0}
@@ -72,7 +72,7 @@ For a full-page application, `ListenAndServe` handles startup, signal
 trapping, and graceful shutdown:
 
 ```go
-h := tether.Live(tether.LiveConfig[State]{
+h := tether.Live(tether.App{}, tether.LiveConfig[State]{
     Upgrade:      ws.Upgrade(),
     Fallback:     sse.Upgrade(),
     Mode:         mode.Both,

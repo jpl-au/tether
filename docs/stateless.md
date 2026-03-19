@@ -11,7 +11,7 @@ Use `tether.Page` when you don't need server push, live updates, or broadcasting
 ## Quick example
 
 ```go
-mux.Handle("/", tether.Page(tether.PageConfig[State]{
+mux.Handle("/", tether.Page(tether.App{}, tether.PageConfig[State]{
     InitialState: func(r *http.Request) State {
         return State{User: getUserFromSession(r)}
     },
@@ -24,16 +24,23 @@ GET requests render the full page. POST requests handle a client event, render t
 
 ## How it works
 
-1. **GET** — `State(r)` creates state from the request, `OnNavigate` (if set) processes URL parameters, `Render` builds the node tree, `Layout` (if set) wraps it in a document shell, and the HTML is written to the response.
+1. **GET** — `InitialState(r)` creates state from the request, `OnNavigate` (if set) processes URL parameters, `Render` builds the node tree, `Layout` (if set) wraps it in a document shell, and the HTML is written to the response.
 
-2. **POST** — `State(r)` reconstructs state from scratch (stateless — no memory of previous requests), `Handle` processes the event, `Render` builds the new tree, and the framework returns a JSON update with a root morph and any side effects. The client morphs the page in place.
+2. **POST** — `InitialState(r)` reconstructs state from scratch (stateless — no memory of previous requests), `Handle` processes the event, `Render` builds the new tree, and the framework returns a JSON update with a root morph and any side effects. The client morphs the page in place.
 
 The POST response uses the same wire format as live mode, so the client JS handles both identically. The key difference: live mode sends targeted patches to keyed elements, while stateless mode always sends a full root morph (since there is no previous tree to diff against).
 
 ## PageConfig
 
 ```go
-tether.Page(tether.PageConfig[State]{
+app := tether.App{
+    Assets:   []*tether.Asset{assets},
+    Client:   tether.Client{DefaultDebounce: 200 * time.Millisecond},
+    Security: tether.Security{TrustedOrigins: []string{"https://example.com"}},
+    DevMode:  true,
+}
+
+tether.Page(app, tether.PageConfig[State]{
     // Required: reconstruct state from the HTTP request.
     // Called on every request (GET and POST). Derive state from
     // the URL, cookies, headers, or a database — not from r.Body.
@@ -60,11 +67,7 @@ tether.Page(tether.PageConfig[State]{
     },
 
     // Optional configuration.
-    Assets:   []*tether.Asset{assets},
-    Limits:   tether.Limits{MaxEventBytes: 128 << 10},
-    Client:   tether.Client{DefaultDebounce: 200 * time.Millisecond},
-    Security: tether.Security{TrustedOrigins: []string{"https://example.com"}},
-    DevMode:  true,
+    Limits: tether.Limits{MaxEventBytes: 128 << 10},
 })
 ```
 
@@ -72,7 +75,7 @@ tether.Page(tether.PageConfig[State]{
 
 | Feature | `tether.Page` | `tether.Live` |
 |---------|-------------|------------|
-| State creation | `State(r)` — every request | `InitialState(r)` — once per session |
+| State creation | `InitialState(r)` — every request | `InitialState(r)` — once per session |
 | Transport | HTTP POST/response | WebSocket or SSE |
 | Handle parameter | `Session` only | `Session` (type-assert to `*LiveSession` for Update and State) |
 | Server push | No | Yes (Update, Signal, Toast from any goroutine) |
@@ -122,11 +125,11 @@ r.Route("/", router.Page[State]{Render: homeRender, Handle: homeHandle})
 r.Route("/settings", router.Page[State]{Render: settingsRender, Handle: settingsHandle})
 r.NotFound(router.Page[State]{Render: notFoundRender})
 
-tether.Page(tether.PageConfig[State]{
-    InitialState:      func(r *http.Request) State { return State{} },
-    Render:     r.Render,
-    Handle:     r.Handle,
-    OnNavigate: r.OnNavigate(func(s *State, p tether.Params) { s.Page = p.Path }),
+tether.Page(tether.App{}, tether.PageConfig[State]{
+    InitialState: func(r *http.Request) State { return State{} },
+    Render:       r.Render,
+    Handle:       r.Handle,
+    OnNavigate:   r.OnNavigate(func(s *State, p tether.Params) { s.Page = p.Path }),
     // ...
 })
 ```
@@ -162,7 +165,7 @@ Start with `tether.Page` and upgrade to `tether.Live` when you need:
 - **File uploads** — streaming files via the upload extension
 - **Push notifications** — Web Push via the service worker
 
-The `Render` function, `HandleFunc` signature, `OnNavigate`, `Layout`, event bindings, `LiveConfig.Components`, and the `router` package all work identically in both modes. Upgrading typically means changing `tether.Page(PageConfig{...})` to `tether.Live(LiveConfig{...})` and adding transport configuration.
+The `Render` function, `HandleFunc` signature, `OnNavigate`, `Layout`, event bindings, `LiveConfig.Components`, and the `router` package all work identically in both modes. Upgrading typically means changing `tether.Page(app, PageConfig{...})` to `tether.Live(app, LiveConfig{...})` and adding transport configuration.
 
 ---
 

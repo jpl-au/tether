@@ -13,7 +13,7 @@ Three update modes give you the right tool for every situation:
 ## Quick example
 
 ```go
-mux.Handle("/counter", tether.Live(tether.LiveConfig[CounterState]{
+mux.Handle("/counter", tether.Live(tether.App{}, tether.LiveConfig[CounterState]{
     Upgrade: ws.Upgrade(),
     InitialState: func(r *http.Request) CounterState {
         return CounterState{Count: 0}
@@ -50,7 +50,7 @@ When the handler owns the entire page, `ListenAndServe` handles signal
 trapping, graceful shutdown, and sensible defaults:
 
 ```go
-h := tether.Live(tether.LiveConfig[State]{
+h := tether.Live(tether.App{}, tether.LiveConfig[State]{
     Upgrade:      ws.Upgrade(),
     Fallback:     sse.Upgrade(),
     Mode:         mode.Both,
@@ -69,7 +69,7 @@ exits.
 
 ## Embedded assets
 
-Serve CSS, JS, and images from an `embed.FS` with automatic content-hashed URLs. Add assets to `LiveConfig.Assets` and they're auto-served — no extra mux setup needed:
+Serve CSS, JS, and images from an `embed.FS` with automatic content-hashed URLs. Add assets to `App.Assets` and they're auto-served — no extra mux setup needed:
 
 ```go
 //go:embed static
@@ -77,8 +77,11 @@ var staticFS embed.FS
 
 var assets = &tether.Asset{FS: staticFS, Prefix: "/static/"}
 
-tether.Live(tether.LiveConfig[State]{
+app := tether.App{
     Assets: []*tether.Asset{assets},
+}
+
+tether.Live(app, tether.LiveConfig[State]{
     Layout: func(state State, content node.Node) node.Node {
         return html.New(
             head.New(assets.Stylesheet("styles.css")),
@@ -117,7 +120,7 @@ for details and examples.
 | Guide | Description |
 |-------|-------------|
 | [Architecture](docs/architecture.md) | Core concepts, session lifecycle, command loop, transport |
-| [API reference](docs/api.md) | LiveConfig, Session, Event, Component, Middleware, tethertest, bind helpers |
+| [API reference](docs/api.md) | App, LiveConfig, Session, Event, Component, Middleware, tethertest, bind helpers |
 | [Getting started](docs/getting-started.md) | Setup, how updates reach the browser |
 | [Stateless pages](docs/stateless.md) | tether.Page for request/response pages without persistent connections |
 | [Events](docs/events.md) | Event binding, timing, loading states, forms |

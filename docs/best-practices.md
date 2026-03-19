@@ -221,7 +221,7 @@ div.New(s.Stars.Render()).Dynamic("stars-section"),
 When many events leave state unchanged — keypresses that don't affect the model, button clicks that only trigger side effects — the render and diff are wasted work. Provide an `Equal` function to skip them:
 
 ```go
-tether.Live(tether.LiveConfig[State]{
+tether.Live(tether.App{}, tether.LiveConfig[State]{
     Equal: func(a, b State) bool {
         return a == b
     },

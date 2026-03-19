@@ -107,7 +107,7 @@ whatever suits your deployment.
 ## Configuration
 
 ```go
-h := tether.Live(tether.LiveConfig[State]{
+h := tether.Live(tether.App{}, tether.LiveConfig[State]{
     DiffStore: NewRedisStore(redisClient),
     // ...
 })

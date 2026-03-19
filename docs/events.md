@@ -64,7 +64,7 @@ bind.Apply(button.Text("Go"),
 
 ### Debounce
 
-`bind.OnInput` is debounced at 300ms by default (configurable via `LiveConfig.Client.DefaultDebounce`). Override per element:
+`bind.OnInput` is debounced at 300ms by default (configurable via `App.Client.DefaultDebounce`). Override per element:
 
 ```go
 bind.Apply(input.Text("q", ""),

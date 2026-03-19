@@ -26,7 +26,7 @@ Frozen mode is ideal for:
 ## Configuration
 
 ```go
-tether.Live(tether.LiveConfig[State]{
+tether.Live(tether.App{}, tether.LiveConfig[State]{
     // ... Render, Handle, etc.
 
     SessionStore:       myStore,    // required — state must persist somewhere

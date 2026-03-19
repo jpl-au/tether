@@ -14,7 +14,7 @@ sender := push.NewSender(push.Config{
     Subject:         "mailto:admin@example.com",
 })
 
-tether.Live(tether.LiveConfig[State]{
+tether.Live(tether.App{}, tether.LiveConfig[State]{
     Push: &tether.PushConfig[State]{
         Sender: sender,
         OnSubscribe: func(ctx context.Context, sess *tether.LiveSession[State], sub push.Subscription) {

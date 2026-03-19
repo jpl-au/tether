@@ -7,21 +7,21 @@ When `Mode` is not set, it defaults to `mode.Both`.
 
 ```go
 // Default (mode.Both) — WebSocket with SSE fallback
-tether.Live(tether.LiveConfig[State]{
+tether.Live(tether.App{}, tether.LiveConfig[State]{
     Upgrade:  ws.Upgrade(),
     Fallback: sse.Upgrade(),
     // ...
 })
 
 // WebSocket only
-tether.Live(tether.LiveConfig[State]{
+tether.Live(tether.App{}, tether.LiveConfig[State]{
     Mode:    mode.WebSocket,
     Upgrade: ws.Upgrade(),
     // ...
 })
 
 // SSE only
-tether.Live(tether.LiveConfig[State]{
+tether.Live(tether.App{}, tether.LiveConfig[State]{
     Mode:     mode.ServerSentEvents,
     Fallback: sse.Upgrade(),
     // ...
@@ -41,7 +41,7 @@ is automatic — the developer does nothing and it works correctly.
 import "github.com/jpl-au/tether/protocol"
 
 // Explicit: tell the framework the environment is HTTP/2.
-tether.Live(tether.LiveConfig[State]{
+tether.Live(tether.App{}, tether.LiveConfig[State]{
     Protocol: protocol.HTTP2,
     // ...
 })
@@ -149,7 +149,7 @@ SSE connections send keep-alive comments at `Timeouts.Heartbeat` (default 20s) t
 Enable the service worker for asset caching and offline page shells:
 
 ```go
-tether.Live(tether.LiveConfig[State]{
+tether.Live(tether.App{}, tether.LiveConfig[State]{
     Worker: true,
     // ...
 })
@@ -166,8 +166,11 @@ var assets = &tether.Asset{
     Precache: []string{"styles.css", "logo.svg"},
 }
 
-tether.Live(tether.LiveConfig[State]{
+app := tether.App{
     Assets: []*tether.Asset{assets},
+}
+
+tether.Live(app, tether.LiveConfig[State]{
     Worker: true,
     // ...
 })
@@ -183,7 +186,7 @@ is selected at handler construction time via `LiveConfig.WireFormat`:
 ```go
 import "github.com/jpl-au/tether/wire"
 
-tether.Live(tether.LiveConfig[State]{
+tether.Live(tether.App{}, tether.LiveConfig[State]{
     WireFormat: wire.JSON, // default — currently the only format
     // ...
 })
@@ -209,12 +212,14 @@ state change and hands it to the encoder.
 
 ## Event resilience (SSE)
 
-Set `Client.BackgroundSync` to true to enable event queuing. When enabled, SSE events that fail to send (due to network interruptions) are queued in IndexedDB and replayed when the connection is restored.
+Set `App.Client.BackgroundSync` to true to enable event queuing. When enabled, SSE events that fail to send (due to network interruptions) are queued in IndexedDB and replayed when the connection is restored.
 
 ```go
-Client: tether.Client{
-    BackgroundSync: true,
-},
+app := tether.App{
+    Client: tether.Client{
+        BackgroundSync: true,
+    },
+}
 ```
 
 When the service worker is active and the browser supports Background Sync (Chromium), queued events are replayed even if the tab was closed. On other browsers, replay occurs when the tab reopens and the SSE connection restores.

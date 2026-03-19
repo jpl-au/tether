@@ -1,11 +1,35 @@
 # API reference
 
+## App
+
+`tether.App` holds application-wide configuration shared across handlers. Pass it as the first argument to `tether.Live` and `tether.Page`.
+
+```go
+app := tether.App{
+    DevMode:  true,
+    Assets:   []*tether.Asset{assets},
+    Logger:   slog.New(slog.NewJSONHandler(os.Stderr, nil)),
+    Client:   tether.Client{DefaultDebounce: 200 * time.Millisecond},
+    Security: tether.Security{TrustedOrigins: []string{"https://example.com"}},
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `DevMode` | `bool` | Development mode (or set `TETHER_DEV=1`). See [operations](operations.md#dev-mode) |
+| `Logger` | `*slog.Logger` | When nil, creates a text handler at INFO level (DEBUG in DevMode) and sets it as the process default once. When provided, used for this handler without touching the global default |
+| `Assets` | `[]*Asset` | Embedded asset collections — auto-served with content-hashed URLs |
+| `Client` | `Client` | Browser-side settings (debounce, transitions, flash duration, etc.) |
+| `Security` | `Security` | CSRF protection and session binding settings |
+
+---
+
 ## LiveConfig
 
 `tether.LiveConfig[S]` configures a handler. `InitialState`, `Render`, and `Handle` are required, plus a transport (`Upgrade` and/or `Fallback` depending on `Mode`). Everything else has sensible defaults.
 
 ```go
-tether.Live(tether.LiveConfig[State]{
+tether.Live(app, tether.LiveConfig[State]{
     Upgrade:      ws.Upgrade(),
     InitialState: func(r *http.Request) State { return State{} },
     Render:       render,
@@ -96,7 +120,7 @@ When either callback is configured, the framework's own logging for that event i
 
 ### Client
 
-`LiveConfig.Client` groups browser-side settings:
+`App.Client` groups browser-side settings:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
@@ -114,30 +138,22 @@ When either callback is configured, the framework's own logging for that event i
 | `Upload` | `*UploadConfig[S]` | File upload support (see [extensions](extensions.md)) |
 | `Push` | `*PushConfig[S]` | Web Push notifications (see [push](push-notifications.md)) |
 | `Worker` | `bool` | Enable service worker (auto-enabled by Push) |
-| `Assets` | `[]*Asset` | Embedded asset collections — auto-served with content-hashed URLs |
 | `DiffStore` | `DiffStore` | External persistence for disconnected session snapshots (opt-in, nil by default). See [store](store.md) |
 | `SessionStore` | `SessionStore` | External persistence for session state — enables crash recovery and node migration (opt-in, nil by default). See [session-store](session-store.md) |
 | `Codec` | `SessionCodec[S]` | Custom serialisation for state `S` (nil = CBOR). Only used when SessionStore is set |
 | `OnRestore` | `func(*LiveSession[S])` | Called instead of OnConnect when a session is restored from the SessionStore. Falls back to OnConnect when nil |
 | `FreezeOnDisconnect` | `bool` | When true, disconnected sessions persist state to the SessionStore, release memory, and exit the command loop. Requires SessionStore. See [frozen mode](frozen-mode.md) |
 | `Protocol` | `protocol.Protocol` | HTTP protocol (default `protocol.Auto` — detects per request). See [transport](transport.md#protocol-awareness) |
-| `DevMode` | `bool` | Development mode (or set `TETHER_DEV=1`). See [operations](operations.md#dev-mode) |
 | `WireFormat` | `wire.Format` | Encoding for server-to-client updates (default `wire.JSON`) |
 
 ### Security
 
-`LiveConfig.Security` groups CSRF protection and session binding:
+`App.Security` groups CSRF protection and session binding:
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `TrustedOrigins` | `[]string` | Origins allowed to make state-changing requests |
 | `DisableSessionBinding` | `bool` | Disable User-Agent verification on reconnect (default: enabled) |
-
-### Other
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `Logger` | `*slog.Logger` | When nil, creates a text handler at INFO level (DEBUG in DevMode) and sets it as the process default once. When provided, used for this handler without touching the global default |
 
 ---
 
@@ -277,7 +293,7 @@ p.Float64s("v")         // ([]float64, error)
 `*tether.Handler[S]` implements `http.Handler`.
 
 ```go
-h := tether.Live(cfg)
+h := tether.Live(app, cfg)
 mux.Handle("/app", h)
 
 h.Health()          // HealthStatus{Pending, Active, Disconnected}
@@ -346,7 +362,7 @@ r.Route("/", router.Page[State]{Render: homeRender, Handle: homeHandle})
 r.Route("/settings", router.Page[State]{Render: settingsRender})
 r.NotFound(router.Page[State]{Render: notFoundRender})
 
-tether.Live(tether.LiveConfig[State]{
+tether.Live(tether.App{}, tether.LiveConfig[State]{
     Render:       r.Render,
     Handle:       r.Handle,
     OnNavigate: r.OnNavigate(func(s *State, p tether.Params) { s.Page = p.Path }),
@@ -450,7 +466,7 @@ Wraps `Handle` for cross-cutting concerns. Applied outermost-first:
 ```go
 type Middleware[S any] func(HandleFunc[S]) HandleFunc[S]
 
-tether.Live(tether.LiveConfig[State]{
+tether.Live(tether.App{}, tether.LiveConfig[State]{
     Middleware: []tether.Middleware[State]{withLogging, withAuth},
 })
 ```
