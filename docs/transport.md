@@ -7,21 +7,21 @@ When `Mode` is not set, it defaults to `mode.Both`.
 
 ```go
 // Default (mode.Both) — WebSocket with SSE fallback
-tether.Live(tether.App{}, tether.LiveConfig[State]{
+tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
     Upgrade:  ws.Upgrade(),
     Fallback: sse.Upgrade(),
     // ...
 })
 
 // WebSocket only
-tether.Live(tether.App{}, tether.LiveConfig[State]{
+tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
     Mode:    mode.WebSocket,
     Upgrade: ws.Upgrade(),
     // ...
 })
 
 // SSE only
-tether.Live(tether.App{}, tether.LiveConfig[State]{
+tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
     Mode:     mode.ServerSentEvents,
     Fallback: sse.Upgrade(),
     // ...
@@ -29,7 +29,7 @@ tether.Live(tether.App{}, tether.LiveConfig[State]{
 ```
 
 Same wire format, same API regardless of transport. The encoding is
-selected via `LiveConfig.WireFormat` (default `wire.JSON`).
+selected via `StatefulConfig.WireFormat` (default `wire.JSON`).
 
 ## Protocol awareness
 
@@ -41,7 +41,7 @@ is automatic — the developer does nothing and it works correctly.
 import "github.com/jpl-au/tether/protocol"
 
 // Explicit: tell the framework the environment is HTTP/2.
-tether.Live(tether.App{}, tether.LiveConfig[State]{
+tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
     Protocol: protocol.HTTP2,
     // ...
 })
@@ -59,9 +59,9 @@ reverse proxy downgrades to HTTP/1.1 — without rejecting the request.
 
 The protocol can also be set via the `TETHER_PROTO` environment
 variable (`HTTP1`, `HTTP2`, `HTTP3`, `AUTO`). Explicit
-`LiveConfig.Protocol` takes precedence over the env var.
+`StatefulConfig.Protocol` takes precedence over the env var.
 
-Protocol awareness applies to live sessions only — `tether.Page` is
+Protocol awareness applies to live sessions only — `tether.Stateless` is
 stateless request/response and does not benefit from protocol-specific
 behaviour.
 
@@ -75,7 +75,7 @@ ws.Upgrade(ws.Options{
 })
 ```
 
-Set `ReadLimit` to match `LiveConfig.Limits.MaxEventBytes` for consistent limits across transport modes. Messages exceeding the limit cause the connection to be closed with a protocol error.
+Set `ReadLimit` to match `StatefulConfig.Limits.MaxEventBytes` for consistent limits across transport modes. Messages exceeding the limit cause the connection to be closed with a protocol error.
 
 ### Compression
 
@@ -130,7 +130,7 @@ JS — no configuration needed.
 | `connected` | WebSocket or SSE stream is open and ready |
 | `disconnected` | Connection lost, will retry |
 
-Stateless pages (`tether.Page` / `mode.HTTP`) are immediately
+Stateless pages (`tether.Stateless` / `mode.HTTP`) are immediately
 `connected` since there is no persistent transport.
 
 Use it in CSS to style elements based on connection state:
@@ -149,7 +149,7 @@ SSE connections send keep-alive comments at `Timeouts.Heartbeat` (default 20s) t
 Enable the service worker for asset caching and offline page shells:
 
 ```go
-tether.Live(tether.App{}, tether.LiveConfig[State]{
+tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
     Worker: true,
     // ...
 })
@@ -170,7 +170,7 @@ app := tether.App{
     Assets: []*tether.Asset{assets},
 }
 
-tether.Live(app, tether.LiveConfig[State]{
+tether.Stateful(app, tether.StatefulConfig[State]{
     Worker: true,
     // ...
 })
@@ -181,12 +181,12 @@ A reconnecting indicator bar appears automatically when the connection drops and
 ## Wire format
 
 Server-to-client updates are encoded by a `wire.Encoder`. The encoder
-is selected at handler construction time via `LiveConfig.WireFormat`:
+is selected at handler construction time via `StatefulConfig.WireFormat`:
 
 ```go
 import "github.com/jpl-au/tether/wire"
 
-tether.Live(tether.App{}, tether.LiveConfig[State]{
+tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
     WireFormat: wire.JSON, // default — currently the only format
     // ...
 })

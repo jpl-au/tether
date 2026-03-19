@@ -213,11 +213,11 @@ bind.Apply(div.New().ID("sentinel"), bind.OnViewport("load-more"))
 
 ## Component event routing
 
-When using `LiveConfig.Components`, events are dispatched by prefix before reaching the page's `Handle`. An event with action `"likes.increment"` is routed to the component mounted at prefix `"likes"` — the component receives the event with action `"increment"` (prefix stripped).
+When using `StatefulConfig.Components`, events are dispatched by prefix before reaching the page's `Handle`. An event with action `"likes.increment"` is routed to the component mounted at prefix `"likes"` — the component receives the event with action `"increment"` (prefix stripped).
 
 ### Event.Target
 
-When `LiveConfig.Components` dispatches an event, `Event.Target` is set to the mount's prefix (e.g. `"likes"`). This lets middleware and logging identify which component handled the event:
+When `StatefulConfig.Components` dispatches an event, `Event.Target` is set to the mount's prefix (e.g. `"likes"`). This lets middleware and logging identify which component handled the event:
 
 ```go
 func loggingMiddleware[S any](next tether.HandleFunc[S]) tether.HandleFunc[S] {

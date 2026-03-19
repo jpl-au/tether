@@ -1,6 +1,6 @@
 # Signals and reactivity
 
-tether gives you three ways to update the UI. Use whichever fits your situation — or mix them freely.
+Tether gives you three ways to update the UI. Use whichever fits your situation — or mix them freely.
 
 ## Server-driven rendering (the default)
 

@@ -14,10 +14,10 @@ sender := push.NewSender(push.Config{
     Subject:         "mailto:admin@example.com",
 })
 
-tether.Live(tether.App{}, tether.LiveConfig[State]{
+tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
     Push: &tether.PushConfig[State]{
         Sender: sender,
-        OnSubscribe: func(ctx context.Context, sess *tether.LiveSession[State], sub push.Subscription) {
+        OnSubscribe: func(ctx context.Context, sess *tether.StatefulSession[State], sub push.Subscription) {
             // Store sub.Endpoint and sub.Keys for later use.
             // Use ctx for database calls — it cancels when the session is destroyed.
         },

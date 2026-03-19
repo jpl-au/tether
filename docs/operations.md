@@ -25,7 +25,7 @@ mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 on SIGINT or SIGTERM, then force-closing after the grace period:
 
 ```go
-h := tether.Live(tether.App{}, tether.LiveConfig[State]{
+h := tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
     // ...
     Timeouts: tether.Timeouts{
         ShutdownGrace: 15 * time.Second, // default: 10s
@@ -75,7 +75,7 @@ During development, enable dev mode for fast iteration:
 ```go
 app := tether.App{DevMode: true}
 
-tether.Live(app, tether.LiveConfig[State]{
+tether.Stateful(app, tether.StatefulConfig[State]{
     // ...
 })
 ```
@@ -112,7 +112,7 @@ app := tether.App{
     Logger: slog.New(slog.NewJSONHandler(os.Stderr, nil)),
 }
 
-tether.Live(app, tether.LiveConfig[State]{
+tether.Stateful(app, tether.StatefulConfig[State]{
     // ...
 })
 ```
@@ -183,7 +183,7 @@ h.Diagnostics.SubscribeAsync(ctx, func(d tether.Diagnostic) {
 means data was lost — the session is critically overwhelmed. Sustained overflow
 usually indicates a blocking `HandleFunc` or a broadcast rate exceeding the
 session's processing speed. Increase `Limits.CmdBufferSize` or move slow work
-into `LiveSession.Go`.
+into `StatefulSession.Go`.
 
 The overflow goroutine count is capped by a semaphore sized to `CmdBufferSize`,
 preventing unbounded goroutine growth under sustained pressure.
@@ -193,8 +193,8 @@ preventing unbounded goroutine growth under sustained pressure.
 When the diff engine detects a structural change (Dynamic keys added, removed, or reordered), it falls back to a full root morph. The `OnStructuralChange` callback lets you observe these for logging, metrics, or debugging:
 
 ```go
-tether.Live(tether.App{}, tether.LiveConfig[State]{
-    OnStructuralChange: func(s *tether.LiveSession[State], c tether.StructuralChange) {
+tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
+    OnStructuralChange: func(s *tether.StatefulSession[State], c tether.StructuralChange) {
         slog.Warn("structural change",
             "session", s.ID(),
             "added", c.Added,
@@ -214,7 +214,7 @@ Wrapping conditional elements in a stable keyed container keeps morphs scoped in
 
 ### Architecture model
 
-tether is a **stateful, server-driven** framework. Each session holds
+Tether is a **stateful, server-driven** framework. Each session holds
 its state, diff engine, and command loop in server memory for the duration of
 the connection. This is fundamentally different from stateless REST/GraphQL
 APIs and has direct implications for scaling.

@@ -2,7 +2,7 @@
 
 Reactive server-driven UI for [Fluent](https://github.com/jpl-au/fluent). Write Go, get live updates.
 
-tether connects Fluent's node trees to the browser via WebSocket (with SSE fallback). When state changes, only the parts that actually changed are sent as targeted patches. The client morphs the DOM in place, preserving input focus, scroll position, and form state.
+Tether connects Fluent's node trees to the browser via WebSocket (with SSE fallback). When state changes, only the parts that actually changed are sent as targeted patches. The client morphs the DOM in place, preserving input focus, scroll position, and form state.
 
 Three update modes give you the right tool for every situation:
 
@@ -13,7 +13,7 @@ Three update modes give you the right tool for every situation:
 ## Quick example
 
 ```go
-mux.Handle("/counter", tether.Live(tether.App{}, tether.LiveConfig[CounterState]{
+mux.Handle("/counter", tether.Stateful(tether.App{}, tether.StatefulConfig[CounterState]{
     Upgrade: ws.Upgrade(),
     InitialState: func(r *http.Request) CounterState {
         return CounterState{Count: 0}
@@ -50,7 +50,7 @@ When the handler owns the entire page, `ListenAndServe` handles signal
 trapping, graceful shutdown, and sensible defaults:
 
 ```go
-h := tether.Live(tether.App{}, tether.LiveConfig[State]{
+h := tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
     Upgrade:      ws.Upgrade(),
     Fallback:     sse.Upgrade(),
     Mode:         mode.Both,
@@ -81,7 +81,7 @@ app := tether.App{
     Assets: []*tether.Asset{assets},
 }
 
-tether.Live(app, tether.LiveConfig[State]{
+tether.Stateful(app, tether.StatefulConfig[State]{
     Layout: func(state State, content node.Node) node.Node {
         return html.New(
             head.New(assets.Stylesheet("styles.css")),
@@ -98,13 +98,13 @@ tether.Live(app, tether.LiveConfig[State]{
 Two independent, opt-in stores handle different concerns:
 
 **Session store** — persists application state `S` for crash recovery and node
-migration. Set `LiveConfig.SessionStore` to enable. On disconnect and graceful
+migration. Set `StatefulConfig.SessionStore` to enable. On disconnect and graceful
 shutdown, the framework serialises `S` (CBOR by default) and saves it. When a
 reconnecting client hits a server with no in-memory session, the framework
 restores from the store. See [session-store](docs/session-store.md) for details.
 
 **Diff store** — offloads differ snapshots to external storage during the
-reconnect window, freeing Go memory. Set `LiveConfig.DiffStore` to enable. This is
+reconnect window, freeing Go memory. Set `StatefulConfig.DiffStore` to enable. This is
 a memory optimisation, not a recovery mechanism. See [store](docs/store.md) for
 details.
 
@@ -120,9 +120,9 @@ for details and examples.
 | Guide | Description |
 |-------|-------------|
 | [Architecture](docs/architecture.md) | Core concepts, session lifecycle, command loop, transport |
-| [API reference](docs/api.md) | App, LiveConfig, Session, Event, Component, Middleware, tethertest, bind helpers |
+| [API reference](docs/api.md) | App, StatefulConfig, Session, Event, Component, Middleware, tethertest, bind helpers |
 | [Getting started](docs/getting-started.md) | Setup, how updates reach the browser |
-| [Stateless pages](docs/stateless.md) | tether.Page for request/response pages without persistent connections |
+| [Stateless pages](docs/stateless.md) | tether.Stateless for request/response pages without persistent connections |
 | [Events](docs/events.md) | Event binding, timing, loading states, forms |
 | [Signals](docs/signals.md) | Reactive signals, client directives, optimistic updates |
 | [Server updates](docs/server-updates.md) | Update, Navigate, SetTitle, Flash, Announce, Dynamic keys |

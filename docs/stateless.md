@@ -2,16 +2,16 @@
 
 ## Overview
 
-`tether.Page` creates an `http.Handler` for traditional request/response pages — no WebSocket, no SSE, no persistent connection. Each request is independent: the server reconstructs state, renders HTML, and returns the response.
+`tether.Stateless` creates an `http.Handler` for traditional request/response pages — no WebSocket, no SSE, no persistent connection. Each request is independent: the server reconstructs state, renders HTML, and returns the response.
 
 Despite being stateless, pages get the same client-side features as live handlers: event binding, debounce, throttle, loading states, client-side directives, signals, transitions, and the morph engine. The only difference is the transport — events travel as individual fetch POST requests instead of a persistent channel.
 
-Use `tether.Page` when you don't need server push, live updates, or broadcasting. It works well for forms, CRUD interfaces, dashboards, and any page where the server only needs to respond to user actions.
+Use `tether.Stateless` when you don't need server push, live updates, or broadcasting. It works well for forms, CRUD interfaces, dashboards, and any page where the server only needs to respond to user actions.
 
 ## Quick example
 
 ```go
-mux.Handle("/", tether.Page(tether.App{}, tether.PageConfig[State]{
+mux.Handle("/", tether.Stateless(tether.App{}, tether.StatelessConfig[State]{
     InitialState: func(r *http.Request) State {
         return State{User: getUserFromSession(r)}
     },
@@ -28,9 +28,9 @@ GET requests render the full page. POST requests handle a client event, render t
 
 2. **POST** — `InitialState(r)` reconstructs state from scratch (stateless — no memory of previous requests), `Handle` processes the event, `Render` builds the new tree, and the framework returns a JSON update with a root morph and any side effects. The client morphs the page in place.
 
-The POST response uses the same wire format as live mode, so the client JS handles both identically. The key difference: live mode sends targeted patches to keyed elements, while stateless mode always sends a full root morph (since there is no previous tree to diff against).
+The POST response uses the same wire format as stateful mode, so the client JS handles both identically. The key difference: stateful mode sends targeted patches to keyed elements, while stateless mode always sends a full root morph (since there is no previous tree to diff against).
 
-## PageConfig
+## StatelessConfig
 
 ```go
 app := tether.App{
@@ -40,7 +40,7 @@ app := tether.App{
     DevMode:  true,
 }
 
-tether.Page(app, tether.PageConfig[State]{
+tether.Stateless(app, tether.StatelessConfig[State]{
     // Required: reconstruct state from the HTTP request.
     // Called on every request (GET and POST). Derive state from
     // the URL, cookies, headers, or a database — not from r.Body.
@@ -61,7 +61,7 @@ tether.Page(app, tether.PageConfig[State]{
     // Optional: wrap page content in a full HTML document.
     Layout: func(s State, content node.Node) node.Node { ... },
 
-    // Optional: declarative component mounts (same as LiveConfig.Components).
+    // Optional: declarative component mounts (same as StatefulConfig.Components).
     Components: []tether.ComponentMount[State]{
         tether.Mount("widget", getWidget, setWidget),
     },
@@ -71,13 +71,13 @@ tether.Page(app, tether.PageConfig[State]{
 })
 ```
 
-### Fields compared to LiveConfig
+### Fields compared to StatefulConfig
 
-| Feature | `tether.Page` | `tether.Live` |
+| Feature | `tether.Stateless` | `tether.Stateful` |
 |---------|-------------|------------|
 | State creation | `InitialState(r)` — every request | `InitialState(r)` — once per session |
 | Transport | HTTP POST/response | WebSocket or SSE |
-| Handle parameter | `Session` only | `Session` (type-assert to `*LiveSession` for Update and State) |
+| Handle parameter | `Session` only | `Session` (type-assert to `*StatefulSession` for Update and State) |
 | Server push | No | Yes (Update, Signal, Toast from any goroutine) |
 | OnConnect/OnDisconnect | No | Yes |
 | Groups/Broadcast | No | Yes |
@@ -113,7 +113,7 @@ func handle(_ tether.Session, s State, ev tether.Event) State {
 }
 ```
 
-This is the fundamental difference from live mode: live handlers accumulate state in memory across events, while stateless handlers reconstruct it each time.
+This is the fundamental difference from stateful mode: stateful handlers accumulate state in memory across events, while stateless handlers reconstruct it each time.
 
 ## Multi-page routing
 
@@ -125,7 +125,7 @@ r.Route("/", router.Page[State]{Render: homeRender, Handle: homeHandle})
 r.Route("/settings", router.Page[State]{Render: settingsRender, Handle: settingsHandle})
 r.NotFound(router.Page[State]{Render: notFoundRender})
 
-tether.Page(tether.App{}, tether.PageConfig[State]{
+tether.Stateless(tether.App{}, tether.StatelessConfig[State]{
     InitialState: func(r *http.Request) State { return State{} },
     Render:       r.Render,
     Handle:       r.Handle,
@@ -138,7 +138,7 @@ tether.Page(tether.App{}, tether.PageConfig[State]{
 
 ## Side effects
 
-Side effects work the same as in live mode, but they travel in the POST response instead of over a persistent channel:
+Side effects work the same as in stateful mode, but they travel in the POST response instead of over a persistent channel:
 
 ```go
 func handle(sess tether.Session, s State, ev tether.Event) State {
@@ -155,9 +155,9 @@ Available methods on `Session`: `Toast`, `Navigate`, `ReplaceURL`, `SetTitle`, `
 
 Note: `Session.ID()` returns an empty string in stateless mode — there is no persistent session. `Push` returns `ErrPushPreWarm`.
 
-## When to upgrade to live mode
+## When to upgrade to stateful mode
 
-Start with `tether.Page` and upgrade to `tether.Live` when you need:
+Start with `tether.Stateless` and upgrade to `tether.Stateful` when you need:
 
 - **Server push** — the server initiating updates without a client event (timers, database changes, external webhooks)
 - **Broadcasting** — pushing updates to multiple users simultaneously
@@ -165,7 +165,7 @@ Start with `tether.Page` and upgrade to `tether.Live` when you need:
 - **File uploads** — streaming files via the upload extension
 - **Push notifications** — Web Push via the service worker
 
-The `Render` function, `HandleFunc` signature, `OnNavigate`, `Layout`, event bindings, `LiveConfig.Components`, and the `router` package all work identically in both modes. Upgrading typically means changing `tether.Page(app, PageConfig{...})` to `tether.Live(app, LiveConfig{...})` and adding transport configuration.
+The `Render` function, `HandleFunc` signature, `OnNavigate`, `Layout`, event bindings, `StatefulConfig.Components`, and the `router` package all work identically in both modes. Upgrading typically means changing `tether.Stateless(app, StatelessConfig{...})` to `tether.Stateful(app, StatefulConfig{...})` and adding transport configuration.
 
 ---
 

@@ -7,14 +7,14 @@ Push updates to multiple sessions at once:
 ```go
 group := tether.NewGroup[State]()
 
-tether.Live(tether.App{}, tether.LiveConfig[State]{
-    OnConnect:    func(s *tether.LiveSession[State]) { group.Add(s) },
-    OnDisconnect: func(s *tether.LiveSession[State]) { group.Remove(s) },
+tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
+    OnConnect:    func(s *tether.StatefulSession[State]) { group.Add(s) },
+    OnDisconnect: func(s *tether.StatefulSession[State]) { group.Remove(s) },
     // ...
 })
 
 // Send a message to every connected client
-group.Broadcast(func(target *tether.LiveSession[State], s State) State {
+group.Broadcast(func(target *tether.StatefulSession[State], s State) State {
     s.Notification = "System update complete"
     target.Announce("System update complete")
     return s
@@ -23,12 +23,12 @@ group.Broadcast(func(target *tether.LiveSession[State], s State) State {
 
 Each session is updated concurrently so a slow render in one session does not block delivery to the rest.
 
-For convenience, use `LiveConfig.Groups` to auto-register sessions without `OnConnect`/`OnDisconnect` boilerplate:
+For convenience, use `StatefulConfig.Groups` to auto-register sessions without `OnConnect`/`OnDisconnect` boilerplate:
 
 ```go
 group := tether.NewGroup[State]()
 
-tether.Live(tether.App{}, tether.LiveConfig[State]{
+tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
     Groups: []*tether.Group[State]{group},
     // ...
 })
@@ -45,7 +45,7 @@ Handle: func(sess tether.Session, s State, ev tether.Event) State {
     if ev.Action == "send-message" {
         s.Messages = append(s.Messages, ev.Data["text"])
         // BroadcastOthers accepts Session directly — no type-assert needed.
-        group.BroadcastOthers(sess, func(target *tether.LiveSession[State], s State) State {
+        group.BroadcastOthers(sess, func(target *tether.StatefulSession[State], s State) State {
             s.Messages = append(s.Messages, ev.Data["text"])
             return s
         })
@@ -60,10 +60,10 @@ Track who is online with callbacks and iteration:
 
 ```go
 group := tether.NewGroup[State]()
-group.OnJoin = func(s *tether.LiveSession[State]) {
+group.OnJoin = func(s *tether.StatefulSession[State]) {
     log.Printf("user joined: %s", s.ID())
 }
-group.OnLeave = func(s *tether.LiveSession[State]) {
+group.OnLeave = func(s *tether.StatefulSession[State]) {
     log.Printf("user left: %s", s.ID())
 }
 
@@ -86,7 +86,7 @@ log.Printf("online: %d", group.Len())
 var messages = tether.NewBus[MessageSent]()
 ```
 
-Subscribe a session declaratively via `LiveConfig.Watchers`:
+Subscribe a session declaratively via `StatefulConfig.Watchers`:
 
 ```go
 Watchers: []tether.Watcher[State]{
@@ -100,7 +100,7 @@ Watchers: []tether.Watcher[State]{
 Or in `OnConnect` for conditional subscriptions:
 
 ```go
-OnConnect: func(sess *tether.LiveSession[State]) {
+OnConnect: func(sess *tether.StatefulSession[State]) {
     tether.On(sess, messages, func(msg MessageSent, s State) State {
         s.Messages = append(s.Messages, msg.Text)
         return s
@@ -195,7 +195,7 @@ messageBus.SubscribeAsync(ctx, func(msg MessageSent) {
 var onlineCount = tether.NewValue(0)
 ```
 
-Observe declaratively via `LiveConfig.Watchers` — the current value is delivered immediately on connect:
+Observe declaratively via `StatefulConfig.Watchers` — the current value is delivered immediately on connect:
 
 ```go
 Watchers: []tether.Watcher[State]{
@@ -209,7 +209,7 @@ Watchers: []tether.Watcher[State]{
 Or in `OnConnect` for conditional subscriptions:
 
 ```go
-OnConnect: func(sess *tether.LiveSession[State]) {
+OnConnect: func(sess *tether.StatefulSession[State]) {
     tether.Observe(sess, onlineCount, func(count int, s State) State {
         s.OnlineCount = count
         return s

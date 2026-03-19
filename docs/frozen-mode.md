@@ -26,7 +26,7 @@ Frozen mode is ideal for:
 ## Configuration
 
 ```go
-tether.Live(tether.App{}, tether.LiveConfig[State]{
+tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
     // ... Render, Handle, etc.
 
     SessionStore:       myStore,    // required — state must persist somewhere
@@ -35,7 +35,7 @@ tether.Live(tether.App{}, tether.LiveConfig[State]{
     // OnRestore fires when a frozen session is thawed. Use it to
     // re-establish runtime resources (rejoin groups, restart timers).
     // Falls back to OnConnect when nil.
-    OnRestore: func(sess *tether.LiveSession[State]) {
+    OnRestore: func(sess *tether.StatefulSession[State]) {
         // Rejoin groups, restart watchers, etc.
     },
 })
@@ -122,7 +122,7 @@ render, and state is loaded from the SessionStore.
 ### Groups
 
 Groups are left on disconnect (via `OnDisconnect`) and rejoined on
-thaw (via `OnRestore` or `OnConnect`, plus `LiveConfig.Groups`
+thaw (via `OnRestore` or `OnConnect`, plus `StatefulConfig.Groups`
 auto-join). The framework handles auto-join groups automatically
 during thaw.
 

@@ -16,13 +16,13 @@ Three libraries work together:
 | [fluent-jit](https://github.com/jpl-au/fluent-jit) | Diff engine — compares two trees, produces patches or morphs |
 | **tether** | Session management, transport, wire protocol, command loop |
 
-fluent builds the tree. fluent-jit diffs it. tether orchestrates the
+Fluent builds the tree. Fluent-jit diffs it. Tether orchestrates the
 lifecycle.
 
 ## Package structure
 
 ```
-tether/              Root package — LiveConfig, Handler, Session, Bus, Group, Value, Observe, On
+tether/              Root package — StatefulConfig, Handler, Session, Bus, Group, Value, Observe, On
 ├── bind/            Event binding and signal binding via Apply + composable Options (OnClick, BindText, Confirm, etc.)
 ├── client/          Embedded JS runtime (tether.js, idiomorph, service worker, upload, push worker)
 ├── dev/             Debug logging — dev.Enable() activates, dev.Debug() is a no-op when disabled
@@ -39,11 +39,11 @@ tether/              Root package — LiveConfig, Handler, Session, Bus, Group, 
 
 ## Key types
 
-### LiveConfig[S] and Handler[S]
+### StatefulConfig[S] and Handler[S]
 
-`LiveConfig[S]` wires everything together: `InitialState`, `Render`, `Handle`,
+`StatefulConfig[S]` wires everything together: `InitialState`, `Render`, `Handle`,
 transport upgraders, middleware, lifecycle callbacks, timeouts, and limits.
-`Live(cfg)` returns a `*Handler[S]` which is an `http.Handler`.
+`Stateful(cfg)` returns a `*Handler[S]` which is an `http.Handler`.
 
 Required fields: `InitialState`, `Render`, `Handle`, and at least one of
 `Upgrade` or `Fallback` (depending on `Mode`).
@@ -52,17 +52,17 @@ Required fields: `InitialState`, `Render`, `Handle`, and at least one of
 
 The interface every handler receives. Provides side-effect methods (`Toast`,
 `Signal`, `Navigate`, `SetTitle`, `Announce`, `Flash`, `Push`, `Go`). Works
-identically in live mode, stateless page mode, and tests. `OnNavigate`,
+identically in stateful mode, stateless page mode, and tests. `OnNavigate`,
 `Handle`, and the test harness all receive `Session`. `Bus.Emit` accepts
 `Session` directly — no type-assert is needed to broadcast from `Handle`.
 
-### LiveSession[S]
+### StatefulSession[S]
 
 One per browser tab. Implements `Session` and adds state-aware methods:
 `State` and `Update`. Owns its own state, diff engine, and command-loop
 goroutine. All exported methods are safe to call from any goroutine.
 
-Type-assert to `*LiveSession[S]` only when you need methods that are not on
+Type-assert to `*StatefulSession[S]` only when you need methods that are not on
 `Session` — `Update` and `State`. These are lifecycle concerns and belong
 in `OnConnect`/`OnDisconnect`, not in `Handle`.
 
@@ -70,7 +70,7 @@ in `OnConnect`/`OnDisconnect`, not in `Handle`.
 
 Client event: `Type` (click, input, submit, navigate, etc.), `Action`
 (the `data-tether-*` value), `Data` (form fields), `EventID` (for
-client-side de-duplication), `Target` (set by `LiveConfig.Components` to
+client-side de-duplication), `Target` (set by `StatefulConfig.Components` to
 the mount prefix). Typed extraction helpers: `Value`, `Key`, `Get`,
 `Int`, `Float64`, `Bool`, `Bind`. `WithAction` returns a copy with a
 different Action (used by Route, RouteTyped, and mounts for prefix
@@ -78,7 +78,7 @@ stripping).
 
 ### Params
 
-Navigation context passed to `LiveConfig.OnNavigate` and
+Navigation context passed to `StatefulConfig.OnNavigate` and
 `router.OnNavigate`. Carries `Path` (URL path) and `Query`
 (`url.Values`). Provides typed extraction helpers that mirror `Event`'s
 API for consistency — `Get`, `Int`, `Float64`, `Bool`. Also provides
@@ -119,7 +119,7 @@ Lock-free reads via `atomic.Value`, copy-on-write for writes.
 ### Group[S]
 
 Session pool for broadcasting. `Add`/`Remove` in `OnConnect`/`OnDisconnect`
-(or use `LiveConfig.Groups` for automatic membership). `Broadcast(fn)` calls
+(or use `StatefulConfig.Groups` for automatic membership). `Broadcast(fn)` calls
 `Update` on every member — non-blocking. `BroadcastOthers` skips the
 sender. Lock-free reads, copy-on-write writes.
 
@@ -133,9 +133,9 @@ stale overwrites.
 
 ### Watcher[S]
 
-Declarative reactive subscription for LiveConfig. `WatchValue(val, mapper)`
+Declarative reactive subscription for StatefulConfig. `WatchValue(val, mapper)`
 creates a watcher that observes a Value; `WatchBus(bus, mapper)` creates
-one that subscribes to a Bus. Listed in `LiveConfig.Watchers`, they are
+one that subscribes to a Bus. Listed in `StatefulConfig.Watchers`, they are
 subscribed automatically before `OnConnect` runs.
 
 ### DiffStore
@@ -147,7 +147,7 @@ destroyed. `Load` is included for tooling and debugging but is not called by
 the framework today — reconnecting sessions re-render from state, which
 re-seeds the differ.
 
-Nil by default (opt-in via `LiveConfig.DiffStore`). No first-party implementations
+Nil by default (opt-in via `StatefulConfig.DiffStore`). No first-party implementations
 are provided — developers supply their own, backed by whatever storage suits
 their deployment (SQLite, Redis, filesystem, etc.).
 
@@ -160,19 +160,19 @@ hits a server with no in-memory session), and deletes after successful restore
 or on destroy.
 
 The codec (`SessionCodec[S]`) serialises `S` — CBOR by default, custom codec
-via `LiveConfig.Codec`. The framework wraps the codec output in an envelope with
+via `StatefulConfig.Codec`. The framework wraps the codec output in an envelope with
 session metadata (endpoint, URL, title, user-agent) before passing to the
 store.
 
 `OnRestore` fires instead of `OnConnect` for restored sessions. Falls back to
-`OnConnect` when nil. Nil by default (opt-in via `LiveConfig.SessionStore`).
+`OnConnect` when nil. Nil by default (opt-in via `StatefulConfig.SessionStore`).
 
 ### Component
 
 `Component` is a self-contained rendering unit — `Render() node.Node` builds
 the UI, `Handle(Session, Event) Component` processes events. Components are
 value types; Handle returns a new value, the receiver is not mutated. They
-receive `Session` (not `*LiveSession`), so they work in SSR pre-warming and
+receive `Session` (not `*StatefulSession`), so they work in SSR pre-warming and
 tests without special cases.
 
 `EqualComponent` is an optional interface for fast equality checking.
@@ -180,7 +180,7 @@ tests without special cases.
 `Route` and `RouteTyped` dispatch events by prefix in Handle. `RouteTyped`
 preserves the concrete type for compile-time safety.
 
-`LiveConfig.Components` with `Mount` wires components declaratively — the framework
+`StatefulConfig.Components` with `Mount` wires components declaratively — the framework
 intercepts events by prefix and dispatches them before Handle runs. Navigate
 events bypass mounts.
 
@@ -188,10 +188,10 @@ events bypass mounts.
 creates event copies with a different action for prefix stripping.
 
 `Mounter` is an optional interface (`Mount(Session) Component`) for one-time
-setup. The framework calls it during session startup for LiveConfig.Components
+setup. The framework calls it during session startup for StatefulConfig.Components
 mounts. Components that don't need setup omit it.
 
-`PageConfig.Components` mirrors `LiveConfig.Components` for stateless pages —
+`StatelessConfig.Components` mirrors `StatefulConfig.Components` for stateless pages —
 same `RouteMount` dispatch before Handle, same `Mount` constructor.
 
 ### Router[S] (router package)
@@ -277,7 +277,7 @@ When a client event arrives, `exec()` in `loop.go` runs:
 
 1. Track activity — update timestamp, reset idle timer
 2. Snapshot state — store atomically for concurrent `State()` readers
-3. Component dispatch — if LiveConfig.Components matches the event prefix, route to the component
+3. Component dispatch — if StatefulConfig.Components matches the event prefix, route to the component
 4. Handle — if no component matched, call the page handler
 5. Drain effects — collect buffered Toast/Signal/Navigate calls
 6. Equality check — skip render if `Equal` says state unchanged
@@ -312,14 +312,14 @@ renders (keys added, removed, or reordered).
 
 ## Stateless pages
 
-`tether.Page(PageConfig[S])` creates an `http.Handler` for pages without
+`tether.Stateless(StatelessConfig[S])` creates an `http.Handler` for pages without
 persistent connections. GET renders HTML, POST handles an event and returns
-a JSON update. Same wire format as live mode. Same `Handle` signature. No
+a JSON update. Same wire format as stateful mode. Same `Handle` signature. No
 session pool, no command loop, no goroutines.
 
 ## Testing
 
-`tethertest.New(cfg)` creates a test harness that wraps `tether.Page`
+`tethertest.New(cfg)` creates a test harness that wraps `tether.Stateless`
 internally. Send events with `h.Send("action")`, `h.SendInput(...)`,
 `h.SendSubmit(...)`, or `h.Navigate("/path")`. Inspect results with
 `h.State()`, `h.HTML()`, `h.Toast()`, `h.Signals()`, etc.
@@ -357,7 +357,7 @@ the diagnostic bus. `DiagnosticKind` constants: `TransportError`,
 `UploadError`, `SessionBindingFailed`, `StoreError`. See [operations](docs/operations.md#diagnostics-bus) for
 details.
 
-Prefer `LiveConfig.Watchers` for declarative subscriptions (`WatchValue`,
+Prefer `StatefulConfig.Watchers` for declarative subscriptions (`WatchValue`,
 `WatchBus`). Use `OnConnect` for imperative setup (incrementing counters,
 publishing events, starting tickers). Do not subscribe in Handle.
 Subscriptions are cleaned up automatically when the session is destroyed.
@@ -381,13 +381,13 @@ Subscriptions are cleaned up automatically when the session is destroyed.
 | `value.go` | Value — shared observable state with Bus internally |
 | `observe.go` | Observe — atomic subscribe + initial value delivery |
 | `emit.go` | On — subscribe a session to a Bus with sender filtering |
-| `watcher.go` | Watcher interface, WatchValue, WatchBus — declarative LiveConfig subscriptions |
+| `watcher.go` | Watcher interface, WatchValue, WatchBus — declarative StatefulConfig subscriptions |
 | `transport.go` | Transport interface |
 | `diff_store.go` | DiffStore interface for external snapshot persistence |
 | `session_store.go` | SessionStore interface for session state persistence |
 | `session_codec.go` | SessionCodec[S] interface + default CBOR implementation |
 | `session_envelope.go` | Envelope struct — wraps encoded S with session metadata |
-| `page.go` | PageConfig, stateless page handler |
+| `page.go` | StatelessConfig, stateless page handler |
 | `effects.go` | Effects struct — buffers Toast, Signal, Navigate, etc. |
 | `render.go` | Render helpers, tetherBody (root div with data attributes) |
 | `asset.go` | Embedded asset serving with content-hashed URLs |
@@ -430,6 +430,6 @@ full model.
 - `atomic.Value` + copy-on-write for lock-free reads on shared collections
 - Effects are buffered during Handle and merged atomically with the diff
 - `dev.Debug` for debug-only logging; `slog` only for panics; all other signals flow through `Handler.Diagnostics`
-- `Live` logs one `tether: ready` line at INFO with `transport`, optional `name`, `worker`, `middleware` count, and `dev`; no other startup noise
-- `LiveConfig.Name` / `PageConfig.Name` — optional label included in startup logs to distinguish handlers that share a transport
+- `Stateful` logs one `tether: ready` line at INFO with `transport`, optional `name`, `worker`, `middleware` count, and `dev`; no other startup noise
+- `StatefulConfig.Name` / `StatelessConfig.Name` — optional label included in startup logs to distinguish handlers that share a transport
 - `context.AfterFunc` for automatic cleanup on context cancellation

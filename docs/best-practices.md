@@ -18,7 +18,7 @@ Move slow work into a background goroutine and push the result back via `Update`
 ```go
 Handle: func(sess tether.Session, s State, ev tether.Event) State {
     if ev.Action == "refresh" {
-        live := sess.(*tether.LiveSession[State])
+        live := sess.(*tether.StatefulSession[State])
         live.Go(func(ctx context.Context) {
             rows, _ := db.QueryContext(ctx, "SELECT * FROM items WHERE user_id = ?", s.UserID)
             items := scanItems(rows)
@@ -46,10 +46,10 @@ span.Textf("Count: %d", state.Count)
 span.Textf("Count: %d", state.Count).Dynamic("count")
 ```
 
-Use `LiveConfig.OnNoPatch` to detect missing keys in development and production:
+Use `StatefulConfig.OnNoPatch` to detect missing keys in development and production:
 
 ```go
-OnNoPatch: func(sess *tether.LiveSession[State], info tether.NoPatch) {
+OnNoPatch: func(sess *tether.StatefulSession[State], info tether.NoPatch) {
     if info.Source != "update" {
         slog.Warn("no patches produced",
             "session", sess.ID(),
@@ -80,7 +80,7 @@ if len(items) == 0 {
 return div.New(ul.New(nodes...)).Dynamic("list")
 ```
 
-Use `LiveConfig.OnStructuralChange` to detect unstable key sets. See [stable key sets](server-updates.md#stable-key-sets).
+Use `StatefulConfig.OnStructuralChange` to detect unstable key sets. See [stable key sets](server-updates.md#stable-key-sets).
 
 ## Use signals for high-frequency updates
 
@@ -118,7 +118,7 @@ Each session has its own state. Shared mutable state at the package level create
 // Wrong — package-level mutable state accessed from multiple sessions
 var onlineUsers int
 
-OnConnect: func(sess *tether.LiveSession[State]) {
+OnConnect: func(sess *tether.StatefulSession[State]) {
     onlineUsers++ // data race
 },
 ```
@@ -128,7 +128,7 @@ Use `Value` for shared state that sessions observe, `Bus` for discrete events, a
 ```go
 var onlineCount = tether.NewValue(0)
 
-OnConnect: func(sess *tether.LiveSession[State]) {
+OnConnect: func(sess *tether.StatefulSession[State]) {
     onlineCount.Update(func(n int) int { return n + 1 })
     tether.Observe(sess, onlineCount, func(count int, s State) State {
         s.OnlineUsers = count
@@ -139,12 +139,12 @@ OnConnect: func(sess *tether.LiveSession[State]) {
 
 `Value`, `Bus`, and `Group` are all internally synchronised. See [broadcasting](broadcasting.md) for when to use each.
 
-## Declare subscriptions on LiveConfig
+## Declare subscriptions on StatefulConfig
 
-Use `LiveConfig.Watchers` to subscribe sessions to shared Values and Buses declaratively. Watchers are subscribed before `OnConnect` runs and cleaned up automatically when the session is destroyed:
+Use `StatefulConfig.Watchers` to subscribe sessions to shared Values and Buses declaratively. Watchers are subscribed before `OnConnect` runs and cleaned up automatically when the session is destroyed:
 
 ```go
-tether.LiveConfig[State]{
+tether.StatefulConfig[State]{
     Watchers: []tether.Watcher[State]{
         tether.WatchValue(onlineCount, func(n int, s State) State {
             s.OnlineUsers = n
@@ -158,14 +158,14 @@ tether.LiveConfig[State]{
 }
 ```
 
-This keeps all reactive subscriptions visible in one place — right next to `LiveConfig.Groups`. Reserve `OnConnect` for imperative setup: incrementing counters, publishing events, pushing initial signals, starting background tickers.
+This keeps all reactive subscriptions visible in one place — right next to `StatefulConfig.Groups`. Reserve `OnConnect` for imperative setup: incrementing counters, publishing events, pushing initial signals, starting background tickers.
 
 Never subscribe inside Handle — it creates a new subscription on every event:
 
 ```go
 // Wrong — creates a new subscription on every click event
 Handle: func(sess tether.Session, s State, ev tether.Event) State {
-    live := sess.(*tether.LiveSession[State])
+    live := sess.(*tether.StatefulSession[State])
     tether.Observe(live, onlineCount, func(count int, s State) State {
         s.OnlineUsers = count
         return s
@@ -178,9 +178,9 @@ Handle: func(sess tether.Session, s State, ev tether.Event) State {
 
 Subscriptions created in `OnConnect` are cleaned up automatically when the session is destroyed. No manual unsubscribe needed.
 
-## Use LiveConfig.Components for self-contained components
+## Use StatefulConfig.Components for self-contained components
 
-When a component handles its own events without needing to coordinate with the rest of the page, mount it declaratively via `LiveConfig.Components`. The framework dispatches events automatically — the page's `Handle` never sees them:
+When a component handles its own events without needing to coordinate with the rest of the page, mount it declaratively via `StatefulConfig.Components`. The framework dispatches events automatically — the page's `Handle` never sees them:
 
 ```go
 Components: []tether.ComponentMount[State]{
@@ -193,7 +193,7 @@ Components: []tether.ComponentMount[State]{
 
 Use `Route`/`RouteTyped` in Handle instead when:
 - The component needs to coordinate with other state changes
-- You are using `tether.Page` (stateless handlers don't support `LiveConfig.Components`)
+- You are using `tether.Stateless` (stateless handlers don't support `StatefulConfig.Components`)
 - You need to inspect or transform the event before forwarding
 
 ## Keep component Render roots keyed
@@ -221,7 +221,7 @@ div.New(s.Stars.Render()).Dynamic("stars-section"),
 When many events leave state unchanged — keypresses that don't affect the model, button clicks that only trigger side effects — the render and diff are wasted work. Provide an `Equal` function to skip them:
 
 ```go
-tether.Live(tether.App{}, tether.LiveConfig[State]{
+tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
     Equal: func(a, b State) bool {
         return a == b
     },

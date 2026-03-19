@@ -38,7 +38,7 @@ app := tether.App{
     },
 }
 
-tether.Live(app, tether.LiveConfig[State]{
+tether.Stateful(app, tether.StatefulConfig[State]{
     // ...
 })
 ```
@@ -110,7 +110,7 @@ app := tether.App{
     },
 }
 
-tether.Live(app, tether.LiveConfig[State]{
+tether.Stateful(app, tether.StatefulConfig[State]{
     // ...
 })
 ```

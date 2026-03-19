@@ -133,11 +133,11 @@ Without this key, navigating between pages changes the rendered HTML but the dif
 
 ### OnStructuralChange — observing structural changes
 
-When the diff engine detects a structural change, it falls back to a full root morph. The `LiveConfig.OnStructuralChange` callback lets you observe these occurrences for telemetry, metrics, or debugging:
+When the diff engine detects a structural change, it falls back to a full root morph. The `StatefulConfig.OnStructuralChange` callback lets you observe these occurrences for telemetry, metrics, or debugging:
 
 ```go
-tether.Live(tether.App{}, tether.LiveConfig[State]{
-    OnStructuralChange: func(sess *tether.LiveSession[State], change tether.StructuralChange) {
+tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
+    OnStructuralChange: func(sess *tether.StatefulSession[State], change tether.StructuralChange) {
         slog.Warn("structural change",
             "session", sess.ID(),
             "added", change.Added,
@@ -155,11 +155,11 @@ When `OnStructuralChange` is nil and DevMode is active, the framework logs a deb
 
 ### OnNoPatch — observing empty render cycles
 
-When a render cycle produces no patches and no structural change, the framework calls `LiveConfig.OnNoPatch` if set. This lets you decide how to handle it — log, count, or ignore:
+When a render cycle produces no patches and no structural change, the framework calls `StatefulConfig.OnNoPatch` if set. This lets you decide how to handle it — log, count, or ignore:
 
 ```go
-tether.Live(tether.App{}, tether.LiveConfig[State]{
-    OnNoPatch: func(sess *tether.LiveSession[State], info tether.NoPatch) {
+tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
+    OnNoPatch: func(sess *tether.StatefulSession[State], info tether.NoPatch) {
         // Signal-only updates (e.g. a ticker) intentionally produce
         // no patches — log at debug. Navigate and event sources that
         // produce nothing are likely missing Dynamic keys — warn.
@@ -199,7 +199,7 @@ Signals (`sess.Signal`, `bind.BindText`, `bind.BindShow`, etc.) update bound ele
 Use `Session.Go` to launch background work tied to a session's lifetime. The context is cancelled when the session is permanently destroyed (reaped or shutdown), but survives temporary disconnects:
 
 ```go
-OnConnect: func(s *tether.LiveSession[State]) {
+OnConnect: func(s *tether.StatefulSession[State]) {
     s.Go(func(ctx context.Context) {
         ticker := time.NewTicker(time.Second)
         defer ticker.Stop()
@@ -269,12 +269,12 @@ func (c Counter) Handle(sess tether.Session, ev tether.Event) tether.Component {
 
 Components are value types — `Handle` returns a new value, the receiver is never mutated. Side effects (`sess.Toast`, `sess.Signal`, etc.) work inside components just like they do in the page handler.
 
-### Declarative mounting with LiveConfig.Components
+### Declarative mounting with StatefulConfig.Components
 
-For components that are fully self-contained, mount them declaratively on LiveConfig. The framework intercepts events matching the mount's prefix and dispatches them automatically — the page's `Handle` never sees these events:
+For components that are fully self-contained, mount them declaratively on StatefulConfig. The framework intercepts events matching the mount's prefix and dispatches them automatically — the page's `Handle` never sees these events:
 
 ```go
-tether.LiveConfig[State]{
+tether.StatefulConfig[State]{
     Components: []tether.ComponentMount[State]{
         tether.Mount("likes",
             func(s State) Counter { return s.Likes },
@@ -297,7 +297,7 @@ Render: func(s State) node.Node {
 
 ### Manual routing with RouteTyped
 
-When you need to coordinate component events with other state changes, or when using `tether.Page` (which does not support `LiveConfig.Components`), route events manually in Handle:
+When you need to coordinate component events with other state changes, or when using `tether.Stateless` (which does not support `StatefulConfig.Components`), route events manually in Handle:
 
 ```go
 Handle: func(sess tether.Session, s State, ev tether.Event) State {
@@ -319,14 +319,14 @@ func (d Dashboard) Mount(sess tether.Session) tether.Component {
 }
 ```
 
-The framework calls `Mount` once per component during session startup for components registered via `LiveConfig.Components`. Components that don't need setup simply omit the method.
+The framework calls `Mount` once per component during session startup for components registered via `StatefulConfig.Components`. Components that don't need setup simply omit the method.
 
 ## URL routing
 
 Bidirectional sync between Go state and the browser URL:
 
 ```go
-tether.Live(tether.App{}, tether.LiveConfig[State]{
+tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
     OnNavigate: func(_ tether.Session, s State, p tether.Params) State {
         s.Page = p.Path
         return s
@@ -346,7 +346,7 @@ r.Route("/", router.Page[State]{Render: homeRender, Handle: homeHandle})
 r.Route("/settings", router.Page[State]{Render: settingsRender})
 r.NotFound(router.Page[State]{Render: notFoundRender})
 
-tether.Live(tether.App{}, tether.LiveConfig[State]{
+tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
     Render:       r.Render,
     Handle:       r.Handle,
     OnNavigate: r.OnNavigate(func(s *State, p tether.Params) { s.Page = p.Path }),

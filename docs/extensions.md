@@ -1,15 +1,15 @@
 # Extensions
 
-Extensions are opt-in features that add capabilities beyond the core render/handle loop. Each is activated by setting a field on `LiveConfig` — if you don't set it, there is zero overhead. Extensions work alongside `LiveConfig.Components` — component events are dispatched before Handle, but upload callbacks and push subscriptions operate at the session level independent of component routing.
+Extensions are opt-in features that add capabilities beyond the core render/handle loop. Each is activated by setting a field on `StatefulConfig` — if you don't set it, there is zero overhead. Extensions work alongside `StatefulConfig.Components` — component events are dispatched before Handle, but upload callbacks and push subscriptions operate at the session level independent of component routing.
 
 ## File uploads
 
-Enable uploads by setting `LiveConfig.Upload`:
+Enable uploads by setting `StatefulConfig.Upload`:
 
 ```go
-tether.Live(tether.App{}, tether.LiveConfig[State]{
+tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
     Upload: &tether.UploadConfig[State]{
-        Handle: func(sess *tether.LiveSession[State], upload tether.Upload) error {
+        Handle: func(sess *tether.StatefulSession[State], upload tether.Upload) error {
             file, err := upload.Open()
             if err != nil {
                 return err
@@ -79,7 +79,7 @@ bind.Apply(
 Enable asset caching and offline page shells:
 
 ```go
-tether.Live(tether.App{}, tether.LiveConfig[State]{
+tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
     Worker: true,
     // ...
 })
@@ -102,7 +102,7 @@ app := tether.App{
     Assets: []*tether.Asset{assets},
 }
 
-tether.Live(app, tether.LiveConfig[State]{
+tether.Stateful(app, tether.StatefulConfig[State]{
     Worker: true,
     // ...
 })
@@ -119,14 +119,14 @@ In dev mode (`App.DevMode` or `TETHER_DEV=1`), the service worker is not registe
 Push notifications are covered in detail in [push notifications](push-notifications.md). Brief setup:
 
 ```go
-tether.Live(tether.App{}, tether.LiveConfig[State]{
+tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
     Push: &tether.PushConfig[State]{
         Sender: push.NewSender(push.Config{
             VAPIDPublicKey:  publicKey,
             VAPIDPrivateKey: privateKey,
             Subject:         "mailto:admin@example.com",
         }),
-        OnSubscribe: func(ctx context.Context, sess *tether.LiveSession[State], sub push.Subscription) {
+        OnSubscribe: func(ctx context.Context, sess *tether.StatefulSession[State], sub push.Subscription) {
             // Store subscription in your database.
             // Use ctx for database calls — it cancels when the session is destroyed.
         },

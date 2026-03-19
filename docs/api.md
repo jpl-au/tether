@@ -2,7 +2,7 @@
 
 ## App
 
-`tether.App` holds application-wide configuration shared across handlers. Pass it as the first argument to `tether.Live` and `tether.Page`.
+`tether.App` holds application-wide configuration shared across handlers. Pass it as the first argument to `tether.Stateful` and `tether.Stateless`.
 
 ```go
 app := tether.App{
@@ -24,12 +24,12 @@ app := tether.App{
 
 ---
 
-## LiveConfig
+## StatefulConfig
 
-`tether.LiveConfig[S]` configures a handler. `InitialState`, `Render`, and `Handle` are required, plus a transport (`Upgrade` and/or `Fallback` depending on `Mode`). Everything else has sensible defaults.
+`tether.StatefulConfig[S]` configures a handler. `InitialState`, `Render`, and `Handle` are required, plus a transport (`Upgrade` and/or `Fallback` depending on `Mode`). Everything else has sensible defaults.
 
 ```go
-tether.Live(app, tether.LiveConfig[State]{
+tether.Stateful(app, tether.StatefulConfig[State]{
     Upgrade:      ws.Upgrade(),
     InitialState: func(r *http.Request) State { return State{} },
     Render:       render,
@@ -63,10 +63,10 @@ Mode constants: `mode.HTTP`, `mode.WebSocket`, `mode.ServerSentEvents`, `mode.Bo
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `OnConnect` | `func(*LiveSession[S])` | Called when a session connects |
-| `OnDisconnect` | `func(*LiveSession[S])` | Called when the transport closes (temporary disconnect or permanent destruction) |
-| `OnStructuralChange` | `func(*LiveSession[S], StructuralChange)` | Called when Dynamic keys change between renders |
-| `OnNoPatch` | `func(*LiveSession[S], NoPatch)` | Called when a render cycle produces no patches |
+| `OnConnect` | `func(*StatefulSession[S])` | Called when a session connects |
+| `OnDisconnect` | `func(*StatefulSession[S])` | Called when the transport closes (temporary disconnect or permanent destruction) |
+| `OnStructuralChange` | `func(*StatefulSession[S], StructuralChange)` | Called when Dynamic keys change between renders |
+| `OnNoPatch` | `func(*StatefulSession[S], NoPatch)` | Called when a render cycle produces no patches |
 | `Groups` | `[]*Group[S]` | Groups the session auto-joins on connect |
 | `Watchers` | `[]Watcher[S]` | Declarative subscriptions to Value and Bus |
 | `Components` | `[]ComponentMount[S]` | Declarative component mounts — events are dispatched by prefix |
@@ -91,7 +91,7 @@ When either callback is configured, the framework's own logging for that event i
 
 ### Timeouts
 
-`LiveConfig.Timeouts` groups duration-based settings:
+`StatefulConfig.Timeouts` groups duration-based settings:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
@@ -108,7 +108,7 @@ When either callback is configured, the framework's own logging for that event i
 
 ### Limits
 
-`LiveConfig.Limits` groups capacity constraints:
+`StatefulConfig.Limits` groups capacity constraints:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
@@ -141,7 +141,7 @@ When either callback is configured, the framework's own logging for that event i
 | `DiffStore` | `DiffStore` | External persistence for disconnected session snapshots (opt-in, nil by default). See [store](store.md) |
 | `SessionStore` | `SessionStore` | External persistence for session state — enables crash recovery and node migration (opt-in, nil by default). See [session-store](session-store.md) |
 | `Codec` | `SessionCodec[S]` | Custom serialisation for state `S` (nil = CBOR). Only used when SessionStore is set |
-| `OnRestore` | `func(*LiveSession[S])` | Called instead of OnConnect when a session is restored from the SessionStore. Falls back to OnConnect when nil |
+| `OnRestore` | `func(*StatefulSession[S])` | Called instead of OnConnect when a session is restored from the SessionStore. Falls back to OnConnect when nil |
 | `FreezeOnDisconnect` | `bool` | When true, disconnected sessions persist state to the SessionStore, release memory, and exit the command loop. Requires SessionStore. See [frozen mode](frozen-mode.md) |
 | `Protocol` | `protocol.Protocol` | HTTP protocol (default `protocol.Auto` — detects per request). See [transport](transport.md#protocol-awareness) |
 | `WireFormat` | `wire.Format` | Encoding for server-to-client updates (default `wire.JSON`) |
@@ -159,7 +159,7 @@ When either callback is configured, the framework's own logging for that event i
 
 ## Session
 
-`*tether.LiveSession[S]` is the handle for an active connection. Methods are safe to call from any goroutine.
+`*tether.StatefulSession[S]` is the handle for an active connection. Methods are safe to call from any goroutine.
 
 ### State
 
@@ -193,7 +193,7 @@ s.Push(push.Notification{...})         // Web Push notification
 
 ### Session (interface)
 
-`tether.Session` is a non-generic interface exposing LiveSession's side-effect methods without the state type parameter. It is available in `Handle`, `OnNavigate`, stateless page handlers, and reusable components.
+`tether.Session` is a non-generic interface exposing StatefulSession's side-effect methods without the state type parameter. It is available in `Handle`, `OnNavigate`, stateless page handlers, and reusable components.
 
 Because Session has no generic parameter, component handlers can accept it directly — they don't need to know the application's state type:
 
@@ -207,7 +207,7 @@ func todoHandle(sess tether.Session, ts TodoState, ev tether.Event) TodoState {
 
 Methods: `ID`, `Context`, `Go`, `Toast`, `Navigate`, `ReplaceURL`, `SetTitle`, `Announce`, `Flash`, `Signal`, `Signals`, `Push`, `Close`.
 
-`ID` returns an empty string in stateless page mode (PageConfig) — there is no persistent session. `Push` returns an error during pre-warming (initial GET) since no browser subscription exists yet. `Close` terminates the session's transport; in stateless page mode and tethertest it is a no-op. During live sessions all methods work normally.
+`ID` returns an empty string in stateless page mode (StatelessConfig) — there is no persistent session. `Push` returns an error during pre-warming (initial GET) since no browser subscription exists yet. `Close` terminates the session's transport; in stateless page mode and tethertest it is a no-op. During stateful sessions all methods work normally.
 
 ---
 
@@ -219,7 +219,7 @@ type Event struct {
     Action  string            // application-defined action name
     Data    map[string]string // event-specific key-value pairs
     EventID string            // monotonic counter for correlation
-    Target  string            // set by LiveConfig.Components to the mount prefix
+    Target  string            // set by StatefulConfig.Components to the mount prefix
 }
 
 // Accessors
@@ -293,7 +293,7 @@ p.Float64s("v")         // ([]float64, error)
 `*tether.Handler[S]` implements `http.Handler`.
 
 ```go
-h := tether.Live(app, cfg)
+h := tether.Stateful(app, cfg)
 mux.Handle("/app", h)
 
 h.Health()          // HealthStatus{Pending, Active, Disconnected}
@@ -333,14 +333,14 @@ group := tether.NewGroup[State]()
 group.Add(sess)
 group.Remove(sess)
 group.Len()       // member count
-group.All()       // iter.Seq[*LiveSession[S]]
+group.All()       // iter.Seq[*StatefulSession[S]]
 
-group.Broadcast(func(target *tether.LiveSession[State], s State) State {
+group.Broadcast(func(target *tether.StatefulSession[State], s State) State {
     s.Message = "hello"
     return s
 })
 
-group.BroadcastOthers(sender, func(target *tether.LiveSession[State], s State) State {
+group.BroadcastOthers(sender, func(target *tether.StatefulSession[State], s State) State {
     s.Message = "hello"
     return s
 })
@@ -348,7 +348,7 @@ group.BroadcastOthers(sender, func(target *tether.LiveSession[State], s State) S
 
 Optional callbacks: `group.OnJoin`, `group.OnLeave`.
 
-For auto-registration, pass groups via `LiveConfig.Groups`.
+For auto-registration, pass groups via `StatefulConfig.Groups`.
 
 ---
 
@@ -362,7 +362,7 @@ r.Route("/", router.Page[State]{Render: homeRender, Handle: homeHandle})
 r.Route("/settings", router.Page[State]{Render: settingsRender})
 r.NotFound(router.Page[State]{Render: notFoundRender})
 
-tether.Live(tether.App{}, tether.LiveConfig[State]{
+tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
     Render:       r.Render,
     Handle:       r.Handle,
     OnNavigate: r.OnNavigate(func(s *State, p tether.Params) { s.Page = p.Path }),
@@ -466,7 +466,7 @@ Wraps `Handle` for cross-cutting concerns. Applied outermost-first:
 ```go
 type Middleware[S any] func(HandleFunc[S]) HandleFunc[S]
 
-tether.Live(tether.App{}, tether.LiveConfig[State]{
+tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
     Middleware: []tether.Middleware[State]{withLogging, withAuth},
 })
 ```
@@ -555,7 +555,7 @@ h.Replaced()                     // last URL used ReplaceURL (not Navigate)
 
 ### Middleware
 
-`tethertest.Middleware` wraps the `Session`-based handler used by tethertest and `PageConfig`:
+`tethertest.Middleware` wraps the `Session`-based handler used by tethertest and `StatelessConfig`:
 
 ```go
 type HandleFunc[S any] func(tether.Session, S, tether.Event) S
@@ -612,7 +612,7 @@ Key behaviours:
 - **Auto-cleanup** — the subscription is removed when the session is destroyed (context cancelled)
 - **Thread-safe** — the callback runs on the session's command loop, never concurrently with Handle or other Updates
 
-Preferred usage is via `LiveConfig.Watchers` for declarative subscription:
+Preferred usage is via `StatefulConfig.Watchers` for declarative subscription:
 
 ```go
 Watchers: []tether.Watcher[State]{
@@ -665,7 +665,7 @@ Key behaviours:
 - **Auto-cleanup** — removed when the session is destroyed
 - **Thread-safe** — runs on the session's command loop
 
-Preferred usage is via `LiveConfig.Watchers` for declarative subscription:
+Preferred usage is via `StatefulConfig.Watchers` for declarative subscription:
 
 ```go
 Watchers: []tether.Watcher[State]{
@@ -722,12 +722,12 @@ s.Chat = tether.RouteTyped(s.Chat, "chat", sess, ev)
 
 `RouteTyped` is the common choice. It preserves compile-time type safety — the parent stores the concrete component type in its state struct with direct field access, no type assertions needed.
 
-### LiveConfig.Components
+### StatefulConfig.Components
 
 Declarative component mounting. The framework intercepts events matching each mount's prefix and dispatches them to the component's `Handle` — the page's `Handle` function never sees these events:
 
 ```go
-tether.LiveConfig[State]{
+tether.StatefulConfig[State]{
     Components: []tether.ComponentMount[State]{
         tether.Mount("likes",
             func(s State) counter.Counter { return s.Likes },
@@ -741,13 +741,13 @@ tether.LiveConfig[State]{
 }
 ```
 
-`Mount` follows the same pattern as `WatchValue` and `WatchBus`: a generic constructor that returns a non-generic interface, so `LiveConfig.Components` can hold mounts for different component types.
+`Mount` follows the same pattern as `WatchValue` and `WatchBus`: a generic constructor that returns a non-generic interface, so `StatefulConfig.Components` can hold mounts for different component types.
 
 Navigate events bypass mounts — they always reach `OnNavigate`.
 
 ### Event.Target
 
-When `LiveConfig.Components` dispatches an event, the framework sets `Event.Target` to the mount's prefix (e.g. `"likes"` or `"stars"`). Middleware and logging can inspect this field to identify which component handled the event without parsing the action string.
+When `StatefulConfig.Components` dispatches an event, the framework sets `Event.Target` to the mount's prefix (e.g. `"likes"` or `"stars"`). Middleware and logging can inspect this field to identify which component handled the event without parsing the action string.
 
 ### Event.WithAction
 
@@ -755,7 +755,7 @@ Returns a copy of the event with a different `Action`. Used by `Route`, `RouteTy
 
 ### Mounter
 
-Optional interface for one-time component setup. The framework calls `Mount` once per component during session startup (after the command loop starts, before any client events arrive) for components registered via `LiveConfig.Components`:
+Optional interface for one-time component setup. The framework calls `Mount` once per component during session startup (after the command loop starts, before any client events arrive) for components registered via `StatefulConfig.Components`:
 
 ```go
 type Mounter interface {
@@ -766,9 +766,9 @@ type Mounter interface {
 
 Use Mount for initial side effects — `sess.Toast("Ready")`, `sess.Signal(...)`, `sess.Go(...)` — that a component needs when it first appears. Components that don't need setup simply implement `Component` without `Mounter`.
 
-### Route vs LiveConfig.Components
+### Route vs StatefulConfig.Components
 
-Use `LiveConfig.Components` when the component is self-contained and the page's `Handle` never needs to see its events. Use `Route`/`RouteTyped` in Handle when you need to coordinate component events with other state changes.
+Use `StatefulConfig.Components` when the component is self-contained and the page's `Handle` never needs to see its events. Use `Route`/`RouteTyped` in Handle when you need to coordinate component events with other state changes.
 
 ### RouteMount
 

@@ -20,7 +20,7 @@ import (
     "github.com/jpl-au/fluent/node"
 )
 
-mux.Handle("/counter", tether.Live(tether.App{}, tether.LiveConfig[CounterState]{
+mux.Handle("/counter", tether.Stateful(tether.App{}, tether.StatefulConfig[CounterState]{
     Upgrade: ws.Upgrade(),
     InitialState: func(r *http.Request) CounterState {
         return CounterState{Count: 0}
@@ -55,7 +55,7 @@ sess.Announce("Item added to cart")
 
 ## How updates reach the browser
 
-tether uses a unified update protocol. Every message sent to the client is a single `"update"` type containing either **patches** (targeted content updates) or **morphs** (structural DOM changes). The default wire format is JSON (`wire.JSON`):
+Tether uses a unified update protocol. Every message sent to the client is a single `"update"` type containing either **patches** (targeted content updates) or **morphs** (structural DOM changes). The default wire format is JSON (`wire.JSON`):
 
 ```json
 {"type":"update","patches":[{"key":"count","html":"<span>43</span>"}]}
@@ -64,7 +64,7 @@ tether uses a unified update protocol. Every message sent to the client is a sin
 
 When only content changes (the common case), patches target specific keyed elements. When the structure changes — keys added, removed, or reordered — the server sends a root morph and the client uses [idiomorph](https://github.com/bigskysoftware/idiomorph) to update the entire root while preserving focus, scroll position, and form state.
 
-The wire format is configurable via `LiveConfig.WireFormat`. See the [transport docs](transport.md#wire-format) for details.
+The wire format is configurable via `StatefulConfig.WireFormat`. See the [transport docs](transport.md#wire-format) for details.
 
 ## Running the server
 
@@ -72,7 +72,7 @@ For a full-page application, `ListenAndServe` handles startup, signal
 trapping, and graceful shutdown:
 
 ```go
-h := tether.Live(tether.App{}, tether.LiveConfig[State]{
+h := tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
     Upgrade:      ws.Upgrade(),
     Fallback:     sse.Upgrade(),
     Mode:         mode.Both,
