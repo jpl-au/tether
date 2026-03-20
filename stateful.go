@@ -15,18 +15,18 @@ import (
 
 // Stateful creates a [Handler] that maintains a persistent connection
 // (WebSocket or SSE) between browser and server. State survives
-// across interactions — when the user triggers an event, the server
+// across interactions - when the user triggers an event, the server
 // updates state and pushes the change without a page reload.
 //
 // Use Stateful for interactive applications: dashboards, forms, chat,
-// real-time collaboration — anything where the server needs to push
+// real-time collaboration - anything where the server needs to push
 // updates or maintain session state between interactions.
 //
 // For traditional request/response pages that reconstruct state from
 // each HTTP request, use [Stateless] instead.
 //
 // Session lifecycle is managed by per-session timers (idle, lifetime,
-// disconnect) — there is no centralised reaper goroutine. A
+// disconnect) - there is no centralised reaper goroutine. A
 // lightweight pending-cleanup goroutine removes pre-warmed sessions
 // that are never claimed.
 //
@@ -43,16 +43,16 @@ func Stateful[S any](app App, cfg StatefulConfig[S]) *Handler[S] {
 		panic("tether: StatefulConfig.Handle is required")
 	}
 	if cfg.Mode == mode.HTTP {
-		panic("tether: mode.HTTP is for tether.Page — use mode.WebSocket, mode.ServerSentEvents, or mode.Both")
+		panic("tether: mode.HTTP is for tether.Page - use mode.WebSocket, mode.ServerSentEvents, or mode.Both")
 	}
 	if cfg.Mode == 0 {
 		cfg.Mode = mode.Both
 	}
 	if cfg.Mode != mode.ServerSentEvents && cfg.Upgrade == nil {
-		panic("tether: StatefulConfig.Upgrade is required — use ws.Upgrade() or set Mode to mode.ServerSentEvents")
+		panic("tether: StatefulConfig.Upgrade is required - use ws.Upgrade() or set Mode to mode.ServerSentEvents")
 	}
 	if cfg.Mode != mode.WebSocket && cfg.Fallback == nil {
-		panic("tether: StatefulConfig.Fallback is required — use sse.Upgrade() or set Mode to mode.WebSocket")
+		panic("tether: StatefulConfig.Fallback is required - use sse.Upgrade() or set Mode to mode.WebSocket")
 	}
 	// Compose OnNavigate into Handle so the middleware chain applies
 	// to navigate events. Without this, navigate events bypass
@@ -84,7 +84,7 @@ func Stateful[S any](app App, cfg StatefulConfig[S]) *Handler[S] {
 		case "", "AUTO":
 			cfg.Protocol = protocol.Auto
 		default:
-			slog.Warn("tether: unrecognised TETHER_PROTO value — using Auto",
+			slog.Warn("tether: unrecognised TETHER_PROTO value - using Auto",
 				"value", os.Getenv("TETHER_PROTO"))
 			cfg.Protocol = protocol.Auto
 		}
@@ -124,10 +124,10 @@ func Stateful[S any](app App, cfg StatefulConfig[S]) *Handler[S] {
 		cfg.Limits.CmdBufferSize = defaultCmdBufferSize
 	}
 	if cfg.Limits.MaxSessions == 0 && !app.DevMode {
-		slog.Warn("tether: Limits.MaxSessions is 0 (unlimited) — set a limit in production to prevent resource exhaustion")
+		slog.Warn("tether: Limits.MaxSessions is 0 (unlimited) - set a limit in production to prevent resource exhaustion")
 	}
 	if cfg.FreezeOnDisconnect && cfg.SessionStore == nil {
-		slog.Warn("tether: FreezeOnDisconnect requires a SessionStore — frozen mode disabled because there is nowhere to persist state")
+		slog.Warn("tether: FreezeOnDisconnect requires a SessionStore - frozen mode disabled because there is nowhere to persist state")
 		cfg.FreezeOnDisconnect = false
 	}
 	mounts := app.mountAssets()

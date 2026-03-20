@@ -80,7 +80,7 @@ func (h *Handler[S]) Shutdown(ctx context.Context) error {
 		return ctx.Err()
 	}
 
-	// Loops have exited — state is stable, no goroutine is mutating
+	// Loops have exited - state is stable, no goroutine is mutating
 	// s.state. Save with context.Background() since session contexts
 	// are cancelled. TTL uses the shutdown grace period as a recovery
 	// window for the restarting server.

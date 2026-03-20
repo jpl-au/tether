@@ -14,7 +14,7 @@ import (
 )
 
 // StructuralChange describes a diff result where the render tree's
-// Dynamic key set changed — keys were added, removed, or reordered.
+// Dynamic key set changed - keys were added, removed, or reordered.
 // This forces a full root morph instead of targeted patches. The
 // fields mirror [jit.StructuralChange] so callers don't need to import
 // the diff engine package.
@@ -35,7 +35,7 @@ type NoPatch struct {
 
 // RenderFunc builds a Fluent node tree from the current state. It is
 // called on initial page render, after each client event, and after
-// each call to [Session.Update]. The function must be pure — given the
+// each call to [Session.Update]. The function must be pure - given the
 // same state it must always produce the same tree, because the diff
 // engine compares consecutive renders to compute patches.
 type RenderFunc[S any] func(state S) node.Node
@@ -49,7 +49,7 @@ const defaultCmdBufferSize = 64
 // engine, and a command-loop goroutine that serialises all state
 // mutations.
 //
-// All exported methods are safe to call from any goroutine — including
+// All exported methods are safe to call from any goroutine - including
 // from within Handle. The command loop processes them in order; there
 // is no mutex and no deadlock risk.
 type StatefulSession[S any] struct {
@@ -71,7 +71,7 @@ type StatefulSession[S any] struct {
 	// the loop picks them up and sends them as standalone updates.
 	fxCh chan func(*Effects)
 
-	// Session lifetime — cancelled on permanent destruction.
+	// Session lifetime - cancelled on permanent destruction.
 	ctx  context.Context
 	stop context.CancelFunc
 	// loopDone is closed each time run() exits. The HTTP handler
@@ -81,7 +81,7 @@ type StatefulSession[S any] struct {
 	loopDone chan struct{}
 	// destroyed is closed when the session reaches the Destroyed
 	// state. Shutdown and Drain block on this to wait for permanent
-	// cleanup — not just a loop exit (which also happens on freeze).
+	// cleanup - not just a loop exit (which also happens on freeze).
 	destroyed chan struct{}
 
 	// Timestamps. lastActivity is atomic so the idle timer reset
@@ -95,7 +95,7 @@ type StatefulSession[S any] struct {
 	status atomic.Int32
 	// stateSnap holds the most recently completed state, updated
 	// atomically after every mutation in exec() and Update(). State()
-	// returns this value when the loop is active — no channel
+	// returns this value when the loop is active - no channel
 	// round-trip, no blocking.
 	stateSnap atomic.Value
 
@@ -127,18 +127,18 @@ type StatefulSession[S any] struct {
 	endpoint string
 
 	// userAgent is the User-Agent header captured when the session was
-	// created. Used for session binding — on reconnect, the framework
+	// created. Used for session binding - on reconnect, the framework
 	// verifies the reconnecting client's UA matches the original to
 	// detect stolen session IDs.
 	userAgent string
 
 	// Last URL and title sent to the client. Captured in send() so
-	// reattach can replay them — the browser's address bar and title
+	// reattach can replay them - the browser's address bar and title
 	// are separate from the DOM and would otherwise desync.
 	lastURL   string
 	lastTitle string
 
-	// Push — sender is set from StatefulConfig, subscription arrives at runtime.
+	// Push - sender is set from StatefulConfig, subscription arrives at runtime.
 	// pushSub is atomic so Push() can read it safely from any goroutine
 	// without routing through the command channel.
 	pushSender *push.Sender
@@ -159,7 +159,7 @@ type StatefulSession[S any] struct {
 	// user's Handle function runs.
 	mounts []ComponentMount[S]
 
-	// Optional equality check — skip render when state unchanged.
+	// Optional equality check - skip render when state unchanged.
 	equal func(a, b S) bool
 
 	// Optional telemetry hook for structural diff changes.
@@ -187,7 +187,7 @@ type StatefulSession[S any] struct {
 	// freeze is true when FreezeOnDisconnect is enabled and a
 	// SessionStore is configured. When set, the session persists
 	// state to the store on disconnect, releases S and the differ,
-	// and exits the command loop — reducing memory to metadata only.
+	// and exits the command loop - reducing memory to metadata only.
 	freeze bool
 
 	// diagnostics is the handler's diagnostic bus. The session emits
@@ -205,7 +205,7 @@ type StatefulSession[S any] struct {
 // capture implementation buffers side effects. In tethertest a
 // test double captures them for assertions.
 //
-// Session is deliberately non-generic — component handlers can
+// Session is deliberately non-generic - component handlers can
 // accept it without inheriting the application's state type
 // parameter, making them reusable across different page states.
 type Session interface {
@@ -227,7 +227,7 @@ type Session interface {
 	Push(n push.Notification) error
 	// Close terminates the session by closing its transport. In
 	// stateless mode ([CaptureSession]) and tethertest this is
-	// a no-op — there is no persistent connection to close.
+	// a no-op - there is no persistent connection to close.
 	Close()
 }
 
@@ -269,7 +269,7 @@ func (cs *CaptureSession) ID() string { return cs.SessionID }
 func (cs *CaptureSession) Context() context.Context { return context.Background() }
 
 // Go spawns a goroutine against a background context. Anything
-// launched during pre-warm runs independently — there is no command
+// launched during pre-warm runs independently - there is no command
 // loop to synchronise with yet.
 func (cs *CaptureSession) Go(fn func(context.Context)) {
 	go fn(context.Background())
@@ -354,7 +354,7 @@ func (s *StatefulSession[S]) ID() string {
 
 // Context returns a context that is cancelled when the session is
 // permanently destroyed (reaped or shutdown). The context survives
-// temporary disconnects and reconnects — use it for background
+// temporary disconnects and reconnects - use it for background
 // goroutines that should keep running while the client is away.
 func (s *StatefulSession[S]) Context() context.Context {
 	if s.ctx != nil {
@@ -380,7 +380,7 @@ func (s *StatefulSession[S]) sessionID() string {
 
 // enqueueFx sends an effect closure to the effects channel. Under
 // normal load the send is non-blocking. When the buffer is full,
-// an overflow goroutine delivers it — same semaphore-bounded
+// an overflow goroutine delivers it - same semaphore-bounded
 // pattern as [enqueue].
 func (s *StatefulSession[S]) enqueueFx(fn func(*Effects)) {
 	if Status(s.status.Load()) == Frozen {

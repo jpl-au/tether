@@ -14,7 +14,7 @@ import (
 // session with the diff state and embeds the session ID in the root
 // element so the client can reclaim it when the transport connects.
 func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
-	// No origin check on the initial page GET — it is a safe method.
+	// No origin check on the initial page GET - it is a safe method.
 	// MaxPending caps pre-warmed sessions to prevent resource exhaustion
 	// from cross-origin <img> tag abuse.
 	if h.draining.Load() {
@@ -102,7 +102,7 @@ func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 }
 
 // serveSession upgrades the connection and starts the session command
-// loop. It checks pools in priority order — disconnected first (so a
+// loop. It checks pools in priority order - disconnected first (so a
 // reconnecting client recovers its state), then pending (the normal
 // path after a page load), and finally creates a fresh session as a
 // fallback for direct transport connections without a prior GET.
@@ -147,7 +147,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		h.active[id] = sess
 		h.mu.Unlock()
 
-		// Clean up stored data — Render rebuilds differ snapshots,
+		// Clean up stored data - Render rebuilds differ snapshots,
 		// and state S is already current in memory (or will be loaded
 		// from the store for frozen sessions).
 		if h.cfg.DiffStore != nil {
@@ -179,7 +179,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 			}
 			dev.Debug("session reattached", "session", id, "endpoint", sess.endpoint, "remote", r.RemoteAddr)
 			h.reattach(sess, transport)
-			// Block so the HTTP goroutine stays alive — SSE
+			// Block so the HTTP goroutine stays alive - SSE
 			// transports need r.Context() to remain valid.
 			<-sess.loopDone
 		}
@@ -359,7 +359,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 	dev.Debug("session ready", "session", sess.id, "endpoint", sess.endpoint)
 
 	// Block until the session loop exits. The HTTP handler goroutine
-	// must stay alive to keep r.Context() valid — both the WebSocket
+	// must stay alive to keep r.Context() valid - both the WebSocket
 	// and SSE transports use it for reads and writes. If we returned
 	// here, net/http would cancel the context and kill the connection
 	// immediately.

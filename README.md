@@ -6,9 +6,9 @@ Tether connects Fluent's node trees to the browser via WebSocket (with SSE fallb
 
 Three update modes give you the right tool for every situation:
 
-- **Server rendering** — the default. Handle returns new state, the framework diffs and sends patches or morphs. Works for everything.
-- **Signals** — push individual values from the server and bound elements update instantly with no render cycle. Ideal for counters, progress bars, and status indicators.
-- **Client directives** — toggle classes, attributes, and signals entirely in the browser. Perfect for menus, modals, and optimistic updates.
+- **Server rendering** - the default. Handle returns new state, the framework diffs and sends patches or morphs. Works for everything.
+- **Signals** - push individual values from the server and bound elements update instantly with no render cycle. Ideal for counters, progress bars, and status indicators.
+- **Client directives** - toggle classes, attributes, and signals entirely in the browser. Perfect for menus, modals, and optimistic updates.
 
 ## Quick example
 
@@ -48,20 +48,20 @@ No WebSocket boilerplate. No JavaScript to write. No diff algorithm to understan
 
 Tether offers two handler modes:
 
-**Stateful** (`tether.Stateful`) — maintains a persistent connection
+**Stateful** (`tether.Stateful`) - maintains a persistent connection
 (WebSocket or SSE) between browser and server. State lives in memory
 across interactions. The server can push updates at any time. Use this
-for dashboards, chat, real-time collaboration — anything where the
+for dashboards, chat, real-time collaboration - anything where the
 server needs to push updates or maintain session state.
 
-**Stateless** (`tether.Stateless`) — traditional HTTP request/response.
+**Stateless** (`tether.Stateless`) - traditional HTTP request/response.
 State is reconstructed from each request. No persistent connection, no
 session pool. Use this for forms, navigation, and pages where each
 interaction is independent. See [stateless pages](docs/stateless.md)
 for details.
 
 Both modes share the same rendering engine, event system, and bind
-helpers. The difference is how state is managed — persistent or
+helpers. The difference is how state is managed - persistent or
 per-request.
 
 ## Standalone server
@@ -89,7 +89,7 @@ exits.
 
 ## Embedded assets
 
-Serve CSS, JS, and images from an `embed.FS` with automatic content-hashed URLs. Add assets to `App.Assets` and they're auto-served — no extra mux setup needed:
+Serve CSS, JS, and images from an `embed.FS` with automatic content-hashed URLs. Add assets to `App.Assets` and they're auto-served - no extra mux setup needed:
 
 ```go
 //go:embed static
@@ -117,20 +117,20 @@ tether.Stateful(app, tether.StatefulConfig[State]{
 
 Two independent, opt-in stores handle different concerns:
 
-**Session store** — persists application state `S` for crash recovery and node
+**Session store** - persists application state `S` for crash recovery and node
 migration. Set `StatefulConfig.SessionStore` to enable. On disconnect and graceful
 shutdown, the framework serialises `S` (CBOR by default) and saves it. When a
 reconnecting client hits a server with no in-memory session, the framework
 restores from the store. See [session-store](docs/session-store.md) for details.
 
-**Diff store** — offloads differ snapshots to external storage during the
+**Diff store** - offloads differ snapshots to external storage during the
 reconnect window, freeing Go memory. Set `StatefulConfig.DiffStore` to enable. This is
 a memory optimisation, not a recovery mechanism. See [store](docs/store.md) for
 details.
 
 ## Diagnostics
 
-`Handler.Diagnostics` is a typed event bus for framework-level signals —
+`Handler.Diagnostics` is a typed event bus for framework-level signals  - 
 transport errors, panics, buffer overflows, and more. Subscribe for metrics,
 alerting, or custom logging. See [operations](docs/operations.md#diagnostics-bus)
 for details and examples.
@@ -140,6 +140,7 @@ for details and examples.
 | Guide | Description |
 |-------|-------------|
 | [Architecture](docs/architecture.md) | Core concepts, session lifecycle, command loop, transport |
+| [Reactivity](docs/reactivity.md) | Observer pattern, event-driven design, how Bus/Value/Group compose |
 | [API reference](docs/api.md) | App, StatefulConfig, Session, Event, Component, Middleware, tethertest, bind helpers |
 | [Getting started](docs/getting-started.md) | Setup, how updates reach the browser |
 | [Stateless pages](docs/stateless.md) | `tether.Stateless` for request/response pages without persistent connections |

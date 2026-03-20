@@ -8,13 +8,13 @@ Event type constants live in the `event` package. Import `github.com/jpl-au/teth
 |----------|-----------|---------|
 | `event.Click` | `"click"` | Button or element click |
 | `event.Input` | `"input"` | Text input value change (debounced by default) |
-| `event.Submit` | `"submit"` | Form submission — includes all named field values |
+| `event.Submit` | `"submit"` | Form submission - includes all named field values |
 | `event.Change` | `"change"` | Select, checkbox, or radio commit |
-| `event.KeyDown` | `"keydown"` | Key press — key name and modifiers in `ev.Data` |
+| `event.KeyDown` | `"keydown"` | Key press - key name and modifiers in `ev.Data` |
 | `event.Focus` | `"focus"` | Element receives focus |
 | `event.Blur` | `"blur"` | Element loses focus |
 | `event.Navigate` | `"navigate"` | Client-side navigation (pushState) |
-| `event.Viewport` | `"viewport"` | Element enters the viewport — used for infinite scroll |
+| `event.Viewport` | `"viewport"` | Element enters the viewport - used for infinite scroll |
 | `event.Online` | `"online"` | Browser connection restored |
 | `event.Offline` | `"offline"` | Browser connection lost |
 | `event.AppInstalled` | `"appinstalled"` | PWA installed to home screen |
@@ -75,7 +75,7 @@ bind.Apply(input.Text("q", ""),
 
 ### Throttle
 
-Minimum interval between events — useful for scroll or resize handlers:
+Minimum interval between events - useful for scroll or resize handlers:
 
 ```go
 bind.Apply(div.New(),
@@ -165,7 +165,7 @@ ev.Bind(&form)
 
 ## Extra data
 
-Attach static key-value pairs to any event — they arrive in `ev.Data`:
+Attach static key-value pairs to any event - they arrive in `ev.Data`:
 
 ```go
 bind.Apply(button.Text("Delete"),
@@ -189,7 +189,7 @@ The event is only sent when that key is pressed. Use `ev.Key()` in Handle to rea
 
 ## PWA and connectivity events
 
-`event.Online`, `event.Offline`, and `event.AppInstalled` are fired automatically by the client JS when the corresponding browser events occur. No bind helper is needed — the events arrive as regular server events:
+`event.Online`, `event.Offline`, and `event.AppInstalled` are fired automatically by the client JS when the corresponding browser events occur. No bind helper is needed - the events arrive as regular server events:
 
 ```go
 Handle: func(_ tether.Session, s State, ev tether.Event) State {
@@ -197,7 +197,7 @@ Handle: func(_ tether.Session, s State, ev tether.Event) State {
     case "online":
         s.Status = "Connected"
     case "offline":
-        s.Status = "Offline — changes will sync when reconnected"
+        s.Status = "Offline - changes will sync when reconnected"
     case "appinstalled":
         s.Installed = true
     }
@@ -205,7 +205,7 @@ Handle: func(_ tether.Session, s State, ev tether.Event) State {
 },
 ```
 
-`event.Viewport` fires when a bound element scrolls into the viewport — useful for infinite scroll and lazy loading:
+`event.Viewport` fires when a bound element scrolls into the viewport - useful for infinite scroll and lazy loading:
 
 ```go
 bind.Apply(div.New().ID("sentinel"), bind.OnViewport("load-more"))
@@ -213,7 +213,7 @@ bind.Apply(div.New().ID("sentinel"), bind.OnViewport("load-more"))
 
 ## Component event routing
 
-When using `StatefulConfig.Components`, events are dispatched by prefix before reaching the page's `Handle`. An event with action `"likes.increment"` is routed to the component mounted at prefix `"likes"` — the component receives the event with action `"increment"` (prefix stripped).
+When using `StatefulConfig.Components`, events are dispatched by prefix before reaching the page's `Handle`. An event with action `"likes.increment"` is routed to the component mounted at prefix `"likes"` - the component receives the event with action `"increment"` (prefix stripped).
 
 ### Event.Target
 

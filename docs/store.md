@@ -2,7 +2,7 @@
 
 > For session state persistence (crash recovery, node migration), see
 > [SessionStore](session-store.md). DiffStore and SessionStore are
-> independent concerns — different data, different lifecycles.
+> independent concerns - different data, different lifecycles.
 
 ## What it does
 
@@ -10,7 +10,7 @@ Disconnected sessions keep their differ snapshots in process memory while
 waiting to reconnect. The `DiffStore` interface lets you move that data to
 external storage during the reconnect window, freeing Go memory.
 
-By default (`StatefulConfig.DiffStore` is nil), nothing changes — sessions stay in
+By default (`StatefulConfig.DiffStore` is nil), nothing changes - sessions stay in
 memory exactly as they always have. Set `StatefulConfig.DiffStore` to opt in.
 
 ## The interface
@@ -24,7 +24,7 @@ type DiffStore interface {
 ```
 
 The `data` is an opaque blob produced by the differ's export method.
-DiffStore implementations must not interpret or modify the bytes — the
+DiffStore implementations must not interpret or modify the bytes - the
 encoding is an internal detail that may change between framework versions.
 
 Implementations must be safe for concurrent use.
@@ -43,8 +43,8 @@ Destroy  →  Delete
 
 1. The differ's snapshots are exported to `[]byte`
 2. `DiffStore.Save(ctx, sessionID, data)` persists the bytes
-3. If Save succeeds, the differ is cleared — memory freed
-4. If Save fails, nothing is cleared — data stays in the differ, a
+3. If Save succeeds, the differ is cleared - memory freed
+4. If Save fails, nothing is cleared - data stays in the differ, a
    `StoreError` diagnostic is emitted, and the session continues as
    if no store were configured
 
@@ -66,7 +66,7 @@ simpler and eliminates a failure point.
 
 ## Writing a DiffStore implementation
 
-The framework ships no implementations — you provide your own. A DiffStore
+The framework ships no implementations - you provide your own. A DiffStore
 is a dumb key-value store keyed by session ID. Here is a minimal
 in-memory example to show the shape:
 
@@ -118,7 +118,7 @@ h := tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
 `DiffStore.Load` is defined on the interface but not called by the framework
 today. It exists for tooling, debugging, and potential future
 optimisations. If you are writing a DiffStore implementation, implement Load
-— but know that the framework will not call it during normal operation.
+ -  but know that the framework will not call it during normal operation.
 
 ## Failure behaviour
 

@@ -118,7 +118,7 @@ func (g *Group[S]) Len() int {
 }
 
 // All returns an iterator over sessions in the group. The map is
-// read via a single atomic load — no lock is held during iteration,
+// read via a single atomic load - no lock is held during iteration,
 // so it is safe to call Add, Remove, or Broadcast from within the
 // loop body.
 func (g *Group[S]) All() iter.Seq[*StatefulSession[S]] {
@@ -134,7 +134,7 @@ func (g *Group[S]) All() iter.Seq[*StatefulSession[S]] {
 // Broadcast applies fn to every session in the group. The callback
 // receives the target session so side-effect methods (Toast, Navigate,
 // etc.) are called on the correct session. Each session's Update is
-// non-blocking — it queues a command on the session's channel — so
+// non-blocking - it queues a command on the session's channel - so
 // Broadcast does not spawn goroutines per session.
 //
 // Safe to call from any goroutine, including from within Handle.

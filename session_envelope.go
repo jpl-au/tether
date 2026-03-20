@@ -5,7 +5,7 @@ import "github.com/fxamacker/cbor/v2"
 // sessionEnvelope wraps the codec-encoded state bytes with session
 // metadata that the framework needs to restore a session on crash
 // recovery or node migration. The envelope is what gets passed to
-// SessionStore — the store sees opaque bytes and never interprets
+// SessionStore - the store sees opaque bytes and never interprets
 // the contents.
 //
 // The codec handles S (the developer's state). The envelope handles
@@ -31,7 +31,7 @@ type sessionEnvelope struct {
 
 	// UserAgent is the User-Agent header captured when the session
 	// was created. Verified on restore to detect stolen session IDs
-	// — a reconnecting client must present the same User-Agent.
+	// - a reconnecting client must present the same User-Agent.
 	UserAgent string `cbor:"user_agent"`
 }
 

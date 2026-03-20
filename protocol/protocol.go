@@ -30,7 +30,7 @@ const (
 	// or behind an HTTP/2-aware proxy.
 	HTTP2
 
-	// HTTP3 indicates HTTP/3 (QUIC). Reserved for future use — the
+	// HTTP3 indicates HTTP/3 (QUIC). Reserved for future use - the
 	// Go ecosystem does not yet have standard library support for
 	// HTTP/3. When support lands, this constant enables
 	// QUIC-specific features.

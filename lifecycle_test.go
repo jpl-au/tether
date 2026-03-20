@@ -15,7 +15,7 @@ func TestStateBeforeLoopDoesNotDeadlock(t *testing.T) {
 		ct := newConnectedTransport()
 		sess := newTestSession(counterState{Count: 42}, ct)
 
-		// State() before run() — must not deadlock.
+		// State() before run() - must not deadlock.
 		got := sess.State()
 		if got.Count != 42 {
 			t.Errorf("State() before loop: got Count=%d, want 42", got.Count)

@@ -2,9 +2,9 @@
 
 ## Overview
 
-`tether.Stateless` creates an `http.Handler` for traditional request/response pages — no WebSocket, no SSE, no persistent connection. Each request is independent: the server reconstructs state, renders HTML, and returns the response.
+`tether.Stateless` creates an `http.Handler` for traditional request/response pages - no WebSocket, no SSE, no persistent connection. Each request is independent: the server reconstructs state, renders HTML, and returns the response.
 
-Despite being stateless, pages get the same client-side features as live handlers: event binding, debounce, throttle, loading states, client-side directives, signals, transitions, and the morph engine. The only difference is the transport — events travel as individual fetch POST requests instead of a persistent channel.
+Despite being stateless, pages get the same client-side features as live handlers: event binding, debounce, throttle, loading states, client-side directives, signals, transitions, and the morph engine. The only difference is the transport - events travel as individual fetch POST requests instead of a persistent channel.
 
 Use `tether.Stateless` when you don't need server push, live updates, or broadcasting. It works well for forms, CRUD interfaces, dashboards, and any page where the server only needs to respond to user actions.
 
@@ -24,9 +24,9 @@ GET requests render the full page. POST requests handle a client event, render t
 
 ## How it works
 
-1. **GET** — `InitialState(r)` creates state from the request, `OnNavigate` (if set) processes URL parameters, `Render` builds the node tree, `Layout` (if set) wraps it in a document shell, and the HTML is written to the response.
+1. **GET** - `InitialState(r)` creates state from the request, `OnNavigate` (if set) processes URL parameters, `Render` builds the node tree, `Layout` (if set) wraps it in a document shell, and the HTML is written to the response.
 
-2. **POST** — `InitialState(r)` reconstructs state from scratch (stateless — no memory of previous requests), `Handle` processes the event, `Render` builds the new tree, and the framework returns a JSON update with a root morph and any side effects. The client morphs the page in place.
+2. **POST** - `InitialState(r)` reconstructs state from scratch (stateless - no memory of previous requests), `Handle` processes the event, `Render` builds the new tree, and the framework returns a JSON update with a root morph and any side effects. The client morphs the page in place.
 
 The POST response uses the same wire format as stateful mode, so the client JS handles both identically. The key difference: stateful mode sends targeted patches to keyed elements, while stateless mode always sends a full root morph (since there is no previous tree to diff against).
 
@@ -43,14 +43,14 @@ app := tether.App{
 tether.Stateless(app, tether.StatelessConfig[State]{
     // Required: reconstruct state from the HTTP request.
     // Called on every request (GET and POST). Derive state from
-    // the URL, cookies, headers, or a database — not from r.Body.
+    // the URL, cookies, headers, or a database - not from r.Body.
     InitialState: func(r *http.Request) State { ... },
 
     // Required: build a node tree from the current state.
     Render: func(s State) node.Node { ... },
 
     // Required: process a client event and return the new state.
-    // The session parameter is a Session — call Toast, Navigate,
+    // The session parameter is a Session - call Toast, Navigate,
     // Flash, etc. for side effects.
     Handle: func(sess tether.Session, s State, ev tether.Event) State { ... },
 
@@ -75,7 +75,7 @@ tether.Stateless(app, tether.StatelessConfig[State]{
 
 | Feature | `tether.Stateless` | `tether.Stateful` |
 |---------|-------------|------------|
-| State creation | `InitialState(r)` — every request | `InitialState(r)` — once per session |
+| State creation | `InitialState(r)` - every request | `InitialState(r)` - once per session |
 | Transport | HTTP POST/response | WebSocket or SSE |
 | Handle parameter | `Session` only | `Session` (type-assert to `*StatefulSession` for Update and State) |
 | Server push | No | Yes (Update, Signal, Toast from any goroutine) |
@@ -134,7 +134,7 @@ tether.Stateless(tether.App{}, tether.StatelessConfig[State]{
 })
 ```
 
-`bind.Link` anchors trigger client-side navigation — the JS runtime POSTs a navigate event instead of doing a full page load.
+`bind.Link` anchors trigger client-side navigation - the JS runtime POSTs a navigate event instead of doing a full page load.
 
 ## Side effects
 
@@ -153,17 +153,17 @@ func handle(sess tether.Session, s State, ev tether.Event) State {
 
 Available methods on `Session`: `Toast`, `Navigate`, `ReplaceURL`, `SetTitle`, `Announce`, `Flash`, `Signal`, `Signals`, `Push`.
 
-Note: `Session.ID()` returns an empty string in stateless mode — there is no persistent session. `Push` returns `ErrPushPreWarm`.
+Note: `Session.ID()` returns an empty string in stateless mode - there is no persistent session. `Push` returns `ErrPushPreWarm`.
 
 ## When to upgrade to stateful mode
 
 Start with `tether.Stateless` and upgrade to `tether.Stateful` when you need:
 
-- **Server push** — the server initiating updates without a client event (timers, database changes, external webhooks)
-- **Broadcasting** — pushing updates to multiple users simultaneously
-- **Background goroutines** — long-running work tied to a session's lifetime
-- **File uploads** — streaming files via the upload extension
-- **Push notifications** — Web Push via the service worker
+- **Server push** - the server initiating updates without a client event (timers, database changes, external webhooks)
+- **Broadcasting** - pushing updates to multiple users simultaneously
+- **Background goroutines** - long-running work tied to a session's lifetime
+- **File uploads** - streaming files via the upload extension
+- **Push notifications** - Web Push via the service worker
 
 The `Render` function, `HandleFunc` signature, `OnNavigate`, `Layout`, event bindings, `StatefulConfig.Components`, and the `router` package all work identically in both modes. Upgrading typically means changing `tether.Stateless(app, StatelessConfig{...})` to `tether.Stateful(app, StatefulConfig{...})` and adding transport configuration.
 

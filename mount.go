@@ -6,7 +6,7 @@ import "strings"
 // Create mounts with [Mount] and list them in [StatefulConfig.Components].
 //
 // ComponentMount has unexported methods so the framework controls
-// dispatch — callers cannot implement this interface directly.
+// dispatch - callers cannot implement this interface directly.
 type ComponentMount[S any] interface {
 	route(sess Session, state S, ev Event) (S, bool)
 
@@ -18,7 +18,7 @@ type ComponentMount[S any] interface {
 
 // Mount creates a [ComponentMount] that wires a [Component]-implementing
 // type into the session's event dispatch. The prefix identifies the
-// component's event namespace — events with actions starting with
+// component's event namespace - events with actions starting with
 // "prefix." are routed to the component. The getter extracts the
 // component from S; the setter writes the updated component back.
 //

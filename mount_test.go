@@ -237,7 +237,7 @@ func TestMounterCalledOnInit(t *testing.T) {
 }
 
 func TestInitMountsSkipsNonMounter(t *testing.T) {
-	// testWidget does not implement Mounter — InitMounts should not panic.
+	// testWidget does not implement Mounter - InitMounts should not panic.
 	mounts := []ComponentMount[mountState]{
 		Mount("widget",
 			func(s mountState) testWidget { return s.Widget },
@@ -275,7 +275,7 @@ func TestMountNavigateBypassesMounts(t *testing.T) {
 		synctest.Wait()
 
 		got := sess.State()
-		// The mount should NOT have handled this — Count stays 0.
+		// The mount should NOT have handled this - Count stays 0.
 		if got.Widget.Count != 0 {
 			t.Errorf("Widget.Count = %d, want 0 (navigate should bypass mounts)", got.Widget.Count)
 		}

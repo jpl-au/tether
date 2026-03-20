@@ -10,10 +10,10 @@ import (
 // emitter is the internal capability marker that [Bus.Emit] uses to
 // distinguish sessions with a live command loop from other [Session]
 // implementations. It is unexported so developers never need to know it
-// exists — they pass the Session they already have.
+// exists - they pass the Session they already have.
 //
 // [*StatefulSession] satisfies emitter via its command-loop enqueue.
-// [*CaptureSession] satisfies emitter with synchronous enqueue —
+// [*CaptureSession] satisfies emitter with synchronous enqueue  - 
 // the function runs immediately in the caller's goroutine.
 type emitter interface {
 	enqueue(fn func())
@@ -32,7 +32,7 @@ type emitter interface {
 //
 // Internally the subscriber map is stored in an [atomic.Value] so
 // publish is completely lock-free. Subscribe and unsubscribe use a
-// write mutex and copy-on-write semantics — they are rare relative
+// write mutex and copy-on-write semantics - they are rare relative
 // to publish so the copy cost is negligible.
 type Bus[E any] struct {
 	// wmu serialises writes (subscribe/unsubscribe). Reads go
@@ -59,15 +59,15 @@ func NewBus[E any]() *Bus[E] {
 
 // Emit publishes a domain event with sender filtering. Subscriptions
 // registered via [On] whose session ID matches the emitting session
-// are skipped — the sender's Handle already updated its own state.
+// are skipped - the sender's Handle already updated its own state.
 //
 // Behaviour varies by context:
 //   - Stateful session ([*StatefulSession]): the publication is enqueued on the
-//     session's command loop. This preserves ordering — the sender's
+//     session's command loop. This preserves ordering - the sender's
 //     diff reaches the client before other subscribers react.
 //   - Pre-warm or test ([*CaptureSession]): synchronous publish.
 //     CaptureSession executes enqueue inline, so publish runs
-//     immediately in the caller's goroutine — deterministic in tests,
+//     immediately in the caller's goroutine - deterministic in tests,
 //     harmless during pre-warm (no subscribers).
 func (b *Bus[E]) Emit(s Session, event E) {
 	if em, ok := s.(emitter); ok {
@@ -95,7 +95,7 @@ func (b *Bus[E]) Publish(event E) {
 // filter). The subscription lives until ctx is cancelled. Returns an
 // unsubscribe function for early removal.
 //
-// The callback runs synchronously in the publisher's goroutine — it
+// The callback runs synchronously in the publisher's goroutine - it
 // must not block. If the publisher is a session (via [Bus.Emit]), a
 // blocking callback stalls that session's command loop. For expensive
 // work, use [Bus.SubscribeAsync] or [On] which routes through the
@@ -181,7 +181,7 @@ func (b *Bus[E]) remove(id uint64) {
 	b.subs.Store(subs)
 }
 
-// publish iterates the subscriber map with no lock — the atomic load
+// publish iterates the subscriber map with no lock - the atomic load
 // returns a consistent snapshot. Subscribers whose sessionID matches
 // senderID are skipped. Async subscribers run in their own goroutine.
 func (b *Bus[E]) publish(event E, senderID string) {

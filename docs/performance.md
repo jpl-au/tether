@@ -8,7 +8,7 @@ The generic helpers are ~47% slower than calling `SetData` directly. For perform
 button.Text("+").SetData("tether-click", "increment")
 ```
 
-In practice the difference is ~250ns per element — negligible unless you're rendering thousands of event-bound elements per frame.
+In practice the difference is ~250ns per element - negligible unless you're rendering thousands of event-bound elements per frame.
 
 ## Profile-Guided Optimisation (PGO)
 
@@ -19,7 +19,7 @@ Applications using tether benefit from [Profile-Guided Optimisation](https://go.
    curl -o default.pgo http://localhost:8080/debug/pprof/profile?seconds=30
    ```
 2. Place `default.pgo` in your main package directory
-3. `go build` — PGO is applied automatically
+3. `go build` - PGO is applied automatically
 
 Both generic helpers and direct `SetData` paths benefit from PGO.
 

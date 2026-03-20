@@ -11,12 +11,12 @@ var _ SessionCodec[struct{}] = cborCodec[struct{}]{}
 // passing it to [SessionStore].
 //
 // When nil on [StatefulConfig], the framework uses CBOR encoding (RFC 8949),
-// which handles any struct with exported fields — no configuration,
+// which handles any struct with exported fields - no configuration,
 // no struct tags, no boilerplate.
 //
 // Implement this when you need encryption, a company-standard wire
 // format, or custom handling of complex types. The codec only handles
-// S — it does not need to know about session IDs, URLs, or binding
+// S - it does not need to know about session IDs, URLs, or binding
 // metadata (the framework wraps those separately in the envelope).
 type SessionCodec[S any] interface {
 	Marshal(state S) ([]byte, error)

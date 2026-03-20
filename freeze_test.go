@@ -73,7 +73,7 @@ func TestFreezeOnDisconnect(t *testing.T) {
 func TestFreezeDiscardsCommands(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		store := newSessionFileStore(t)
-		mt := &mockTransport{} // no events — disconnects immediately
+		mt := &mockTransport{} // no events - disconnects immediately
 		sess := newTestSession(counterState{}, mt)
 		sess.sessionStore = store
 		sess.codec = cborCodec[counterState]{}
@@ -184,7 +184,7 @@ func TestNoFreezeWithoutStore(t *testing.T) {
 			events: []Event{{Type: "event", Action: "increment"}},
 		}
 		sess := newTestSession(counterState{Count: 0}, mt)
-		// freeze is true but no sessionStore — simulates the config
+		// freeze is true but no sessionStore - simulates the config
 		// validation catching this at startup.
 		sess.freeze = false // would have been disabled by Stateful()
 
@@ -205,7 +205,7 @@ func TestNoFreezeWithoutStore(t *testing.T) {
 }
 
 // TestFreezeWithoutFreezeFlag verifies that sessions with a
-// SessionStore but without freeze enabled behave normally — the
+// SessionStore but without freeze enabled behave normally - the
 // loop keeps running after disconnect.
 func TestFreezeWithoutFreezeFlag(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
@@ -234,7 +234,7 @@ func TestFreezeWithoutFreezeFlag(t *testing.T) {
 		case <-called:
 			// expected
 		default:
-			t.Error("command was not processed — loop should still be running")
+			t.Error("command was not processed - loop should still be running")
 		}
 
 		sess.stop()

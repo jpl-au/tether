@@ -124,7 +124,7 @@ func TestObserveCrossHandler(t *testing.T) {
 			t.Errorf("B.Active = %d, want 5", s.Active)
 		}
 
-		// Store a new value — both should update.
+		// Store a new value - both should update.
 		v.Store(20)
 		synctest.Wait()
 

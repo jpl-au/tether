@@ -5,7 +5,7 @@
 Handle runs inside the session's command loop. While it executes, no other events, commands, or effects are processed for that session. The client sees a frozen page.
 
 ```go
-// Wrong — blocks the loop for the duration of the query
+// Wrong - blocks the loop for the duration of the query
 Handle: func(sess tether.Session, s State, ev tether.Event) State {
     rows, _ := db.Query("SELECT * FROM items WHERE user_id = ?", s.UserID)
     s.Items = scanItems(rows)
@@ -32,14 +32,14 @@ Handle: func(sess tether.Session, s State, ev tether.Event) State {
 },
 ```
 
-The same applies to `OnConnect` — blocking there delays the session becoming interactive. Use `Session.Go` for database lookups, API calls, or any I/O that might be slow.
+The same applies to `OnConnect` - blocking there delays the session becoming interactive. Use `Session.Go` for database lookups, API calls, or any I/O that might be slow.
 
 ## Always key state-dependent elements
 
-The diff engine only tracks elements marked with `.Dynamic("key")`. If state changes but the affected element has no key, the diff produces no patches and the client never updates. This is silent — no error, no warning.
+The diff engine only tracks elements marked with `.Dynamic("key")`. If state changes but the affected element has no key, the diff produces no patches and the client never updates. This is silent - no error, no warning.
 
 ```go
-// Wrong — no Dynamic key, changes are invisible to the diff engine
+// Wrong - no Dynamic key, changes are invisible to the diff engine
 span.Textf("Count: %d", state.Count)
 
 // Right
@@ -64,16 +64,16 @@ See [Dynamic keys](server-updates.md#dynamic-keys) for the full guide.
 
 ## Keep key sets stable
 
-When the set of Dynamic keys changes between renders — keys added, removed, or reordered — the diff engine falls back to a full root morph. Correct but expensive.
+When the set of Dynamic keys changes between renders - keys added, removed, or reordered - the diff engine falls back to a full root morph. Correct but expensive.
 
 ```go
-// Wrong — the key disappears when items is empty
+// Wrong - the key disappears when items is empty
 if len(items) > 0 {
     return ul.New(nodes...).Dynamic("list")
 }
 return p.Text("Empty")
 
-// Right — the key is always present
+// Right - the key is always present
 if len(items) == 0 {
     return div.New(p.Text("Empty")).Dynamic("list")
 }
@@ -84,13 +84,13 @@ Use `StatefulConfig.OnStructuralChange` to detect unstable key sets. See [stable
 
 ## Use signals for high-frequency updates
 
-A full render-diff-send cycle for a single counter increment is wasteful. Signals push values directly to bound elements — no render, no diff, no HTML:
+A full render-diff-send cycle for a single counter increment is wasteful. Signals push values directly to bound elements - no render, no diff, no HTML:
 
 ```go
-// In Render — bind the element once
+// In Render - bind the element once
 bind.Apply(span.New(), bind.BindText("count"))
 
-// From anywhere — push the value
+// From anywhere - push the value
 sess.Signal("count", 42)
 ```
 
@@ -98,13 +98,13 @@ Signals are ideal for counters, progress bars, status indicators, and anything w
 
 ## Prefer SetData in hot render loops
 
-`bind.Apply` is convenient but adds ~250ns per element. For most pages this is negligible. For render functions that produce thousands of event-bound elements — large tables, long lists — use `SetData` directly:
+`bind.Apply` is convenient but adds ~250ns per element. For most pages this is negligible. For render functions that produce thousands of event-bound elements - large tables, long lists - use `SetData` directly:
 
 ```go
-// Apply — clearer, slightly slower
+// Apply - clearer, slightly slower
 bind.Apply(button.Text("+"), bind.OnClick("increment"))
 
-// Direct — faster in bulk
+// Direct - faster in bulk
 button.Text("+").SetData("tether-click", "increment")
 ```
 
@@ -112,10 +112,10 @@ See [performance](performance.md) for benchmarks.
 
 ## Isolate cross-session state
 
-Each session has its own state. Shared mutable state at the package level creates data races — multiple session goroutines read and write it concurrently without synchronisation.
+Each session has its own state. Shared mutable state at the package level creates data races - multiple session goroutines read and write it concurrently without synchronisation.
 
 ```go
-// Wrong — package-level mutable state accessed from multiple sessions
+// Wrong - package-level mutable state accessed from multiple sessions
 var onlineUsers int
 
 OnConnect: func(sess *tether.StatefulSession[State]) {
@@ -158,12 +158,12 @@ tether.StatefulConfig[State]{
 }
 ```
 
-This keeps all reactive subscriptions visible in one place — right next to `StatefulConfig.Groups`. Reserve `OnConnect` for imperative setup: incrementing counters, publishing events, pushing initial signals, starting background tickers.
+This keeps all reactive subscriptions visible in one place - right next to `StatefulConfig.Groups`. Reserve `OnConnect` for imperative setup: incrementing counters, publishing events, pushing initial signals, starting background tickers.
 
-Never subscribe inside Handle — it creates a new subscription on every event:
+Never subscribe inside Handle - it creates a new subscription on every event:
 
 ```go
-// Wrong — creates a new subscription on every click event
+// Wrong - creates a new subscription on every click event
 Handle: func(sess tether.Session, s State, ev tether.Event) State {
     live := sess.(*tether.StatefulSession[State])
     tether.Observe(live, onlineCount, func(count int, s State) State {
@@ -180,7 +180,7 @@ Subscriptions created in `OnConnect` are cleaned up automatically when the sessi
 
 ## Use StatefulConfig.Components for self-contained components
 
-When a component handles its own events without needing to coordinate with the rest of the page, mount it declaratively via `StatefulConfig.Components`. The framework dispatches events automatically — the page's `Handle` never sees them:
+When a component handles its own events without needing to coordinate with the rest of the page, mount it declaratively via `StatefulConfig.Components`. The framework dispatches events automatically - the page's `Handle` never sees them:
 
 ```go
 Components: []tether.ComponentMount[State]{
@@ -218,7 +218,7 @@ div.New(s.Stars.Render()).Dynamic("stars-section"),
 
 ## Use Equal to skip unchanged renders
 
-When many events leave state unchanged — keypresses that don't affect the model, button clicks that only trigger side effects — the render and diff are wasted work. Provide an `Equal` function to skip them:
+When many events leave state unchanged - keypresses that don't affect the model, button clicks that only trigger side effects - the render and diff are wasted work. Provide an `Equal` function to skip them:
 
 ```go
 tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
@@ -231,7 +231,7 @@ tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
 
 When `Equal` returns true, the render, diff, and send are skipped entirely. Side effects (Toast, Signal, etc.) are still sent.
 
-For struct types with slice or map fields, `a == b` does not compile — use `reflect.DeepEqual` or write a field-by-field comparison. A manual comparison is faster and avoids reflecting over fields that don't affect rendering.
+For struct types with slice or map fields, `a == b` does not compile - use `reflect.DeepEqual` or write a field-by-field comparison. A manual comparison is faster and avoids reflecting over fields that don't affect rendering.
 
 ---
 

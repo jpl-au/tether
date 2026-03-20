@@ -1,4 +1,4 @@
-// tether-upload.js — file upload extension for Tether.
+// tether-upload.js - file upload extension for Tether.
 //
 // Loaded automatically when any element uses data-tether-upload. Handles
 // file selection, multipart POST to the server, and progress tracking

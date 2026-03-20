@@ -7,7 +7,7 @@ import (
 )
 
 // Value is a thread-safe container for shared state that notifies
-// observers when it changes. Built on top of [Bus] internally — when
+// observers when it changes. Built on top of [Bus] internally - when
 // Store or Update is called, the new value is published to all
 // observers registered via [Observe].
 //
@@ -38,7 +38,7 @@ type Value[V any] struct {
 }
 
 // valueBox wraps the stored value so atomic.Value.Store never receives
-// a nil interface — which would panic. The box is always non-nil even
+// a nil interface - which would panic. The box is always non-nil even
 // when V itself is nil (e.g. Value[*Foo] with a nil pointer).
 type valueBox[V any] struct{ v V }
 
@@ -87,7 +87,7 @@ func (v *Value[V]) Len() int {
 
 // observe registers a subscriber and returns the current value
 // atomically. The write mutex is held during both the read and the
-// subscribe so a concurrent Set cannot publish between the two —
+// subscribe so a concurrent Set cannot publish between the two  - 
 // preventing duplicate delivery of the initial value. Get() callers
 // are unaffected because reads are lock-free.
 func (v *Value[V]) observe(ctx context.Context, fn func(V), sessionID string) V {

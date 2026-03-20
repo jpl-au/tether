@@ -27,7 +27,7 @@ func TestBindDefaultFieldName(t *testing.T) {
 	ev := Event{Data: map[string]string{"name": "Bob"}}
 
 	var form struct {
-		Name string // no tag — uses lowercased field name
+		Name string // no tag - uses lowercased field name
 	}
 	if err := ev.Bind(&form); err != nil {
 		t.Fatalf("Bind() error: %v", err)

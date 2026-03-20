@@ -253,7 +253,7 @@ func TestNavigateSkipsHandle(t *testing.T) {
 		Render: render,
 		Handle: func(_ tether.Session, s state, _ tether.Event) state {
 			// Handle should NOT be called for navigate events when
-			// OnNavigate is set — this mirrors live session behaviour.
+			// OnNavigate is set - this mirrors live session behaviour.
 			s.Count = 999
 			return s
 		},
@@ -268,7 +268,7 @@ func TestNavigateSkipsHandle(t *testing.T) {
 		t.Errorf("Name = %q, want %q", h.State().Name, "/hello")
 	}
 	if h.State().Count != 0 {
-		t.Errorf("Count = %d, want 0 — Handle should not run for navigate events", h.State().Count)
+		t.Errorf("Count = %d, want 0 - Handle should not run for navigate events", h.State().Count)
 	}
 }
 
@@ -406,7 +406,7 @@ func TestDisconnectPanicsWithoutCallback(t *testing.T) {
 
 // TestBusEmitFromHandle verifies that a handler calling bus.Emit works
 // correctly inside the test harness. CaptureSession executes enqueue
-// synchronously, so Bus.Emit publishes immediately — the subscriber
+// synchronously, so Bus.Emit publishes immediately - the subscriber
 // callback is invoked before h.Send returns, making assertions
 // straightforward without goroutines or waits.
 func TestBusEmitFromHandle(t *testing.T) {
@@ -438,11 +438,11 @@ func TestBusEmitFromHandle(t *testing.T) {
 func TestBusEmitSenderFiltering(t *testing.T) {
 	bus := tether.NewBus[string]()
 
-	// Register a raw subscriber with no session ID — should always receive.
+	// Register a raw subscriber with no session ID - should always receive.
 	var rawReceived string
 	bus.Subscribe(context.Background(), func(ev string) { rawReceived = ev })
 
-	// Register a subscriber tagged with the harness sender ID — should be filtered.
+	// Register a subscriber tagged with the harness sender ID - should be filtered.
 	var filteredReceived string
 	bus.Subscribe(context.Background(), func(ev string) { filteredReceived = ev })
 
@@ -473,7 +473,7 @@ func TestBusEmitSenderFiltering(t *testing.T) {
 		t.Errorf("raw subscriber received %q, want %q", rawReceived, "ping")
 	}
 	// filteredReceived is registered with empty session ID so it also
-	// receives — sender filtering only applies to session-bound subscriptions
+	// receives - sender filtering only applies to session-bound subscriptions
 	// (those registered via tether.On). This test confirms the raw-subscriber
 	// path is unaffected.
 	_ = filteredReceived
@@ -481,7 +481,7 @@ func TestBusEmitSenderFiltering(t *testing.T) {
 
 // TestBusEmitStateAndBus verifies the chat pattern: the sender's own state
 // is updated directly in Handle, and other subscribers receive the event
-// via Bus.Emit — both happen in the same h.Send call in the test harness.
+// via Bus.Emit - both happen in the same h.Send call in the test harness.
 func TestBusEmitStateAndBus(t *testing.T) {
 	type msg struct{ Text string }
 	bus := tether.NewBus[msg]()

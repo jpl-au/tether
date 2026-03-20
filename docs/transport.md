@@ -6,7 +6,7 @@ Control which transports the handler accepts with the `Mode` field.
 When `Mode` is not set, it defaults to `mode.Both`.
 
 ```go
-// Default (mode.Both) — WebSocket with SSE fallback
+// Default (mode.Both) - WebSocket with SSE fallback
 tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
     Upgrade:  ws.Upgrade(),
     Fallback: sse.Upgrade(),
@@ -35,7 +35,7 @@ selected via `StatefulConfig.WireFormat` (default `wire.JSON`).
 
 The framework detects whether each request arrives over HTTP/1.1 or
 HTTP/2 and adapts accordingly. By default (`protocol.Auto`), detection
-is automatic — the developer does nothing and it works correctly.
+is automatic - the developer does nothing and it works correctly.
 
 ```go
 import "github.com/jpl-au/tether/protocol"
@@ -54,14 +54,14 @@ a warning on every request where the wire protocol doesn't match:
 WARN tether: protocol mismatch  configured=HTTP/2 detected=HTTP/1.1
 ```
 
-This catches misconfigurations — e.g. setting `protocol.HTTP2` when a
-reverse proxy downgrades to HTTP/1.1 — without rejecting the request.
+This catches misconfigurations - e.g. setting `protocol.HTTP2` when a
+reverse proxy downgrades to HTTP/1.1 - without rejecting the request.
 
 The protocol can also be set via the `TETHER_PROTO` environment
 variable (`HTTP1`, `HTTP2`, `HTTP3`, `AUTO`). Explicit
 `StatefulConfig.Protocol` takes precedence over the env var.
 
-Protocol awareness applies to live sessions only — `tether.Stateless` is
+Protocol awareness applies to live sessions only - `tether.Stateless` is
 stateless request/response and does not benefit from protocol-specific
 behaviour.
 
@@ -81,7 +81,7 @@ Set `ReadLimit` to match `StatefulConfig.Limits.MaxEventBytes` for consistent li
 
 WebSocket per-message deflate (RFC 7692) is **enabled by default**. The
 browser negotiates the extension during the handshake and handles
-decompression transparently — no client-side code is needed.
+decompression transparently - no client-side code is needed.
 
 Default settings (zero value of `ws.Compression`):
 
@@ -110,19 +110,19 @@ ws.Upgrade(ws.Options{
 
 Compression levels:
 
-- `ws.CompressionFastest` — least CPU, best for real-time (default)
-- `ws.CompressionBalanced` — middle ground
-- `ws.CompressionSmallest` — smallest payloads, highest CPU
+- `ws.CompressionFastest` - least CPU, best for real-time (default)
+- `ws.CompressionBalanced` - middle ground
+- `ws.CompressionSmallest` - smallest payloads, highest CPU
 
 SSE compression is handled by the reverse proxy (nginx, Caddy,
-Cloudflare) via standard `Content-Encoding` negotiation — tether does
+Cloudflare) via standard `Content-Encoding` negotiation - tether does
 not need any configuration for it.
 
 ### Connection state
 
 The tether root element exposes transport lifecycle via
 `data-tether-state`. The attribute is set automatically by the client
-JS — no configuration needed.
+JS - no configuration needed.
 
 | Value | Meaning |
 |-------|---------|
@@ -155,7 +155,7 @@ tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
 })
 ```
 
-The service worker caches the JS runtime (`tether.js`, `idiomorph.min.js`) using a cache-first strategy. Navigation responses are only cached when the server sends the `X-Tether-Cache: true` header — this prevents caching sensitive or session-specific pages without explicit intent. Cached pages are served as a fallback when offline.
+The service worker caches the JS runtime (`tether.js`, `idiomorph.min.js`) using a cache-first strategy. Navigation responses are only cached when the server sends the `X-Tether-Cache: true` header - this prevents caching sensitive or session-specific pages without explicit intent. Cached pages are served as a fallback when offline.
 
 To precache application assets (CSS, icons, fonts), use the `Precache` field on `Asset`:
 
@@ -187,14 +187,14 @@ is selected at handler construction time via `StatefulConfig.WireFormat`:
 import "github.com/jpl-au/tether/wire"
 
 tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
-    WireFormat: wire.JSON, // default — currently the only format
+    WireFormat: wire.JSON, // default - currently the only format
     // ...
 })
 ```
 
 `wire.JSON` encodes updates as JSON objects. Additional formats (e.g.
 HTML fragments) will be added in future. The wire format is an internal
-concern — transports receive pre-encoded bytes and the client JS
+concern - transports receive pre-encoded bytes and the client JS
 handles decoding, so changing the format requires no application code
 changes.
 

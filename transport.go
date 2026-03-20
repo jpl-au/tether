@@ -9,7 +9,7 @@ import "time"
 // (via [Session.Update]), while ReceiveEvent is only called from the
 // event loop goroutine.
 //
-// Send receives pre-encoded bytes — the session handles all encoding
+// Send receives pre-encoded bytes - the session handles all encoding
 // (via [wire.Encoder]) so transports only deal with raw bytes.
 //
 // See the ws sub-package for WebSocket and the sse sub-package for

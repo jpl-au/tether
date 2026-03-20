@@ -36,7 +36,7 @@ func TestBusEmitDefersPublication(t *testing.T) {
 		var received string
 		bus.Subscribe(context.Background(), func(ev string) { received = ev })
 
-		// Emit enqueues the publication — it runs after the loop
+		// Emit enqueues the publication - it runs after the loop
 		// processes the command, not immediately.
 		bus.Emit(sess, "deferred")
 		synctest.Wait()
@@ -94,7 +94,7 @@ func TestBusSenderFiltering(t *testing.T) {
 		bus.subscribe(sessA.ctx, func(ev string) { gotA = ev }, "A")
 		bus.subscribe(sessB.ctx, func(ev string) { gotB = ev }, "B")
 
-		// Emit from session A — A should be skipped, B should receive.
+		// Emit from session A - A should be skipped, B should receive.
 		bus.Emit(sessA, "from-A")
 		synctest.Wait()
 
@@ -149,7 +149,7 @@ func TestBusPublishNoSenderFilter(t *testing.T) {
 		// Subscribe with session ID (as tether.On would).
 		bus.subscribe(sess.ctx, func(ev string) { got = ev }, sess.id)
 
-		// Publish (no sender) — should deliver to everyone.
+		// Publish (no sender) - should deliver to everyone.
 		bus.Publish("broadcast")
 
 		if got != "broadcast" {

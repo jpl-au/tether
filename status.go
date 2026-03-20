@@ -21,7 +21,7 @@ const (
 
 	// Frozen means the session's state has been persisted to the
 	// SessionStore and the command loop has exited. The session
-	// holds only its ID and metadata — S and the differ have been
+	// holds only its ID and metadata - S and the differ have been
 	// released. Commands and effects are silently discarded.
 	// A reconnecting client thaws the session by loading state
 	// from the store and starting a new loop.

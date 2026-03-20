@@ -11,7 +11,7 @@ import (
 )
 
 // sessionFileStore is a filesystem-backed SessionStore for testing.
-// TTL is recorded but not enforced — the tests verify it is passed
+// TTL is recorded but not enforced - the tests verify it is passed
 // correctly without relying on real expiry.
 type sessionFileStore struct {
 	dir     string
@@ -141,7 +141,7 @@ func TestCBORCodecRoundTrip(t *testing.T) {
 }
 
 // TestCBORCodecTolerateMissingFields verifies that CBOR handles
-// schema evolution gracefully — a struct with fewer fields than the
+// schema evolution gracefully - a struct with fewer fields than the
 // encoded data decodes without error, ignoring unknown fields.
 func TestCBORCodecTolerateMissingFields(t *testing.T) {
 	type v2State struct {

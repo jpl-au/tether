@@ -32,28 +32,28 @@ When no side effects are needed, just return the new state.
 
 ### Selector helpers vs signals
 
-`Flash` and `Indicator` target DOM elements by CSS selector. This is productive — a single line shows a message or a spinner — but it couples the server to the DOM's ID structure. For simple apps and quick iterations this is the right trade-off.
+`Flash` and `Indicator` target DOM elements by CSS selector. This is productive - a single line shows a message or a spinner - but it couples the server to the DOM's ID structure. For simple apps and quick iterations this is the right trade-off.
 
 For reusable components or complex layouts where selectors become fragile, signals achieve the same result without coupling:
 
 ```go
-// Selector approach — quick and direct
+// Selector approach - quick and direct
 sess.Flash("#notice", "Saved")
 
-// Signal approach — decoupled, no selector needed
+// Signal approach - decoupled, no selector needed
 sess.Signal("saved", true)
 // In Render:
 bind.Apply(span.Text("Saved"), bind.BindShow("saved"))
 ```
 
 ```go
-// Selector approach — show a spinner by ID
+// Selector approach - show a spinner by ID
 bind.Apply(button.Text("Load"),
     bind.OnClick("load"),
     bind.Indicator("#spinner"),
 )
 
-// Signal approach — show a spinner via signal binding
+// Signal approach - show a spinner via signal binding
 bind.Apply(button.Text("Load"),
     bind.OnClick("load"),
     bind.Optimistic("loading", "true"),
@@ -76,7 +76,7 @@ session.Update(func(s State) State {
 
 ## Dynamic keys
 
-The diff engine only tracks elements marked with `.Dynamic("key")`. When state changes and the framework re-renders, it compares the HTML of each keyed element with the previous render. Elements without a Dynamic key are invisible to the diff engine — their changes produce no patches and the client never updates.
+The diff engine only tracks elements marked with `.Dynamic("key")`. When state changes and the framework re-renders, it compares the HTML of each keyed element with the previous render. Elements without a Dynamic key are invisible to the diff engine - their changes produce no patches and the client never updates.
 
 **This is the most common source of "my state changed but the UI didn't update" bugs.**
 
@@ -100,16 +100,16 @@ func fileList(files []FileEntry) node.Node {
 
 ### Stable key sets
 
-Both branches of a conditional must produce the same key. If a key appears or disappears between renders, the diff engine treats it as a structural change and falls back to a full root morph — correct but expensive. Keep the key set stable by wrapping conditionals in a keyed container:
+Both branches of a conditional must produce the same key. If a key appears or disappears between renders, the diff engine treats it as a structural change and falls back to a full root morph - correct but expensive. Keep the key set stable by wrapping conditionals in a keyed container:
 
 ```go
-// Wrong — key only exists when items are present
+// Wrong - key only exists when items are present
 if len(items) > 0 {
     return ul.New(nodes...).Dynamic("list")
 }
-return p.Text("Empty")  // no key — structural change on first item
+return p.Text("Empty")  // no key - structural change on first item
 
-// Right — key is always present
+// Right - key is always present
 if len(items) == 0 {
     return div.New(p.Text("Empty")).Dynamic("list")
 }
@@ -129,9 +129,9 @@ Render: func(s State) node.Node {
 },
 ```
 
-Without this key, navigating between pages changes the rendered HTML but the diff engine produces no patches — the new page never appears.
+Without this key, navigating between pages changes the rendered HTML but the diff engine produces no patches - the new page never appears.
 
-### OnStructuralChange — observing structural changes
+### OnStructuralChange - observing structural changes
 
 When the diff engine detects a structural change, it falls back to a full root morph. The `StatefulConfig.OnStructuralChange` callback lets you observe these occurrences for telemetry, metrics, or debugging:
 
@@ -153,16 +153,16 @@ tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
 
 When `OnStructuralChange` is nil and DevMode is active, the framework logs a debug message for each occurrence. When DevMode is off and no callback is set, nothing happens.
 
-### OnNoPatch — observing empty render cycles
+### OnNoPatch - observing empty render cycles
 
-When a render cycle produces no patches and no structural change, the framework calls `StatefulConfig.OnNoPatch` if set. This lets you decide how to handle it — log, count, or ignore:
+When a render cycle produces no patches and no structural change, the framework calls `StatefulConfig.OnNoPatch` if set. This lets you decide how to handle it - log, count, or ignore:
 
 ```go
 tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
     OnNoPatch: func(sess *tether.StatefulSession[State], info tether.NoPatch) {
         // Signal-only updates (e.g. a ticker) intentionally produce
-        // no patches — log at debug. Navigate and event sources that
-        // produce nothing are likely missing Dynamic keys — warn.
+        // no patches - log at debug. Navigate and event sources that
+        // produce nothing are likely missing Dynamic keys - warn.
         if info.Source == "update" {
             slog.Debug("no-patch update", "session", sess.ID())
             return
@@ -185,10 +185,10 @@ When `OnNoPatch` is nil and DevMode is active, the framework logs a debug messag
 If a handler or Update callback panics after calling `Toast()`, `Signal()`, or `Navigate()`, those buffered effects are discarded. In DevMode, a warning explains what was dropped:
 
 ```
-level=WARN msg="side effects discarded due to handler panic — any Toast, Signal, or Navigate calls before the panic were dropped"
+level=WARN msg="side effects discarded due to handler panic - any Toast, Signal, or Navigate calls before the panic were dropped"
 ```
 
-These warnings are centralised in the `dev` package — call sites use `dev.Warn()` which silently no-ops outside DevMode.
+These warnings are centralised in the `dev` package - call sites use `dev.Warn()` which silently no-ops outside DevMode.
 
 ### Signals bypass the diff engine
 
@@ -224,11 +224,11 @@ No global maps, no done channels, no OnDisconnect cleanup needed.
 
 ## Session methods
 
-These methods are safe to call from any goroutine — use them from `OnConnect`, timers, broadcast callbacks, or background workers:
+These methods are safe to call from any goroutine - use them from `OnConnect`, timers, broadcast callbacks, or background workers:
 
 ```go
 session.Toast("Settings saved")
-session.SetTitle("New Page — My App")
+session.SetTitle("New Page - My App")
 session.Announce("Item added to cart")
 session.Flash("#notice", "Settings saved")
 session.Navigate("/success")           // pushState (adds history entry)
@@ -236,9 +236,9 @@ session.ReplaceURL("/current?saved=1") // replaceState (no history entry)
 session.Signal("count", 42)            // push a reactive value
 ```
 
-Each sends a standalone update message. For side effects during event handling, call them on the session parameter inside `Handle` — they merge into the same message as the state diff.
+Each sends a standalone update message. For side effects during event handling, call them on the session parameter inside `Handle` - they merge into the same message as the state diff.
 
-## Components — reusable state isolation
+## Components - reusable state isolation
 
 `tether.Component` is a self-contained rendering unit with its own state. Components know how to render themselves and handle their own events, without any knowledge of the parent's state type:
 
@@ -267,11 +267,11 @@ func (c Counter) Handle(sess tether.Session, ev tether.Event) tether.Component {
 }
 ```
 
-Components are value types — `Handle` returns a new value, the receiver is never mutated. Side effects (`sess.Toast`, `sess.Signal`, etc.) work inside components just like they do in the page handler.
+Components are value types - `Handle` returns a new value, the receiver is never mutated. Side effects (`sess.Toast`, `sess.Signal`, etc.) work inside components just like they do in the page handler.
 
 ### Declarative mounting with StatefulConfig.Components
 
-For components that are fully self-contained, mount them declaratively on StatefulConfig. The framework intercepts events matching the mount's prefix and dispatches them automatically — the page's `Handle` never sees these events:
+For components that are fully self-contained, mount them declaratively on StatefulConfig. The framework intercepts events matching the mount's prefix and dispatches them automatically - the page's `Handle` never sees these events:
 
 ```go
 tether.StatefulConfig[State]{
@@ -306,7 +306,7 @@ Handle: func(sess tether.Session, s State, ev tether.Event) State {
 },
 ```
 
-Events with actions like `"counter.increment"` are forwarded to the component with the prefix stripped — the component sees `"increment"`. Events without a matching prefix pass through unchanged.
+Events with actions like `"counter.increment"` are forwarded to the component with the prefix stripped - the component sees `"increment"`. Events without a matching prefix pass through unchanged.
 
 ### Initial setup with Mounter
 

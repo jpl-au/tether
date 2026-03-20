@@ -18,7 +18,7 @@ app := tether.App{
 |-------|------|-------------|
 | `DevMode` | `bool` | Development mode (or set `TETHER_DEV=1`). See [operations](operations.md#dev-mode) |
 | `Logger` | `*slog.Logger` | When nil, creates a text handler at INFO level (DEBUG in DevMode) and sets it as the process default once. When provided, used for this handler without touching the global default |
-| `Assets` | `[]*Asset` | Embedded asset collections — auto-served with content-hashed URLs |
+| `Assets` | `[]*Asset` | Embedded asset collections - auto-served with content-hashed URLs |
 | `Client` | `Client` | Browser-side settings (debounce, transitions, flash duration, etc.) |
 | `Security` | `Security` | CSRF protection and session binding settings |
 
@@ -53,8 +53,8 @@ tether.Stateful(app, tether.StatefulConfig[State]{
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `Upgrade` | `func(w, r) (Transport, error)` | — | Primary transport (typically `ws.Upgrade()`) |
-| `Fallback` | `func(w, r) (Transport, error)` | — | Secondary transport (typically `sse.Upgrade()`) |
+| `Upgrade` | `func(w, r) (Transport, error)` | - | Primary transport (typically `ws.Upgrade()`) |
+| `Fallback` | `func(w, r) (Transport, error)` | - | Secondary transport (typically `sse.Upgrade()`) |
 | `Mode` | `mode.Transport` | `mode.Both` | Which transports to accept |
 
 Mode constants: `mode.HTTP`, `mode.WebSocket`, `mode.ServerSentEvents`, `mode.Both`.
@@ -69,7 +69,7 @@ Mode constants: `mode.HTTP`, `mode.WebSocket`, `mode.ServerSentEvents`, `mode.Bo
 | `OnNoPatch` | `func(*StatefulSession[S], NoPatch)` | Called when a render cycle produces no patches |
 | `Groups` | `[]*Group[S]` | Groups the session auto-joins on connect |
 | `Watchers` | `[]Watcher[S]` | Declarative subscriptions to Value and Bus |
-| `Components` | `[]ComponentMount[S]` | Declarative component mounts — events are dispatched by prefix |
+| `Components` | `[]ComponentMount[S]` | Declarative component mounts - events are dispatched by prefix |
 
 `StructuralChange` reports what changed when the diff engine falls back to a root morph:
 
@@ -87,7 +87,7 @@ Mode constants: `mode.HTTP`, `mode.WebSocket`, `mode.ServerSentEvents`, `mode.Bo
 | `Source` | `string` | `"update"`, `"navigate"`, or `"event"` |
 | `Action` | `string` | Event action; empty for `"update"` source |
 
-When either callback is configured, the framework's own logging for that event is suppressed — the callback controls the output. When nil and DevMode is active, a debug message is logged instead.
+When either callback is configured, the framework's own logging for that event is suppressed - the callback controls the output. When nil and DevMode is active, a debug message is logged instead.
 
 ### Timeouts
 
@@ -139,11 +139,11 @@ When either callback is configured, the framework's own logging for that event i
 | `Push` | `*PushConfig[S]` | Web Push notifications (see [push](push-notifications.md)) |
 | `Worker` | `bool` | Enable service worker (auto-enabled by Push) |
 | `DiffStore` | `DiffStore` | External persistence for disconnected session snapshots (opt-in, nil by default). See [store](store.md) |
-| `SessionStore` | `SessionStore` | External persistence for session state — enables crash recovery and node migration (opt-in, nil by default). See [session-store](session-store.md) |
+| `SessionStore` | `SessionStore` | External persistence for session state - enables crash recovery and node migration (opt-in, nil by default). See [session-store](session-store.md) |
 | `Codec` | `SessionCodec[S]` | Custom serialisation for state `S` (nil = CBOR). Only used when SessionStore is set |
 | `OnRestore` | `func(*StatefulSession[S])` | Called instead of OnConnect when a session is restored from the SessionStore. Falls back to OnConnect when nil |
 | `FreezeOnDisconnect` | `bool` | When true, disconnected sessions persist state to the SessionStore, release memory, and exit the command loop. Requires SessionStore. See [frozen mode](frozen-mode.md) |
-| `Protocol` | `protocol.Protocol` | HTTP protocol (default `protocol.Auto` — detects per request). See [transport](transport.md#protocol-awareness) |
+| `Protocol` | `protocol.Protocol` | HTTP protocol (default `protocol.Auto` - detects per request). See [transport](transport.md#protocol-awareness) |
 | `WireFormat` | `wire.Format` | Encoding for server-to-client updates (default `wire.JSON`) |
 
 ### Security
@@ -185,7 +185,7 @@ s.Announce("Item added to cart")       // screen reader live region
 s.Flash("#notice", "Saved")            // notification at selector (5s)
 s.Navigate("/success")                 // pushState
 s.ReplaceURL("/current?saved=1")       // replaceState
-s.SetTitle("Settings — My App")        // document.title
+s.SetTitle("Settings - My App")        // document.title
 s.Signal("count", 42)                  // push reactive value
 s.Signals(map[string]any{"a": 1})      // push multiple values
 s.Push(push.Notification{...})         // Web Push notification
@@ -195,11 +195,11 @@ s.Push(push.Notification{...})         // Web Push notification
 
 `tether.Session` is a non-generic interface exposing StatefulSession's side-effect methods without the state type parameter. It is available in `Handle`, `OnNavigate`, stateless page handlers, and reusable components.
 
-Because Session has no generic parameter, component handlers can accept it directly — they don't need to know the application's state type:
+Because Session has no generic parameter, component handlers can accept it directly - they don't need to know the application's state type:
 
 ```go
 func todoHandle(sess tether.Session, ts TodoState, ev tether.Event) TodoState {
-    sess.Toast("Saved")   // works — no generic needed
+    sess.Toast("Saved")   // works - no generic needed
     sess.Signal("count", len(ts.Items))
     return ts
 }
@@ -207,7 +207,7 @@ func todoHandle(sess tether.Session, ts TodoState, ev tether.Event) TodoState {
 
 Methods: `ID`, `Context`, `Go`, `Toast`, `Navigate`, `ReplaceURL`, `SetTitle`, `Announce`, `Flash`, `Signal`, `Signals`, `Push`, `Close`.
 
-`ID` returns an empty string in stateless page mode (StatelessConfig) — there is no persistent session. `Push` returns an error during pre-warming (initial GET) since no browser subscription exists yet. `Close` terminates the session's transport; in stateless page mode and tethertest it is a no-op. During stateful sessions all methods work normally.
+`ID` returns an empty string in stateless page mode (StatelessConfig) - there is no persistent session. `Push` returns an error during pre-warming (initial GET) since no browser subscription exists yet. `Close` terminates the session's transport; in stateless page mode and tethertest it is a no-op. During stateful sessions all methods work normally.
 
 ---
 
@@ -258,30 +258,30 @@ type Params struct {
 ```
 
 Params provides typed extraction helpers that mirror `Event`'s API for
-consistency — one data extraction pattern across the framework.
+consistency - one data extraction pattern across the framework.
 
 **Single-value helpers** (return error on missing/invalid):
 
 ```go
-p.Get("q")              // string — first value for key
+p.Get("q")              // string - first value for key
 p.Int("page")           // (int, error)
 p.Float64("min")        // (float64, error)
 p.Bool("active")        // true only for "true"
 ```
 
-**Soft getters** (return default on missing/invalid — ideal for optional
+**Soft getters** (return default on missing/invalid - ideal for optional
 URL parameters):
 
 ```go
-p.IntDefault("page", 1)      // int — returns 1 if missing or invalid
+p.IntDefault("page", 1)      // int - returns 1 if missing or invalid
 p.Float64Default("min", 0.0) // float64
-p.BoolDefault("drafts", false) // bool — returns default if key absent
+p.BoolDefault("drafts", false) // bool - returns default if key absent
 ```
 
 **Multi-value helpers** (for repeated keys like `?tag=go&tag=web`):
 
 ```go
-p.Strings("tag")        // []string — all values for key
+p.Strings("tag")        // []string - all values for key
 p.Ints("id")            // ([]int, error)
 p.Float64s("v")         // ([]float64, error)
 ```
@@ -320,7 +320,7 @@ For multi-handler apps, use the package-level `tether.ListenAndServe` which drai
 tether.ListenAndServe("", mux, wsHandler, sseHandler, swHandler)
 ```
 
-Any `*Handler[S]` satisfies the `Drainable` interface automatically — no type-assert or adapter needed.
+Any `*Handler[S]` satisfies the `Drainable` interface automatically - no type-assert or adapter needed.
 
 ---
 
@@ -575,28 +575,28 @@ var messages = tether.NewBus[MessageSent]()
 ### Publishing
 
 ```go
-bus.Publish(msg)         // to all subscribers — use for external sources (DB, queues, cron)
-bus.Emit(sess, msg)      // to all except sender — use inside Handle
+bus.Publish(msg)         // to all subscribers - use for external sources (DB, queues, cron)
+bus.Emit(sess, msg)      // to all except sender - use inside Handle
 bus.Len()                // active subscriber count
 ```
 
-`Emit` accepts any `Session` value, so it can be called directly from `Handle` without a type-assert. In live sessions, publication is enqueued on the sender's command loop so the sender's diff is sent to the client before other subscribers react. Subscriptions registered via `tether.On` whose session ID matches the emitting session are automatically skipped — preventing double-apply since `Handle` already updated the sender's state.
+`Emit` accepts any `Session` value, so it can be called directly from `Handle` without a type-assert. In live sessions, publication is enqueued on the sender's command loop so the sender's diff is sent to the client before other subscribers react. Subscriptions registered via `tether.On` whose session ID matches the emitting session are automatically skipped - preventing double-apply since `Handle` already updated the sender's state.
 
 ### Subscribing
 
 Raw subscription for non-session consumers (external services, monitoring):
 
 ```go
-// Synchronous — callback runs in the publisher's goroutine. Must not block.
+// Synchronous - callback runs in the publisher's goroutine. Must not block.
 cancel := bus.Subscribe(ctx, func(msg ChatMessage) { ... })
 
-// Asynchronous — callback runs in its own goroutine per event. Safe for I/O.
+// Asynchronous - callback runs in its own goroutine per event. Safe for I/O.
 cancel := bus.SubscribeAsync(ctx, func(msg ChatMessage) { ... })
 ```
 
-`Subscribe` runs the callback synchronously in the publisher's goroutine — it must not block. `SubscribeAsync` spawns a goroutine per event, isolating the publisher from slow callbacks. Use `SubscribeAsync` for external consumers that perform database writes, HTTP calls, or other I/O.
+`Subscribe` runs the callback synchronously in the publisher's goroutine - it must not block. `SubscribeAsync` spawns a goroutine per event, isolating the publisher from slow callbacks. Use `SubscribeAsync` for external consumers that perform database writes, HTTP calls, or other I/O.
 
-Session-aware subscription via `tether.On` — the primary way to connect a Bus to a session:
+Session-aware subscription via `tether.On` - the primary way to connect a Bus to a session:
 
 ```go
 tether.On(sess, messages, func(msg MessageSent, state ChatState) ChatState {
@@ -605,12 +605,12 @@ tether.On(sess, messages, func(msg MessageSent, state ChatState) ChatState {
 })
 ```
 
-`tether.On` subscribes the session to the bus. When an event arrives, the callback runs inside the session's command loop (via `Session.Update`) with the event and the current state. The callback returns the new state — same pattern as Update.
+`tether.On` subscribes the session to the bus. When an event arrives, the callback runs inside the session's command loop (via `Session.Update`) with the event and the current state. The callback returns the new state - same pattern as Update.
 
 Key behaviours:
-- **Sender filtering** — if the event was emitted by this session (via `Bus.Emit`), the callback is skipped automatically
-- **Auto-cleanup** — the subscription is removed when the session is destroyed (context cancelled)
-- **Thread-safe** — the callback runs on the session's command loop, never concurrently with Handle or other Updates
+- **Sender filtering** - if the event was emitted by this session (via `Bus.Emit`), the callback is skipped automatically
+- **Auto-cleanup** - the subscription is removed when the session is destroyed (context cancelled)
+- **Thread-safe** - the callback runs on the session's command loop, never concurrently with Handle or other Updates
 
 Preferred usage is via `StatefulConfig.Watchers` for declarative subscription:
 
@@ -627,7 +627,7 @@ Watchers: []tether.Watcher[State]{
 
 ### Bus vs Group
 
-Bus is parameterised on the **event type** — any session can subscribe regardless of its state type. Group requires all sessions to share the same state type. Use Bus for cross-handler communication; use Group for same-handler broadcasting.
+Bus is parameterised on the **event type** - any session can subscribe regardless of its state type. Group requires all sessions to share the same state type. Use Bus for cross-handler communication; use Group for same-handler broadcasting.
 
 ---
 
@@ -642,7 +642,7 @@ var onlineCount = tether.NewValue(0)
 ### Reading and writing
 
 ```go
-v.Load()              // lock-free read — safe from any goroutine
+v.Load()              // lock-free read - safe from any goroutine
 v.Store(val)          // set and notify all observers
 v.Update(func(V) V)   // atomic read-modify-write (counters, accumulators)
 v.Len()               // active observer count
@@ -660,10 +660,10 @@ tether.Observe(sess, onlineCount, func(count int, s State) State {
 ```
 
 Key behaviours:
-- **Immediate sync** — the callback fires once with the current value at subscription time
-- **Atomic subscribe+read+apply** — the subscription, read, and initial state application happen within a single session command, so a concurrent Store is always ordered after the initial value
-- **Auto-cleanup** — removed when the session is destroyed
-- **Thread-safe** — runs on the session's command loop
+- **Immediate sync** - the callback fires once with the current value at subscription time
+- **Atomic subscribe+read+apply** - the subscription, read, and initial state application happen within a single session command, so a concurrent Store is always ordered after the initial value
+- **Auto-cleanup** - removed when the session is destroyed
+- **Thread-safe** - runs on the session's command loop
 
 Preferred usage is via `StatefulConfig.Watchers` for declarative subscription:
 
@@ -695,7 +695,7 @@ type Component interface {
 }
 ```
 
-Components are value types — `Handle` returns a new value, the receiver is never mutated. This matches the `HandleFunc` pattern (returns new S).
+Components are value types - `Handle` returns a new value, the receiver is never mutated. This matches the `HandleFunc` pattern (returns new S).
 
 ### EqualComponent
 
@@ -713,18 +713,18 @@ type EqualComponent interface {
 Dispatch events to a component by prefix. Events with actions starting with `"prefix."` are routed to the component with the prefix stripped:
 
 ```go
-// Route returns Component — use when the field stores the interface type.
+// Route returns Component - use when the field stores the interface type.
 s.Chat = tether.Route(s.Chat, "chat", sess, ev)
 
-// RouteTyped preserves the concrete type — use when the field stores a concrete struct.
+// RouteTyped preserves the concrete type - use when the field stores a concrete struct.
 s.Chat = tether.RouteTyped(s.Chat, "chat", sess, ev)
 ```
 
-`RouteTyped` is the common choice. It preserves compile-time type safety — the parent stores the concrete component type in its state struct with direct field access, no type assertions needed.
+`RouteTyped` is the common choice. It preserves compile-time type safety - the parent stores the concrete component type in its state struct with direct field access, no type assertions needed.
 
 ### StatefulConfig.Components
 
-Declarative component mounting. The framework intercepts events matching each mount's prefix and dispatches them to the component's `Handle` — the page's `Handle` function never sees these events:
+Declarative component mounting. The framework intercepts events matching each mount's prefix and dispatches them to the component's `Handle` - the page's `Handle` function never sees these events:
 
 ```go
 tether.StatefulConfig[State]{
@@ -743,7 +743,7 @@ tether.StatefulConfig[State]{
 
 `Mount` follows the same pattern as `WatchValue` and `WatchBus`: a generic constructor that returns a non-generic interface, so `StatefulConfig.Components` can hold mounts for different component types.
 
-Navigate events bypass mounts — they always reach `OnNavigate`.
+Navigate events bypass mounts - they always reach `OnNavigate`.
 
 ### Event.Target
 
@@ -764,7 +764,7 @@ type Mounter interface {
 }
 ```
 
-Use Mount for initial side effects — `sess.Toast("Ready")`, `sess.Signal(...)`, `sess.Go(...)` — that a component needs when it first appears. Components that don't need setup simply implement `Component` without `Mounter`.
+Use Mount for initial side effects - `sess.Toast("Ready")`, `sess.Signal(...)`, `sess.Go(...)` - that a component needs when it first appears. Components that don't need setup simply implement `Component` without `Mounter`.
 
 ### Route vs StatefulConfig.Components
 
@@ -803,7 +803,7 @@ sess.Push(push.Notification{
 pub, priv, err := push.GenerateVAPIDKeys()
 ```
 
-**Sentinel errors** — check with `errors.Is()`:
+**Sentinel errors** - check with `errors.Is()`:
 
 | Error | Meaning |
 |-------|---------|

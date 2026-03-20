@@ -42,7 +42,7 @@ const (
 )
 
 // Compression configures WebSocket per-message deflate (RFC 7692).
-// Compression is enabled by default with sensible defaults — set
+// Compression is enabled by default with sensible defaults - set
 // Disabled to opt out. When enabled, the server negotiates the
 // permessage-deflate extension during the WebSocket handshake.
 // Browsers handle decompression transparently.

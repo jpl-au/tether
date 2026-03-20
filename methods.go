@@ -18,7 +18,7 @@ import (
 // call from any goroutine at any time.
 //
 // When the loop is not active (before startup, after destruction, or
-// while frozen), the state field is returned directly — no concurrent
+// while frozen), the state field is returned directly - no concurrent
 // mutations are possible.
 func (s *StatefulSession[S]) State() S {
 	if Status(s.status.Load()) != Active {
@@ -28,15 +28,15 @@ func (s *StatefulSession[S]) State() S {
 }
 
 // Update applies a state change and pushes the resulting diff to the
-// client. This is the primary way to push server-initiated updates —
+// client. This is the primary way to push server-initiated updates  - 
 // call it from timers, database change listeners, message queue
 // consumers, or [Group.Broadcast].
 //
 // A full render-diff-send cycle is queued as a command and runs after
 // the current event (if any) has been fully processed. This means
 // that when called inside Handle, the update does not take effect
-// until Handle returns — the Handle return value is always
-// authoritative for the triggering event. Non-blocking — returns
+// until Handle returns - the Handle return value is always
+// authoritative for the triggering event. Non-blocking - returns
 // immediately after queuing.
 //
 // The diff engine only tracks elements marked with .Dynamic("key").
@@ -165,7 +165,7 @@ func (s *StatefulSession[S]) Flash(selector, text string) {
 
 // Signal pushes a reactive value to the client. Elements bound to the
 // signal name via [BindText], [BindShow], [BindClass], or [BindAttr]
-// update instantly — no render cycle, no diff, no HTML. Inside Handle
+// update instantly - no render cycle, no diff, no HTML. Inside Handle
 // the signal is buffered and sent atomically with the state diff.
 // Outside Handle it is sent as a standalone update.
 //
@@ -185,7 +185,7 @@ func (s *StatefulSession[S]) Signal(key string, value any) {
 }
 
 // Signals pushes multiple reactive values to the client in a single
-// update. This is a batch variant of [Signal] — use it when setting
+// update. This is a batch variant of [Signal] - use it when setting
 // several signals at once to avoid sending one message per key.
 // Inside Handle all keys are merged into the buffered effects.
 // Outside Handle a single update is sent with all keys.
@@ -204,7 +204,7 @@ func (s *StatefulSession[S]) Signals(signals map[string]any) {
 // the session has an active push subscription and a [push.Sender] is
 // configured. Returns an error if either is missing.
 //
-// Safe to call from any goroutine — pushSender is immutable and
+// Safe to call from any goroutine - pushSender is immutable and
 // pushSub is an atomic pointer, so no command-channel round-trip is
 // needed.
 func (s *StatefulSession[S]) Push(n push.Notification) error {

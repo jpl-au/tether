@@ -1,4 +1,4 @@
-// tether-worker.js — service worker for Tether.
+// tether-worker.js - service worker for Tether.
 //
 // Provides asset caching for faster loads, offline page shells for
 // graceful disconnects, push notification handling, and background
@@ -63,7 +63,7 @@ self.addEventListener("fetch", function (e) {
 
   // Navigation requests: pass through to the network by default.
   // Only cache the response when the server opts in with the
-  // X-Tether-Cache header — this prevents caching sensitive or
+  // X-Tether-Cache header - this prevents caching sensitive or
   // session-specific pages without explicit intent.
   if (e.request.mode === "navigate") {
     e.respondWith(
@@ -216,13 +216,13 @@ function replayEvent(db, key, ev) {
     },
     body: ev.payload
   }).then(function (resp) {
-    // Delete on success or permanent client error (4xx — e.g. session
+    // Delete on success or permanent client error (4xx - e.g. session
     // not found). Keep on server error (5xx) for retry on next sync.
     if (resp.ok || (resp.status >= 400 && resp.status < 500)) {
       deleteFromEventDB(db, key);
     }
   }).catch(function () {
-    // Network failure — leave in IndexedDB for the next sync attempt.
+    // Network failure - leave in IndexedDB for the next sync attempt.
   });
 }
 

@@ -3,7 +3,7 @@
 ## What it does
 
 By default, sessions live entirely in memory. A server restart loses
-all state — reconnecting clients get fresh sessions. `SessionStore`
+all state - reconnecting clients get fresh sessions. `SessionStore`
 changes this: the framework persists the developer's application state
 `S` (plus session metadata) on disconnect and graceful shutdown, and
 restores it when a reconnecting client reaches a server that has no
@@ -12,7 +12,7 @@ in-memory session.
 This enables crash recovery and node migration without the developer
 writing any persistence plumbing.
 
-By default (`StatefulConfig.SessionStore` is nil), nothing changes — sessions
+By default (`StatefulConfig.SessionStore` is nil), nothing changes - sessions
 are in-memory only. Set `StatefulConfig.SessionStore` to opt in.
 
 ## How it relates to DiffStore
@@ -47,7 +47,7 @@ The `data` is an opaque envelope produced by the framework containing
 the serialised state and session metadata. Implementations must not
 interpret or modify the bytes.
 
-The `ttl` on Save is a hint — the framework passes the reconnect
+The `ttl` on Save is a hint - the framework passes the reconnect
 window on disconnect, or the shutdown grace period on graceful
 shutdown. Implementations may use it for automatic expiry (e.g.
 Redis `SETEX`), store it for periodic cleanup, or ignore it entirely.
@@ -87,7 +87,7 @@ the session continues with in-memory state.
 
 **On same-node reconnect:**
 
-The session is still in memory — state `S` is current. The store
+The session is still in memory - state `S` is current. The store
 entry is stale (state may have changed via `Update`/broadcasts
 during disconnect).
 
@@ -124,7 +124,7 @@ On restart, reconnecting clients recover via the crash recovery path.
 ## Codec
 
 The framework serialises state `S` using CBOR (RFC 8949) by default.
-No configuration, no struct tags, no boilerplate — it works for any
+No configuration, no struct tags, no boilerplate - it works for any
 struct with exported fields.
 
 When you need control (encryption, a company-standard format, complex
@@ -137,7 +137,7 @@ type SessionCodec[S any] interface {
 }
 ```
 
-Set `StatefulConfig.Codec` to use it. The codec only handles `S` — session
+Set `StatefulConfig.Codec` to use it. The codec only handles `S` - session
 metadata (URL, title, user-agent) is wrapped separately by the
 framework.
 
@@ -162,7 +162,7 @@ type StatefulConfig[S any] struct {
 it to re-establish runtime resources: rejoin groups, restart timers,
 re-subscribe to buses.
 
-If nil, `OnConnect` fires as a fallback — suitable for apps where
+If nil, `OnConnect` fires as a fallback - suitable for apps where
 setup is identical for new and restored sessions.
 
 ## Configuration
@@ -186,7 +186,7 @@ is not a hard dependency.
 | Save fails | State remains in memory. Session continues normally. `SessionStoreError` diagnostic emitted |
 | Load fails | Client gets a fresh session. `SessionStoreError` diagnostic emitted |
 | Delete fails | Orphaned data in the store (TTL handles cleanup). `SessionStoreError` diagnostic emitted |
-| Codec fails | Same as Save/Load failure — diagnostic emitted, session continues or starts fresh |
+| Codec fails | Same as Save/Load failure - diagnostic emitted, session continues or starts fresh |
 
 Subscribe to `SessionStoreError` diagnostics for alerting:
 
@@ -204,7 +204,7 @@ h.Diagnostics.Subscribe(ctx, func(d tether.Diagnostic) {
 
 ## State versioning
 
-CBOR handles missing and extra fields gracefully — new fields get
+CBOR handles missing and extra fields gracefully - new fields get
 zero values, removed fields are silently dropped. This covers the
 common case of deploying new code while sessions are stored.
 

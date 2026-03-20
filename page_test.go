@@ -420,7 +420,7 @@ func TestPagePOSTNavigateSkipsHandle(t *testing.T) {
 		Render:       renderCounter,
 		Handle: func(_ Session, state counterState, _ Event) counterState {
 			// Handle should NOT run for navigate events when
-			// OnNavigate is set — this matches live session behaviour.
+			// OnNavigate is set - this matches live session behaviour.
 			state.Count = 999
 			return state
 		},
@@ -477,7 +477,7 @@ func TestPagePOSTComponentsDispatch(t *testing.T) {
 		},
 	})
 
-	// Component event — should be routed to widget, not Handle.
+	// Component event - should be routed to widget, not Handle.
 	body := `{"type":"click","action":"widget.inc","data":{},"event_id":"1"}`
 	req := httptest.NewRequest("POST", "/app", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -493,7 +493,7 @@ func TestPagePOSTComponentsDispatch(t *testing.T) {
 		t.Errorf("expected count:1 from component dispatch, got %s", msg.Morphs[0].HTML)
 	}
 
-	// Non-component event — should fall through to Handle.
+	// Non-component event - should fall through to Handle.
 	body = `{"type":"click","action":"set-other","data":{"value":"hi"},"event_id":"2"}`
 	req = httptest.NewRequest("POST", "/app", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")

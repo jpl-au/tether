@@ -99,13 +99,13 @@ func (a *Asset) init() {
 //
 // If the path is not found in the filesystem (typo, read failure),
 // the unhashed URL is returned and an error is logged. The asset
-// file server will still serve the file — only cache-busting is
+// file server will still serve the file - only cache-busting is
 // lost.
 func (a *Asset) URL(path string) string {
 	a.init()
 	h, ok := a.hashes[path]
 	if !ok {
-		slog.Error("tether: asset not found — check the path and look for earlier read errors", "path", path)
+		slog.Error("tether: asset not found - check the path and look for earlier read errors", "path", path)
 		return a.prefix + path
 	}
 	return a.prefix + path + "?v=" + h

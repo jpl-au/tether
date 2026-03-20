@@ -19,7 +19,7 @@ tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
         Sender: sender,
         OnSubscribe: func(ctx context.Context, sess *tether.StatefulSession[State], sub push.Subscription) {
             // Store sub.Endpoint and sub.Keys for later use.
-            // Use ctx for database calls — it cancels when the session is destroyed.
+            // Use ctx for database calls - it cancels when the session is destroyed.
         },
     },
     // ...
@@ -43,7 +43,7 @@ sender.Send(sub, push.Notification{
 })
 ```
 
-Subscription is never automatic — browsers require a user gesture for the push permission prompt. Use `bind.PushSubscribe` on a button or link to let the user opt in:
+Subscription is never automatic - browsers require a user gesture for the push permission prompt. Use `bind.PushSubscribe` on a button or link to let the user opt in:
 
 ```go
 bind.Apply(button.Text("Enable notifications"), bind.PushSubscribe())
@@ -53,7 +53,7 @@ When clicked, the JS runtime requests notification permission, subscribes via th
 
 ### Automatic resync on connect
 
-The client runtime automatically re-sends the browser's existing push subscription to the server on every transport connect (including reconnects). This means subscriptions survive page reloads, navigation between pages on the same handler, and temporary disconnects — the user only needs to click the subscribe button once.
+The client runtime automatically re-sends the browser's existing push subscription to the server on every transport connect (including reconnects). This means subscriptions survive page reloads, navigation between pages on the same handler, and temporary disconnects - the user only needs to click the subscribe button once.
 
 If the server's VAPID keys have changed since the subscription was created (e.g. the server restarted with new ephemeral keys), the client detects the mismatch and silently unsubscribes. The user will need to click the subscribe button again to create a fresh subscription bound to the new keys. Production apps should persist VAPID keys across restarts to avoid this.
 

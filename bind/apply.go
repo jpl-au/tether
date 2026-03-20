@@ -30,7 +30,7 @@ func Apply[E Settable[E]](el E, opts ...Option) E {
 	return el
 }
 
-// Server event options — each sends a [tether.Event] to the server's
+// Server event options - each sends a [tether.Event] to the server's
 // Handle function when the corresponding DOM event fires on the element.
 // The action string becomes [tether.Event].Action, which Handle switches
 // on to determine what happened.
@@ -86,7 +86,7 @@ func OnBlur(action string) Option { return Option{"tether-blur", action} }
 
 // OnViewport fires when the element enters the visible viewport, using
 // an IntersectionObserver internally. Place this on a sentinel element
-// at the bottom of a list to implement infinite scroll — when the
+// at the bottom of a list to implement infinite scroll - when the
 // sentinel scrolls into view, the server loads the next page of data.
 func OnViewport(action string) Option { return Option{"tether-viewport", action} }
 
@@ -99,7 +99,7 @@ func Event(eventType, action string) Option {
 	return Option{"tether-" + eventType, action}
 }
 
-// Control options — modify how events behave without changing which
+// Control options - modify how events behave without changing which
 // events are sent. Stack these with event options via [Apply].
 
 // Disable replaces the element's text and disables it while the server
@@ -131,11 +131,11 @@ func Indicator(selector string) Option { return Option{"tether-indicator", selec
 
 // FocusTrap constrains keyboard focus (Tab/Shift+Tab) to elements
 // within this container. Use this for modals and drawers to prevent
-// focus from escaping to elements behind the overlay — required for
+// focus from escaping to elements behind the overlay - required for
 // accessibility.
 func FocusTrap() Option { return Option{"tether-focus-trap", ""} }
 
-// Timing options — control how frequently events reach the server.
+// Timing options - control how frequently events reach the server.
 
 // Debounce overrides the default input debounce delay for this element.
 // The default (300ms, configurable via [tether.App].Client.DefaultDebounce)
@@ -166,18 +166,18 @@ func Data(key, value string) Option { return Option{key, value} }
 // EventData attaches a static key-value pair to every event from this
 // element. The pair appears in [tether.Event].Data alongside any
 // values the client collects automatically (input value, form fields).
-// Use this to carry context — like an item ID — with each click so the
+// Use this to carry context - like an item ID - with each click so the
 // handler knows which item was acted on without maintaining server-side
 // selection state.
 func EventData(key, value string) Option { return Option{"tether-data-" + key, value} }
 
-// Directive options — client-side behaviour that runs entirely in the
+// Directive options - client-side behaviour that runs entirely in the
 // browser without a server round-trip.
 
 // Link enables client-side navigation for anchor elements. Instead of
 // a full page reload, the client intercepts the click, updates the
 // browser URL via pushState, and sends a navigate event to the server.
-// The server re-renders the active page and pushes a diff — only the
+// The server re-renders the active page and pushes a diff - only the
 // changed content is updated, preserving scroll position and input
 // state. Use this for navigation within a single tether handler. For
 // links to a different handler (e.g. from /ws/ to /sse/), use a
@@ -200,20 +200,20 @@ func ToggleAttr(attr string) Option { return Option{"tether-toggle-attr", attr} 
 
 // Cloak hides the element until the tether runtime initialises. The
 // client removes the attribute on startup, making the element visible.
-// Use this to prevent a flash of unbound content — e.g. a signal-bound
+// Use this to prevent a flash of unbound content - e.g. a signal-bound
 // element that would briefly show its raw template text before the
 // signal value is applied.
 func Cloak() Option { return Option{"tether-cloak", ""} }
 
 // Permanent excludes the element from DOM morphing. When idiomorph
-// processes a server update, it skips elements marked permanent —
+// processes a server update, it skips elements marked permanent  - 
 // their content, attributes, and children are preserved exactly as-is.
 // Use this for elements with client-side state that must survive server
 // updates (e.g. a video player, an interactive map, or a third-party
 // widget that manages its own DOM).
 func Permanent() Option { return Option{"tether-permanent", ""} }
 
-// Signal binding options — bind DOM properties to server-pushed signals.
+// Signal binding options - bind DOM properties to server-pushed signals.
 // Signals update elements directly on the client without a render cycle
 // or diff. Push values via [tether.Session.Signal]; bound elements react
 // instantly. Elements with signal bindings do not need Dynamic keys
@@ -225,7 +225,7 @@ func Permanent() Option { return Option{"tether-permanent", ""} }
 func BindText(signal string) Option { return Option{"tether-bind-text", signal} }
 
 // BindShow makes the element visible when the named signal is truthy
-// and hidden when falsy. Visibility is toggled via CSS display — the
+// and hidden when falsy. Visibility is toggled via CSS display - the
 // element remains in the DOM either way.
 func BindShow(signal string) Option { return Option{"tether-bind-show", signal} }
 
@@ -252,18 +252,18 @@ func BindAttr(attr, signal string) Option {
 // value, the form element's displayed value updates instantly.
 func BindValue(signal string) Option { return Option{"tether-bind-value", signal} }
 
-// Signal directive options — modify signal values on the client without
+// Signal directive options - modify signal values on the client without
 // waiting for a server response. These are purely client-side operations
 // that update bound elements instantly.
 
 // ToggleSignal flips a boolean signal between true and false on click.
-// No server round-trip — the signal updates instantly on the client.
+// No server round-trip - the signal updates instantly on the client.
 // Combine with [BindShow] or [BindClass] for UI that toggles without
 // network latency (dropdowns, accordions, dark mode).
 func ToggleSignal(signal string) Option { return Option{"tether-toggle-signal", signal} }
 
 // SetSignal sets a signal to a specific value on click. No server
-// round-trip — the signal updates instantly on the client. Use this
+// round-trip - the signal updates instantly on the client. Use this
 // for tab selection, radio-style patterns, or any case where clicking
 // an element should set a known value.
 func SetSignal(signal, value string) Option {
@@ -273,7 +273,7 @@ func SetSignal(signal, value string) Option {
 // Optimistic sets a signal immediately on click AND sends the event to
 // the server. The signal provides instant visual feedback while the
 // server processes the event. If the server sends a different signal
-// value in its response, the client updates to match — the server is
+// value in its response, the client updates to match - the server is
 // always authoritative.
 func Optimistic(signal, value string) Option {
 	return Option{"tether-optimistic", signal + " " + value}
@@ -281,7 +281,7 @@ func Optimistic(signal, value string) Option {
 
 // OptimisticToggle flips a boolean signal immediately on click AND
 // sends the event to the server. Like [Optimistic] but for boolean
-// toggles — the signal flips instantly while the server processes the
+// toggles - the signal flips instantly while the server processes the
 // real state change.
 func OptimisticToggle(signal string) Option { return Option{"tether-optimistic-toggle", signal} }
 
@@ -296,7 +296,7 @@ func OptimisticToggle(signal string) Option { return Option{"tether-optimistic-t
 //	)
 func Collect(selector string) Option { return Option{"tether-collect", selector} }
 
-// Upload options — file upload via the upload extension JS. Requires
+// Upload options - file upload via the upload extension JS. Requires
 // [tether.UploadConfig] on [tether.StatefulConfig].
 
 // Upload marks the element as a file upload trigger. Clicking it opens
@@ -319,7 +319,7 @@ func UploadProgress(action string) Option {
 	return Option{"tether-bind-attr", "value upload:" + action + ":progress"}
 }
 
-// Push options — Web Push notification subscription. Requires
+// Push options - Web Push notification subscription. Requires
 // [tether.PushConfig] on [tether.StatefulConfig].
 
 // PushSubscribe marks a button for Web Push subscription. On click, the
@@ -329,7 +329,7 @@ func UploadProgress(action string) Option {
 // stored for later use with [tether.Session.Push].
 func PushSubscribe() Option { return Option{"tether-push-subscribe", ""} }
 
-// Lifecycle options — integrate with the client JS lifecycle and CSS
+// Lifecycle options - integrate with the client JS lifecycle and CSS
 // transition system.
 
 // Hook attaches a named JS lifecycle hook to the element. Hooks are

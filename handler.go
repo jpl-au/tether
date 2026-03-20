@@ -26,11 +26,11 @@ type pendingSession[S any] struct {
 const defaultPendingTimeout = 30 * time.Second
 
 // Handler manages the lifecycle of tether sessions. Sessions move through
-// three pools — pending, active, and disconnected — so the server can
+// three pools - pending, active, and disconnected - so the server can
 // pre-warm state on the initial GET and preserve it across brief network
 // interruptions. Use Shutdown for graceful termination.
 //
-// The handler also serves the embedded client runtime at /_tether/ — there
+// The handler also serves the embedded client runtime at /_tether/ - there
 // is no need to mount a separate file server for the JS assets.
 type Handler[S any] struct {
 	app          App
@@ -62,7 +62,7 @@ type Handler[S any] struct {
 
 	// Diagnostics emits framework-level events so application code
 	// can observe them for metrics, alerting, or custom logging.
-	// The framework is quiet by default — slog is only used for
+	// The framework is quiet by default - slog is only used for
 	// panics. All other operational signals (transport errors,
 	// encode failures, buffer overflows, upload errors) flow
 	// exclusively through this bus.

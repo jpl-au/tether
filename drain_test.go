@@ -48,7 +48,7 @@ func TestDrainAllowsReconnect(t *testing.T) {
 	handler.disconnected[sess.id] = sess
 	handler.mu.Unlock()
 
-	// Start draining — the disconnected session should still be reachable.
+	// Start draining - the disconnected session should still be reachable.
 	handler.draining.Store(true)
 
 	handler.mu.Lock()

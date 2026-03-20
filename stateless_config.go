@@ -9,10 +9,10 @@ import (
 // StatelessConfig wires together a stateless page: how to reconstruct
 // state from each request, how to render it, and how to handle events.
 // Unlike [StatefulConfig], there is no persistent transport, no session
-// pool, and no command loop — each request is independent. The server
+// pool, and no command loop - each request is independent. The server
 // reconstructs state, renders HTML, and returns the response.
 //
-// State is reconstructed from each request — nothing persists between
+// State is reconstructed from each request - nothing persists between
 // interactions. For pages with persistent connections and session
 // state, use [StatefulConfig] with [Stateful] instead.
 //
@@ -26,19 +26,19 @@ import (
 type StatelessConfig[S any] struct {
 	// InitialState returns the starting state for each request. Called
 	// on every request (GET and POST). Derive state from the URL,
-	// cookies, headers, or a database — not from r.Body, which
+	// cookies, headers, or a database - not from r.Body, which
 	// contains the event JSON on POST requests.
 	InitialState func(r *http.Request) S
 
 	// Render builds a node tree from the current state. Same type as
-	// [StatefulConfig].Render — a pure function that returns a Fluent node
+	// [StatefulConfig].Render - a pure function that returns a Fluent node
 	// tree. The same render function can be used for both live and
 	// stateless pages.
 	Render RenderFunc[S]
 
 	// Handle processes a client event and returns the new state. Side
 	// effects (toast, navigate, title, etc.) are expressed as calls on
-	// the [Session] parameter — the same interface used by
+	// the [Session] parameter - the same interface used by
 	// [StatefulConfig].OnNavigate. The effects are included in the JSON
 	// response so the client can apply them atomically.
 	Handle func(session Session, state S, event Event) S
@@ -55,7 +55,7 @@ type StatelessConfig[S any] struct {
 
 	// Layout wraps the page content in a full HTML document. Runs on
 	// every GET request (stateless pages reconstruct state each time).
-	// Signal bindings in the Layout shell work document-wide — see
+	// Signal bindings in the Layout shell work document-wide - see
 	// [StatefulConfig].Layout for details. Optional.
 	Layout func(state S, content node.Node) node.Node
 

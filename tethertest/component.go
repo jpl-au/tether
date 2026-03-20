@@ -6,7 +6,7 @@ import (
 )
 
 // ComponentHarness drives a [tether.Component] in isolation for testing.
-// Events are dispatched directly to the component's Handle method —
+// Events are dispatched directly to the component's Handle method  - 
 // no prefix stripping, no wrapper state, no transport plumbing.
 //
 //	h := tethertest.NewComponent(MyWidget{Count: 0})
@@ -20,7 +20,7 @@ type ComponentHarness[C tether.Component] struct {
 }
 
 // NewComponent creates a test harness for an isolated [tether.Component].
-// The component receives events directly — no prefix, no parent state,
+// The component receives events directly - no prefix, no parent state,
 // no getter/setter boilerplate.
 func NewComponent[C tether.Component](initial C) *ComponentHarness[C] {
 	return &ComponentHarness[C]{comp: initial}

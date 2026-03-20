@@ -15,7 +15,7 @@ import (
 
 // run is the session's command loop. It processes transport events,
 // commands from external callers, and effect closures in a single
-// goroutine — no mutex needed. The loop exits when the session
+// goroutine - no mutex needed. The loop exits when the session
 // context is cancelled (shutdown, reaper timeout, or explicit
 // destruction).
 //
@@ -38,7 +38,7 @@ func (s *StatefulSession[S]) run() {
 				s.events = nil
 				s.onTransportClose()
 				if s.freeze {
-					// Frozen — exit the loop. State has been
+					// Frozen - exit the loop. State has been
 					// persisted and memory released. A reconnect
 					// will thaw by starting a new run().
 					return
@@ -51,7 +51,7 @@ func (s *StatefulSession[S]) run() {
 			s.runCmd(cmd)
 
 		case fn := <-s.fxCh:
-			// Effect arriving outside of Handle — send immediately.
+			// Effect arriving outside of Handle - send immediately.
 			// Reset idle timer: the server is actively communicating
 			// with the client, so the session is not idle.
 			s.lastActivity.Store(time.Now().UnixNano())
@@ -87,7 +87,7 @@ func (s *StatefulSession[S]) runCmd(cmd func()) {
 }
 
 // readTransport bridges the blocking ReceiveEvent call into the
-// events channel. Its only job is to read and forward — it closes
+// events channel. Its only job is to read and forward - it closes
 // the output channel on exit so the loop knows the transport is gone.
 func (s *StatefulSession[S]) readTransport(out chan<- Event) {
 	dev.Debug("readTransport started", "session", s.id, "endpoint", s.endpoint)
@@ -142,7 +142,7 @@ func (s *StatefulSession[S]) exec(ev Event) {
 	)
 
 	// Component mounts intercept events before Handle so that
-	// mounted components are self-contained — the application's
+	// mounted components are self-contained - the application's
 	// Handle never sees events meant for a component. Navigate
 	// events bypass mounts because they need the OnNavigate chain.
 	var newState S
@@ -206,7 +206,7 @@ func (s *StatefulSession[S]) exec(ev Event) {
 // onTransportClose runs when the client's transport connection drops.
 // It nils the transport so send() silently discards updates during
 // the reconnect window, then persists session data to any configured
-// stores — DiffStore for differ snapshots (memory optimisation) and
+// stores - DiffStore for differ snapshots (memory optimisation) and
 // SessionStore for application state (crash recovery). Persistence
 // happens before the pool transition so data is safely stored before
 // the session becomes visible as reconnectable.
@@ -257,7 +257,7 @@ func (s *StatefulSession[S]) onTransportClose() {
 
 	// Save session state for crash recovery. The codec serialises S,
 	// the envelope wraps it with metadata, and the store persists the
-	// bytes. TTL matches the reconnect window — if the client never
+	// bytes. TTL matches the reconnect window - if the client never
 	// comes back, the store entry can expire.
 	if s.sessionStore != nil {
 		s.saveSessionState(s.ctx, s.reconnectTimeout)
@@ -281,7 +281,7 @@ func (s *StatefulSession[S]) onTransportClose() {
 
 // saveSessionState encodes the session's state and metadata into an
 // envelope and persists it to the SessionStore. The caller provides
-// the context — onTransportClose passes s.ctx (still valid during
+// the context - onTransportClose passes s.ctx (still valid during
 // disconnect), Shutdown passes context.Background() (s.ctx is
 // cancelled after the loop exits). Failures are logged and emitted
 // as diagnostics but are non-fatal.
@@ -329,7 +329,7 @@ func (s *StatefulSession[S]) saveSessionState(ctx context.Context, ttl time.Dura
 }
 
 // cleanup runs when the loop exits. For frozen sessions only the
-// idle timer is stopped — the disconnect timer keeps running so the
+// idle timer is stopped - the disconnect timer keeps running so the
 // reaper can destroy the session if it is never thawed. For
 // destroyed sessions, everything is stopped and the destroyed
 // channel is closed.

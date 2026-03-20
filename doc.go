@@ -1,18 +1,18 @@
 // Package tether is a reactive UI layer for Go. The server owns
 // application state and renders HTML; the client owns ephemeral UI
-// state — toggling drawers, binding text to signals, showing and hiding
-// elements — without a round-trip.
+// state - toggling drawers, binding text to signals, showing and hiding
+// elements - without a round-trip.
 //
 // Tether provides two handler modes:
 //
 // [Stateful] handlers maintain a persistent connection (WebSocket or SSE)
-// between browser and server. State survives across interactions —
+// between browser and server. State survives across interactions  - 
 // when the user clicks a button, the server updates state and pushes
 // the change without a page reload. Use Stateful for interactive
 // applications: dashboards, forms, chat, real-time collaboration.
 //
 // [Stateless] handlers reconstruct state from each HTTP request. No
-// persistent connection — every interaction is a standard
+// persistent connection - every interaction is a standard
 // request/response cycle. Use Stateless for content-focused pages that
 // don't need real-time updates.
 //
@@ -39,7 +39,7 @@
 //  4. For lightweight updates that don't need a full render cycle, the
 //     server pushes signals via [Session.Signal]. Bound elements
 //     ([bind.BindText], [bind.BindShow], [bind.BindClass],
-//     [bind.BindAttr]) update instantly on the client — no diff, no
+//     [bind.BindAttr]) update instantly on the client - no diff, no
 //     HTML.
 //
 // # Stateless mode

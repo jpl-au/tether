@@ -54,7 +54,7 @@ func (p *tetherBody) Render(w ...io.Writer) []byte {
 	if len(w) > 0 && w[0] != nil {
 		// Write error is intentionally not checked. This writes to
 		// an http.ResponseWriter during the initial GET. A failure
-		// means the client disconnected — a normal condition that
+		// means the client disconnected - a normal condition that
 		// requires no action. The node.Node interface does not
 		// return an error.
 		buf.WriteTo(w[0])
@@ -92,7 +92,7 @@ func (p *tetherBody) RenderBuilder(buf *bytes.Buffer) {
 	}
 	// Pass JS runtime configuration as data attributes so the client
 	// reads them instead of using hardcoded values. Retry-delay and
-	// max-retry-delay are omitted for fetch mode — there is no
+	// max-retry-delay are omitted for fetch mode - there is no
 	// persistent connection to reconnect.
 	if p.transport != mode.HTTP {
 		buf.WriteString(` data-tether-retry-delay="`)
@@ -157,8 +157,8 @@ func (p *tetherBody) Nodes() []node.Node { return nil }
 
 // newID generates a cryptographically random session identifier using
 // Go's crypto/rand.Text (base-32, no padding). The session ID doubles
-// as a bearer token — knowing it is sufficient to send events to the
-// session — so it must be unguessable.
+// as a bearer token - knowing it is sufficient to send events to the
+// session - so it must be unguessable.
 func newID() string {
 	return rand.Text()
 }

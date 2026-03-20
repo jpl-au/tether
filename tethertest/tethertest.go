@@ -1,6 +1,6 @@
 // Package tethertest provides a test harness for tether Handle functions.
-// It invokes the handler directly — no HTTP server, no JSON serialisation,
-// no transport plumbing — so tests see the exact types the handler pushed.
+// It invokes the handler directly - no HTTP server, no JSON serialisation,
+// no transport plumbing - so tests see the exact types the handler pushed.
 //
 //	func TestIncrement(t *testing.T) {
 //	    h := tethertest.New(tethertest.Config[State]{
@@ -29,7 +29,7 @@ type Config[S any] struct {
 	// State is the initial state for each test interaction.
 	State S
 
-	// Render builds a node tree from the current state. Optional —
+	// Render builds a node tree from the current state. Optional  - 
 	// only required when calling [Harness.HTML], [Harness.Render],
 	// or [Harness.RenderNode].
 	Render tether.RenderFunc[S]
@@ -57,12 +57,12 @@ type Config[S any] struct {
 
 	// Components declares component mounts for automatic event routing.
 	// Events matching a mount's prefix are dispatched to the component
-	// before Handle runs — mirroring [tether.StatefulConfig].Components.
+	// before Handle runs - mirroring [tether.StatefulConfig].Components.
 	// Optional.
 	Components []tether.ComponentMount[S]
 
 	// Layout wraps the rendered content for [Harness.Render] and
-	// [Harness.HTML], mirroring [tether.StatefulConfig].Layout. Optional —
+	// [Harness.HTML], mirroring [tether.StatefulConfig].Layout. Optional  - 
 	// when absent, only the content node is rendered.
 	Layout func(S, node.Node) node.Node
 }
@@ -89,7 +89,7 @@ type Harness[S any] struct {
 	lastHTML string
 }
 
-// New creates a test harness. The harness invokes Handle directly —
+// New creates a test harness. The harness invokes Handle directly  - 
 // no HTTP server, no JSON round-trip, no goroutines.
 func New[S any](cfg Config[S]) *Harness[S] {
 	handle := cfg.Handle
@@ -109,7 +109,7 @@ func New[S any](cfg Config[S]) *Harness[S] {
 }
 
 // Send fires a click event with the given action name. This is the
-// most common case — use [Harness.SendEvent] for other event types.
+// most common case - use [Harness.SendEvent] for other event types.
 func (h *Harness[S]) Send(action string) {
 	h.SendEvent(tether.Event{
 		Type:   event.Click,
@@ -226,7 +226,7 @@ func (h *Harness[S]) Flash() map[string]string {
 
 // Signals returns the signal values from the most recent Send call.
 // Returns nil if no signals were pushed. Values retain their original
-// Go types — no JSON round-tripping.
+// Go types - no JSON round-tripping.
 func (h *Harness[S]) Signals() map[string]any {
 	return h.last.Signals
 }

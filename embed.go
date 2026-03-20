@@ -37,7 +37,7 @@ var (
 )
 
 // clientVersion returns a 12-character hex hash of the embedded client
-// files. The hash is computed once and cached — the embedded content is
+// files. The hash is computed once and cached - the embedded content is
 // immutable for the lifetime of the process. Used for cache-busting
 // query strings on script tags and as the base for the service worker
 // CACHE_VERSION.

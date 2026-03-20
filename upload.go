@@ -36,7 +36,7 @@ type UploadConfig[S any] struct {
 // Upload represents a single uploaded file delivered to the
 // [UploadConfig].Handle callback.
 type Upload struct {
-	// Action is the value from bind.Upload — the application-defined
+	// Action is the value from bind.Upload - the application-defined
 	// name that identifies this upload (e.g. "avatar", "document").
 	Action string
 
@@ -132,7 +132,7 @@ func (h *Handler[S]) handleUpload(w http.ResponseWriter, r *http.Request) {
 
 	// Hand ownership of the multipart form to a single goroutine
 	// that processes all files. Temp files are cleaned up after
-	// every callback has returned — not before.
+	// every callback has returned - not before.
 	form := r.MultipartForm
 	handler := h.cfg.Upload.Handle
 	sessionID := sess.id

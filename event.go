@@ -23,7 +23,7 @@ import (
 //
 // Type is the DOM [event.Type] (e.g. [event.Click], [event.Input],
 // [event.Submit], [event.Navigate]). Action is the value of the
-// data-tether-* attribute — it is the application-defined name that the
+// data-tether-* attribute - it is the application-defined name that the
 // Handle function switches on. Data carries event-specific key-value
 // pairs: for input events this is {"value": "..."}, for submit events
 // it includes all named form fields, and for keydown events it
@@ -83,7 +83,7 @@ func (e Event) Float64(key string) (float64, error) {
 }
 
 // Bool returns true when the data value for key is the string "true".
-// All other values — including missing keys — return false.
+// All other values - including missing keys - return false.
 func (e Event) Bool(key string) bool {
 	return e.Data[key] == "true"
 }

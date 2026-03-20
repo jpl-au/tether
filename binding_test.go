@@ -40,7 +40,7 @@ func TestSessionBindingRejectsReattachWithMismatchedUA(t *testing.T) {
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, req)
 
-	// Session should remain in disconnected — the legitimate client
+	// Session should remain in disconnected - the legitimate client
 	// can still reconnect with the correct UA.
 	h.mu.Lock()
 	_, inDisc := h.disconnected[sess.id]
@@ -126,7 +126,7 @@ func TestSessionBindingDisabledAllowsMismatchedUA(t *testing.T) {
 	}
 	h.mu.Unlock()
 
-	// Claim with a different User-Agent — should succeed because
+	// Claim with a different User-Agent - should succeed because
 	// binding is disabled.
 	req := httptest.NewRequest("GET", "/?session=test-disabled", nil)
 	req.Header.Set("Upgrade", "websocket")
@@ -138,7 +138,7 @@ func TestSessionBindingDisabledAllowsMismatchedUA(t *testing.T) {
 	// OnConnect fires only if the session was successfully claimed.
 	select {
 	case <-connected:
-		// Success — session was created despite UA mismatch.
+		// Success - session was created despite UA mismatch.
 	case <-time.After(2 * time.Second):
 		t.Fatal("expected OnConnect when binding is disabled, but it was not called")
 	}

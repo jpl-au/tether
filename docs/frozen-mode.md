@@ -11,7 +11,7 @@ a fresh session is started.
 Enable frozen mode when sessions do not need background processing
 during disconnect. If your sessions use timers, broadcasts, or
 `Update()` calls that fire while disconnected, frozen mode will
-discard those — use the default (non-frozen) disconnect behaviour
+discard those - use the default (non-frozen) disconnect behaviour
 instead.
 
 Frozen mode is ideal for:
@@ -29,7 +29,7 @@ Frozen mode is ideal for:
 tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
     // ... Render, Handle, etc.
 
-    SessionStore:       myStore,    // required — state must persist somewhere
+    SessionStore:       myStore,    // required - state must persist somewhere
     FreezeOnDisconnect: true,
 
     // OnRestore fires when a frozen session is thawed. Use it to
@@ -45,7 +45,7 @@ tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
 the framework logs a warning at startup and disables freeze:
 
 ```
-WARN tether: FreezeOnDisconnect requires a SessionStore — frozen mode disabled because there is nowhere to persist state
+WARN tether: FreezeOnDisconnect requires a SessionStore - frozen mode disabled because there is nowhere to persist state
 ```
 
 ## Lifecycle
@@ -54,8 +54,8 @@ WARN tether: FreezeOnDisconnect requires a SessionStore — frozen mode disabled
 
 ```
 1. Transport closes
-2. DiffStore.Save(snapshots)     — if configured
-3. SessionStore.Save(state, ttl) — serialise S + metadata
+2. DiffStore.Save(snapshots)     - if configured
+3. SessionStore.Save(state, ttl) - serialise S + metadata
 4. OnDisconnect fires
 5. Release S (zero value) and differ (nil)
 6. Set status to Frozen
@@ -63,7 +63,7 @@ WARN tether: FreezeOnDisconnect requires a SessionStore — frozen mode disabled
 ```
 
 The session remains in the disconnected pool as a lightweight stub.
-The reconnect timer keeps running — if it fires before the client
+The reconnect timer keeps running - if it fires before the client
 returns, the session is destroyed and the store entry expires via
 its TTL.
 
@@ -84,7 +84,7 @@ its TTL.
 ```
 
 The thaw path is similar to crash recovery (`restoreSession`) but
-reuses the existing session stub — preserving the session ID,
+reuses the existing session stub - preserving the session ID,
 endpoint, user-agent, and context.
 
 ### Commands while frozen
@@ -92,7 +92,7 @@ endpoint, user-agent, and context.
 Commands (`Update`, `Broadcast`, `Signal`, `Toast`, etc.) sent to a
 frozen session are silently discarded. The command loop has exited
 and there is no channel to receive them. This is the key trade-off
-of frozen mode — background processing stops during disconnect.
+of frozen mode - background processing stops during disconnect.
 
 ## Session status
 
@@ -116,7 +116,7 @@ operating on a session in an unexpected state.
 DiffStore and SessionStore are independent. Both save on disconnect.
 DiffStore saves differ snapshots (memory optimisation); SessionStore
 saves application state (crash recovery and freeze). A frozen
-session clears both on thaw — the differ is rebuilt from a fresh
+session clears both on thaw - the differ is rebuilt from a fresh
 render, and state is loaded from the SessionStore.
 
 ### Groups
@@ -129,7 +129,7 @@ during thaw.
 ### Watchers
 
 Watchers are re-subscribed during thaw, before `OnRestore` fires.
-Any values or bus events that arrived while frozen are lost — the
+Any values or bus events that arrived while frozen are lost - the
 session picks up the current state from its next render.
 
 ### Codec

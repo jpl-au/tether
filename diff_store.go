@@ -4,7 +4,7 @@ import "context"
 
 // DiffStore persists differ snapshots for disconnected sessions,
 // allowing snapshot data to live outside process memory during the
-// reconnect window. This is a memory optimisation — not a recovery
+// reconnect window. This is a memory optimisation - not a recovery
 // mechanism. The framework calls Save when a session disconnects and
 // Delete when it reconnects or is destroyed.
 //
@@ -15,10 +15,10 @@ import "context"
 //
 // The data passed to Save is an opaque blob produced by the differ's
 // Export method. Implementations must not interpret or modify the
-// bytes — the encoding is an internal detail that may change between
+// bytes - the encoding is an internal detail that may change between
 // framework versions.
 //
-// Load is not called by the framework today — reconnecting sessions
+// Load is not called by the framework today - reconnecting sessions
 // re-render from state, which re-seeds the differ. Load is included
 // for tooling, debugging, and future optimisations.
 //
@@ -35,7 +35,7 @@ type DiffStore interface {
 
 	// Load retrieves previously saved snapshot data. Returns the data
 	// and nil on success. If the session ID is not found, returns
-	// (nil, nil) — a missing entry is not an error. The framework
+	// (nil, nil) - a missing entry is not an error. The framework
 	// treats a missing entry the same as a Load failure: the client
 	// gets a fresh session.
 	Load(ctx context.Context, id string) ([]byte, error)

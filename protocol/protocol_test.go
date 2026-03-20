@@ -22,7 +22,7 @@ func TestString(t *testing.T) {
 }
 
 func TestConstants(t *testing.T) {
-	// Zero value must not equal any named constant — this is how
+	// Zero value must not equal any named constant - this is how
 	// Live() detects "not set" and falls back to Auto.
 	if Auto == 0 {
 		t.Fatal("Auto must not be zero")

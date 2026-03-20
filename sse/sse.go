@@ -2,7 +2,7 @@
 // the deployment environment does not support WebSocket (e.g. certain
 // PaaS providers, corporate proxies, or HTTP/2-only setups).
 //
-// The transport is unidirectional — server→client only. Updates flow
+// The transport is unidirectional - server→client only. Updates flow
 // as Server-Sent Events over a long-lived HTTP GET (EventSource on
 // the client side). Client events arrive as individual HTTP POST
 // requests and are routed directly to the session's command channel
@@ -25,7 +25,7 @@ import (
 )
 
 // heartbeatMsg is the SSE comment written by the heartbeat ticker.
-// Allocated once and shared across all transports — read-only.
+// Allocated once and shared across all transports - read-only.
 var heartbeatMsg = []byte(": heartbeat\n\n")
 
 // Upgrade returns an upgrade function for use in [tether.StatefulConfig].Fallback
@@ -43,7 +43,7 @@ func Upgrade() func(http.ResponseWriter, *http.Request) (tether.Transport, error
 		// Disable write deadlines for the SSE stream. This ensures that
 		// even if the server has a global WriteTimeout, it won't kill our
 		// long-lived SSE connection. Requires Go 1.20+. Not all
-		// ResponseWriters support this — the error is non-fatal.
+		// ResponseWriters support this - the error is non-fatal.
 		rc := http.NewResponseController(w)
 		if err := rc.SetWriteDeadline(time.Time{}); err != nil {
 			slog.Debug("sse: SetWriteDeadline not supported", "error", err)
@@ -51,7 +51,7 @@ func Upgrade() func(http.ResponseWriter, *http.Request) (tether.Transport, error
 
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.Header().Set("Cache-Control", "no-cache")
-		// Connection: keep-alive is not set — it is invalid in HTTP/2
+		// Connection: keep-alive is not set - it is invalid in HTTP/2
 		// (RFC 7540 §8.1.2.2) and Go's HTTP/2 implementation strips
 		// connection-specific headers. HTTP/1.1 keep-alive is the
 		// default behaviour and does not need an explicit header.
@@ -84,7 +84,7 @@ func Upgrade() func(http.ResponseWriter, *http.Request) (tether.Transport, error
 
 // transport implements [tether.Transport] using SSE for the server→client
 // direction. A dedicated writer goroutine owns the http.ResponseWriter
-// — Send and StartHeartbeat submit payloads to the writes channel, and
+// - Send and StartHeartbeat submit payloads to the writes channel, and
 // the writer serialises them onto the wire.
 //
 // ReceiveEvent blocks until the transport is closed. It returns the
@@ -98,7 +98,7 @@ var (
 // write error that caused the closure (if any) so the session can
 // distinguish clean disconnects from broken pipes. Client events in
 // SSE mode arrive as HTTP POSTs and are routed directly to the
-// session's command channel — they never pass through the transport.
+// session's command channel - they never pass through the transport.
 type transport struct {
 	writes chan []byte
 	done   chan struct{}
@@ -148,7 +148,7 @@ func (t *transport) Send(data []byte) error {
 
 // ReceiveEvent blocks until the transport is closed, then returns
 // io.EOF. In SSE mode, client events arrive as HTTP POSTs and are
-// routed directly to the session's command channel — they never pass
+// routed directly to the session's command channel - they never pass
 // through this method. The session's readTransport goroutine calls
 // ReceiveEvent in a loop; it exits when Close is called (HTTP
 // connection drop or session shutdown).

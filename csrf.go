@@ -8,7 +8,7 @@ import "net/http"
 func (s *Security) csrf() *http.CrossOriginProtection {
 	for _, o := range s.TrustedOrigins {
 		if o == "" {
-			panic("tether: Security.TrustedOrigins contains an empty string — remove it or provide a valid origin like \"https://example.com\"")
+			panic("tether: Security.TrustedOrigins contains an empty string - remove it or provide a valid origin like \"https://example.com\"")
 		}
 	}
 	csrf := http.NewCrossOriginProtection()

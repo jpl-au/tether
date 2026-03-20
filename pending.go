@@ -4,7 +4,7 @@ import "time"
 
 // pendingCheckInterval controls how often expired pending sessions are
 // cleaned up. This is the only polling that remains after removing the
-// centralised reaper — active and disconnected sessions use per-session
+// centralised reaper - active and disconnected sessions use per-session
 // timers instead.
 const pendingCheckInterval = 10 * time.Second
 

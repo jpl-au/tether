@@ -59,7 +59,7 @@ func TestSessionUpdatePanicDoesNotCrashCaller(t *testing.T) {
 		defer func() { sess.stop(); synctest.Wait() }()
 
 		// Queue an update that panics. The panic is recovered inside
-		// the command loop — the caller is not affected.
+		// the command loop - the caller is not affected.
 		sess.Update(func(s counterState) counterState {
 			panic("boom in update")
 		})
@@ -86,7 +86,7 @@ func TestServeInitialPagePanicDoesNotCrashProcess(t *testing.T) {
 	req := httptest.NewRequest("GET", "/app", nil)
 	w := httptest.NewRecorder()
 
-	// Should not panic — the recovery in serveInitialPage catches it.
+	// Should not panic - the recovery in serveInitialPage catches it.
 	handler.ServeHTTP(w, req)
 
 	if w.Code != http.StatusInternalServerError {

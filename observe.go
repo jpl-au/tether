@@ -4,7 +4,7 @@ import "github.com/jpl-au/tether/dev"
 
 // Observe subscribes a session to a shared [Value]. The callback
 // receives the shared value and the session's current state, and
-// returns the new state — same shape as [On].
+// returns the new state - same shape as [On].
 //
 // The current value is delivered immediately so the session's state
 // is up to date from the moment of subscription. Future changes via
@@ -13,7 +13,7 @@ import "github.com/jpl-au/tether/dev"
 // The subscription, initial read, and initial state application all
 // happen within a single session command. A concurrent [Value.Store]
 // that arrives after the subscription is registered will always be
-// ordered after the initial value — the session never sees a stale
+// ordered after the initial value - the session never sees a stale
 // overwrite.
 //
 // The subscription is cleaned up when the session is destroyed.

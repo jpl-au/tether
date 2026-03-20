@@ -13,7 +13,7 @@ import (
 
 // StatefulConfig wires together all the pieces of a stateful page:
 // how to create initial state, how to render it, and how to handle
-// events. The type parameter S is the session state — typically a
+// events. The type parameter S is the session state - typically a
 // struct, but it can be any type. Each connected browser tab gets its
 // own independent copy of S, so state is never shared across sessions
 // unless you explicitly coordinate via [Group] or external storage.
@@ -45,7 +45,7 @@ type StatefulConfig[S any] struct {
 	// Protocol sets the HTTP protocol the server uses. When set to
 	// [protocol.Auto] (the default), the framework detects the
 	// protocol from each request. Set explicitly when you know your
-	// environment — e.g. [protocol.HTTP2] when serving HTTPS
+	// environment - e.g. [protocol.HTTP2] when serving HTTPS
 	// directly, or [protocol.HTTP1] behind a downgrading proxy.
 	// Mismatches between the configured and detected protocol emit
 	// a warning on every affected request.
@@ -53,7 +53,7 @@ type StatefulConfig[S any] struct {
 	// Can also be set via the TETHER_PROTO environment variable
 	// (HTTP1, HTTP2, HTTP3, AUTO). Explicit config takes precedence.
 	//
-	// Protocol awareness applies to stateful sessions only — [Stateless] is
+	// Protocol awareness applies to stateful sessions only - [Stateless] is
 	// stateless and does not benefit from protocol-specific behaviour.
 	Protocol protocol.Protocol
 
@@ -68,7 +68,7 @@ type StatefulConfig[S any] struct {
 	// effects (toast, navigate, title, etc.) are expressed as imperative
 	// calls on the session parameter. In stateful mode the session is a
 	// [*StatefulSession] which can be type-asserted for Update, Go, and Close.
-	// See [HandleFunc] for concurrency constraints — Handle runs inside
+	// See [HandleFunc] for concurrency constraints - Handle runs inside
 	// the session's command loop and must not block.
 	Handle HandleFunc[S]
 
@@ -103,7 +103,7 @@ type StatefulConfig[S any] struct {
 	// client events. This means State, Update, On, Observe, and all
 	// side-effect methods are safe to call. However, any blocking work
 	// (slow database queries, HTTP calls) delays the session becoming
-	// fully interactive — move heavy initialisation into [StatefulSession.Go].
+	// fully interactive - move heavy initialisation into [StatefulSession.Go].
 	OnConnect func(session *StatefulSession[S])
 
 	// OnDisconnect is called after a session's transport closes (either
@@ -113,7 +113,7 @@ type StatefulConfig[S any] struct {
 	OnDisconnect func(session *StatefulSession[S])
 
 	// Equal compares two states. When provided and the old and new state
-	// are equal, the render and diff are skipped entirely — no work is
+	// are equal, the render and diff are skipped entirely - no work is
 	// done and nothing is sent to the client. This is an optimisation
 	// for handlers where many events leave state unchanged (e.g.
 	// keystrokes that don't affect the model). Optional.
@@ -130,7 +130,7 @@ type StatefulConfig[S any] struct {
 	// containers. When nil and DevMode is active, the framework logs a
 	// debug message for each occurrence.
 	//
-	// The callback runs inside the session's command loop — keep it
+	// The callback runs inside the session's command loop - keep it
 	// fast and offload any expensive work to a goroutine. Optional.
 	OnStructuralChange func(session *StatefulSession[S], change StructuralChange)
 
@@ -144,7 +144,7 @@ type StatefulConfig[S any] struct {
 	// DevMode is active, the framework logs a debug message for each
 	// occurrence.
 	//
-	// The callback runs inside the session's command loop — keep it
+	// The callback runs inside the session's command loop - keep it
 	// fast and offload any expensive work to a goroutine. Optional.
 	OnNoPatch func(session *StatefulSession[S], info NoPatch)
 
@@ -156,7 +156,7 @@ type StatefulConfig[S any] struct {
 	// html.New(head.New(...), body.New(content))).
 	//
 	// Layout runs once on the initial GET request. After that, only the
-	// tether root div is morphed — the outer shell is not re-rendered.
+	// tether root div is morphed - the outer shell is not re-rendered.
 	// To update shell elements during navigation or event handling, use
 	// [Session.SetTitle] for the page title, and signal bindings
 	// ([bind.BindText], [bind.BindClass], [bind.BindShow], etc.) for
@@ -177,7 +177,7 @@ type StatefulConfig[S any] struct {
 	// page shells, and background sync. When true, the client JS
 	// registers /_tether/tether-worker.js as a service worker with
 	// scope "/". When false and Push is configured, a lightweight
-	// push-only service worker is registered instead — it handles push
+	// push-only service worker is registered instead - it handles push
 	// events without intercepting fetch requests or caching. Default
 	// false.
 	Worker bool
@@ -263,7 +263,7 @@ type StatefulConfig[S any] struct {
 	// restart timers, re-subscribe to buses.
 	//
 	// OnRestore fires instead of OnConnect for restored sessions.
-	// If nil, OnConnect fires as a fallback — suitable for apps
+	// If nil, OnConnect fires as a fallback - suitable for apps
 	// where setup is identical for new and restored sessions.
 	OnRestore func(session *StatefulSession[S])
 
@@ -289,7 +289,7 @@ type StatefulConfig[S any] struct {
 // PushConfig enables Web Push notifications for the page. The VAPID
 // public key is passed to the client so it can subscribe when the user
 // clicks a [bind.PushSubscribe] element. Subscription is never
-// automatic — it always requires a user gesture.
+// automatic - it always requires a user gesture.
 type PushConfig[S any] struct {
 	// Sender handles push notification delivery. Create with
 	// [push.NewSender]. The sender's public key is automatically
@@ -302,7 +302,7 @@ type PushConfig[S any] struct {
 	// so it is safe to perform I/O (e.g. database writes).
 	//
 	// The context is derived from the session and cancels when the
-	// session is destroyed — use it for database calls and external
+	// session is destroyed - use it for database calls and external
 	// requests to avoid leaking goroutines. The subscription is passed
 	// as a parameter; do not read it from the session object as the
 	// store may not have completed yet. Optional.

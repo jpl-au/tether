@@ -2,13 +2,13 @@ package tether
 
 // HandleFunc processes a client event and returns the new state. Side
 // effects (toast, navigate, announce, flash, title, URL) are expressed
-// as imperative calls on the session — there is no wrapper type. The
+// as imperative calls on the session - there is no wrapper type. The
 // session buffers effects during Handle and flushes them atomically
 // with the state diff, so the client receives everything in one frame.
 //
 // Handle runs inside the session's command loop. While it is executing,
 // no other commands, events, or effects are processed for this session.
-// Keep Handle fast — do not perform blocking I/O, sleep, or wait on
+// Keep Handle fast - do not perform blocking I/O, sleep, or wait on
 // channels. For slow operations, use [Session.Go] to run them in a
 // background goroutine and feed results back via [Session.Update].
 //

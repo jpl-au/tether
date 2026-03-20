@@ -8,7 +8,7 @@ import (
 )
 
 // detectProtocol returns the wire protocol for a request. If r.TLS is
-// nil, the request arrived over plain HTTP — assumed HTTP/1.1 because
+// nil, the request arrived over plain HTTP - assumed HTTP/1.1 because
 // browsers require TLS for HTTP/2. Otherwise, r.ProtoMajor
 // distinguishes HTTP/1.1 from HTTP/2.
 func detectProtocol(r *http.Request) protocol.Protocol {

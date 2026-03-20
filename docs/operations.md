@@ -21,7 +21,7 @@ mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 
 ### Single handler
 
-`Handler.ListenAndServe` handles shutdown automatically — draining sessions
+`Handler.ListenAndServe` handles shutdown automatically - draining sessions
 on SIGINT or SIGTERM, then force-closing after the grace period:
 
 ```go
@@ -88,16 +88,16 @@ TETHER_DEV=1 go run .
 
 Dev mode does the following:
 
-1. **No service worker** — unregisters the service worker scoped to this handler's endpoint and skips registration, so you always get fresh assets. Workers registered by other handlers on the same origin are left alone
-2. **Graceful reconnect** — when the server goes away, the page stays visible with a "Reconnecting…" bar. Once the server comes back, the client syncs the current URL so the server re-renders without a page reload. The page is never destroyed on disconnect or reconnect.
-3. **No caching** — sets `Cache-Control: no-store` on all responses
-4. **Debug logging** — the default logger uses DEBUG level (when no Logger is provided)
-5. **Visual flash** — morphed DOM elements flash with a blue outline
-6. **Console logging** — events, patches, and morphs are logged to the browser console
-7. **Per-session diagnostics** — all session-level debug logging (events, diffs, reconnections, group membership, etc.) is gated behind dev mode via `dev.Debug`. In production with dev mode off, none of this output fires. For structured observability, use `OnStructuralChange` and `OnNoPatch` callbacks instead
-8. **Discarded effect warnings** — logs a warning when a handler panic discards buffered side effects (Toast, Signal, Navigate, etc.)
+1. **No service worker** - unregisters the service worker scoped to this handler's endpoint and skips registration, so you always get fresh assets. Workers registered by other handlers on the same origin are left alone
+2. **Graceful reconnect** - when the server goes away, the page stays visible with a "Reconnecting…" bar. Once the server comes back, the client syncs the current URL so the server re-renders without a page reload. The page is never destroyed on disconnect or reconnect.
+3. **No caching** - sets `Cache-Control: no-store` on all responses
+4. **Debug logging** - the default logger uses DEBUG level (when no Logger is provided)
+5. **Visual flash** - morphed DOM elements flash with a blue outline
+6. **Console logging** - events, patches, and morphs are logged to the browser console
+7. **Per-session diagnostics** - all session-level debug logging (events, diffs, reconnections, group membership, etc.) is gated behind dev mode via `dev.Debug`. In production with dev mode off, none of this output fires. For structured observability, use `OnStructuralChange` and `OnNoPatch` callbacks instead
+8. **Discarded effect warnings** - logs a warning when a handler panic discards buffered side effects (Toast, Signal, Navigate, etc.)
 
-Diagnostics are centralised in the `dev` package. During handler construction, `App.DevMode` (or `TETHER_DEV`) calls `dev.Enable()` once. After that, all runtime checks — cache headers, the `data-tether-dev` attribute, diagnostic logging — use `dev.Enabled()`. No code threads the `DevMode` bool downstream; everything goes through the `dev` package.
+Diagnostics are centralised in the `dev` package. During handler construction, `App.DevMode` (or `TETHER_DEV`) calls `dev.Enable()` once. After that, all runtime checks - cache headers, the `data-tether-dev` attribute, diagnostic logging - use `dev.Enabled()`. No code threads the `DevMode` bool downstream; everything goes through the `dev` package.
 
 Call sites use `dev.Warn()`, `dev.Debug()`, and `dev.Error()` which silently no-op outside dev mode.
 
@@ -137,7 +137,7 @@ When set, `Tether.onError` is called for every error and warning the JS runtime 
 ## Diagnostics bus
 
 `Handler.Diagnostics` is a typed event bus (`Bus[Diagnostic]`) for framework-level
-signals. The framework is quiet by default — `slog` is only used for panics as a
+signals. The framework is quiet by default - `slog` is only used for panics as a
 critical safety net. All other operational signals flow exclusively through this bus.
 
 ```go
@@ -170,17 +170,17 @@ h.Diagnostics.SubscribeAsync(ctx, func(d tether.Diagnostic) {
 | Kind | Meaning |
 |------|---------|
 | `TransportError` | Failure reading from or writing to the transport. Normal disconnects (io.EOF) are not emitted |
-| `EncodeError` | JSON serialisation failure — usually an unencodable type in state or render output |
+| `EncodeError` | JSON serialisation failure - usually an unencodable type in state or render output |
 | `BufferOverflow` | Command channel was full; an overflow goroutine was spawned to deliver the command |
-| `CommandDropped` | Both the command buffer and the overflow goroutine cap were exhausted — data was lost |
+| `CommandDropped` | Both the command buffer and the overflow goroutine cap were exhausted - data was lost |
 | `HandlerPanic` | Recovered panic inside Handle, Update, or a command callback |
 | `UploadError` | Failure or recovered panic in an upload handler callback |
 | `SessionBindingFailed` | A reconnect or session claim was rejected because the User-Agent did not match the original |
-| `StoreError` | Failure saving or deleting differ snapshots from the configured DiffStore. The Detail field indicates the operation ("save" or "delete"). Store failures are non-fatal — the framework falls back to in-memory behaviour |
-| `SessionStoreError` | Failure saving, loading, or deleting session state from the configured SessionStore. The Detail field indicates the operation ("save", "load", "delete", "marshal", "unmarshal", or "envelope"). Non-fatal — the framework continues with in-memory state |
+| `StoreError` | Failure saving or deleting differ snapshots from the configured DiffStore. The Detail field indicates the operation ("save" or "delete"). Store failures are non-fatal - the framework falls back to in-memory behaviour |
+| `SessionStoreError` | Failure saving, loading, or deleting session state from the configured SessionStore. The Detail field indicates the operation ("save", "load", "delete", "marshal", "unmarshal", or "envelope"). Non-fatal - the framework continues with in-memory state |
 
 `BufferOverflow` means the system coped (spawned a goroutine). `CommandDropped`
-means data was lost — the session is critically overwhelmed. Sustained overflow
+means data was lost - the session is critically overwhelmed. Sustained overflow
 usually indicates a blocking `HandleFunc` or a broadcast rate exceeding the
 session's processing speed. Increase `Limits.CmdBufferSize` or move slow work
 into `StatefulSession.Go`.
@@ -206,7 +206,7 @@ tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
 })
 ```
 
-When `OnStructuralChange` is nil and DevMode is active, the framework logs a debug message. When DevMode is off and no callback is set, nothing happens — the framework never pushes diagnostic output at developers who haven't opted in.
+When `OnStructuralChange` is nil and DevMode is active, the framework logs a debug message. When DevMode is off and no callback is set, nothing happens - the framework never pushes diagnostic output at developers who haven't opted in.
 
 Wrapping conditional elements in a stable keyed container keeps morphs scoped instead of full-page. See the [Dynamic keys](server-updates.md#stable-key-sets) section for patterns.
 
@@ -223,25 +223,25 @@ APIs and has direct implications for scaling.
 
 Each active session consumes:
 
-- **2 goroutines** — the command loop (`run`) and the transport reader
+- **2 goroutines** - the command loop (`run`) and the transport reader
   (`readTransport`)
-- **2 buffered channels** — `cmds` and `fxCh`, each sized to
+- **2 buffered channels** - `cmds` and `fxCh`, each sized to
   `Limits.CmdBufferSize` (default 64)
-- **The state `S`** — developer-defined, typically a struct
-- **The diff engine** — holds a copy of the previous render tree for
+- **The state `S`** - developer-defined, typically a struct
+- **The diff engine** - holds a copy of the previous render tree for
   diffing. Memory scales linearly with the number of Dynamic-keyed elements
 
 Disconnected sessions waiting for reconnect retain all of the above except
 the transport reader goroutine. When a DiffStore is configured, differ snapshot
 data is offloaded to external storage during disconnect, reducing memory
 usage for disconnected sessions. When a SessionStore is configured, application
-state is also persisted for crash recovery — see
+state is also persisted for crash recovery - see
 [session-store](session-store.md).
 
 ### Vertical scaling
 
 The framework is optimised for vertical scaling. A single server can handle
-thousands of concurrent sessions — goroutines are cheap, and the command loop
+thousands of concurrent sessions - goroutines are cheap, and the command loop
 is lock-free. Profile with `net/http/pprof` to identify bottlenecks under
 load.
 
@@ -252,7 +252,7 @@ Because sessions are in-memory, horizontal scaling requires **sticky sessions**
 the same server node to reclaim its state.
 
 If a server node crashes, all sessions on that node are lost. Clients
-reconnect and receive a fresh `InitialState` — any unsaved ephemeral UI
+reconnect and receive a fresh `InitialState` - any unsaved ephemeral UI
 state is gone.
 
 `Bus` and `Group` are **node-local**. `Bus.Publish` only reaches subscribers

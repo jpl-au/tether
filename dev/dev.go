@@ -1,7 +1,7 @@
 // Package dev provides development-mode diagnostics. Call Enable
 // once at startup; Warn, Debug, and Error silently no-op when dev
 // mode is inactive. This centralises the dev-mode gate so call
-// sites stay clean — dev.Warn("msg", "key", val) instead of
+// sites stay clean - dev.Warn("msg", "key", val) instead of
 // scattered if-checks.
 package dev
 

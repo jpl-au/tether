@@ -4,7 +4,7 @@ import "log/slog"
 
 // App holds configuration shared across all handlers in an
 // application: logging, client-side behaviour, security, and
-// assets. Create one App and pass it to [Stateful] and [Stateless] — each
+// assets. Create one App and pass it to [Stateful] and [Stateless] - each
 // handler gets its own copy, so shared settings are defined once.
 //
 //	app := tether.App{

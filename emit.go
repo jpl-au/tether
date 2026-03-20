@@ -5,11 +5,11 @@ import "github.com/jpl-au/tether/dev"
 // On subscribes a session to a typed event bus. When the bus publishes
 // an event, fn is called inside the session's command loop (via
 // [StatefulSession.Update]) with the event and the current state. The
-// callback returns the new state — same pattern as Update.
+// callback returns the new state - same pattern as Update.
 //
 // Sender filtering is automatic: if the event was emitted by this
 // session (via [Bus.Emit]), the callback is skipped. This prevents
-// double-apply — Handle updates the sender's state directly, the bus
+// double-apply - Handle updates the sender's state directly, the bus
 // updates everyone else.
 //
 // The subscription is cleaned up automatically when the session is

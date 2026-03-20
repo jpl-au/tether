@@ -13,20 +13,20 @@ import (
 // navigates via a tether link click or the back/forward buttons.
 //
 // Params lives in its own file (separate from [Event]) because it
-// represents a different data source — URL navigation context rather
-// than DOM interaction — even though both types share a similar
+// represents a different data source - URL navigation context rather
+// than DOM interaction - even though both types share a similar
 // extraction API. Keeping them apart makes the conceptual boundary
 // clear: Event is wire protocol from the client JS, Params is parsed
 // from the browser's address bar.
 //
 // The extraction helpers are organised into three tiers:
 //
-// Single-value with error — [Params.Get], [Params.Int], [Params.Bool],
+// Single-value with error - [Params.Get], [Params.Int], [Params.Bool],
 // [Params.Float64]. These mirror [Event]'s API so developers learn one
 // extraction pattern for the whole framework. Use these when a missing
 // or malformed value is a hard error (e.g. a required resource ID).
 //
-// Soft getters with default — [Params.IntDefault], [Params.BoolDefault],
+// Soft getters with default - [Params.IntDefault], [Params.BoolDefault],
 // [Params.Float64Default]. These exist because URL parameters are
 // fundamentally different from event data: event data is developer-
 // controlled wire protocol where a missing field signals a bug, but
@@ -34,8 +34,8 @@ import (
 // eliminate the if-err-else boilerplate that would otherwise dominate
 // every OnNavigate handler.
 //
-// Multi-value — [Params.Strings], [Params.Ints], [Params.Float64s].
-// These exist because [url.Values] is map[string][]string — query keys
+// Multi-value - [Params.Strings], [Params.Ints], [Params.Float64s].
+// These exist because [url.Values] is map[string][]string - query keys
 // can repeat (e.g. ?tag=go&tag=web). Without these, developers would
 // have to bypass the helper API and access p.Query directly, defeating
 // the purpose of the abstraction.
@@ -45,7 +45,7 @@ type Params struct {
 	Path string
 
 	// Query holds the parsed URL query parameters. It is nil when the
-	// URL has no query string. All extraction methods are nil-safe —
+	// URL has no query string. All extraction methods are nil-safe  - 
 	// calling Get, IntDefault, etc. on a nil Query returns zero values or
 	// defaults without panicking, because url.Values is a map type and
 	// nil map reads return zero values in Go.
@@ -72,7 +72,7 @@ func paramsFromEvent(ev Event) Params {
 //
 // These mirror Event's API (Get, Int, Float64, Bool) so developers
 // learn one extraction pattern for the entire framework. Use these
-// when a missing or malformed value is a hard error — e.g. a required
+// when a missing or malformed value is a hard error - e.g. a required
 // resource ID in a URL like /items?id=42.
 
 // Get returns the first query value for key. If the key is not present,
@@ -86,7 +86,7 @@ func (p Params) Get(key string) string {
 // Int returns the first query value for key parsed as an integer. If
 // the key is missing or the value is not a valid integer, it returns 0
 // and an error. Most navigation handlers should prefer [Params.IntDefault]
-// because URL parameters are typically optional — Int is here for the
+// because URL parameters are typically optional - Int is here for the
 // rare case where absence genuinely means something is wrong.
 func (p Params) Int(key string) (int, error) {
 	return strconv.Atoi(p.Query.Get(key))
@@ -100,8 +100,8 @@ func (p Params) Float64(key string) (float64, error) {
 }
 
 // Bool returns true when the first query value for key is the string
-// "true". All other values — including "false", "0", empty, and
-// missing keys — return false. This matches [Event.Bool]'s semantics
+// "true". All other values - including "false", "0", empty, and
+// missing keys - return false. This matches [Event.Bool]'s semantics
 // so the same truthiness rules apply everywhere in the framework.
 func (p Params) Bool(key string) bool {
 	return p.Query.Get(key) == "true"
@@ -109,7 +109,7 @@ func (p Params) Bool(key string) bool {
 
 // --- Soft getters ---
 //
-// URL parameters are user-supplied and routinely absent — a user
+// URL parameters are user-supplied and routinely absent - a user
 // visiting /items without ?page= is not an error, they just want
 // page 1. Soft getters return a caller-supplied default when the key
 // is missing or the value is malformed, eliminating the if-err-else
@@ -147,7 +147,7 @@ func (p Params) Float64Default(key string, def float64) float64 {
 
 // BoolDefault returns the first query value for key parsed as a boolean. If
 // the key is missing (empty string from url.Values.Get), it returns
-// the provided default — this distinguishes "user didn't specify" from
+// the provided default - this distinguishes "user didn't specify" from
 // "user explicitly set to false". When the key is present, any value
 // other than the literal string "true" evaluates to false, matching
 // [Params.Bool] and [Event.Bool] semantics.
@@ -155,7 +155,7 @@ func (p Params) Float64Default(key string, def float64) float64 {
 //	s.ShowDrafts = p.BoolDefault("drafts", false)
 func (p Params) BoolDefault(key string, def bool) bool {
 	v := p.Query.Get(key)
-	// Empty means the key was absent — return the caller's default so
+	// Empty means the key was absent - return the caller's default so
 	// they can distinguish "not specified" from "explicitly false".
 	if v == "" {
 		return def
@@ -180,7 +180,7 @@ func (p Params) Strings(key string) []string {
 
 // Ints returns all query values for key parsed as integers. If any
 // value cannot be parsed, it returns the values successfully parsed
-// before the error and the error itself — callers can choose to use
+// before the error and the error itself - callers can choose to use
 // the partial result or treat it as a failure. If the key is not
 // present, it returns nil and no error.
 func (p Params) Ints(key string) ([]int, error) {

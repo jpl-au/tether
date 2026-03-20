@@ -42,7 +42,7 @@ type Drainable interface {
 // failures such as a port already in use. A second signal during
 // shutdown forces an immediate exit.
 //
-// For single-handler apps, [Handler.ListenAndServe] is simpler — it
+// For single-handler apps, [Handler.ListenAndServe] is simpler - it
 // uses the handler's configured ShutdownGrace timeout and serves
 // itself without a separate mux.
 func ListenAndServe(addr string, handler http.Handler, drainers ...Drainable) error {
@@ -157,7 +157,7 @@ func serve(srv *http.Server, start func() error, url string, grace time.Duration
 
 	// A second signal during shutdown forces an immediate exit.
 	// The channel is closed after clean shutdown to release this
-	// goroutine — the ok check prevents a force-exit on close.
+	// goroutine - the ok check prevents a force-exit on close.
 	go func() {
 		_, ok := <-sigCh
 		if ok {
@@ -169,7 +169,7 @@ func serve(srv *http.Server, start func() error, url string, grace time.Duration
 	ctx, cancel := context.WithTimeout(context.Background(), grace)
 	defer cancel()
 
-	// Drain all handlers concurrently — let existing sessions
+	// Drain all handlers concurrently - let existing sessions
 	// finish naturally before force-closing anything.
 	var wg sync.WaitGroup
 	for _, d := range drainers {

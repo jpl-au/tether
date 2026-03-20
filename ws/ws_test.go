@@ -147,7 +147,7 @@ func TestSendDeliversJSON(t *testing.T) {
 func TestSendPreservesAngleBrackets(t *testing.T) {
 	tp, client := dial(t)
 
-	// Angle brackets should pass through unchanged — the session
+	// Angle brackets should pass through unchanged - the session
 	// encodes with SetEscapeHTML(false) before calling Send.
 	data := []byte(`{"type":"update","patches":[{"key":"x","html":"<b>hi</b>"}]}`)
 	if err := tp.Send(data); err != nil {
@@ -306,7 +306,7 @@ func TestContextTakeoverRoundTrip(t *testing.T) {
 	tp, client := dialWith(t, opts, clientDeflate)
 
 	// Send several messages to exercise the sliding window across
-	// messages — context takeover means the compressor retains state.
+	// messages - context takeover means the compressor retains state.
 	for i := range 3 {
 		data := []byte(`{"type":"update","patches":[{"key":"count","html":"<span>` + strings.Repeat("x", 100) + `</span>"}]}`)
 		if err := tp.Send(data); err != nil {

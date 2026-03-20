@@ -68,7 +68,7 @@ type Limits struct {
 	// creates a pending session (state + differ), so this cap
 	// protects against GET-flooding attacks where an attacker
 	// scripts thousands of requests without ever connecting.
-	// Pending sessions are cheap but unauthenticated — capping them
+	// Pending sessions are cheap but unauthenticated - capping them
 	// separately prevents an attacker from crowding out legitimate
 	// active sessions under the global MaxSessions limit. Zero
 	// defaults to 128.
@@ -81,7 +81,7 @@ type Limits struct {
 	// deadlocks during broadcasts. Each overflow emits a
 	// [BufferOverflow] diagnostic. Sustained overflow usually
 	// indicates a blocking [HandleFunc] or a broadcast rate that
-	// exceeds the session's processing speed — increase the buffer
+	// exceeds the session's processing speed - increase the buffer
 	// or move slow work into [StatefulSession.Go]. Zero defaults to 64.
 	CmdBufferSize int
 

@@ -75,7 +75,7 @@ func (t todoList) Handle(sess Session, ev Event) Component {
 	return t
 }
 
-// EqualComponent provides a fast equality check — only compare
+// EqualComponent provides a fast equality check - only compare
 // item count and input, not the full slice contents.
 func (t todoList) EqualComponent(other Component) bool {
 	o, ok := other.(todoList)
@@ -421,7 +421,7 @@ func TestComponentEqualComponentSkipsRender(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		mt := &mockTransport{
 			events: []Event{
-				// "noop" action — component returns itself unchanged.
+				// "noop" action - component returns itself unchanged.
 				{Type: event.Click, Action: "todo.noop"},
 			},
 		}
@@ -455,7 +455,7 @@ func TestComponentEqualComponentSkipsRender(t *testing.T) {
 		mt.mu.Lock()
 		defer mt.mu.Unlock()
 
-		// No patches or morphs should be sent — Equal returned true.
+		// No patches or morphs should be sent - Equal returned true.
 		if len(mt.sent) != 0 {
 			t.Errorf("expected no updates when EqualComponent returns true, got %d", len(mt.sent))
 		}

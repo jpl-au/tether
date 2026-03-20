@@ -17,7 +17,7 @@ package mode
 type Transport int
 
 const (
-	// HTTP uses plain request/response — no persistent connection.
+	// HTTP uses plain request/response - no persistent connection.
 	// Client events are sent as individual POST requests and the
 	// response carries the update. Used internally by [tether.Page].
 	HTTP Transport = iota + 1

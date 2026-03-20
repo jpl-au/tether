@@ -130,7 +130,7 @@ func (r *Router[S]) loadNotFound() Page[S] {
 //
 // The setter receives [tether.Params] which carries the URL path and
 // query parameters with typed extraction helpers. Params is passed
-// through in full — nothing is discarded — so the setter has access
+// through in full - nothing is discarded - so the setter has access
 // to both the path and every query parameter.
 //
 // For simple cases where only the path matters:

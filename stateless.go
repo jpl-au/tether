@@ -14,7 +14,7 @@ import (
 )
 
 // Page creates an [http.Handler] for a stateless page. State is
-// reconstructed from each HTTP request — nothing persists between
+// reconstructed from each HTTP request - nothing persists between
 // interactions. GET requests render the full HTML page. POST requests
 // handle a client event and return a JSON update with the new HTML
 // and any side effects.

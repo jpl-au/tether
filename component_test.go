@@ -69,7 +69,7 @@ func TestRouteTypedPreservesConcreteType(t *testing.T) {
 	sess := &CaptureSession{SessionID: "test"}
 	ev := Event{Action: "w.inc"}
 
-	// RouteTyped returns testWidget, not Component — no type assertion needed.
+	// RouteTyped returns testWidget, not Component - no type assertion needed.
 	got := RouteTyped(w, "w", sess, ev)
 	if got.Count != 1 {
 		t.Errorf("Count = %d, want 1", got.Count)
@@ -93,7 +93,7 @@ func TestRouteNoPartialPrefixMatch(t *testing.T) {
 	w := testWidget{Count: 0}
 	sess := &CaptureSession{SessionID: "test"}
 
-	// "counter_extra.inc" should NOT match prefix "counter" —
+	// "counter_extra.inc" should NOT match prefix "counter"  - 
 	// Route requires "counter." as the delimiter.
 	ev := Event{Action: "counter_extra.inc"}
 	got := RouteTyped(w, "counter", sess, ev)

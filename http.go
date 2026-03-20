@@ -55,7 +55,7 @@ func (h *Handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch h.cfg.Mode {
 	case mode.ServerSentEvents:
 		if strings.Contains(r.Header.Get("Accept"), "text/event-stream") {
-			// SSE stream is a read-only GET — safe method, no origin
+			// SSE stream is a read-only GET - safe method, no origin
 			// check needed. POST events have their own check.
 			h.serveSession(w, r, h.cfg.Fallback)
 			return
@@ -100,7 +100,7 @@ func (h *Handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // wsOriginAllowed checks the Origin header on WebSocket upgrade
 // requests to prevent cross-site WebSocket hijacking. Unlike standard
 // HTTP requests, WebSocket connections are not protected by the
-// browser's Same-Origin Policy — the server must validate the Origin
+// browser's Same-Origin Policy - the server must validate the Origin
 // during the handshake.
 //
 // The check mirrors the logic in [http.CrossOriginProtection] but
@@ -108,7 +108,7 @@ func (h *Handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // (available in all browsers since 2023), then Origin is compared
 // against TrustedOrigins or the Host header as a fallback.
 //
-// Requests without Sec-Fetch-Site or Origin headers are allowed —
+// Requests without Sec-Fetch-Site or Origin headers are allowed  - 
 // they come from same-origin navigations or non-browser clients.
 func (h *Handler[S]) wsOriginAllowed(r *http.Request) bool {
 	// Sec-Fetch-Site is the primary signal. Modern browsers send it
@@ -117,7 +117,7 @@ func (h *Handler[S]) wsOriginAllowed(r *http.Request) bool {
 	case "same-origin", "none":
 		return true
 	case "":
-		// Header absent — fall through to Origin check.
+		// Header absent - fall through to Origin check.
 	default:
 		// "cross-site", "same-site", or any other value.
 		// Check if the origin is explicitly trusted.
@@ -128,7 +128,7 @@ func (h *Handler[S]) wsOriginAllowed(r *http.Request) bool {
 	// No Sec-Fetch-Site header. Check the Origin header.
 	origin := r.Header.Get("Origin")
 	if origin == "" {
-		// Neither header present — same-origin or non-browser client.
+		// Neither header present - same-origin or non-browser client.
 		return true
 	}
 
@@ -137,7 +137,7 @@ func (h *Handler[S]) wsOriginAllowed(r *http.Request) bool {
 		return slices.Contains(h.app.Security.TrustedOrigins, origin)
 	}
 
-	// No TrustedOrigins — compare Origin's host:port against the
+	// No TrustedOrigins - compare Origin's host:port against the
 	// Host header. This matches the stdlib's fallback behaviour
 	// (see net/http/csrf.go line 161).
 	u, err := url.Parse(origin)
@@ -248,7 +248,7 @@ func (h *Handler[S]) handlePushSubscribe(w http.ResponseWriter, r *http.Request)
 
 	// Non-blocking send: store the subscription via the session loop
 	// so it doesn't race with other loop operations. If the buffer is
-	// full, the session is overloaded — return 429 to apply back-pressure
+	// full, the session is overloaded - return 429 to apply back-pressure
 	// (matching the pattern in handlePostEvent).
 	select {
 	case sess.cmds <- func() { sess.pushSub.Store(&sub) }:
@@ -262,7 +262,7 @@ func (h *Handler[S]) handlePushSubscribe(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Fire OnSubscribe asynchronously so the HTTP response returns
-	// immediately — the callback receives the subscription as a
+	// immediately - the callback receives the subscription as a
 	// parameter so it doesn't need to read session state. Panic
 	// recovery matches the pattern used in exec() and runCmd().
 	go func() {

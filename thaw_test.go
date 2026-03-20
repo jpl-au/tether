@@ -68,7 +68,7 @@ func freezeSession(t *testing.T, h *Handler[counterState], initial counterState,
 // TestThawRestoresState verifies the full freeze→thaw cycle: state
 // is loaded from the store and the session processes events with the
 // restored count. After thaw the mockTransport disconnects, which
-// re-freezes the session — so we verify the restored state by
+// re-freezes the session - so we verify the restored state by
 // checking the store contents from the second freeze.
 func TestThawRestoresState(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
@@ -298,7 +298,7 @@ func TestThawMultipleCycles(t *testing.T) {
 		// First cycle: freeze with Count=1.
 		sess := freezeSession(t, h, counterState{Count: 1}, nil)
 
-		// Thaw — mockTransport delivers one increment then disconnects,
+		// Thaw - mockTransport delivers one increment then disconnects,
 		// re-freezing the session.
 		thawMT := &mockTransport{
 			events: []Event{{Type: "event", Action: "increment"}},

@@ -1,4 +1,4 @@
-// tether.js — client runtime for Tether reactive UI.
+// tether.js - client runtime for Tether reactive UI.
 //
 // This script is injected automatically by the tether handler. It connects
 // to the server via WebSocket, applies patches to the DOM using idiomorph,
@@ -42,7 +42,7 @@ window.Tether.signals = window.Tether.signals || {};
   var leavingNodes = new Set();
   var pendingElements = {};
   var eventCounter = 0;
-  var transportMode = "ws"; // "ws", "sse", or "auto" — set from data-tether-transport
+  var transportMode = "ws"; // "ws", "sse", or "auto" - set from data-tether-transport
   var connectionMode = "ws";
   var eventSource = null;
   var wsOpened = false;
@@ -108,7 +108,7 @@ window.Tether.signals = window.Tether.signals || {};
 
     // Dev mode: expose a disconnect helper for integration testing.
     // Closes the transport so the server sees a clean disconnect.
-    // Not available in production — devMode is only set when the
+    // Not available in production - devMode is only set when the
     // server includes data-tether-dev on the root element.
     if (devMode) {
       window.Tether.disconnect = function () {
@@ -119,7 +119,7 @@ window.Tether.signals = window.Tether.signals || {};
 
     // Dev mode: unregister the service worker scoped to this handler so
     // cached assets are never served stale during development. Only the
-    // worker matching this endpoint's scope is removed — workers
+    // worker matching this endpoint's scope is removed - workers
     // registered by other handlers on the same origin are left alone.
     if (devMode && "serviceWorker" in navigator) {
       var devScope = new URL(endpoint || "/", location.href).href;
@@ -160,7 +160,7 @@ window.Tether.signals = window.Tether.signals || {};
       });
     });
 
-    // Signal actions (toggle/set) are bound on document — not root —
+    // Signal actions (toggle/set) are bound on document - not root  - 
     // because signal bindings query the whole document. This lets signal
     // actions on elements in the Layout shell (outside the morphed root)
     // work the same as those inside it.
@@ -200,7 +200,7 @@ window.Tether.signals = window.Tether.signals || {};
       hideReconnectBar();
       resyncPushSubscription();
       if (isReconnect) {
-        // Sync the current URL with the server — the user may have
+        // Sync the current URL with the server - the user may have
         // navigated via back/forward while disconnected.
         sendNavigate(location.pathname + location.search);
       } else {
@@ -274,7 +274,7 @@ window.Tether.signals = window.Tether.signals || {};
     eventSource.onerror = function () {
       if (root) root.setAttribute("data-tether-state", "disconnected");
       showReconnectBar();
-      // EventSource reconnects automatically — no manual retry needed.
+      // EventSource reconnects automatically - no manual retry needed.
     };
   }
 
@@ -338,14 +338,14 @@ window.Tether.signals = window.Tether.signals || {};
   //
   // Push subscription is deferred until the user clicks an element with
   // data-tether-push-subscribe. Browsers require a user gesture for
-  // pushManager.subscribe — auto-prompting causes permission denials
+  // pushManager.subscribe - auto-prompting causes permission denials
   // and can permanently block the site from ever prompting again.
   //
   // On every connect (including reconnects), resyncPushSubscription
   // checks whether the browser already holds a valid subscription for
   // the current VAPID key and re-sends it to the server so the new
   // session can use it immediately. Stale subscriptions bound to old
-  // VAPID keys are unsubscribed silently — the user will need to
+  // VAPID keys are unsubscribed silently - the user will need to
   // click the subscribe button again to create a fresh one.
 
   // Compare the existing subscription's applicationServerKey against
@@ -377,7 +377,7 @@ window.Tether.signals = window.Tether.signals || {};
         if (pushKeyMatches(sub, pushKey)) {
           sendPushSubscription(sub);
         } else {
-          // VAPID key changed — subscription is useless, discard it.
+          // VAPID key changed - subscription is useless, discard it.
           sub.unsubscribe().catch(function (err) {
             reportError("push", "unsubscribe failed: " + err);
           });
@@ -390,12 +390,12 @@ window.Tether.signals = window.Tether.signals || {};
     reg.pushManager.getSubscription().then(function (sub) {
       if (sub) {
         if (pushKeyMatches(sub, vapidKey)) {
-          // Already subscribed with the current key — re-send in case
+          // Already subscribed with the current key - re-send in case
           // the server restarted and lost the session's subscription.
           sendPushSubscription(sub);
           return;
         }
-        // Subscription bound to old VAPID keys — discard and
+        // Subscription bound to old VAPID keys - discard and
         // resubscribe so the push service accepts messages signed
         // with the current key.
         return sub.unsubscribe().then(function () {
@@ -430,7 +430,7 @@ window.Tether.signals = window.Tether.signals || {};
       body: JSON.stringify(sub.toJSON())
     };
     fetch(url, opts).catch(function () {
-      // Retry once after a short delay — covers transient network
+      // Retry once after a short delay - covers transient network
       // blips during mobile handoffs or server rolling deploys.
       setTimeout(function () {
         fetch(url, opts).catch(function (err) {
@@ -508,7 +508,7 @@ window.Tether.signals = window.Tether.signals || {};
       return;
     }
 
-    // No active worker — replay from the main thread as a fallback.
+    // No active worker - replay from the main thread as a fallback.
     openEventDB().then(function (db) {
       var tx = db.transaction(EVENT_STORE, "readonly");
       var store = tx.objectStore(EVENT_STORE);
@@ -750,7 +750,7 @@ window.Tether.signals = window.Tether.signals || {};
 
   // callHookDeep invokes a lifecycle callback on the element itself and
   // on any descendant hook elements. Idiomorph only fires afterNodeAdded
-  // for the top-level node — descendants are already part of its innerHTML
+  // for the top-level node - descendants are already part of its innerHTML
   // and need to be scanned separately.
   function callHookDeep(el, lifecycle) {
     callHook(el, lifecycle);
@@ -880,12 +880,12 @@ window.Tether.signals = window.Tether.signals || {};
     beforeNodeMorphed: function (oldNode, newNode) {
       if (oldNode.nodeType !== 1) return true;
 
-      // Permanent elements are never morphed — their subtree is left
+      // Permanent elements are never morphed - their subtree is left
       // untouched. Used for video players, iframes, and third-party
       // widgets that manage their own DOM.
       if (oldNode.hasAttribute("data-tether-permanent")) return false;
 
-      // Cancel any pending leave transition — the element is being
+      // Cancel any pending leave transition - the element is being
       // morphed back in rather than removed.
       if (leavingNodes.has(oldNode)) {
         leavingNodes.delete(oldNode);
@@ -912,7 +912,7 @@ window.Tether.signals = window.Tether.signals || {};
       var name = oldNode.getAttribute("data-tether-transition");
       if (!name) return true;
 
-      // Already leaving — let it finish
+      // Already leaving - let it finish
       if (leavingNodes.has(oldNode)) return false;
 
       leavingNodes.add(oldNode);
@@ -1049,7 +1049,7 @@ window.Tether.signals = window.Tether.signals || {};
   //
   // Signals are reactive key/value pairs pushed by the server. Elements
   // bind to signals via data-tether-bind-* attributes. When a signal
-  // changes, all bound elements update instantly — no render, no diff.
+  // changes, all bound elements update instantly - no render, no diff.
   // Signal values are stored in Tether.signals so JS hooks can read them.
 
   function applySignals(updates) {
@@ -1060,7 +1060,7 @@ window.Tether.signals = window.Tether.signals || {};
   }
 
   // updateSignalBindings applies a signal value to all bound elements
-  // in the document — not just inside the tether root. This allows signal
+  // in the document - not just inside the tether root. This allows signal
   // bindings on elements in the Layout shell (nav highlights, body
   // classes, status indicators) that sit outside the morphed content area.
   function updateSignalBindings(key, value) {
@@ -1125,9 +1125,9 @@ window.Tether.signals = window.Tether.signals || {};
   }
 
   // isTruthy evaluates signal truthiness for show/hide/class/attr
-  // bindings. Signal values are always properly typed — booleans from
+  // bindings. Signal values are always properly typed - booleans from
   // the server arrive as JSON booleans, strings from data attributes
-  // are parsed by parseSignalValue before storage — so standard JS
+  // are parsed by parseSignalValue before storage - so standard JS
   // falsy checks are sufficient.
   function isTruthy(val) {
     return val !== null && val !== undefined && val !== false && val !== 0 && val !== "";
@@ -1404,7 +1404,7 @@ window.Tether.signals = window.Tether.signals || {};
 
       // Reset form fields after submit only when explicitly requested.
       // In a server-driven framework the server controls field values
-      // via the re-render — auto-resetting races the server's state.
+      // via the re-render - auto-resetting races the server's state.
       if (domEvent === "submit" && target.hasAttribute("data-tether-reset")) {
         target.reset();
       }

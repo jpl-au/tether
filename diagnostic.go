@@ -8,7 +8,7 @@ type DiagnosticKind string
 const (
 	// TransportError signals a failure reading from or writing to the
 	// session's transport (WebSocket or SSE). Normal disconnects
-	// (io.EOF) are not emitted — only genuine failures.
+	// (io.EOF) are not emitted - only genuine failures.
 	TransportError DiagnosticKind = "transport_error"
 
 	// EncodeError signals a failure encoding a wire update (JSON
@@ -36,7 +36,7 @@ const (
 
 	// CommandDropped signals that a command was discarded because
 	// both the session's command buffer and its overflow goroutine
-	// cap were exhausted. This means data was lost — the command
+	// cap were exhausted. This means data was lost - the command
 	// will not be delivered. Unlike [BufferOverflow] (which copes
 	// by spawning a goroutine), a drop indicates the session is
 	// critically overwhelmed.
@@ -51,14 +51,14 @@ const (
 	// StoreError signals a failure saving, loading, or deleting
 	// differ snapshots from the configured [DiffStore]. The Detail
 	// field indicates the operation ("save", "load", or "delete").
-	// Store failures are non-fatal — the framework falls back to
+	// Store failures are non-fatal - the framework falls back to
 	// in-memory behaviour.
 	StoreError DiagnosticKind = "store_error"
 
 	// SessionStoreError signals a failure saving, loading, or
 	// deleting session state from the configured [SessionStore].
 	// The Detail field indicates the operation. Session store
-	// failures are non-fatal — the framework continues with
+	// failures are non-fatal - the framework continues with
 	// in-memory state.
 	SessionStoreError DiagnosticKind = "session_store_error"
 )
@@ -70,7 +70,7 @@ const (
 // Each diagnostic has a [DiagnosticKind] that identifies the category,
 // an optional [Diagnostic.Err] with the underlying failure, and a
 // [Diagnostic.SessionID] linking it to the affected session. Subscribers
-// run synchronously by default — use [Bus.SubscribeAsync] for callbacks
+// run synchronously by default - use [Bus.SubscribeAsync] for callbacks
 // that perform I/O.
 //
 //	h.Diagnostics.Subscribe(ctx, func(d tether.Diagnostic) {

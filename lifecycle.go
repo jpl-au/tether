@@ -10,7 +10,7 @@ import (
 
 // reattach reconnects a disconnected session with a new transport.
 // A command is sent to the session's loop to swap in the new transport
-// and re-render. This avoids any locking — only the loop touches
+// and re-render. This avoids any locking - only the loop touches
 // session state.
 func (h *Handler[S]) reattach(sess *StatefulSession[S], transport Transport) {
 	// Stop the disconnect timer before writing callback fields
@@ -37,7 +37,7 @@ func (h *Handler[S]) reattach(sess *StatefulSession[S], transport Transport) {
 
 		// Re-render and send full state to catch the client up.
 		// Include the last URL and title so the browser's address bar
-		// and document title are synced — they live outside the DOM
+		// and document title are synced - they live outside the DOM
 		// and would otherwise be stale after reconnection.
 		tree := sess.render(sess.state)
 		html := sess.differ.Render(tree)
@@ -60,10 +60,10 @@ func (h *Handler[S]) reattach(sess *StatefulSession[S], transport Transport) {
 
 // thaw restores a frozen session from the SessionStore and starts a
 // new command loop. The session's state, differ, channels, and timers
-// are rebuilt from scratch — the only things carried over from the
+// are rebuilt from scratch - the only things carried over from the
 // frozen stub are the ID, endpoint, user-agent, and metadata.
 func (h *Handler[S]) thaw(sess *StatefulSession[S], r *http.Request, transport Transport) {
-	// Stop the disconnect timer — the client is back.
+	// Stop the disconnect timer - the client is back.
 	if sess.disconnectTimer != nil {
 		sess.disconnectTimer.Stop()
 		sess.disconnectTimer = nil
@@ -81,7 +81,7 @@ func (h *Handler[S]) thaw(sess *StatefulSession[S], r *http.Request, transport T
 				Detail:    "load",
 			})
 		}
-		// Cannot restore — destroy the frozen stub.
+		// Cannot restore - destroy the frozen stub.
 		h.mu.Lock()
 		delete(h.active, sess.id)
 		h.mu.Unlock()
@@ -206,7 +206,7 @@ func (h *Handler[S]) wireDisconnect(sess *StatefulSession[S]) {
 		h.mu.Unlock()
 
 		// destroySession calls g.Remove which may fire OnLeave
-		// callbacks — run it outside h.mu to avoid deadlock if
+		// callbacks - run it outside h.mu to avoid deadlock if
 		// the callback accesses the Handler (e.g. Health).
 		if destroy {
 			h.destroySession(sess)

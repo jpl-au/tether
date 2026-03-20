@@ -38,13 +38,13 @@ Sessions are automatically added when the transport connects and removed when th
 
 ## Broadcasting from Handle
 
-When broadcasting from inside `Handle`, use `BroadcastOthers` to exclude the sender. Handle already updates the sender's state via the return value — broadcasting to everyone would double-apply the change on the sender:
+When broadcasting from inside `Handle`, use `BroadcastOthers` to exclude the sender. Handle already updates the sender's state via the return value - broadcasting to everyone would double-apply the change on the sender:
 
 ```go
 Handle: func(sess tether.Session, s State, ev tether.Event) State {
     if ev.Action == "send-message" {
         s.Messages = append(s.Messages, ev.Data["text"])
-        // BroadcastOthers accepts Session directly — no type-assert needed.
+        // BroadcastOthers accepts Session directly - no type-assert needed.
         group.BroadcastOthers(sess, func(target *tether.StatefulSession[State], s State) State {
             s.Messages = append(s.Messages, ev.Data["text"])
             return s
@@ -78,7 +78,7 @@ log.Printf("online: %d", group.Len())
 
 `OnJoin` fires when `Add` is called with a new session. `OnLeave` fires when `Remove` is called for a session that was in the group. Duplicate adds and absent removes are no-ops.
 
-## Bus — typed cross-session events
+## Bus - typed cross-session events
 
 `tether.Bus` routes typed domain events to subscribers. Unlike Group, Bus is parameterised on the **event type** rather than the state type, so sessions from different handlers can communicate:
 
@@ -115,7 +115,7 @@ Handle: func(sess tether.Session, s State, ev tether.Event) State {
     if ev.Action == "send" {
         msg := MessageSent{Text: ev.Value()}
         s.Messages = append(s.Messages, msg.Text)
-        // Emit skips the sender — Handle already updated their state directly.
+        // Emit skips the sender - Handle already updated their state directly.
         // Bus.Emit accepts Session, so no type-assert is needed.
         messages.Emit(sess, msg)
     }
@@ -134,13 +134,13 @@ messages.Publish(MessageSent{Text: "System announcement"})
 For non-session consumers (monitoring, logging, external services), `Subscribe` and `SubscribeAsync` register callbacks directly:
 
 ```go
-// Synchronous — callback runs in the publisher's goroutine.
+// Synchronous - callback runs in the publisher's goroutine.
 // Must not block.
 bus.Subscribe(ctx, func(msg MessageSent) {
     metrics.Counter("messages").Inc()
 })
 
-// Asynchronous — callback runs in its own goroutine per event.
+// Asynchronous - callback runs in its own goroutine per event.
 // Safe for I/O (database writes, HTTP calls, logging).
 bus.SubscribeAsync(ctx, func(msg MessageSent) {
     db.InsertAuditLog(ctx, msg)
@@ -170,15 +170,15 @@ defer stop()
 handler.Setup(ctx)
 ```
 
-Avoid registering raw subscriptions in `init()` — that creates goroutines with no context cancellation, which run until the process exits regardless of graceful shutdown signals.
+Avoid registering raw subscriptions in `init()` - that creates goroutines with no context cancellation, which run until the process exits regardless of graceful shutdown signals.
 
 Session-bound subscriptions (registered via `tether.On`) are cleaned up automatically when the session is destroyed. No manual unsubscribe needed.
 
 ### Ordering note for synchronous subscribers
 
-Synchronous `Subscribe` callbacks run inline in the publisher's goroutine. If a callback updates a `Value`, the Value's observers fire immediately — before the original event reaches session command loops via `On`. This can cause a brief inconsistency where a session sees the Value change (e.g. a counter increment) before the event that caused it (e.g. a new message).
+Synchronous `Subscribe` callbacks run inline in the publisher's goroutine. If a callback updates a `Value`, the Value's observers fire immediately - before the original event reaches session command loops via `On`. This can cause a brief inconsistency where a session sees the Value change (e.g. a counter increment) before the event that caused it (e.g. a new message).
 
-The session's FIFO command loop restores consistency within one tick, and in practice the client coalesces rapid renders. But if strict ordering matters, use `SubscribeAsync` instead — it runs in its own goroutine, so the original event reaches session command loops first:
+The session's FIFO command loop restores consistency within one tick, and in practice the client coalesces rapid renders. But if strict ordering matters, use `SubscribeAsync` instead - it runs in its own goroutine, so the original event reaches session command loops first:
 
 ```go
 // Ordering-safe: async subscriber doesn't block the publish loop
@@ -187,7 +187,7 @@ messageBus.SubscribeAsync(ctx, func(msg MessageSent) {
 })
 ```
 
-## Value — shared observable state
+## Value - shared observable state
 
 `tether.Value` holds a single value that sessions can observe. When the value changes, all observers are notified automatically. Built on Bus internally:
 
@@ -195,7 +195,7 @@ messageBus.SubscribeAsync(ctx, func(msg MessageSent) {
 var onlineCount = tether.NewValue(0)
 ```
 
-Observe declaratively via `StatefulConfig.Watchers` — the current value is delivered immediately on connect:
+Observe declaratively via `StatefulConfig.Watchers` - the current value is delivered immediately on connect:
 
 ```go
 Watchers: []tether.Watcher[State]{

@@ -36,7 +36,7 @@ func TestEnqueueOverflowSpawnsGoroutine(t *testing.T) {
 		sess.cmds <- func() { <-block }
 		synctest.Wait()
 
-		// Buffer has capacity 1, loop is blocked — fill it.
+		// Buffer has capacity 1, loop is blocked - fill it.
 		sess.cmds <- func() {}
 
 		// The next enqueue should overflow via the semaphore.
@@ -87,7 +87,7 @@ func TestEnqueueDropWhenExhausted(t *testing.T) {
 		// Fill the overflow semaphore (cap 1).
 		sess.overflowSem <- struct{}{}
 
-		// Both full — the next enqueue should drop.
+		// Both full - the next enqueue should drop.
 		sess.enqueue(func() {})
 		synctest.Wait()
 

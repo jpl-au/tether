@@ -1,10 +1,10 @@
-# Tether — Agent Guide
+# Tether - Agent Guide
 
 ## What this is
 
 Reactive server-driven UI for Go. The server owns state and renders HTML;
 the browser owns ephemeral UI state (toggles, signals, transitions). A
-persistent transport (WebSocket or SSE) keeps the two in sync — the server
+persistent transport (WebSocket or SSE) keeps the two in sync - the server
 pushes targeted DOM patches and reactive signal updates, the client forwards
 user events back.
 
@@ -12,8 +12,8 @@ Three libraries work together:
 
 | Library | Role |
 |---------|------|
-| [fluent](https://github.com/jpl-au/fluent) | HTML node trees — composable, renderable, no side effects |
-| [fluent-jit](https://github.com/jpl-au/fluent-jit) | Diff engine — compares two trees, produces patches or morphs |
+| [fluent](https://github.com/jpl-au/fluent) | HTML node trees - composable, renderable, no side effects |
+| [fluent-jit](https://github.com/jpl-au/fluent-jit) | Diff engine - compares two trees, produces patches or morphs |
 | **tether** | Session management, transport, wire protocol, command loop |
 
 Fluent builds the tree. Fluent-jit diffs it. Tether orchestrates the
@@ -22,18 +22,18 @@ lifecycle.
 ## Package structure
 
 ```
-tether/              Root package — StatefulConfig, Handler, Session, Bus, Group, Value, Observe, On
+tether/              Root package - StatefulConfig, Handler, Session, Bus, Group, Value, Observe, On
 ├── bind/            Event binding and signal binding via Apply + composable Options (OnClick, BindText, Confirm, etc.)
 ├── client/          Embedded JS runtime (tether.js, idiomorph, service worker, upload, push worker)
-├── dev/             Debug logging — dev.Enable() activates, dev.Debug() is a no-op when disabled
+├── dev/             Debug logging - dev.Enable() activates, dev.Debug() is a no-op when disabled
 ├── docs/            Markdown guides (architecture, API, events, signals, broadcasting, etc.)
 ├── event/           Event type constants (click, input, submit, navigate, etc.)
 ├── mode/            Transport mode constants (WebSocket, ServerSentEvents, Both, HTTP)
 ├── push/            Web Push notification support (VAPID, Sender, Subscription)
-├── router/          Multi-page routing — dispatches Render/Handle to the active page by URL path
+├── router/          Multi-page routing - dispatches Render/Handle to the active page by URL path
 ├── sse/             SSE+POST transport implementation
-├── tethertest/      Test harness — drives Handle functions and component dispatch without transport or goroutines
-├── wire/            Wire protocol — Update struct, Encoder interface, JSON encoding
+├── tethertest/      Test harness - drives Handle functions and component dispatch without transport or goroutines
+├── wire/            Wire protocol - Update struct, Encoder interface, JSON encoding
 └── ws/              WebSocket transport implementation
 ```
 
@@ -54,7 +54,7 @@ The interface every handler receives. Provides side-effect methods (`Toast`,
 `Signal`, `Navigate`, `SetTitle`, `Announce`, `Flash`, `Push`, `Go`). Works
 identically in stateful mode, stateless page mode, and tests. `OnNavigate`,
 `Handle`, and the test harness all receive `Session`. `Bus.Emit` accepts
-`Session` directly — no type-assert is needed to broadcast from `Handle`.
+`Session` directly - no type-assert is needed to broadcast from `Handle`.
 
 ### StatefulSession[S]
 
@@ -63,7 +63,7 @@ One per browser tab. Implements `Session` and adds state-aware methods:
 goroutine. All exported methods are safe to call from any goroutine.
 
 Type-assert to `*StatefulSession[S]` only when you need methods that are not on
-`Session` — `Update` and `State`. These are lifecycle concerns and belong
+`Session` - `Update` and `State`. These are lifecycle concerns and belong
 in `OnConnect`/`OnDisconnect`, not in `Handle`.
 
 ### Event
@@ -81,38 +81,38 @@ stripping).
 Navigation context passed to `StatefulConfig.OnNavigate` and
 `router.OnNavigate`. Carries `Path` (URL path) and `Query`
 (`url.Values`). Provides typed extraction helpers that mirror `Event`'s
-API for consistency — `Get`, `Int`, `Float64`, `Bool`. Also provides
-soft getters — `IntDefault`, `Float64Default`, `BoolDefault` — that return a default
+API for consistency - `Get`, `Int`, `Float64`, `Bool`. Also provides
+soft getters - `IntDefault`, `Float64Default`, `BoolDefault` - that return a default
 when the key is missing or the value is malformed, which is the common
-case for optional URL parameters. Multi-value helpers — `Strings`,
-`Ints`, `Float64s` — handle repeated query keys. Defined in
+case for optional URL parameters. Multi-value helpers - `Strings`,
+`Ints`, `Float64s` - handle repeated query keys. Defined in
 `params.go`.
 
 ### HandleFunc[S]
 
-`func(session Session, state S, event Event) S` — processes a client
+`func(session Session, state S, event Event) S` - processes a client
 event and returns the new state. Runs inside the command loop; must not
 block.
 
 ### Bus[E]
 
 Typed pub/sub for cross-handler communication. `Bus.Emit(sess, event)`
-accepts `Session` directly — no type-assert needed in `Handle`.
+accepts `Session` directly - no type-assert needed in `Handle`.
 Publishes with sender filtering: subscriptions whose session ID matches
 the emitter are skipped, preventing double-apply. In live sessions,
 publication is enqueued on the sender's command loop so the sender's
 diff is delivered before other subscribers react.
 
-`Bus.Publish(event)` publishes with no sender filter — use for external
+`Bus.Publish(event)` publishes with no sender filter - use for external
 sources (database listeners, message queues, cron jobs). Two raw
-subscription modes: `Subscribe` (synchronous — callback runs in the
+subscription modes: `Subscribe` (synchronous - callback runs in the
 publisher's goroutine, must not block) and `SubscribeAsync` (asynchronous
-— callback runs in its own goroutine per event, safe for I/O). `On` wraps
+ -  callback runs in its own goroutine per event, safe for I/O). `On` wraps
 the callback in `s.Update` so it runs in the subscriber's command loop.
 
 Register raw subscriptions via a `Setup(ctx context.Context)` function
 called from `main` with the root context so they cancel on shutdown.
-Avoid `init()` — subscribers registered there have no cancellation path.
+Avoid `init()` - subscribers registered there have no cancellation path.
 
 Lock-free reads via `atomic.Value`, copy-on-write for writes.
 
@@ -120,14 +120,14 @@ Lock-free reads via `atomic.Value`, copy-on-write for writes.
 
 Session pool for broadcasting. `Add`/`Remove` in `OnConnect`/`OnDisconnect`
 (or use `StatefulConfig.Groups` for automatic membership). `Broadcast(fn)` calls
-`Update` on every member — non-blocking. `BroadcastOthers` skips the
+`Update` on every member - non-blocking. `BroadcastOthers` skips the
 sender. Lock-free reads, copy-on-write writes.
 
 ### Value[V]
 
 Thread-safe shared state with observer notifications. `Store`/`Update`
 publish to all observers via an internal `Bus`. `Load` is lock-free.
-`Observe(session, val, fn)` subscribes a session — the initial value and
+`Observe(session, val, fn)` subscribes a session - the initial value and
 subscription happen atomically within a single session command to prevent
 stale overwrites.
 
@@ -144,11 +144,11 @@ subscribed automatically before `OnConnect` runs.
 The framework calls `Save` when a session disconnects (persisting the differ
 snapshot to external storage) and `Delete` when the session reconnects or is
 destroyed. `Load` is included for tooling and debugging but is not called by
-the framework today — reconnecting sessions re-render from state, which
+the framework today - reconnecting sessions re-render from state, which
 re-seeds the differ.
 
 Nil by default (opt-in via `StatefulConfig.DiffStore`). No first-party implementations
-are provided — developers supply their own, backed by whatever storage suits
+are provided - developers supply their own, backed by whatever storage suits
 their deployment (SQLite, Redis, filesystem, etc.).
 
 ### SessionStore
@@ -159,7 +159,7 @@ disconnect and graceful shutdown, loads on crash recovery (reconnecting client
 hits a server with no in-memory session), and deletes after successful restore
 or on destroy.
 
-The codec (`SessionCodec[S]`) serialises `S` — CBOR by default, custom codec
+The codec (`SessionCodec[S]`) serialises `S` - CBOR by default, custom codec
 via `StatefulConfig.Codec`. The framework wraps the codec output in an envelope with
 session metadata (endpoint, URL, title, user-agent) before passing to the
 store.
@@ -169,7 +169,7 @@ store.
 
 ### Component
 
-`Component` is a self-contained rendering unit — `Render() node.Node` builds
+`Component` is a self-contained rendering unit - `Render() node.Node` builds
 the UI, `Handle(Session, Event) Component` processes events. Components are
 value types; Handle returns a new value, the receiver is not mutated. They
 receive `Session` (not `*StatefulSession`), so they work in SSR pre-warming and
@@ -180,7 +180,7 @@ tests without special cases.
 `Route` and `RouteTyped` dispatch events by prefix in Handle. `RouteTyped`
 preserves the concrete type for compile-time safety.
 
-`StatefulConfig.Components` with `Mount` wires components declaratively — the framework
+`StatefulConfig.Components` with `Mount` wires components declaratively - the framework
 intercepts events by prefix and dispatches them before Handle runs. Navigate
 events bypass mounts.
 
@@ -191,7 +191,7 @@ creates event copies with a different action for prefix stripping.
 setup. The framework calls it during session startup for StatefulConfig.Components
 mounts. Components that don't need setup omit it.
 
-`StatelessConfig.Components` mirrors `StatefulConfig.Components` for stateless pages —
+`StatelessConfig.Components` mirrors `StatefulConfig.Components` for stateless pages  - 
 same `RouteMount` dispatch before Handle, same `Mount` constructor.
 
 ### Router[S] (router package)
@@ -207,9 +207,9 @@ a selector function. Lock-free dispatch via `atomic.Value`.
 Every session has a single goroutine (`run()` in `loop.go`) that processes
 three channels:
 
-- `events` — client events from the transport reader goroutine
-- `cmds` — commands from `Update`, `Broadcast`, `Observe`, bus callbacks
-- `fxCh` — side effects (Toast, Signal, Navigate) arriving outside Handle
+- `events` - client events from the transport reader goroutine
+- `cmds` - commands from `Update`, `Broadcast`, `Observe`, bus callbacks
+- `fxCh` - side effects (Toast, Signal, Navigate) arriving outside Handle
 
 All state mutations happen inside this goroutine. No mutexes in the hot
 path.
@@ -224,7 +224,7 @@ diagnostic via `Handler.Diagnostics`.
 
 Overflow goroutines are capped by a semaphore sized to `CmdBufferSize`. When
 both the buffer and the semaphore are full, the command is dropped and a
-`CommandDropped` diagnostic is emitted — this signals data loss.
+`CommandDropped` diagnostic is emitted - this signals data loss.
 
 See [operations](docs/operations.md#diagnostics-bus) for the full list of
 diagnostic kinds and subscription examples.
@@ -232,16 +232,16 @@ diagnostic kinds and subscription examples.
 ### State snapshots
 
 `Session.State()` has three paths:
-1. **Inside Handle** (`handling` is true) — returns an atomic snapshot
+1. **Inside Handle** (`handling` is true) - returns an atomic snapshot
    captured before Handle started. No channel hop, no deadlock.
-2. **Loop not yet started** — returns `s.state` directly.
-3. **Outside Handle** — synchronous read through the command channel.
+2. **Loop not yet started** - returns `s.state` directly.
+3. **Outside Handle** - synchronous read through the command channel.
 
 ### Effect buffering
 
 Side effects called during Handle (`Toast`, `Signal`, `Navigate`, etc.)
 are buffered on `fxCh` and drained after Handle returns. They are merged
-into the same update message as the diff — the client receives state
+into the same update message as the diff - the client receives state
 changes and effects in a single frame.
 
 Effects called outside Handle (from `Go` goroutines, timers, bus callbacks)
@@ -275,15 +275,15 @@ Pending  →  Active  ⇄  Disconnected  →  Destroyed
 
 When a client event arrives, `exec()` in `loop.go` runs:
 
-1. Track activity — update timestamp, reset idle timer
-2. Snapshot state — store atomically for concurrent `State()` readers
-3. Component dispatch — if StatefulConfig.Components matches the event prefix, route to the component
-4. Handle — if no component matched, call the page handler
-5. Drain effects — collect buffered Toast/Signal/Navigate calls
-6. Equality check — skip render if `Equal` says state unchanged
-7. Render — build a new node tree
-8. Diff — compare with the previous tree via fluent-jit
-9. Send — serialise patches + effects, push to the client
+1. Track activity - update timestamp, reset idle timer
+2. Snapshot state - store atomically for concurrent `State()` readers
+3. Component dispatch - if StatefulConfig.Components matches the event prefix, route to the component
+4. Handle - if no component matched, call the page handler
+5. Drain effects - collect buffered Toast/Signal/Navigate calls
+6. Equality check - skip render if `Equal` says state unchanged
+7. Render - build a new node tree
+8. Diff - compare with the previous tree via fluent-jit
+9. Send - serialise patches + effects, push to the client
 
 ## Transport
 
@@ -306,7 +306,7 @@ Server-to-client updates are JSON objects containing any combination of:
 (structural DOM changes via idiomorph), `url`, `title`, `toast`, `flash`,
 `signals`, `announce`, `eventID`.
 
-**Patches** are the common case — a Dynamic-keyed element's HTML changed.
+**Patches** are the common case - a Dynamic-keyed element's HTML changed.
 **Morphs** are the fallback when the set of Dynamic keys changed between
 renders (keys added, removed, or reordered).
 
@@ -324,7 +324,7 @@ internally. Send events with `h.Send("action")`, `h.SendInput(...)`,
 `h.SendSubmit(...)`, or `h.Navigate("/path")`. Inspect results with
 `h.State()`, `h.HTML()`, `h.Toast()`, `h.Signals()`, etc.
 
-No transport, no goroutines, no channels — each `Send` is a synchronous
+No transport, no goroutines, no channels - each `Send` is a synchronous
 HTTP round-trip via `httptest`.
 
 Integration tests for the live session system use `testing/synctest` for
@@ -350,7 +350,7 @@ h.Diagnostics.Subscribe(ctx, func(d tether.Diagnostic) {
 })
 ```
 
-The framework is quiet by default — `slog` is only used for panics
+The framework is quiet by default - `slog` is only used for panics
 (as a critical safety net). All other operational signals flow through
 the diagnostic bus. `DiagnosticKind` constants: `TransportError`,
 `EncodeError`, `BufferOverflow`, `CommandDropped`, `HandlerPanic`,
@@ -367,32 +367,32 @@ Subscriptions are cleaned up automatically when the session is destroyed.
 | File | Purpose |
 |------|---------|
 | `config.go` | Timeouts, Limits, Client, Security structs (shared) |
-| `handler.go` | Handler — session pools, routing, transport upgrade |
+| `handler.go` | Handler - session pools, routing, transport upgrade |
 | `diagnostic.go` | Diagnostic struct, DiagnosticKind constants, panicErr helper |
 | `session.go` | Session struct, enqueue, enqueueFx, drainFx, emitDiagnostic |
 | `loop.go` | Command loop (run), exec pipeline, readTransport, send |
-| `methods.go` | Session methods — State, Update, Close, Toast, Navigate, Signal, Push |
+| `methods.go` | Session methods - State, Update, Close, Toast, Navigate, Signal, Push |
 | `handle.go` | HandleFunc type, middleware chain |
 | `serve.go` | HTTP handler (ServeHTTP), session creation, reattach |
 | `component.go` | Component interface, EqualComponent, Route, RouteTyped |
 | `mount.go` | ComponentMount interface, Mount constructor, RouteMount dispatch |
-| `bus.go` | Bus — typed pub/sub with atomic reads and copy-on-write |
-| `group.go` | Group — session pool with Broadcast/BroadcastOthers |
-| `value.go` | Value — shared observable state with Bus internally |
-| `observe.go` | Observe — atomic subscribe + initial value delivery |
-| `emit.go` | On — subscribe a session to a Bus with sender filtering |
-| `watcher.go` | Watcher interface, WatchValue, WatchBus — declarative StatefulConfig subscriptions |
+| `bus.go` | Bus - typed pub/sub with atomic reads and copy-on-write |
+| `group.go` | Group - session pool with Broadcast/BroadcastOthers |
+| `value.go` | Value - shared observable state with Bus internally |
+| `observe.go` | Observe - atomic subscribe + initial value delivery |
+| `emit.go` | On - subscribe a session to a Bus with sender filtering |
+| `watcher.go` | Watcher interface, WatchValue, WatchBus - declarative StatefulConfig subscriptions |
 | `transport.go` | Transport interface |
 | `diff_store.go` | DiffStore interface for external snapshot persistence |
 | `session_store.go` | SessionStore interface for session state persistence |
 | `session_codec.go` | SessionCodec[S] interface + default CBOR implementation |
-| `session_envelope.go` | Envelope struct — wraps encoded S with session metadata |
+| `session_envelope.go` | Envelope struct - wraps encoded S with session metadata |
 | `page.go` | StatelessConfig, stateless page handler |
-| `effects.go` | Effects struct — buffers Toast, Signal, Navigate, etc. |
+| `effects.go` | Effects struct - buffers Toast, Signal, Navigate, etc. |
 | `render.go` | Render helpers, tetherBody (root div with data attributes) |
 | `asset.go` | Embedded asset serving with content-hashed URLs |
 | `listen.go` | ListenAndServe (method + package-level), Drainable interface, signal trapping, graceful shutdown |
-| `drain.go` | Graceful drain — stop accepting new sessions, wait for existing |
+| `drain.go` | Graceful drain - stop accepting new sessions, wait for existing |
 | `health.go` | Health check endpoint |
 
 ## Build and test
@@ -415,7 +415,7 @@ go test ./...
 
 ## Security
 
-Session IDs are bearer tokens — TLS is a hard requirement. User-Agent
+Session IDs are bearer tokens - TLS is a hard requirement. User-Agent
 binding is enabled by default: the framework captures the User-Agent on
 session creation and verifies it on reconnect, rejecting mismatches with
 a `SessionBindingFailed` diagnostic. Origin checking protects against
@@ -431,5 +431,5 @@ full model.
 - Effects are buffered during Handle and merged atomically with the diff
 - `dev.Debug` for debug-only logging; `slog` only for panics; all other signals flow through `Handler.Diagnostics`
 - `Stateful` logs one `tether: ready` line at INFO with `transport`, optional `name`, `worker`, `middleware` count, and `dev`; no other startup noise
-- `StatefulConfig.Name` / `StatelessConfig.Name` — optional label included in startup logs to distinguish handlers that share a transport
+- `StatefulConfig.Name` / `StatelessConfig.Name` - optional label included in startup logs to distinguish handlers that share a transport
 - `context.AfterFunc` for automatic cleanup on context cancellation

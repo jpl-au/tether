@@ -25,7 +25,7 @@ func WatchValue[S any, V any](val *Value[V], mapper func(V, S) S) Watcher[S] {
 
 // WatchBus creates a [Watcher] that subscribes a session to a [Bus].
 // Published events from other sessions are folded into the subscriber's
-// state via the mapper function. Sender filtering is automatic — events
+// state via the mapper function. Sender filtering is automatic - events
 // emitted by this session via [Bus.Emit] are skipped.
 //
 //	tether.WatchBus(messages, func(msg Message, s State) State {

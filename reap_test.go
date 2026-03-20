@@ -100,7 +100,7 @@ func TestIdleTimerResetsOnActivity(t *testing.T) {
 		go sess.readTransport(sess.events)
 		go sess.run()
 
-		// Send an update at 200ms — well within the 300ms idle timeout.
+		// Send an update at 200ms - well within the 300ms idle timeout.
 		// This should reset the timer.
 		time.Sleep(200 * time.Millisecond)
 		sess.Update(func(s counterState) counterState {
@@ -115,7 +115,7 @@ func TestIdleTimerResetsOnActivity(t *testing.T) {
 		synctest.Wait()
 
 		if sess.ctx.Err() != nil {
-			t.Error("session should still be alive — idle timer was reset by activity")
+			t.Error("session should still be alive - idle timer was reset by activity")
 		}
 
 		// At 600ms (500ms since last activity), the timer fires.

@@ -1,6 +1,6 @@
 # Extensions
 
-Extensions are opt-in features that add capabilities beyond the core render/handle loop. Each is activated by setting a field on `StatefulConfig` — if you don't set it, there is zero overhead. Extensions work alongside `StatefulConfig.Components` — component events are dispatched before Handle, but upload callbacks and push subscriptions operate at the session level independent of component routing.
+Extensions are opt-in features that add capabilities beyond the core render/handle loop. Each is activated by setting a field on `StatefulConfig` - if you don't set it, there is zero overhead. Extensions work alongside `StatefulConfig.Components` - component events are dispatched before Handle, but upload callbacks and push subscriptions operate at the session level independent of component routing.
 
 ## File uploads
 
@@ -128,14 +128,14 @@ tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
         }),
         OnSubscribe: func(ctx context.Context, sess *tether.StatefulSession[State], sub push.Subscription) {
             // Store subscription in your database.
-            // Use ctx for database calls — it cancels when the session is destroyed.
+            // Use ctx for database calls - it cancels when the session is destroyed.
         },
     },
     // ...
 })
 ```
 
-Use `bind.PushSubscribe` on a button so the user opts in with a click — browsers require a user gesture for the push permission prompt. Send notifications with:
+Use `bind.PushSubscribe` on a button so the user opts in with a click - browsers require a user gesture for the push permission prompt. Send notifications with:
 
 ```go
 sess.Push(push.Notification{

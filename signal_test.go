@@ -143,7 +143,7 @@ func TestSignalWithoutStateChange(t *testing.T) {
 
 		handle := func(s Session, state counterState, ev Event) counterState {
 			s.Signal("ping", "pong")
-			// State unchanged — signal should still be sent.
+			// State unchanged - signal should still be sent.
 			return state
 		}
 

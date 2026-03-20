@@ -1,6 +1,6 @@
 # Signals and reactivity
 
-Tether gives you three ways to update the UI. Use whichever fits your situation — or mix them freely.
+Tether gives you three ways to update the UI. Use whichever fits your situation - or mix them freely.
 
 ## Server-driven rendering (the default)
 
@@ -15,9 +15,9 @@ Handle: func(_ tether.Session, s State, ev tether.Event) State {
 
 Use this when the update involves structural changes, conditional rendering, or anything where the full render function should run.
 
-## Signals — lightweight targeted updates
+## Signals - lightweight targeted updates
 
-Signals let the server push individual values to the client without a full render cycle. Bound elements update instantly — no diff, no HTML.
+Signals let the server push individual values to the client without a full render cycle. Bound elements update instantly - no diff, no HTML.
 
 ```go
 // Push a single value
@@ -45,9 +45,9 @@ Signal bindings work **document-wide**, not just inside the tether root. This me
 
 After a morph replaces part of the DOM, the client reapplies current signal values to newly added elements automatically.
 
-**When to use signals:** high-frequency updates where a full render cycle is wasteful — counters, progress bars, online status indicators, form field synchronisation.
+**When to use signals:** high-frequency updates where a full render cycle is wasteful - counters, progress bars, online status indicators, form field synchronisation.
 
-## Client-side signal directives — instant feedback
+## Client-side signal directives - instant feedback
 
 Signal directives update signal values on the client without contacting the server at all. All signal bindings react instantly.
 
@@ -61,9 +61,9 @@ bind.Apply(button.Text("Settings"), bind.SetSignal("tab", "settings"))
 
 The server can override any client-set signal at any time by calling `sess.Signal(key, correctValue)`.
 
-## Optimistic updates — predict and correct
+## Optimistic updates - predict and correct
 
-For predictable actions where the round-trip delay would feel sluggish, update a signal immediately before the event reaches the server. When the server responds, its signals overwrite the optimistic value — if the prediction was wrong, the DOM corrects itself.
+For predictable actions where the round-trip delay would feel sluggish, update a signal immediately before the event reaches the server. When the server responds, its signals overwrite the optimistic value - if the prediction was wrong, the DOM corrects itself.
 
 ```go
 // Set a signal to a specific value immediately, then send the event
@@ -79,7 +79,7 @@ bind.Apply(button.Text("Like"),
 )
 ```
 
-## Client-side directives — ephemeral state
+## Client-side directives - ephemeral state
 
 For toggle-only UI (drawers, menus, modals) where the server doesn't need to know, use client-side directives. These are covered in [client-side features](client-side.md).
 
@@ -104,25 +104,25 @@ Because values are always typed, truthiness follows standard rules:
 | `""` (empty string) | Yes |
 | `nil` / `null` | Yes |
 
-Everything else is **truthy** — `true`, non-zero numbers, non-empty strings.
+Everything else is **truthy** - `true`, non-zero numbers, non-empty strings.
 
 **Always use Go booleans for boolean signals.** `Signal("flag", false)` is
 correct. `Signal("flag", "false")` stores the string `"false"` which is a
-non-empty string and therefore **truthy** — this is a bug in your code, not
+non-empty string and therefore **truthy** - this is a bug in your code, not
 a framework issue.
 
 ## Don't mix signals and state rendering on the same element
 
-An element should be driven by **either** signals **or** state rendering — never both. If a signal updates an element's text and the next render cycle also touches that element, the render overwrites the signal value:
+An element should be driven by **either** signals **or** state rendering - never both. If a signal updates an element's text and the next render cycle also touches that element, the render overwrites the signal value:
 
 ```go
-// Wrong — the render and signal fight over the same element
+// Wrong - the render and signal fight over the same element
 bind.Apply(span.Textf("Count: %d", s.Count).Dynamic("count"), bind.BindText("count"))
 
-// Right — signal-only element, no Dynamic key needed
+// Right - signal-only element, no Dynamic key needed
 bind.Apply(span.New(), bind.BindText("count"))
 
-// Right — state-rendered element, no signal binding
+// Right - state-rendered element, no signal binding
 span.Textf("Count: %d", s.Count).Dynamic("count")
 ```
 

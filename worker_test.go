@@ -334,7 +334,7 @@ func TestHandlePushSubscribe(t *testing.T) {
 		t.Fatalf("status = %d, want %d", w.Code, http.StatusNoContent)
 	}
 
-	// OnSubscribe runs in a goroutine — wait for it via channel.
+	// OnSubscribe runs in a goroutine - wait for it via channel.
 	select {
 	case got := <-ch:
 		if got.sub.Endpoint != sub.Endpoint {
