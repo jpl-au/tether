@@ -999,7 +999,6 @@ window.Tether.signals = window.Tether.signals || {};
 
     if (devMode) {
       console.log("tether: patch", patch.key);
-      flashElement(el);
     }
 
     var template = document.createElement("template");
@@ -1028,7 +1027,6 @@ window.Tether.signals = window.Tether.signals || {};
       // firstElementChild would strip that wrapper because
       // idiomorph would use the element's children instead.
       if (root && morph.html) {
-        if (devMode) flashElement(root);
         Idiomorph.morph(root, morph.html, {morphStyle: "innerHTML", callbacks: morphCallbacks});
       }
     } else {
@@ -1042,28 +1040,9 @@ window.Tether.signals = window.Tether.signals || {};
       if (!newEl) return;
       var el = document.querySelector('[data-tether-key="' + morph.key + '"]');
       if (el) {
-        if (devMode) flashElement(el);
         Idiomorph.morph(el, newEl, {callbacks: morphCallbacks});
       }
     }
-  }
-
-  function flashElement(el) {
-    var oldTransition = el.style.transition;
-    var oldOutline = el.style.outline;
-    el.style.transition = "none";
-    el.style.outline = "2px solid rgba(59, 130, 246, 0.5)";
-    el.style.outlineOffset = "-2px";
-    requestAnimationFrame(function () {
-      if (!el.isConnected) return;
-      el.style.transition = "outline 0.5s ease-out";
-      el.style.outline = "2px solid transparent";
-      setTimeout(function () {
-        if (!el.isConnected) return;
-        el.style.transition = oldTransition;
-        el.style.outline = oldOutline;
-      }, 500);
-    });
   }
 
   // --- Signals ---
