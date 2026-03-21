@@ -87,7 +87,7 @@ func (v *Value[V]) Len() int {
 
 // observe registers a subscriber and returns the current value
 // atomically. The write mutex is held during both the read and the
-// subscribe so a concurrent Set cannot publish between the two  - 
+// subscribe so a concurrent Set cannot publish between the two  -
 // preventing duplicate delivery of the initial value. Get() callers
 // are unaffected because reads are lock-free.
 func (v *Value[V]) observe(ctx context.Context, fn func(V), sessionID string) V {

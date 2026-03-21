@@ -206,7 +206,7 @@ func ToggleAttr(attr string) Option { return Option{"tether-toggle-attr", attr} 
 func Cloak() Option { return Option{"tether-cloak", ""} }
 
 // Permanent excludes the element from DOM morphing. When idiomorph
-// processes a server update, it skips elements marked permanent  - 
+// processes a server update, it skips elements marked permanent  -
 // their content, attributes, and children are preserved exactly as-is.
 // Use this for elements with client-side state that must survive server
 // updates (e.g. a video player, an interactive map, or a third-party

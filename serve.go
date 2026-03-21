@@ -76,6 +76,8 @@ func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 		transport:         h.cfg.Mode,
 		retryDelay:        h.cfg.Timeouts.Retry,
 		maxRetryDelay:     h.cfg.Timeouts.MaxRetry,
+		backoffMultiplier: h.cfg.Timeouts.BackoffMultiplier,
+		jitter:            h.cfg.Timeouts.Jitter == nil || *h.cfg.Timeouts.Jitter,
 		defaultDebounce:   h.app.Client.DefaultDebounce,
 		transitionTimeout: h.app.Client.TransitionTimeout,
 		flashDuration:     h.app.Client.FlashDuration,

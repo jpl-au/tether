@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"net/http"
 	"sync"
 
 	jit "github.com/jpl-au/fluent-jit"
 	"github.com/jpl-au/fluent/html5/div"
 	"github.com/jpl-au/fluent/html5/span"
 	"github.com/jpl-au/fluent/node"
+	"github.com/jpl-au/tether/mode"
 	"github.com/jpl-au/tether/wire"
 )
 
@@ -157,6 +159,24 @@ func (c *connectedTransport) Close() error {
 		close(c.ch)
 	}
 	return nil
+}
+
+// newTestHandler creates a stateful Handler with default test
+// configuration. Used across multiple test files.
+func newTestHandler() *Handler[counterState] {
+	return Stateful(App{}, StatefulConfig[counterState]{
+		Mode:         mode.WebSocket,
+		Upgrade:      stubUpgrade,
+		InitialState: func(r *http.Request) counterState { return counterState{} },
+		Render:       renderCounter,
+		Handle:       handleCounter,
+	})
+}
+
+// stubUpgrade is a no-op upgrade function for tests that don't need
+// a real transport connection.
+func stubUpgrade(w http.ResponseWriter, r *http.Request) (Transport, error) {
+	return &mockTransport{}, nil
 }
 
 type counterState struct {

@@ -36,6 +36,8 @@ window.Tether.signals = window.Tether.signals || {};
   var retryDelay = 0;
   var initialRetryDelay = 0;
   var maxRetryDelay = 0;
+  var backoffMultiplier = 1.5;
+  var jitter = true;
   var defaultDebounce = 0;
   var transitionTimeout = 0;
   var debounceTimers = {};
@@ -74,9 +76,11 @@ window.Tether.signals = window.Tether.signals || {};
     endpoint = root.getAttribute("data-tether-endpoint") || "";
     sessionID = root.getAttribute("data-tether-session") || "";
     transportMode = root.getAttribute("data-tether-transport") || "ws";
-    initialRetryDelay = parseInt(root.getAttribute("data-tether-retry-delay")) || 1000;
+    initialRetryDelay = parseInt(root.getAttribute("data-tether-retry-delay")) || 500;
     retryDelay = initialRetryDelay;
-    maxRetryDelay = parseInt(root.getAttribute("data-tether-max-retry-delay")) || 30000;
+    maxRetryDelay = parseInt(root.getAttribute("data-tether-max-retry-delay")) || 10000;
+    backoffMultiplier = parseFloat(root.getAttribute("data-tether-backoff-multiplier")) || 1.5;
+    jitter = root.hasAttribute("data-tether-jitter");
     defaultDebounce = parseInt(root.getAttribute("data-tether-debounce-default")) || 300;
     transitionTimeout = parseInt(root.getAttribute("data-tether-transition-timeout")) || 5000;
     devMode = root.hasAttribute("data-tether-dev");
@@ -279,11 +283,16 @@ window.Tether.signals = window.Tether.signals || {};
   }
 
   function scheduleReconnect() {
+    var delay = retryDelay;
+    // Jitter spreads reconnection attempts across time to prevent
+    // synchronised waves (thundering herd) after a server restart.
+    // The delay is multiplied by a random factor in [0.5, 1.0).
+    if (jitter) delay = Math.floor(delay * (0.5 + Math.random() * 0.5));
     setTimeout(function () {
       if (root) root.setAttribute("data-tether-state", "connecting");
-      retryDelay = Math.min(retryDelay * 2, maxRetryDelay);
+      retryDelay = Math.min(retryDelay * backoffMultiplier, maxRetryDelay);
       connect();
-    }, retryDelay);
+    }, delay);
   }
 
   // --- Reconnecting indicator ---

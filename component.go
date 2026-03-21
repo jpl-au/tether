@@ -51,7 +51,7 @@ type Component interface {
 // only scalar fields can rely on the default comparison.
 //
 // When a Component is stored as an interface field (Approach B), Go's ==
-// operator cannot compare interface values containing slices or maps  - 
+// operator cannot compare interface values containing slices or maps  -
 // it panics. EqualComponent is load-bearing in that scenario, not
 // optional.
 type EqualComponent interface {
@@ -62,7 +62,7 @@ type EqualComponent interface {
 // Mounter is an optional interface that components can implement to
 // perform one-time setup when they are first mounted into a session.
 // The framework calls Mount once per component - after the session's
-// command loop starts but before any client events are processed  - 
+// command loop starts but before any client events are processed  -
 // when the component is registered via [StatefulConfig.Components].
 //
 // Mount receives the [Session] so the component can fire side effects

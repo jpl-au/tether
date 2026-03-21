@@ -29,7 +29,7 @@ type Config[S any] struct {
 	// State is the initial state for each test interaction.
 	State S
 
-	// Render builds a node tree from the current state. Optional  - 
+	// Render builds a node tree from the current state. Optional  -
 	// only required when calling [Harness.HTML], [Harness.Render],
 	// or [Harness.RenderNode].
 	Render tether.RenderFunc[S]
@@ -62,7 +62,7 @@ type Config[S any] struct {
 	Components []tether.ComponentMount[S]
 
 	// Layout wraps the rendered content for [Harness.Render] and
-	// [Harness.HTML], mirroring [tether.StatefulConfig].Layout. Optional  - 
+	// [Harness.HTML], mirroring [tether.StatefulConfig].Layout. Optional  -
 	// when absent, only the content node is rendered.
 	Layout func(S, node.Node) node.Node
 }
@@ -89,7 +89,7 @@ type Harness[S any] struct {
 	lastHTML string
 }
 
-// New creates a test harness. The harness invokes Handle directly  - 
+// New creates a test harness. The harness invokes Handle directly  -
 // no HTTP server, no JSON round-trip, no goroutines.
 func New[S any](cfg Config[S]) *Harness[S] {
 	handle := cfg.Handle

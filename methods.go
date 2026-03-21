@@ -28,7 +28,7 @@ func (s *StatefulSession[S]) State() S {
 }
 
 // Update applies a state change and pushes the resulting diff to the
-// client. This is the primary way to push server-initiated updates  - 
+// client. This is the primary way to push server-initiated updates  -
 // call it from timers, database change listeners, message queue
 // consumers, or [Group.Broadcast].
 //

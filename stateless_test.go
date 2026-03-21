@@ -14,8 +14,8 @@ import (
 	"github.com/jpl-au/tether/event"
 )
 
-// pageHandleCounter is a stateless handle function for testing.
-func pageHandleCounter(sess Session, state counterState, ev Event) counterState {
+// statelessHandleCounter is a stateless handle function for testing.
+func statelessHandleCounter(sess Session, state counterState, ev Event) counterState {
 	switch ev.Action {
 	case "increment":
 		state.Count++
@@ -33,16 +33,16 @@ func pageHandleCounter(sess Session, state counterState, ev Event) counterState 
 	return state
 }
 
-func newTestPageHandler() http.Handler {
+func newTestStatelessHandler() http.Handler {
 	return Stateless(App{}, StatelessConfig[counterState]{
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
-		Handle:       pageHandleCounter,
+		Handle:       statelessHandleCounter,
 	})
 }
 
-func TestPageGETRendersHTML(t *testing.T) {
-	handler := newTestPageHandler()
+func TestStatelessGETRendersHTML(t *testing.T) {
+	handler := newTestStatelessHandler()
 
 	req := httptest.NewRequest("GET", "/app", nil)
 	w := httptest.NewRecorder()
@@ -63,8 +63,8 @@ func TestPageGETRendersHTML(t *testing.T) {
 	}
 }
 
-func TestPageGETNoSessionAttribute(t *testing.T) {
-	handler := newTestPageHandler()
+func TestStatelessGETNoSessionAttribute(t *testing.T) {
+	handler := newTestStatelessHandler()
 
 	req := httptest.NewRequest("GET", "/app", nil)
 	w := httptest.NewRecorder()
@@ -75,8 +75,8 @@ func TestPageGETNoSessionAttribute(t *testing.T) {
 	}
 }
 
-func TestPageGETNoRetryDelayAttributes(t *testing.T) {
-	handler := newTestPageHandler()
+func TestStatelessGETNoRetryDelayAttributes(t *testing.T) {
+	handler := newTestStatelessHandler()
 
 	req := httptest.NewRequest("GET", "/app", nil)
 	w := httptest.NewRecorder()
@@ -91,11 +91,11 @@ func TestPageGETNoRetryDelayAttributes(t *testing.T) {
 	}
 }
 
-func TestPageGETWithOnNavigate(t *testing.T) {
+func TestStatelessGETWithOnNavigate(t *testing.T) {
 	handler := Stateless(App{}, StatelessConfig[counterState]{
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
-		Handle:       pageHandleCounter,
+		Handle:       statelessHandleCounter,
 		OnNavigate: func(_ Session, state counterState, p Params) counterState {
 			if p.Query.Get("count") == "5" {
 				state.Count = 5
@@ -113,13 +113,13 @@ func TestPageGETWithOnNavigate(t *testing.T) {
 	}
 }
 
-func TestPageGETDevMode(t *testing.T) {
+func TestStatelessGETDevMode(t *testing.T) {
 	t.Cleanup(dev.Reset)
 
 	handler := Stateless(App{DevMode: true}, StatelessConfig[counterState]{
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
-		Handle:       pageHandleCounter,
+		Handle:       statelessHandleCounter,
 	})
 
 	req := httptest.NewRequest("GET", "/app", nil)
@@ -134,8 +134,8 @@ func TestPageGETDevMode(t *testing.T) {
 	}
 }
 
-func TestPagePOSTReturnsJSON(t *testing.T) {
-	handler := newTestPageHandler()
+func TestStatelessPOSTReturnsJSON(t *testing.T) {
+	handler := newTestStatelessHandler()
 
 	body := `{"type":"click","action":"increment","data":{},"event_id":"1"}`
 	req := httptest.NewRequest("POST", "/app", strings.NewReader(body))
@@ -168,8 +168,8 @@ func TestPagePOSTReturnsJSON(t *testing.T) {
 	}
 }
 
-func TestPagePOSTEventID(t *testing.T) {
-	handler := newTestPageHandler()
+func TestStatelessPOSTEventID(t *testing.T) {
+	handler := newTestStatelessHandler()
 
 	body := `{"type":"click","action":"increment","data":{},"event_id":"42"}`
 	req := httptest.NewRequest("POST", "/app", strings.NewReader(body))
@@ -184,8 +184,8 @@ func TestPagePOSTEventID(t *testing.T) {
 	}
 }
 
-func TestPagePOSTWithEffects(t *testing.T) {
-	handler := newTestPageHandler()
+func TestStatelessPOSTWithEffects(t *testing.T) {
+	handler := newTestStatelessHandler()
 
 	t.Run("toast", func(t *testing.T) {
 		body := `{"type":"click","action":"toast","data":{},"event_id":"1"}`
@@ -230,8 +230,8 @@ func TestPagePOSTWithEffects(t *testing.T) {
 	})
 }
 
-func TestPagePOSTOriginCheck(t *testing.T) {
-	handler := newTestPageHandler()
+func TestStatelessPOSTOriginCheck(t *testing.T) {
+	handler := newTestStatelessHandler()
 
 	req := httptest.NewRequest("POST", "http://myapp.com/app", strings.NewReader("{}"))
 	req.Header.Set("Origin", "https://evil.com")
@@ -244,8 +244,8 @@ func TestPagePOSTOriginCheck(t *testing.T) {
 	}
 }
 
-func TestPagePOSTOriginAllowed(t *testing.T) {
-	handler := newTestPageHandler()
+func TestStatelessPOSTOriginAllowed(t *testing.T) {
+	handler := newTestStatelessHandler()
 
 	body := `{"type":"click","action":"increment","data":{},"event_id":"1"}`
 	req := httptest.NewRequest("POST", "http://myapp.com/app", strings.NewReader(body))
@@ -259,8 +259,8 @@ func TestPagePOSTOriginAllowed(t *testing.T) {
 	}
 }
 
-func TestPagePOSTInvalidJSON(t *testing.T) {
-	handler := newTestPageHandler()
+func TestStatelessPOSTInvalidJSON(t *testing.T) {
+	handler := newTestStatelessHandler()
 
 	req := httptest.NewRequest("POST", "/app", strings.NewReader("not json"))
 	req.Header.Set("Content-Type", "application/json")
@@ -272,8 +272,8 @@ func TestPagePOSTInvalidJSON(t *testing.T) {
 	}
 }
 
-func TestPageMethodNotAllowed(t *testing.T) {
-	handler := newTestPageHandler()
+func TestStatelessMethodNotAllowed(t *testing.T) {
+	handler := newTestStatelessHandler()
 
 	req := httptest.NewRequest("PUT", "/app", nil)
 	w := httptest.NewRecorder()
@@ -284,8 +284,8 @@ func TestPageMethodNotAllowed(t *testing.T) {
 	}
 }
 
-func TestPagePOSTPanicRecovery(t *testing.T) {
-	handler := newTestPageHandler()
+func TestStatelessPOSTPanicRecovery(t *testing.T) {
+	handler := newTestStatelessHandler()
 
 	body := `{"type":"click","action":"panic","data":{},"event_id":"1"}`
 	req := httptest.NewRequest("POST", "/app", strings.NewReader(body))
@@ -298,11 +298,11 @@ func TestPagePOSTPanicRecovery(t *testing.T) {
 	}
 }
 
-func TestPageGETPanicRecovery(t *testing.T) {
+func TestStatelessGETPanicRecovery(t *testing.T) {
 	handler := Stateless(App{}, StatelessConfig[counterState]{
 		InitialState: func(r *http.Request) counterState { panic("render panic") },
 		Render:       renderCounter,
-		Handle:       pageHandleCounter,
+		Handle:       statelessHandleCounter,
 	})
 
 	req := httptest.NewRequest("GET", "/app", nil)
@@ -314,8 +314,8 @@ func TestPageGETPanicRecovery(t *testing.T) {
 	}
 }
 
-func TestPageServesClientJS(t *testing.T) {
-	handler := newTestPageHandler()
+func TestStatelessServesClientJS(t *testing.T) {
+	handler := newTestStatelessHandler()
 
 	req := httptest.NewRequest("GET", "/_tether/tether.js", nil)
 	w := httptest.NewRecorder()
@@ -329,7 +329,7 @@ func TestPageServesClientJS(t *testing.T) {
 	}
 }
 
-func TestPagePanicsOnMissingState(t *testing.T) {
+func TestStatelessPanicsOnMissingState(t *testing.T) {
 	defer func() {
 		if r := recover(); r == nil {
 			t.Error("expected panic for missing State")
@@ -337,11 +337,11 @@ func TestPagePanicsOnMissingState(t *testing.T) {
 	}()
 	Stateless(App{}, StatelessConfig[counterState]{
 		Render: renderCounter,
-		Handle: pageHandleCounter,
+		Handle: statelessHandleCounter,
 	})
 }
 
-func TestPagePanicsOnMissingRender(t *testing.T) {
+func TestStatelessPanicsOnMissingRender(t *testing.T) {
 	defer func() {
 		if r := recover(); r == nil {
 			t.Error("expected panic for missing Render")
@@ -349,11 +349,11 @@ func TestPagePanicsOnMissingRender(t *testing.T) {
 	}()
 	Stateless(App{}, StatelessConfig[counterState]{
 		InitialState: func(r *http.Request) counterState { return counterState{} },
-		Handle:       pageHandleCounter,
+		Handle:       statelessHandleCounter,
 	})
 }
 
-func TestPagePanicsOnMissingHandle(t *testing.T) {
+func TestStatelessPanicsOnMissingHandle(t *testing.T) {
 	defer func() {
 		if r := recover(); r == nil {
 			t.Error("expected panic for missing Handle")
@@ -365,11 +365,11 @@ func TestPagePanicsOnMissingHandle(t *testing.T) {
 	})
 }
 
-func TestPagePOSTWithOnNavigate(t *testing.T) {
+func TestStatelessPOSTWithOnNavigate(t *testing.T) {
 	handler := Stateless(App{}, StatelessConfig[counterState]{
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
-		Handle:       pageHandleCounter,
+		Handle:       statelessHandleCounter,
 		OnNavigate: func(_ Session, state counterState, p Params) counterState {
 			if p.Query.Get("count") == "5" {
 				state.Count = 5
@@ -395,14 +395,14 @@ func TestPagePOSTWithOnNavigate(t *testing.T) {
 	}
 }
 
-func TestPageDevModeFromEnv(t *testing.T) {
+func TestStatelessDevModeFromEnv(t *testing.T) {
 	t.Setenv("TETHER_DEV", "1")
 	t.Cleanup(dev.Reset)
 
 	handler := Stateless(App{}, StatelessConfig[counterState]{
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
-		Handle:       pageHandleCounter,
+		Handle:       statelessHandleCounter,
 	})
 
 	req := httptest.NewRequest("GET", "/app", nil)
@@ -414,7 +414,7 @@ func TestPageDevModeFromEnv(t *testing.T) {
 	}
 }
 
-func TestPagePOSTNavigateSkipsHandle(t *testing.T) {
+func TestStatelessPOSTNavigateSkipsHandle(t *testing.T) {
 	handler := Stateless(App{}, StatelessConfig[counterState]{
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
@@ -449,7 +449,7 @@ func TestPagePOSTNavigateSkipsHandle(t *testing.T) {
 	}
 }
 
-func TestPagePOSTComponentsDispatch(t *testing.T) {
+func TestStatelessPOSTComponentsDispatch(t *testing.T) {
 	type pageState struct {
 		Widget testWidget
 		Other  string

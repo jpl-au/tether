@@ -6,7 +6,7 @@ import (
 )
 
 // ComponentHarness drives a [tether.Component] in isolation for testing.
-// Events are dispatched directly to the component's Handle method  - 
+// Events are dispatched directly to the component's Handle method  -
 // no prefix stripping, no wrapper state, no transport plumbing.
 //
 //	h := tethertest.NewComponent(MyWidget{Count: 0})

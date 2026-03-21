@@ -113,6 +113,9 @@ func Stateful[S any](app App, cfg StatefulConfig[S]) *Handler[S] {
 	if cfg.Timeouts.MaxRetry == 0 {
 		cfg.Timeouts.MaxRetry = defaultMaxRetryDelay
 	}
+	if cfg.Timeouts.BackoffMultiplier < 1 {
+		cfg.Timeouts.BackoffMultiplier = defaultBackoffMultiplier
+	}
 	app.Client.defaults()
 	if app.Client.SyncRetention == 0 {
 		app.Client.SyncRetention = defaultSyncRetention

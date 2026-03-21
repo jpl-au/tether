@@ -38,6 +38,8 @@ type tetherBody struct {
 	transport         mode.Transport
 	retryDelay        time.Duration
 	maxRetryDelay     time.Duration
+	backoffMultiplier float64
+	jitter            bool
 	defaultDebounce   time.Duration
 	transitionTimeout time.Duration
 	flashDuration     time.Duration
@@ -99,7 +101,12 @@ func (p *tetherBody) RenderBuilder(buf *bytes.Buffer) {
 		buf.WriteString(strconv.FormatInt(p.retryDelay.Milliseconds(), 10))
 		buf.WriteString(`" data-tether-max-retry-delay="`)
 		buf.WriteString(strconv.FormatInt(p.maxRetryDelay.Milliseconds(), 10))
+		buf.WriteString(`" data-tether-backoff-multiplier="`)
+		buf.WriteString(strconv.FormatFloat(p.backoffMultiplier, 'f', -1, 64))
 		buf.WriteString(`"`)
+		if p.jitter {
+			buf.WriteString(` data-tether-jitter`)
+		}
 	}
 	buf.WriteString(` data-tether-debounce-default="`)
 	buf.WriteString(strconv.FormatInt(p.defaultDebounce.Milliseconds(), 10))

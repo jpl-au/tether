@@ -6,7 +6,7 @@
 // Tether provides two handler modes:
 //
 // [Stateful] handlers maintain a persistent connection (WebSocket or SSE)
-// between browser and server. State survives across interactions  - 
+// between browser and server. State survives across interactions  -
 // when the user clicks a button, the server updates state and pushes
 // the change without a page reload. Use Stateful for interactive
 // applications: dashboards, forms, chat, real-time collaboration.

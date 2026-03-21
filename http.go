@@ -108,7 +108,7 @@ func (h *Handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // (available in all browsers since 2023), then Origin is compared
 // against TrustedOrigins or the Host header as a fallback.
 //
-// Requests without Sec-Fetch-Site or Origin headers are allowed  - 
+// Requests without Sec-Fetch-Site or Origin headers are allowed  -
 // they come from same-origin navigations or non-browser clients.
 func (h *Handler[S]) wsOriginAllowed(r *http.Request) bool {
 	// Sec-Fetch-Site is the primary signal. Modern browsers send it

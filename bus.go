@@ -13,7 +13,7 @@ import (
 // exists - they pass the Session they already have.
 //
 // [*StatefulSession] satisfies emitter via its command-loop enqueue.
-// [*CaptureSession] satisfies emitter with synchronous enqueue  - 
+// [*CaptureSession] satisfies emitter with synchronous enqueue  -
 // the function runs immediately in the caller's goroutine.
 type emitter interface {
 	enqueue(fn func())

@@ -48,13 +48,29 @@ type Timeouts struct {
 	DisableHeartbeat bool
 
 	// Retry is the initial delay before the client JS attempts to
-	// reconnect after a WebSocket close. The delay doubles on each
-	// failed attempt up to MaxRetry. Zero defaults to 1 second.
+	// reconnect after a transport close. The delay grows by
+	// BackoffMultiplier on each failed attempt up to MaxRetry.
+	// Zero defaults to 500 milliseconds.
 	Retry time.Duration
 
 	// MaxRetry caps the exponential backoff for client reconnection
-	// attempts. Zero defaults to 30 seconds.
+	// attempts. Zero defaults to 10 seconds.
 	MaxRetry time.Duration
+
+	// BackoffMultiplier controls how aggressively the retry delay
+	// grows after each failed reconnection attempt. The delay after
+	// attempt N is: Retry * BackoffMultiplier^N, capped at MaxRetry.
+	// Zero defaults to 1.5. Values below 1 are treated as the
+	// default.
+	BackoffMultiplier float64
+
+	// Jitter adds randomisation to each retry delay to prevent
+	// synchronised reconnection waves (thundering herd) when many
+	// clients reconnect after a server restart. When enabled, each
+	// delay is multiplied by a random factor in [0.5, 1.0), spreading
+	// clients across time instead of concentrating them in bursts.
+	// Defaults to true. Set to the pointer value false to disable.
+	Jitter *bool
 }
 
 // Limits groups capacity constraints for sessions and requests.
@@ -207,8 +223,10 @@ const defaultMaxPending = 128
 const defaultShutdownGrace = 10 * time.Second
 
 const (
-	defaultRetryDelay        = 1000 * time.Millisecond
-	defaultMaxRetryDelay     = 30 * time.Second
+	defaultRetryDelay        = 500 * time.Millisecond
+	defaultMaxRetryDelay     = 10 * time.Second
+	defaultBackoffMultiplier = 1.5
+	defaultJitter            = true
 	defaultDefaultDebounce   = 300 * time.Millisecond
 	defaultTransitionTimeout = 5 * time.Second
 	defaultFlashDuration     = 5 * time.Second
