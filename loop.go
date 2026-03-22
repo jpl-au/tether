@@ -3,8 +3,10 @@ package tether
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
+	"net/url"
 	"time"
 
 	jit "github.com/jpl-au/fluent-jit"
@@ -12,6 +14,11 @@ import (
 	"github.com/jpl-au/tether/dev"
 	"github.com/jpl-au/tether/wire"
 )
+
+// maxNavigateRedirects caps how many consecutive Navigate calls the
+// framework resolves inline during a single navigate event. This
+// prevents infinite loops when OnNavigate unconditionally redirects.
+const maxNavigateRedirects = 5
 
 // run is the session's command loop. It processes transport events,
 // commands from external callers, and effect closures in a single
@@ -146,6 +153,51 @@ func (s *StatefulSession[S]) exec(ev Event) {
 	newState := s.handle(s, s.state, ev)
 
 	s.drainFx(fx)
+
+	// Resolve navigate redirects inline. When OnNavigate calls
+	// Navigate(), re-process the redirect target server-side rather
+	// than round-tripping to the client. Effects from intermediate
+	// steps are preserved unless the redirect target overwrites them.
+	if ev.Type == "navigate" && fx.URL != "" {
+		for i := range maxNavigateRedirects {
+			redirectURL := fx.URL
+			u, err := url.Parse(redirectURL)
+			if err != nil {
+				dev.Warn("malformed navigate redirect URL",
+					"session", s.id, "url", redirectURL, "error", err)
+				break
+			}
+
+			fx.URL = ""
+			fx.Replace = false
+			redirectEv := Event{
+				Type: "navigate",
+				Data: map[string]string{"path": u.Path, "search": u.RawQuery},
+			}
+			newState = s.handle(s, newState, redirectEv)
+			s.drainFx(fx)
+
+			if fx.URL == "" {
+				// Redirect resolved - send the target URL as a replace
+				// so the client updates the address bar without a
+				// history entry or a navigate event back.
+				fx.URL = redirectURL
+				fx.Replace = true
+				break
+			}
+			if i == maxNavigateRedirects-1 {
+				dev.Warn("navigate redirect limit reached",
+					"session", s.id, "url", fx.URL)
+				s.emitDiagnostic(Diagnostic{
+					Kind:      NavigateRedirectLoop,
+					SessionID: s.id,
+					Err:       fmt.Errorf("redirect limit exceeded after %d redirects", maxNavigateRedirects),
+					Detail:    fx.URL,
+				})
+				fx.Replace = true
+			}
+		}
+	}
 
 	if s.equal != nil && s.equal(s.state, newState) {
 		dev.Debug("state unchanged, skipping render",

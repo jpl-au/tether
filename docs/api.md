@@ -45,7 +45,7 @@ tether.Stateful(app, tether.StatefulConfig[State]{
 | `Render` | `func(S) node.Node` | Builds the node tree from state |
 | `Handle` | `func(Session, S, Event) S` | Processes events, returns new state |
 | `Middleware` | `[]Middleware[S]` | Wraps Handle with cross-cutting behaviour |
-| `OnNavigate` | `func(Session, S, Params) S` | Handles URL navigation and initial load |
+| `OnNavigate` | `func(Session, S, Params) S` | Handles URL navigation and initial load. Redirects via `Navigate()` are resolved inline (no client round-trip). |
 | `Layout` | `func(S, node.Node) node.Node` | Wraps the tether root in a full HTML document |
 | `Equal` | `func(a, b S) bool` | Skips render when state is unchanged |
 

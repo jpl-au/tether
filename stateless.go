@@ -5,6 +5,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/jpl-au/tether/dev"
@@ -210,6 +211,39 @@ func (p *statelessHandler[S]) servePOST(w http.ResponseWriter, r *http.Request) 
 	// All events flow through the unified dispatch: middleware,
 	// OnNavigate, component routing, then Handle.
 	state = p.cfg.Handle(cs, state, ev)
+
+	// Resolve navigate redirects inline, matching the stateful
+	// behaviour in exec(). See loop.go for the full explanation.
+	if ev.Type == event.Navigate && cs.Effects.URL != "" {
+		for i := range maxNavigateRedirects {
+			redirectURL := cs.Effects.URL
+			u, err := url.Parse(redirectURL)
+			if err != nil {
+				slog.Warn("malformed navigate redirect URL",
+					"url", redirectURL, "error", err)
+				break
+			}
+
+			cs.Effects.URL = ""
+			cs.Effects.Replace = false
+			redirectEv := Event{
+				Type: event.Navigate,
+				Data: map[string]string{"path": u.Path, "search": u.RawQuery},
+			}
+			state = p.cfg.Handle(cs, state, redirectEv)
+
+			if cs.Effects.URL == "" {
+				cs.Effects.URL = redirectURL
+				cs.Effects.Replace = true
+				break
+			}
+			if i == maxNavigateRedirects-1 {
+				slog.Warn("navigate redirect limit reached",
+					"url", cs.Effects.URL)
+				cs.Effects.Replace = true
+			}
+		}
+	}
 
 	tree := p.cfg.Render(state)
 	html := tree.Render()

@@ -89,6 +89,15 @@ type StatefulConfig[S any] struct {
 	// exists) and during live navigation. Side-effect methods (SetTitle,
 	// Toast, etc.) are always safe to call. During pre-warming, effects
 	// are captured; during navigation, they are sent to the client.
+	//
+	// Redirects are resolved inline: if OnNavigate calls
+	// [Session.Navigate], the framework immediately re-processes the
+	// redirect target within the same event cycle rather than
+	// round-tripping to the client. This makes redirects instant and
+	// eliminates the risk of navigation loops. The redirect chain is
+	// capped at 5 steps; exceeding the cap emits a
+	// [NavigateRedirectLoop] diagnostic. The final URL is sent to the
+	// client as a history replacement.
 	OnNavigate func(session Session, state S, params Params) S
 
 	// OnConnect is called after a new session is created, its transport

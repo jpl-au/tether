@@ -49,8 +49,9 @@ type StatelessConfig[S any] struct {
 	Middleware []Middleware[S]
 
 	// OnNavigate processes URL parameters on every request. Called
-	// after State on both GET and POST. Same signature as
-	// [StatefulConfig].OnNavigate. Optional.
+	// after State on both GET and POST. Same signature and redirect
+	// behaviour as [StatefulConfig].OnNavigate - redirects via
+	// [Session.Navigate] are resolved inline. Optional.
 	OnNavigate func(session Session, state S, params Params) S
 
 	// Layout wraps the page content in a full HTML document. Runs on
