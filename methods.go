@@ -24,7 +24,10 @@ func (s *StatefulSession[S]) State() S {
 	if Status(s.status.Load()) != Active {
 		return s.state
 	}
-	return s.stateSnap.Load().(S)
+	if v := s.stateSnap.Load(); v != nil {
+		return v.(S)
+	}
+	return s.state
 }
 
 // Update applies a state change and pushes the resulting diff to the

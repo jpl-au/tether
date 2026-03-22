@@ -64,13 +64,12 @@ type Timeouts struct {
 	// default.
 	BackoffMultiplier float64
 
-	// Jitter adds randomisation to each retry delay to prevent
-	// synchronised reconnection waves (thundering herd) when many
-	// clients reconnect after a server restart. When enabled, each
-	// delay is multiplied by a random factor in [0.5, 1.0), spreading
-	// clients across time instead of concentrating them in bursts.
-	// Defaults to true. Set to the pointer value false to disable.
-	Jitter *bool
+	// DisableJitter turns off the randomisation applied to each retry
+	// delay. Without jitter, all clients that disconnect at the same
+	// time will reconnect in lockstep (thundering herd). With jitter
+	// (the default), each delay is multiplied by a random factor in
+	// [0.5, 1.0), spreading clients across time.
+	DisableJitter bool
 }
 
 // Limits groups capacity constraints for sessions and requests.
@@ -226,7 +225,6 @@ const (
 	defaultRetryDelay        = 500 * time.Millisecond
 	defaultMaxRetryDelay     = 10 * time.Second
 	defaultBackoffMultiplier = 1.5
-	defaultJitter            = true
 	defaultDefaultDebounce   = 300 * time.Millisecond
 	defaultTransitionTimeout = 5 * time.Second
 	defaultFlashDuration     = 5 * time.Second

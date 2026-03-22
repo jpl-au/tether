@@ -26,6 +26,7 @@ func (h *Handler[S]) reapPending() {
 					delete(h.pending, id)
 				}
 			}
+			h.notifyDrain()
 			h.mu.Unlock()
 		}
 	}

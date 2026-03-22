@@ -1,5 +1,22 @@
 # Security
 
+## Security model
+
+Tether secures the transport layer: session integrity, cross-origin
+protection, and safe HTML delivery. Application-level concerns -
+authentication, authorisation, per-IP rate limiting, and Content Security
+Policy - are intentionally left to the developer.
+
+This is a deliberate design choice. These concerns are highly
+application-specific, and a framework that bakes in opinionated defaults
+would either be too restrictive for real applications or too permissive
+to be meaningful. Tether provides the primitives (middleware, capacity
+limits, configuration hooks) so you can implement policies that fit your
+deployment.
+
+The sections below describe what Tether provides and where its
+responsibility ends.
+
 ## TLS is required
 
 Session IDs are bearer tokens - knowing one is sufficient to send events,
@@ -211,6 +228,64 @@ A failure at the fluent render step (e.g. raw user input inserted via
 `UnsafeRaw` without escaping) would result in XSS. The fluent engine is
 the single point of responsibility for escaping - audit it if you use
 `UnsafeRaw` or similar bypass functions.
+
+For dynamic content beyond plain text - such as user-provided HTML
+fragments, inline scripts, or inline styles - fluent provides a
+`security` package with sanitisation utilities (`Sanitise`, `Safe`,
+`SafeScript`, `SafeStyle`). These validate content against known XSS
+patterns before rendering. See the
+[fluent documentation](https://github.com/jpl-au/fluent) for details.
+
+## Developer responsibilities
+
+The following concerns are outside Tether's scope. This is intentional -
+they depend on your application's requirements and deployment
+environment.
+
+### Authentication and authorisation
+
+Tether has no concept of users, roles, or permissions. Sessions are
+anonymous transport channels. To restrict access:
+
+- Use **middleware** to check credentials before the handler runs.
+- Use the **`InitialState` callback** to scope session state to an
+  authenticated user.
+- Implement **authorisation checks** in your event handlers.
+
+### Per-IP rate limiting
+
+The capacity limits (`MaxSessions`, `MaxPending`, `MaxEventBytes`)
+protect against resource exhaustion but do not throttle individual
+clients. For per-IP rate limiting, use your reverse proxy (nginx
+`limit_req`, Cloudflare rate rules) or Go rate-limiting middleware in
+front of the handler.
+
+### Content Security Policy
+
+Tether does not set CSP headers. CSP policies are application-specific -
+they depend on which external resources your application loads, whether
+you use inline scripts or styles, and your tolerance for restrictiveness.
+
+Add CSP headers via your reverse proxy or a middleware wrapper. A
+`script-src 'self'` policy is recommended as defence-in-depth against
+XSS and session ID exfiltration from the DOM.
+
+### Summary
+
+| Concern | Tether provides | Developer responsibility |
+|---------|----------------|------------------------|
+| Session identity | 128-bit crypto random IDs | Treat session IDs as credentials in logs |
+| Session binding | User-Agent verification on reconnect (default on) | - |
+| CSRF | Sec-Fetch-Site + Origin + custom headers, no cookies | Configure `TrustedOrigins` for production |
+| WebSocket origin | Two-layer check (Sec-Fetch-Site then Origin) | Configure `TrustedOrigins` |
+| TLS | - | Deploy behind TLS |
+| Capacity limits | `MaxSessions`, `MaxPending`, `MaxEventBytes` | Set `MaxSessions` in production |
+| Per-IP rate limiting | - | Reverse proxy or Go middleware |
+| HTML escaping | Delegated to fluent's `Text()` (auto-escapes) | Audit any use of `UnsafeRaw` / `RawText` |
+| Content sanitisation | - | Use fluent's `security` package for dynamic content |
+| CSP headers | - | Add via reverse proxy or middleware |
+| Authentication | - | Implement via middleware or `InitialState` |
+| Authorisation | - | Implement via middleware or event handlers |
 
 ---
 

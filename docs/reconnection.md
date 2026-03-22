@@ -33,7 +33,7 @@ All reconnection parameters live on `tether.Timeouts`:
 | `Retry`           | time.Duration | 500ms   | Initial delay before the first reconnect attempt  |
 | `MaxRetry`        | time.Duration | 10s     | Maximum delay between reconnect attempts          |
 | `BackoffMultiplier` | float64     | 1.5     | Multiplier applied to the delay after each failure |
-| `Jitter`          | *bool         | true    | Randomise each delay to prevent synchronised waves |
+| `DisableJitter`   | bool          | false   | Turn off delay randomisation (not recommended)     |
 
 ### Example
 
@@ -43,7 +43,7 @@ tether.Stateful(app, tether.StatefulConfig[State]{
         Retry:             time.Second,
         MaxRetry:          30 * time.Second,
         BackoffMultiplier: 2.0,
-        Jitter:            boolPtr(false), // disable jitter
+        DisableJitter:     true, // not recommended
     },
     // ...
 })

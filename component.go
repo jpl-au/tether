@@ -1,6 +1,7 @@
 package tether
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/jpl-au/fluent/node"
@@ -130,5 +131,10 @@ func RouteTyped[C Component](comp C, prefix string, sess Session, ev Event) C {
 	if !strings.HasPrefix(ev.Action, target) {
 		return comp
 	}
-	return comp.Handle(sess, ev.WithAction(strings.TrimPrefix(ev.Action, target))).(C)
+	result := comp.Handle(sess, ev.WithAction(strings.TrimPrefix(ev.Action, target)))
+	c, ok := result.(C)
+	if !ok {
+		panic(fmt.Sprintf("tether: RouteTyped: %T.Handle returned %T, expected %T", comp, result, comp))
+	}
+	return c
 }

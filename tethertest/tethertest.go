@@ -245,6 +245,9 @@ func (h *Harness[S]) Render() string {
 // inspecting the tree structure directly. Panics if Render was not
 // configured.
 func (h *Harness[S]) RenderNode() node.Node {
+	if h.render == nil {
+		panic("tethertest: RenderNode called but Render is not configured")
+	}
 	return h.render(h.state)
 }
 

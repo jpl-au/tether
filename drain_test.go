@@ -69,6 +69,7 @@ func TestDrainReturnsWhenEmpty(t *testing.T) {
 			active:       make(map[string]*StatefulSession[counterState]),
 			disconnected: make(map[string]*StatefulSession[counterState]),
 			done:         make(chan struct{}),
+			drainNotify:  make(chan struct{}, 1),
 		}
 
 		ctx := context.Background()
@@ -87,6 +88,7 @@ func TestDrainReturnsWhenContextCancelled(t *testing.T) {
 		active:       map[string]*StatefulSession[counterState]{"a": {}},
 		disconnected: make(map[string]*StatefulSession[counterState]),
 		done:         make(chan struct{}),
+		drainNotify:  make(chan struct{}, 1),
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)

@@ -126,6 +126,15 @@ func Stateful[S any](app App, cfg StatefulConfig[S]) *Handler[S] {
 	if cfg.Limits.CmdBufferSize == 0 {
 		cfg.Limits.CmdBufferSize = defaultCmdBufferSize
 	}
+
+	// Validate boundaries now that defaults are applied.
+	if cfg.Timeouts.Retry > cfg.Timeouts.MaxRetry {
+		panic("tether: Timeouts.Retry must not exceed Timeouts.MaxRetry")
+	}
+	if cfg.Timeouts.BackoffMultiplier > 10 {
+		panic("tether: Timeouts.BackoffMultiplier must not exceed 10")
+	}
+
 	if cfg.Limits.MaxSessions == 0 && !app.DevMode {
 		slog.Warn("tether: Limits.MaxSessions is 0 (unlimited) - set a limit in production to prevent resource exhaustion")
 	}
@@ -143,6 +152,7 @@ func Stateful[S any](app App, cfg StatefulConfig[S]) *Handler[S] {
 		active:        make(map[string]*StatefulSession[S]),
 		disconnected:  make(map[string]*StatefulSession[S]),
 		done:          make(chan struct{}),
+		drainNotify:   make(chan struct{}, 1),
 		encoder:       resolveEncoder(cfg.WireFormat),
 		clientHandler: app.jsHandler(),
 		assetMounts:   mounts,

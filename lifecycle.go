@@ -84,6 +84,7 @@ func (h *Handler[S]) thaw(sess *StatefulSession[S], r *http.Request, transport T
 		// Cannot restore - destroy the frozen stub.
 		h.mu.Lock()
 		delete(h.active, sess.id)
+		h.notifyDrain()
 		h.mu.Unlock()
 		h.destroySession(sess)
 		transport.Close()
@@ -101,6 +102,7 @@ func (h *Handler[S]) thaw(sess *StatefulSession[S], r *http.Request, transport T
 		})
 		h.mu.Lock()
 		delete(h.active, sess.id)
+		h.notifyDrain()
 		h.mu.Unlock()
 		h.destroySession(sess)
 		transport.Close()
@@ -119,6 +121,7 @@ func (h *Handler[S]) thaw(sess *StatefulSession[S], r *http.Request, transport T
 		})
 		h.mu.Lock()
 		delete(h.active, sess.id)
+		h.notifyDrain()
 		h.mu.Unlock()
 		h.destroySession(sess)
 		transport.Close()
@@ -203,6 +206,7 @@ func (h *Handler[S]) wireDisconnect(sess *StatefulSession[S]) {
 		if !destroy {
 			h.disconnected[sess.id] = sess
 		}
+		h.notifyDrain()
 		h.mu.Unlock()
 
 		// destroySession calls g.Remove which may fire OnLeave
@@ -220,6 +224,7 @@ func (h *Handler[S]) wireDisconnect(sess *StatefulSession[S]) {
 	sess.onTimeout = func() {
 		h.mu.Lock()
 		delete(h.disconnected, sess.id)
+		h.notifyDrain()
 		h.mu.Unlock()
 		h.destroySession(sess)
 	}

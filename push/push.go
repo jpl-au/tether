@@ -236,7 +236,7 @@ func (s *Sender) Send(sub Subscription, n Notification) error {
 	if err != nil {
 		return fmt.Errorf("push: send request: %w", err)
 	}
-	resp.Body.Close()
+	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusGone {
 		return ErrSubscriptionExpired

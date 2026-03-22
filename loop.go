@@ -333,6 +333,13 @@ func (s *StatefulSession[S]) saveSessionState(ctx context.Context, ttl time.Dura
 // reaper can destroy the session if it is never thawed. For
 // destroyed sessions, everything is stopped and the destroyed
 // channel is closed.
+//
+// The destroyed channel has split ownership: cleanup() closes it for
+// sessions that reach Destroyed via the normal path (context
+// cancelled). For frozen sessions, cleanup() returns early and
+// [Handler.destroySession] closes it instead when the session is
+// permanently removed. Both paths are mutually exclusive - a session
+// is either frozen or not - so a double-close cannot occur.
 func (s *StatefulSession[S]) cleanup() {
 	if s.idleTimer != nil {
 		s.idleTimer.Stop()

@@ -1,9 +1,6 @@
 package tether
 
-import (
-	"context"
-	"time"
-)
+import "context"
 
 // Compile-time check: *Handler must satisfy Drainable.
 var _ Drainable = (*Handler[struct{}])(nil)
@@ -20,20 +17,33 @@ var _ Drainable = (*Handler[struct{}])(nil)
 func (h *Handler[S]) Drain(ctx context.Context) error {
 	h.draining.Store(true)
 
-	ticker := time.NewTicker(500 * time.Millisecond)
-	defer ticker.Stop()
+	// Check immediately in case all pools are already empty.
+	h.mu.Lock()
+	empty := len(h.pending) == 0 && len(h.active) == 0 && len(h.disconnected) == 0
+	h.mu.Unlock()
+	if empty {
+		return nil
+	}
 
-	for {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-h.drainNotify:
+		return nil
+	}
+}
+
+// notifyDrain sends a non-blocking signal to drainNotify when all
+// pools are empty and draining is active. Must be called while h.mu
+// is held.
+func (h *Handler[S]) notifyDrain() {
+	if h.drainNotify == nil {
+		return
+	}
+	if h.draining.Load() && len(h.pending) == 0 && len(h.active) == 0 && len(h.disconnected) == 0 {
 		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-ticker.C:
-			h.mu.Lock()
-			empty := len(h.pending) == 0 && len(h.active) == 0 && len(h.disconnected) == 0
-			h.mu.Unlock()
-			if empty {
-				return nil
-			}
+		case h.drainNotify <- struct{}{}:
+		default:
 		}
 	}
 }
