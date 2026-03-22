@@ -189,6 +189,11 @@ type StatefulSession[S any] struct {
 	// integrity. Set from StatefulConfig.OnPanic.
 	onPanic func(*StatefulSession[S], error)
 
+	// onCommandDropped is called when a command is dropped because
+	// the buffer and overflow semaphore are both full. When nil,
+	// the session is destroyed. Set from StatefulConfig.OnCommandDropped.
+	onCommandDropped func(*StatefulSession[S])
+
 	// freeze is true when FreezeOnDisconnect is enabled and a
 	// SessionStore is configured. When set, the session persists
 	// state to the store on disconnect, releases S and the differ,
@@ -426,12 +431,25 @@ func (s *StatefulSession[S]) enqueueFx(fn func(*Effects)) {
 				}
 			}()
 		default:
-			s.emitDiagnostic(Diagnostic{
-				Kind:      CommandDropped,
-				SessionID: s.id,
-				Detail:    s.endpoint,
-			})
+			s.commandDropped()
 		}
+	}
+}
+
+// commandDropped handles the case where both the command buffer and
+// overflow semaphore are full. By default the session is destroyed
+// to prevent silent client drift. If OnCommandDropped is set, the
+// developer handles it instead.
+func (s *StatefulSession[S]) commandDropped() {
+	s.emitDiagnostic(Diagnostic{
+		Kind:      CommandDropped,
+		SessionID: s.id,
+		Detail:    s.endpoint,
+	})
+	if s.onCommandDropped != nil {
+		s.onCommandDropped(s)
+	} else {
+		s.stop()
 	}
 }
 
@@ -491,7 +509,8 @@ func (s *StatefulSession[S]) sendFx(fx *Effects) {
 //
 // The number of overflow goroutines is capped by a semaphore sized to
 // CmdBufferSize. If both the buffer and the semaphore are full, the
-// command is dropped and a [CommandDropped] diagnostic is emitted.
+// command is dropped and the session is destroyed unless the developer
+// has set [StatefulConfig.OnCommandDropped].
 func (s *StatefulSession[S]) enqueue(fn func()) {
 	if Status(s.status.Load()) == Frozen {
 		return
@@ -510,11 +529,7 @@ func (s *StatefulSession[S]) enqueue(fn func()) {
 				}
 			}()
 		default:
-			s.emitDiagnostic(Diagnostic{
-				Kind:      CommandDropped,
-				SessionID: s.id,
-				Detail:    s.endpoint,
-			})
+			s.commandDropped()
 		}
 	}
 }

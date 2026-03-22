@@ -312,6 +312,18 @@ type StatefulConfig[S any] struct {
 	// fast. Optional.
 	OnPanic func(session *StatefulSession[S], err error)
 
+	// OnCommandDropped is called when a session's command buffer and
+	// overflow semaphore are both full and a command must be
+	// discarded. When nil (the default), the session is destroyed
+	// because a client that cannot keep up will silently drift out
+	// of sync. The client reconnects and gets a fresh page load.
+	//
+	// Set this to opt into custom handling. The callback runs in
+	// the caller's goroutine (not the session's command loop, which
+	// is backed up). Keep it fast. If set, the session is kept
+	// alive after the callback returns. Optional.
+	OnCommandDropped func(session *StatefulSession[S])
+
 	// Freeze enables frozen mode for disconnected sessions. When
 	// set, a session that loses its transport persists state S to
 	// the [SessionStore], releases the state and differ from
