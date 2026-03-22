@@ -172,18 +172,20 @@ h.Diagnostics.SubscribeAsync(ctx, func(d tether.Diagnostic) {
 | `TransportError` | Failure reading from or writing to the transport. Normal disconnects (io.EOF) are not emitted |
 | `EncodeError` | JSON serialisation failure - usually an unencodable type in state or render output |
 | `BufferOverflow` | Command channel was full; an overflow goroutine was spawned to deliver the command |
-| `CommandDropped` | Both the command buffer and the overflow goroutine cap were exhausted - data was lost |
-| `HandlerPanic` | Recovered panic inside Handle, Update, or a command callback |
+| `CommandDropped` | Both the command buffer and the overflow goroutine cap were exhausted. By default the session is destroyed to prevent silent client drift. Set `OnCommandDropped` to override |
+| `HandlerPanic` | Recovered panic inside Handle, Update, or a command callback. By default the session is destroyed because state may be corrupted. Set `OnPanic` to override |
 | `UploadError` | Failure or recovered panic in an upload handler callback |
 | `SessionBindingFailed` | A reconnect or session claim was rejected because the User-Agent did not match the original |
 | `StoreError` | Failure saving or deleting differ snapshots from the configured DiffStore. The Detail field indicates the operation ("save" or "delete"). Store failures are non-fatal - the framework falls back to in-memory behaviour |
 | `SessionStoreError` | Failure saving, loading, or deleting session state from the configured SessionStore. The Detail field indicates the operation ("save", "load", "delete", "marshal", "unmarshal", or "envelope"). Non-fatal - the framework continues with in-memory state |
 
 `BufferOverflow` means the system coped (spawned a goroutine). `CommandDropped`
-means data was lost - the session is critically overwhelmed. Sustained overflow
-usually indicates a blocking `HandleFunc` or a broadcast rate exceeding the
-session's processing speed. Increase `Limits.CmdBufferSize` or move slow work
-into `StatefulSession.Go`.
+means the session was critically overwhelmed - by default it is destroyed to
+prevent silent client drift. To keep the session alive on drop, set
+`StatefulConfig.OnCommandDropped`. Sustained overflow usually indicates a
+blocking `HandleFunc` or a broadcast rate exceeding the session's processing
+speed. Increase `Limits.CmdBufferSize` or move slow work into
+`StatefulSession.Go`.
 
 The overflow goroutine count is capped by a semaphore sized to `CmdBufferSize`,
 preventing unbounded goroutine growth under sustained pressure.

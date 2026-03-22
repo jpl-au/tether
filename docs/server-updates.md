@@ -182,7 +182,7 @@ When `OnNoPatch` is nil and DevMode is active, the framework logs a debug messag
 
 ### DevMode warnings
 
-If a handler or Update callback panics after calling `Toast()`, `Signal()`, or `Navigate()`, those buffered effects are discarded. In DevMode, a warning explains what was dropped:
+If a handler or Update callback panics, the session is destroyed by default because the state may contain partially mutated maps or slices that cannot be trusted. Any buffered effects (`Toast()`, `Signal()`, `Navigate()`) are discarded. Set `StatefulConfig.OnPanic` to opt into custom recovery - the callback receives the session and the error, and the session is kept alive. In DevMode, a warning explains what was dropped:
 
 ```
 level=WARN msg="side effects discarded due to handler panic - any Toast, Signal, or Navigate calls before the panic were dropped"
@@ -196,7 +196,7 @@ Signals (`sess.Signal`, `bind.BindText`, `bind.BindShow`, etc.) update bound ele
 
 ## Background goroutines
 
-Use `Session.Go` to launch background work tied to a session's lifetime. The context is cancelled when the session is permanently destroyed (reaped or shutdown), but survives temporary disconnects:
+Use `Session.Go` to launch background work tied to the transport's lifetime. The context is cancelled when the client disconnects or the session freezes. On reconnect, `OnConnect`/`OnRestore` fires again and can spawn fresh goroutines - no duplicates accumulate:
 
 ```go
 OnConnect: func(s *tether.StatefulSession[State]) {
@@ -220,7 +220,17 @@ OnConnect: func(s *tether.StatefulSession[State]) {
 
 No global maps, no done channels, no OnDisconnect cleanup needed.
 
-`Session.Context()` returns the context directly for passing to database queries, HTTP clients, or other context-aware APIs.
+For the rare case where a goroutine must survive disconnects (e.g. a long-running database migration), use `Session.Context()` directly:
+
+```go
+go func(ctx context.Context) {
+    // This goroutine lives until the session is permanently destroyed.
+    result := expensiveMigration(ctx)
+    sess.Update(func(s State) State { s.Result = result; return s })
+}(sess.Context())
+```
+
+`Session.Context()` returns the session-lifetime context - cancelled only on permanent destruction (reaper, shutdown, or explicit close).
 
 ## Session methods
 

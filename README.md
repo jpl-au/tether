@@ -151,7 +151,7 @@ for details and examples.
 | [Broadcasting](docs/broadcasting.md) | Groups, broadcast, presence |
 | [Extensions](docs/extensions.md) | File uploads, service worker, push notifications |
 | [SessionStore](docs/session-store.md) | Session state persistence for crash recovery and node migration |
-| [Frozen mode](docs/frozen-mode.md) | Zero-memory disconnected sessions via FreezeOnDisconnect |
+| [Frozen mode](docs/frozen-mode.md) | Zero-memory disconnected sessions via `Freeze` |
 | [DiffStore](docs/store.md) | External snapshot persistence for disconnected sessions |
 | [Transport](docs/transport.md) | WebSocket, SSE, resilience |
 | [Push notifications](docs/push-notifications.md) | Web Push with VAPID |

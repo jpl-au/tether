@@ -10,10 +10,10 @@ import (
 	"github.com/jpl-au/tether/mode"
 )
 
-// TestFreezeOnDisconnect verifies that a session with freeze enabled
-// transitions to Frozen status, persists state to the store, and
-// nils out the differ after the transport closes.
-func TestFreezeOnDisconnect(t *testing.T) {
+// TestFreeze verifies that a session with freeze enabled transitions
+// to Frozen status, persists state to the store, and nils out the
+// differ after the transport closes.
+func TestFreeze(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		store := newSessionFileStore(t)
 		mt := &mockTransport{

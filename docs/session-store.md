@@ -30,8 +30,8 @@ These are independent concerns:
 A developer may use one without the other, both, or neither.
 
 SessionStore is also required for [frozen mode](frozen-mode.md)
-(`FreezeOnDisconnect`), which releases all session memory on
-disconnect and restores from the store on reconnect.
+(`Freeze`), which releases all session memory on disconnect and
+restores from the store on reconnect.
 
 ## The interface
 

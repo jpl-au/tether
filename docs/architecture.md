@@ -142,7 +142,7 @@ Sessions move through three pools managed by the Handler:
                  Disconnected ──────┘
               (waiting to reconnect)
                       │
-                      ├── FreezeOnDisconnect ──► Frozen ──► thaw ──► Active
+                      ├── Freeze enabled ──► Frozen ──► thaw ──► Active
                       │                       (zero memory)    │
            reconnect timeout fires              reconnect timeout fires
                       │                                        │
@@ -156,7 +156,7 @@ Sessions move through three pools managed by the Handler:
 
 **Disconnected** sessions have lost their transport but remain alive for `Timeouts.Reconnect` (default 30s). The command loop keeps running - `Update`, `Broadcast`, and timer callbacks continue to modify state. When a DiffStore is configured, differ snapshots are saved to external storage on disconnect and cleared from memory, reducing per-session overhead during the reconnect window. When a SessionStore is configured, application state `S` and session metadata are saved for crash recovery. When the client reconnects to the same node, the session is reattached: the transport is swapped, store entries are deleted (Render re-seeds the differ), a full re-render is sent to catch the client up, and the browser's URL and title are replayed (they live outside the DOM and would otherwise desync). When the client reconnects after a server restart (crash recovery), the framework restores the session from the SessionStore, fires `OnRestore` (or `OnConnect` as fallback), and sends a full update.
 
-**Frozen** sessions are disconnected sessions with `FreezeOnDisconnect` enabled. Instead of keeping the command loop running, the session persists state `S` to the SessionStore, releases state and the differ from memory, and exits the command loop. The session becomes a lightweight stub holding only its ID, endpoint, and metadata. Commands and effects sent to a frozen session are silently discarded. On reconnect, the framework loads state from the SessionStore, rebuilds the differ, starts a fresh command loop, and fires `OnRestore` (or `OnConnect` as fallback). See [frozen mode](frozen-mode.md) for details.
+**Frozen** sessions are disconnected sessions with `Freeze` enabled (see [FreezeMode](frozen-mode.md)). Instead of keeping the command loop running, the session persists state `S` to the SessionStore, releases state and the differ from memory, and exits the command loop. The session becomes a lightweight stub holding only its ID, endpoint, and metadata. Commands and effects sent to a frozen session are silently discarded. On reconnect, the framework loads state from the SessionStore, rebuilds the differ, starts a fresh command loop, and fires `OnRestore` (or `OnConnect` as fallback depending on the `FreezeMode`). See [frozen mode](frozen-mode.md) for details.
 
 ## Transport abstraction
 

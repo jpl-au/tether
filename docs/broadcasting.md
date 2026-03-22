@@ -140,8 +140,8 @@ bus.Subscribe(ctx, func(msg MessageSent) {
     metrics.Counter("messages").Inc()
 })
 
-// Asynchronous - callback runs in its own goroutine per event.
-// Safe for I/O (database writes, HTTP calls, logging).
+// Asynchronous - callback runs in its own goroutine, bounded
+// by a semaphore (default 64 workers). Safe for I/O.
 bus.SubscribeAsync(ctx, func(msg MessageSent) {
     db.InsertAuditLog(ctx, msg)
 })

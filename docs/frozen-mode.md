@@ -25,27 +25,63 @@ Frozen mode is ideal for:
 
 ## Configuration
 
+The `Freeze` field accepts a `FreezeMode` value. Zero (the default)
+disables freeze entirely.
+
+### FreezeWithRestore (recommended)
+
+Requires `OnRestore` to be set. The developer must re-fetch
+authoritative state from the database or other source on thaw. The
+framework panics at startup if `OnRestore` is nil.
+
 ```go
 tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
     // ... Render, Handle, etc.
 
-    SessionStore:       myStore,    // required - state must persist somewhere
-    FreezeOnDisconnect: true,
+    SessionStore: myStore,
+    Freeze:       tether.FreezeWithRestore,
 
-    // OnRestore fires when a frozen session is thawed. Use it to
-    // re-establish runtime resources (rejoin groups, restart timers).
-    // Falls back to OnConnect when nil.
     OnRestore: func(sess *tether.StatefulSession[State]) {
-        // Rejoin groups, restart watchers, etc.
+        // Re-fetch state from the database, rejoin groups,
+        // restart timers. The store snapshot may be stale -
+        // always re-fetch authoritative data here.
     },
 })
 ```
 
-`FreezeOnDisconnect` requires a `SessionStore`. If the store is nil,
-the framework logs a warning at startup and disables freeze:
+### FreezeWithConnect
+
+Falls back to `OnConnect` on thaw. Use this when `OnConnect` already
+performs full initialisation and a dedicated `OnRestore` is not needed.
+The developer accepts that the restored snapshot may be stale if
+domain events occurred while frozen.
+
+```go
+tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
+    // ... Render, Handle, etc.
+
+    SessionStore: myStore,
+    Freeze:       tether.FreezeWithConnect,
+
+    OnConnect: func(sess *tether.StatefulSession[State]) {
+        // Same setup for new and restored sessions.
+    },
+})
+```
+
+### Validation
+
+`Freeze` requires a `SessionStore`. The framework panics at startup
+if the store is nil:
 
 ```
-WARN tether: FreezeOnDisconnect requires a SessionStore - frozen mode disabled because there is nowhere to persist state
+panic: tether: Freeze requires a SessionStore
+```
+
+`FreezeWithRestore` additionally requires `OnRestore`:
+
+```
+panic: tether: FreezeWithRestore requires OnRestore - implement OnRestore to re-fetch state, or use FreezeWithConnect to fall back to OnConnect
 ```
 
 ## Lifecycle

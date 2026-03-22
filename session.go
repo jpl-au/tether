@@ -200,10 +200,10 @@ type StatefulSession[S any] struct {
 	// the session is destroyed. Set from StatefulConfig.OnCommandDropped.
 	onCommandDropped func(*StatefulSession[S])
 
-	// freeze is true when FreezeOnDisconnect is enabled and a
-	// SessionStore is configured. When set, the session persists
-	// state to the store on disconnect, releases S and the differ,
-	// and exits the command loop - reducing memory to metadata only.
+	// freeze is true when Freeze is enabled and a SessionStore is
+	// configured. When set, the session persists state to the store
+	// on disconnect, releases S and the differ, and exits the
+	// command loop - reducing memory to metadata only.
 	freeze bool
 
 	// diagnostics is the handler's diagnostic bus. The session emits

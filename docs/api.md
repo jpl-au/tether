@@ -141,8 +141,10 @@ When either callback is configured, the framework's own logging for that event i
 | `DiffStore` | `DiffStore` | External persistence for disconnected session snapshots (opt-in, nil by default). See [store](store.md) |
 | `SessionStore` | `SessionStore` | External persistence for session state - enables crash recovery and node migration (opt-in, nil by default). See [session-store](session-store.md) |
 | `Codec` | `SessionCodec[S]` | Custom serialisation for state `S` (nil = CBOR). Only used when SessionStore is set |
-| `OnRestore` | `func(*StatefulSession[S])` | Called instead of OnConnect when a session is restored from the SessionStore. Falls back to OnConnect when nil |
-| `FreezeOnDisconnect` | `bool` | When true, disconnected sessions persist state to the SessionStore, release memory, and exit the command loop. Requires SessionStore. See [frozen mode](frozen-mode.md) |
+| `OnRestore` | `func(*StatefulSession[S])` | Called instead of OnConnect when a session is restored from the SessionStore |
+| `OnPanic` | `func(*StatefulSession[S], error)` | Called when a panic occurs during Handle or Update. When nil (default), the session is destroyed to prevent corrupted state. When set, the session survives and the developer assumes responsibility |
+| `OnCommandDropped` | `func(*StatefulSession[S])` | Called when a command is dropped because buffers are full. When nil (default), the session is destroyed to prevent silent drift. When set, the developer handles it |
+| `Freeze` | `FreezeMode` | Frozen mode for disconnected sessions. `FreezeWithRestore` requires OnRestore; `FreezeWithConnect` falls back to OnConnect. Zero disables. See [frozen mode](frozen-mode.md) |
 | `Protocol` | `protocol.Protocol` | HTTP protocol (default `protocol.Auto` - detects per request). See [transport](transport.md#protocol-awareness) |
 | `WireFormat` | `wire.Format` | Encoding for server-to-client updates (default `wire.JSON`) |
 
@@ -170,8 +172,8 @@ s.Update(func(s State) State {  // mutate state from outside Handle
     return s
 })
 s.ID()                          // unique session identifier
-s.Context()                     // cancelled on permanent destruction
-s.Go(func(ctx context.Context) { ... }) // goroutine bound to session lifetime
+s.Context()                     // cancelled on permanent destruction (session lifetime)
+s.Go(func(ctx context.Context) { ... }) // goroutine bound to transport lifetime (stops on disconnect)
 s.Close()                       // close the transport connection
 ```
 
@@ -572,6 +574,28 @@ Typed pub/sub for cross-session communication. Create one per event type at prog
 var messages = tether.NewBus[MessageSent]()
 ```
 
+An optional `BusConfig` can customise async subscriber behaviour:
+
+```go
+var events = tether.NewBus[Event](tether.BusConfig{
+    AsyncWorkers:  128,           // default 64
+    AsyncOverflow: tether.Drop,   // default Block
+})
+```
+
+| `BusConfig` field | Type | Default | Description |
+|-------------------|------|---------|-------------|
+| `AsyncWorkers` | `int` | 64 | Maximum concurrent goroutines for async subscribers |
+| `AsyncOverflow` | `AsyncOverflow` | `Block` | What happens when all worker slots are full |
+
+`AsyncOverflow` constants:
+
+| Value | Behaviour |
+|-------|-----------|
+| `Block` | Wait for a slot. No data loss, but the publisher stalls |
+| `Drop` | Discard the event and log a warning. Publisher never stalls |
+| `Inline` | Run the callback synchronously in the publisher's goroutine |
+
 ### Publishing
 
 ```go
@@ -594,7 +618,7 @@ cancel := bus.Subscribe(ctx, func(msg ChatMessage) { ... })
 cancel := bus.SubscribeAsync(ctx, func(msg ChatMessage) { ... })
 ```
 
-`Subscribe` runs the callback synchronously in the publisher's goroutine - it must not block. `SubscribeAsync` spawns a goroutine per event, isolating the publisher from slow callbacks. Use `SubscribeAsync` for external consumers that perform database writes, HTTP calls, or other I/O.
+`Subscribe` runs the callback synchronously in the publisher's goroutine - it must not block. `SubscribeAsync` dispatches each event to a goroutine bounded by a semaphore (default 64 workers, configurable via `BusConfig.AsyncWorkers`). When all slots are full, the `BusConfig.AsyncOverflow` strategy applies: `Block` (wait), `Drop` (discard), or `Inline` (run synchronously). Use `SubscribeAsync` for external consumers that perform database writes, HTTP calls, or other I/O.
 
 Session-aware subscription via `tether.On` - the primary way to connect a Bus to a session:
 
