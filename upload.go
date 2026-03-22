@@ -1,16 +1,24 @@
 package tether
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"mime"
 	"mime/multipart"
 	"net/http"
+	"path/filepath"
 	"strings"
 )
 
 // defaultMaxUploadSize is used when UploadConfig.MaxSize is zero.
 const defaultMaxUploadSize = 10 << 20 // 10 MB
+
+// multipartMemory is the threshold passed to ParseMultipartForm. Data
+// beyond this is spilled to temporary files on disk. This is
+// deliberately much smaller than MaxSize so large uploads don't
+// consume unbounded RAM.
+const multipartMemory = 32 << 20 // 32 MB
 
 // UploadConfig enables file upload support. When set on [StatefulConfig], the
 // handler accepts multipart POST requests from the upload extension JS
@@ -25,6 +33,13 @@ type UploadConfig[S any] struct {
 	// MaxSize is the maximum upload size in bytes. Requests
 	// exceeding this limit are rejected with 413. Default 10 MB.
 	MaxSize int64
+
+	// MaxMemory is the maximum number of bytes held in RAM during
+	// multipart parsing. Data beyond this threshold is spilled to
+	// temporary files on disk. This is deliberately separate from
+	// MaxSize so large uploads don't consume unbounded RAM. Zero
+	// defaults to 32 MB.
+	MaxMemory int64
 
 	// Accept is a list of allowed MIME type patterns (e.g.
 	// "image/*", "application/pdf"). When empty, all types are
@@ -91,8 +106,13 @@ func (h *Handler[S]) handleUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, maxSize)
 
-	if err := r.ParseMultipartForm(maxSize); err != nil {
-		if err.Error() == "http: request body too large" {
+	memLimit := h.cfg.Upload.MaxMemory
+	if memLimit == 0 {
+		memLimit = multipartMemory
+	}
+	if err := r.ParseMultipartForm(memLimit); err != nil {
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
 			http.Error(w, "file too large", http.StatusRequestEntityTooLarge)
 			return
 		}
@@ -114,7 +134,7 @@ func (h *Handler[S]) handleUpload(w http.ResponseWriter, r *http.Request) {
 					Kind:      UploadRejected,
 					SessionID: id,
 					Err:       fmt.Errorf("content type %q not in %v", ct, h.cfg.Upload.Accept),
-					Detail:    fh.Filename,
+					Detail:    filepath.Base(fh.Filename),
 				})
 				r.MultipartForm.RemoveAll()
 				http.Error(w, "file type not allowed", http.StatusUnsupportedMediaType)
@@ -122,7 +142,7 @@ func (h *Handler[S]) handleUpload(w http.ResponseWriter, r *http.Request) {
 			}
 			uploads = append(uploads, Upload{
 				Action:      action,
-				Name:        fh.Filename,
+				Name:        filepath.Base(fh.Filename),
 				Size:        fh.Size,
 				ContentType: ct,
 				header:      fh,
