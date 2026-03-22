@@ -243,6 +243,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 
 	now := time.Now()
 	ctx, cancel := context.WithCancel(context.Background())
+	tctx, tcancel := context.WithCancel(ctx)
 	sess := &StatefulSession[S]{
 		id:               id,
 		state:            state,
@@ -251,6 +252,8 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		differ:           differ,
 		encoder:          h.encoder,
 		transport:        transport,
+		transportCtx:     tctx,
+		transportCancel:  tcancel,
 		events:           make(chan Event),
 		cmds:             make(chan func(), h.cfg.Limits.CmdBufferSize),
 		fxCh:             make(chan func(*Effects), h.cfg.Limits.CmdBufferSize),
@@ -429,6 +432,7 @@ func (h *Handler[S]) restoreSession(id string, r *http.Request, transport Transp
 
 	now := time.Now()
 	ctx, cancel := context.WithCancel(context.Background())
+	tctx, tcancel := context.WithCancel(ctx)
 	sess := &StatefulSession[S]{
 		id:               id,
 		state:            state,
@@ -437,6 +441,8 @@ func (h *Handler[S]) restoreSession(id string, r *http.Request, transport Transp
 		differ:           differ,
 		encoder:          h.encoder,
 		transport:        transport,
+		transportCtx:     tctx,
+		transportCancel:  tcancel,
 		events:           make(chan Event),
 		cmds:             make(chan func(), h.cfg.Limits.CmdBufferSize),
 		fxCh:             make(chan func(*Effects), h.cfg.Limits.CmdBufferSize),

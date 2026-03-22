@@ -1,6 +1,7 @@
 package tether
 
 import (
+	"context"
 	"net/http"
 
 	jit "github.com/jpl-au/fluent-jit"
@@ -61,6 +62,7 @@ func (h *Handler[S]) reattach(sess *StatefulSession[S], transport Transport) {
 	case sess.cmds <- func() {
 
 		sess.transport = transport
+		sess.transportCtx, sess.transportCancel = context.WithCancel(sess.ctx)
 		sess.events = make(chan Event)
 		go sess.readTransport(sess.events)
 
@@ -215,6 +217,7 @@ func (h *Handler[S]) thaw(sess *StatefulSession[S], r *http.Request, transport T
 	sess.state = state
 	sess.differ = differ
 	sess.transport = transport
+	sess.transportCtx, sess.transportCancel = context.WithCancel(sess.ctx)
 	sess.events = make(chan Event)
 	sess.cmds = make(chan func(), h.cfg.Limits.CmdBufferSize)
 	sess.fxCh = make(chan func(*Effects), h.cfg.Limits.CmdBufferSize)

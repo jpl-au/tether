@@ -208,22 +208,25 @@ func handleCounter(_ Session, state counterState, ev Event) counterState {
 func newTestSession(state counterState, mt Transport) *StatefulSession[counterState] {
 	differ := jit.NewDiffer()
 	ctx, cancel := context.WithCancel(context.Background())
+	tctx, tcancel := context.WithCancel(ctx)
 	sess := &StatefulSession[counterState]{
-		id:          "test",
-		state:       state,
-		render:      renderCounter,
-		handle:      handleCounter,
-		differ:      differ,
-		encoder:     wire.JSONEncoder{},
-		transport:   mt,
-		events:      make(chan Event),
-		cmds:        make(chan func(), defaultCmdBufferSize),
-		fxCh:        make(chan func(*Effects), defaultCmdBufferSize),
-		overflowSem: make(chan struct{}, defaultCmdBufferSize),
-		loopDone:    make(chan struct{}),
-		destroyed:   make(chan struct{}),
-		ctx:         ctx,
-		stop:        cancel,
+		id:              "test",
+		state:           state,
+		render:          renderCounter,
+		handle:          handleCounter,
+		differ:          differ,
+		encoder:         wire.JSONEncoder{},
+		transport:       mt,
+		transportCtx:    tctx,
+		transportCancel: tcancel,
+		events:          make(chan Event),
+		cmds:            make(chan func(), defaultCmdBufferSize),
+		fxCh:            make(chan func(*Effects), defaultCmdBufferSize),
+		overflowSem:     make(chan struct{}, defaultCmdBufferSize),
+		loopDone:        make(chan struct{}),
+		destroyed:       make(chan struct{}),
+		ctx:             ctx,
+		stop:            cancel,
 	}
 	tree := sess.render(sess.state)
 	differ.Render(tree)

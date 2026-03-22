@@ -275,6 +275,9 @@ func (s *StatefulSession[S]) onTransportClose() {
 	)
 	s.transport.Close()
 	s.transport = nil
+	if s.transportCancel != nil {
+		s.transportCancel()
+	}
 
 	if s.reconnectTimeout > 0 {
 		dev.Debug("disconnect timer started",

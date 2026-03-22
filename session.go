@@ -75,6 +75,12 @@ type StatefulSession[S any] struct {
 	// Session lifetime - cancelled on permanent destruction.
 	ctx  context.Context
 	stop context.CancelFunc
+	// Transport lifetime - cancelled when the transport drops
+	// (disconnect or freeze). Recreated on reattach and thaw.
+	// Go() passes this context so background goroutines stop
+	// when the client is no longer connected.
+	transportCtx    context.Context
+	transportCancel context.CancelFunc
 	// loopDone is closed each time run() exits. The HTTP handler
 	// goroutine blocks on this so it can return when the transport
 	// is no longer needed. A frozen session closes loopDone on
@@ -389,18 +395,23 @@ func (s *StatefulSession[S]) Context() context.Context {
 	return context.Background()
 }
 
-// Go launches a goroutine bound to the session's lifetime. The
-// context passed to fn is cancelled when the session is permanently
-// destroyed (reaped or shutdown). Use this in OnConnect for background
-// work like tickers, watchers, or change listeners that should stop
-// when the session is gone.
+// Go launches a goroutine bound to the transport's lifetime. The
+// context passed to fn is cancelled when the client disconnects or
+// the session freezes. Use this in OnConnect for background work
+// like tickers, watchers, or change listeners that should stop
+// when the client is no longer connected.
 //
-// The goroutine must respect context cancellation. [Handler.Shutdown]
-// waits for the session's command loop to exit but does not wait for
-// goroutines started via Go. A goroutine that ignores the context
-// will leak and may race with the final state save during shutdown.
+// On reconnect or thaw, OnConnect/OnRestore fires again and can
+// spawn fresh goroutines. This prevents duplicate goroutines from
+// accumulating across disconnect/reconnect cycles.
+//
+// For goroutines that must survive disconnects (rare), use
+// [StatefulSession.Context] directly: go fn(sess.Context()).
+//
+// The goroutine must respect context cancellation. A goroutine
+// that ignores the context will leak.
 func (s *StatefulSession[S]) Go(fn func(ctx context.Context)) {
-	go fn(s.Context())
+	go fn(s.transportCtx)
 }
 
 // sessionID returns the session's unique identifier. Used by
