@@ -72,10 +72,15 @@ func (h *Handler[S]) Shutdown(ctx context.Context) error {
 	clear(h.disconnected)
 	h.mu.Unlock()
 
-	// Destroy all sessions. destroySession cancels the context,
-	// handles frozen sessions (closes destroyed), and cleans up
-	// store entries and group memberships.
+	// Destroy all sessions. Frozen sessions keep their store
+	// entries so a restarting server can restore them - only the
+	// destroyed channel is closed to unblock waiters below.
 	for _, sess := range sessions {
+		if sess.freeze && Status(sess.status.Load()) == Frozen {
+			sess.status.Store(int32(Destroyed))
+			sess.destroyedOnce.Do(func() { close(sess.destroyed) })
+			continue
+		}
 		h.destroySession(sess)
 	}
 
@@ -112,13 +117,17 @@ func (h *Handler[S]) Shutdown(ctx context.Context) error {
 	// s.state. Save with context.Background() since session contexts
 	// are cancelled. TTL uses the shutdown grace period as a recovery
 	// window for the restarting server.
+	//
+	// Skip frozen sessions: their state was already persisted during
+	// onTransportClose and s.state has been zeroed. Saving here would
+	// overwrite the valid snapshot with empty data.
 	if h.cfg.SessionStore != nil {
 		ttl := h.cfg.Timeouts.ShutdownGrace
 		if ttl == 0 {
 			ttl = defaultShutdownGrace
 		}
 		for _, sess := range sessions {
-			if sess.sessionStore != nil {
+			if sess.sessionStore != nil && !sess.freeze {
 				sess.saveSessionState(context.Background(), ttl)
 			}
 		}
