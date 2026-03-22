@@ -146,13 +146,24 @@ func TestComponentIntegrationMultiInstance(t *testing.T) {
 			Personal: todoList{prefix: "personal"},
 		}
 
+		// Compose component routing into handle, matching Stateful().
+		handle := HandleFunc[dualTodoState](handleDualTodo)
+		composedHandle := func(sess Session, s dualTodoState, ev Event) dualTodoState {
+			if ev.Type != event.Navigate {
+				if newState, ok := RouteMount(mounts, sess, s, ev); ok {
+					return newState
+				}
+			}
+			return handle(sess, s, ev)
+		}
+
 		differ := jit.NewDiffer()
 		ctx, cancel := context.WithCancel(context.Background())
 		sess := &StatefulSession[dualTodoState]{
 			id:        "test",
 			state:     initial,
 			render:    renderDualTodo,
-			handle:    handleDualTodo,
+			handle:    composedHandle,
 			differ:    differ,
 			encoder:   wire.JSONEncoder{},
 			transport: mt,
@@ -163,7 +174,6 @@ func TestComponentIntegrationMultiInstance(t *testing.T) {
 			destroyed: make(chan struct{}),
 			ctx:       ctx,
 			stop:      cancel,
-			mounts:    mounts,
 		}
 		tree := sess.render(sess.state)
 		differ.Render(tree)
@@ -223,13 +233,24 @@ func TestComponentIntegrationSideEffects(t *testing.T) {
 
 		initial := dualTodoState{Work: todoList{prefix: "work"}}
 
+		// Compose component routing into handle, matching Stateful().
+		handle := HandleFunc[dualTodoState](handleDualTodo)
+		composedHandle := func(sess Session, s dualTodoState, ev Event) dualTodoState {
+			if ev.Type != event.Navigate {
+				if newState, ok := RouteMount(mounts, sess, s, ev); ok {
+					return newState
+				}
+			}
+			return handle(sess, s, ev)
+		}
+
 		differ := jit.NewDiffer()
 		ctx, cancel := context.WithCancel(context.Background())
 		sess := &StatefulSession[dualTodoState]{
 			id:        "test",
 			state:     initial,
 			render:    renderDualTodo,
-			handle:    handleDualTodo,
+			handle:    composedHandle,
 			differ:    differ,
 			encoder:   wire.JSONEncoder{},
 			transport: mt,
@@ -240,7 +261,6 @@ func TestComponentIntegrationSideEffects(t *testing.T) {
 			destroyed: make(chan struct{}),
 			ctx:       ctx,
 			stop:      cancel,
-			mounts:    mounts,
 		}
 		tree := sess.render(sess.state)
 		differ.Render(tree)
@@ -304,13 +324,24 @@ func TestComponentIntegrationToggleAndClear(t *testing.T) {
 			},
 		}
 
+		// Compose component routing into handle, matching Stateful().
+		handle := HandleFunc[dualTodoState](handleDualTodo)
+		composedHandle := func(sess Session, s dualTodoState, ev Event) dualTodoState {
+			if ev.Type != event.Navigate {
+				if newState, ok := RouteMount(mounts, sess, s, ev); ok {
+					return newState
+				}
+			}
+			return handle(sess, s, ev)
+		}
+
 		differ := jit.NewDiffer()
 		ctx, cancel := context.WithCancel(context.Background())
 		sess := &StatefulSession[dualTodoState]{
 			id:        "test",
 			state:     initial,
 			render:    renderDualTodo,
-			handle:    handleDualTodo,
+			handle:    composedHandle,
 			differ:    differ,
 			encoder:   wire.JSONEncoder{},
 			transport: mt,
@@ -321,7 +352,6 @@ func TestComponentIntegrationToggleAndClear(t *testing.T) {
 			destroyed: make(chan struct{}),
 			ctx:       ctx,
 			stop:      cancel,
-			mounts:    mounts,
 		}
 		tree := sess.render(sess.state)
 		differ.Render(tree)

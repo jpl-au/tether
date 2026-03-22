@@ -44,8 +44,8 @@ func Mount[S any, C Component](prefix string, getter func(S) C, setter func(S, C
 
 // RouteMount tries each mount in order. If one matches, it returns the
 // updated state and true. Otherwise it returns the original state and
-// false. Used by the exec loop and tethertest to dispatch component
-// events before the user's Handle function.
+// false. Called during Handle composition in [Stateful] and [Stateless]
+// constructors so component events flow through the middleware chain.
 func RouteMount[S any](mounts []ComponentMount[S], sess Session, state S, ev Event) (S, bool) {
 	for _, m := range mounts {
 		if s, ok := m.route(sess, state, ev); ok {

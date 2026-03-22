@@ -286,9 +286,6 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		freeze:           h.cfg.FreezeOnDisconnect && h.cfg.SessionStore != nil,
 	}
 	sess.lastActivity.Store(now.UnixNano())
-	if len(h.cfg.Components) > 0 {
-		sess.mounts = h.cfg.Components
-	}
 	dev.Debug("session created", "session", id, "endpoint", r.URL.Path, "remote", r.RemoteAddr)
 
 	if h.cfg.Push != nil && h.cfg.Push.Sender != nil {
@@ -471,9 +468,6 @@ func (h *Handler[S]) restoreSession(id string, r *http.Request, transport Transp
 	sess.lastURL = env.URL
 	sess.lastTitle = env.Title
 	sess.lastActivity.Store(now.UnixNano())
-	if len(h.cfg.Components) > 0 {
-		sess.mounts = h.cfg.Components
-	}
 
 	if h.cfg.Push != nil && h.cfg.Push.Sender != nil {
 		sess.pushSender = h.cfg.Push.Sender

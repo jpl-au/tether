@@ -33,13 +33,27 @@ func handleMountState(_ Session, s mountState, ev Event) mountState {
 }
 
 func newMountSession(state mountState, mt Transport, mounts []ComponentMount[mountState]) *StatefulSession[mountState] {
+	// Compose component routing into Handle, matching what Stateful() does.
+	handle := HandleFunc[mountState](handleMountState)
+	if len(mounts) > 0 {
+		appHandle := handle
+		handle = func(sess Session, s mountState, ev Event) mountState {
+			if ev.Type != event.Navigate {
+				if newState, ok := RouteMount(mounts, sess, s, ev); ok {
+					return newState
+				}
+			}
+			return appHandle(sess, s, ev)
+		}
+	}
+
 	differ := jit.NewDiffer()
 	ctx, cancel := context.WithCancel(context.Background())
 	sess := &StatefulSession[mountState]{
 		id:        "test",
 		state:     state,
 		render:    renderMountState,
-		handle:    handleMountState,
+		handle:    handle,
 		differ:    differ,
 		encoder:   wire.JSONEncoder{},
 		transport: mt,
@@ -50,7 +64,6 @@ func newMountSession(state mountState, mt Transport, mounts []ComponentMount[mou
 		destroyed: make(chan struct{}),
 		ctx:       ctx,
 		stop:      cancel,
-		mounts:    mounts,
 	}
 	tree := sess.render(sess.state)
 	differ.Render(tree)
@@ -139,13 +152,24 @@ func TestMountRouteSetsEventTarget(t *testing.T) {
 			},
 		}
 
+		// Compose component routing into handle.
+		appHandle := func(_ Session, s targetState, ev Event) targetState { return s }
+		handle := func(sess Session, s targetState, ev Event) targetState {
+			if ev.Type != event.Navigate {
+				if newState, ok := RouteMount(mounts, sess, s, ev); ok {
+					return newState
+				}
+			}
+			return appHandle(sess, s, ev)
+		}
+
 		differ := jit.NewDiffer()
 		ctx, cancel := context.WithCancel(context.Background())
 		sess := &StatefulSession[targetState]{
 			id:     "test",
 			state:  targetState{Widget: targetWidget{onHandle: func(ev Event) { captured = ev.Target }}},
 			render: func(s targetState) node.Node { return div.New(span.Text("x").Dynamic("x")) },
-			handle: func(_ Session, s targetState, ev Event) targetState { return s },
+			handle: handle,
 			differ: differ, encoder: wire.JSONEncoder{},
 			transport: mt, events: make(chan Event),
 			cmds:      make(chan func(), defaultCmdBufferSize),
@@ -153,7 +177,6 @@ func TestMountRouteSetsEventTarget(t *testing.T) {
 			loopDone:  make(chan struct{}),
 			destroyed: make(chan struct{}),
 			ctx:       ctx, stop: cancel,
-			mounts: mounts,
 		}
 		tree := sess.render(sess.state)
 		differ.Render(tree)

@@ -141,18 +141,9 @@ func (s *StatefulSession[S]) exec(ev Event) {
 		"type", ev.Type,
 	)
 
-	// Component mounts intercept events before Handle so that
-	// mounted components are self-contained - the application's
-	// Handle never sees events meant for a component. Navigate
-	// events bypass mounts because they need the OnNavigate chain.
-	var newState S
-	handled := false
-	if ev.Type != "navigate" {
-		newState, handled = RouteMount(s.mounts, s, s.state, ev)
-	}
-	if !handled {
-		newState = s.handle(s, s.state, ev)
-	}
+	// All events flow through the composed Handle function, which
+	// includes middleware, OnNavigate, and component routing.
+	newState := s.handle(s, s.state, ev)
 
 	s.drainFx(fx)
 

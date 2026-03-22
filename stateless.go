@@ -34,6 +34,34 @@ func Stateless[S any](app App, cfg StatelessConfig[S]) http.Handler {
 
 	app.initLog()
 
+	// Compose component routing into Handle so that mounted component
+	// events flow through middleware, matching the Stateful composition.
+	if len(cfg.Components) > 0 {
+		appHandle := cfg.Handle
+		components := cfg.Components
+		cfg.Handle = func(sess Session, s S, ev Event) S {
+			if ev.Type != event.Navigate {
+				if newState, ok := RouteMount(components, sess, s, ev); ok {
+					return newState
+				}
+			}
+			return appHandle(sess, s, ev)
+		}
+	}
+
+	// Compose OnNavigate into Handle so middleware covers navigate
+	// events, matching the Stateful composition.
+	if cfg.OnNavigate != nil {
+		appHandle := cfg.Handle
+		appNav := cfg.OnNavigate
+		cfg.Handle = func(sess Session, s S, ev Event) S {
+			if ev.Type == event.Navigate {
+				return appNav(sess, s, paramsFromEvent(ev))
+			}
+			return appHandle(sess, s, ev)
+		}
+	}
+
 	if len(cfg.Middleware) > 0 {
 		cfg.Handle = Chain(cfg.Handle, cfg.Middleware)
 	}
@@ -169,27 +197,19 @@ func (p *statelessHandler[S]) servePOST(w http.ResponseWriter, r *http.Request) 
 	}
 
 	state := p.cfg.InitialState(r)
-
 	cs := &CaptureSession{PushErr: ErrPushPreWarm}
-	if ev.Type == event.Navigate && p.cfg.OnNavigate != nil {
-		// Navigate events carry the target path in event data, not
-		// in the request URL (the client always POSTs to its
-		// endpoint). Read path and search from ev.Data.
-		state = p.cfg.OnNavigate(cs, state, paramsFromEvent(ev))
-	} else {
-		// For all other events, derive state from the URL first
-		// (stateless mode reconstructs state each request), then
-		// process the event via Handle.
-		if p.cfg.OnNavigate != nil {
-			params := Params{Path: r.URL.Path, Query: r.URL.Query()}
-			state = p.cfg.OnNavigate(cs, state, params)
-		}
-		if newState, ok := RouteMount(p.cfg.Components, cs, state, ev); ok {
-			state = newState
-		} else {
-			state = p.cfg.Handle(cs, state, ev)
-		}
+
+	// In stateless mode, non-navigate events need URL-derived state as
+	// a starting point because stateless mode reconstructs state from
+	// each request. This is state preparation, not event dispatch.
+	if ev.Type != event.Navigate && p.cfg.OnNavigate != nil {
+		params := Params{Path: r.URL.Path, Query: r.URL.Query()}
+		state = p.cfg.OnNavigate(cs, state, params)
 	}
+
+	// All events flow through the unified dispatch: middleware,
+	// OnNavigate, component routing, then Handle.
+	state = p.cfg.Handle(cs, state, ev)
 
 	tree := p.cfg.Render(state)
 	html := tree.Render()

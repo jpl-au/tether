@@ -71,18 +71,14 @@ type Config[S any] struct {
 // send events with [Harness.Send] or [Harness.SendEvent], and inspect
 // the result with the accessor methods.
 type Harness[S any] struct {
-	state      S
-	render     tether.RenderFunc[S]
-	handle     func(tether.Session, S, tether.Event) S
-	onNavigate func(tether.Session, S, tether.Params) S
-	layout     func(S, node.Node) node.Node
+	state  S
+	render tether.RenderFunc[S]
+	handle func(tether.Session, S, tether.Event) S
+	layout func(S, node.Node) node.Node
 
 	// Lifecycle callbacks stored from Config.
 	onConnect    func(tether.Session)
 	onDisconnect func(tether.Session)
-
-	// Component mounts for automatic event routing.
-	mounts []tether.ComponentMount[S]
 
 	// Last captured effects and rendered HTML.
 	last     tether.Effects
@@ -91,19 +87,52 @@ type Harness[S any] struct {
 
 // New creates a test harness. The harness invokes Handle directly  -
 // no HTTP server, no JSON round-trip, no goroutines.
+//
+// Component routing, OnNavigate, and middleware are composed into
+// Handle in the same order as [tether.Stateful] and [tether.Stateless],
+// so all events flow through the full middleware chain.
 func New[S any](cfg Config[S]) *Harness[S] {
 	handle := cfg.Handle
+
+	// Compose component routing into Handle.
+	if len(cfg.Components) > 0 {
+		appHandle := handle
+		components := cfg.Components
+		handle = func(sess tether.Session, s S, ev tether.Event) S {
+			if ev.Type != event.Navigate {
+				if newState, ok := tether.RouteMount(components, sess, s, ev); ok {
+					return newState
+				}
+			}
+			return appHandle(sess, s, ev)
+		}
+	}
+
+	// Compose OnNavigate into Handle.
+	if cfg.OnNavigate != nil {
+		appHandle := handle
+		appNav := cfg.OnNavigate
+		handle = func(sess tether.Session, s S, ev tether.Event) S {
+			if ev.Type == event.Navigate {
+				return appNav(sess, s, tether.Params{
+					Path:  ev.Data["path"],
+					Query: parseQuery(ev.Data["search"]),
+				})
+			}
+			return appHandle(sess, s, ev)
+		}
+	}
+
 	if len(cfg.Middleware) > 0 {
 		handle = tether.Chain(handle, cfg.Middleware)
 	}
+
 	return &Harness[S]{
 		state:        cfg.State,
 		render:       cfg.Render,
 		handle:       handle,
-		onNavigate:   cfg.OnNavigate,
 		onConnect:    cfg.OnConnect,
 		onDisconnect: cfg.OnDisconnect,
-		mounts:       cfg.Components,
 		layout:       cfg.Layout,
 	}
 }
@@ -149,20 +178,9 @@ func (h *Harness[S]) SendEvent(ev tether.Event) {
 	}
 }
 
-// dispatch routes the event to the correct handler: navigate events go
-// to OnNavigate, component-prefixed events go to RouteMount, and
-// everything else goes to Handle.
+// dispatch sends the event through the composed Handle function, which
+// includes middleware, OnNavigate, and component routing.
 func (h *Harness[S]) dispatch(cs *tether.CaptureSession, ev tether.Event) S {
-	if ev.Type == event.Navigate && h.onNavigate != nil {
-		params := tether.Params{
-			Path:  ev.Data["path"],
-			Query: parseQuery(ev.Data["search"]),
-		}
-		return h.onNavigate(cs, h.state, params)
-	}
-	if newState, ok := tether.RouteMount(h.mounts, cs, h.state, ev); ok {
-		return newState
-	}
 	return h.handle(cs, h.state, ev)
 }
 
