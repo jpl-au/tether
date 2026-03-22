@@ -103,6 +103,19 @@ func (a *Asset) init() {
 // lost.
 func (a *Asset) URL(path string) string {
 	a.init()
+	if dev.Enabled() {
+		// Recompute the hash on every call so edited files get fresh
+		// cache-busting parameters without a server restart. Slightly
+		// slower per request but correctness matters more than speed
+		// during development.
+		data, err := fs.ReadFile(a.FS, path)
+		if err != nil {
+			dev.Warn("asset not found", "path", path, "error", err)
+			return a.prefix + path
+		}
+		h := sha256.Sum256(data)
+		return a.prefix + path + "?v=" + hex.EncodeToString(h[:])[:12]
+	}
 	h, ok := a.hashes[path]
 	if !ok {
 		slog.Error("tether: asset not found - check the path and look for earlier read errors", "path", path)
