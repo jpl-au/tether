@@ -299,3 +299,98 @@ func TestBusSubscribeAsyncUnsubscribe(t *testing.T) {
 		}
 	})
 }
+
+func TestBusAsyncOverflowBlock(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		// Semaphore of 1 so the second publish must wait.
+		bus := NewBus[int](BusConfig{AsyncWorkers: 1, AsyncOverflow: Block})
+
+		gate := make(chan struct{})
+		var count int
+		bus.SubscribeAsync(context.Background(), func(int) {
+			<-gate
+			count++
+		})
+
+		bus.Publish(1) // fills the single slot
+		synctest.Wait()
+
+		// Publish in a goroutine because Block will stall.
+		go bus.Publish(2)
+		synctest.Wait()
+
+		// First callback still blocked, second queued.
+		if count != 0 {
+			t.Fatalf("count = %d, want 0 (callbacks blocked)", count)
+		}
+
+		close(gate)
+		synctest.Wait()
+
+		if count != 2 {
+			t.Errorf("count = %d, want 2 (both delivered)", count)
+		}
+	})
+}
+
+func TestBusAsyncOverflowDrop(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		bus := NewBus[int](BusConfig{AsyncWorkers: 1, AsyncOverflow: Drop})
+
+		gate := make(chan struct{})
+		var count int
+		bus.SubscribeAsync(context.Background(), func(int) {
+			<-gate
+			count++
+		})
+
+		bus.Publish(1) // fills the single slot
+		bus.Publish(2) // semaphore full, dropped
+
+		close(gate)
+		synctest.Wait()
+
+		if count != 1 {
+			t.Errorf("count = %d, want 1 (second event dropped)", count)
+		}
+	})
+}
+
+func TestBusAsyncOverflowInline(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		bus := NewBus[int](BusConfig{AsyncWorkers: 1, AsyncOverflow: Inline})
+
+		gate := make(chan struct{})
+		var results []string
+		bus.SubscribeAsync(context.Background(), func(v int) {
+			if v == 1 {
+				<-gate // block first callback
+			}
+			results = append(results, "async")
+		})
+
+		bus.Publish(1) // fills the single slot
+		synctest.Wait()
+
+		// Second publish runs inline because semaphore is full.
+		// We use a sync subscriber to verify ordering.
+		var syncRan bool
+		bus.Subscribe(context.Background(), func(int) { syncRan = true })
+		bus.Publish(2)
+
+		if !syncRan {
+			t.Fatal("sync subscriber did not run")
+		}
+		// The inline execution should have appended before Publish returned.
+		if len(results) != 1 || results[0] != "async" {
+			t.Errorf("results = %v, want [async] (inline execution)", results)
+		}
+
+		close(gate)
+		synctest.Wait()
+
+		if len(results) != 2 {
+			t.Errorf("len(results) = %d, want 2", len(results))
+		}
+	})
+}

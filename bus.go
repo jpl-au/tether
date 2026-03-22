@@ -2,10 +2,48 @@ package tether
 
 import (
 	"context"
+	"log/slog"
 	"maps"
 	"sync"
 	"sync/atomic"
 )
+
+// defaultAsyncWorkers is the semaphore size for async subscribers
+// when [BusConfig].AsyncWorkers is zero.
+const defaultAsyncWorkers = 64
+
+// AsyncOverflow controls what happens when all async worker slots
+// are occupied during publication.
+type AsyncOverflow int
+
+const (
+	// Block waits for a semaphore slot before spawning the
+	// goroutine. No data loss, but the publisher's goroutine
+	// stalls until a worker finishes. This is the default.
+	Block AsyncOverflow = iota + 1
+
+	// Drop discards the event for this subscriber and logs a
+	// warning. The publisher never stalls.
+	Drop
+
+	// Inline runs the callback synchronously in the publisher's
+	// goroutine. No data loss, but the publisher blocks for the
+	// full duration of the callback.
+	Inline
+)
+
+// BusConfig customises the behaviour of a [Bus]. Pass to [NewBus]
+// to override defaults.
+type BusConfig struct {
+	// AsyncWorkers limits the number of concurrent goroutines for
+	// async subscribers. Each publication acquires a semaphore slot
+	// before spawning a goroutine. Default 64.
+	AsyncWorkers int
+
+	// AsyncOverflow controls what happens when all worker slots
+	// are occupied. Default [Block].
+	AsyncOverflow AsyncOverflow
+}
 
 // emitter is the internal capability marker that [Bus.Emit] uses to
 // distinguish sessions with a live command loop from other [Session]
@@ -34,13 +72,20 @@ type emitter interface {
 // publish is completely lock-free. Subscribe and unsubscribe use a
 // write mutex and copy-on-write semantics - they are rare relative
 // to publish so the copy cost is negligible.
+//
+// Async subscribers are bounded by a semaphore (default 64 workers).
+// When all slots are occupied, the overflow strategy controls
+// behaviour: [Block] (default), [Drop], or [Inline]. Configure via
+// [BusConfig] in [NewBus].
 type Bus[E any] struct {
 	// wmu serialises writes (subscribe/unsubscribe). Reads go
 	// through the atomic.Value and need no lock.
 	wmu  sync.Mutex
 	subs atomic.Value // holds map[uint64]subscriber[E]
 
-	nextID uint64
+	nextID   uint64
+	sem      chan struct{} // bounds concurrent async goroutines
+	overflow AsyncOverflow
 }
 
 type subscriber[E any] struct {
@@ -50,9 +95,27 @@ type subscriber[E any] struct {
 	async     bool            // true for SubscribeAsync subscribers
 }
 
-// NewBus creates an empty bus ready to accept subscribers.
-func NewBus[E any]() *Bus[E] {
-	b := &Bus[E]{}
+// NewBus creates an empty bus ready to accept subscribers. An optional
+// [BusConfig] can be provided to customise async worker limits and
+// overflow behaviour. Without config, async subscribers are bounded to
+// 64 concurrent workers and the publisher blocks when the semaphore
+// is full.
+func NewBus[E any](cfg ...BusConfig) *Bus[E] {
+	workers := defaultAsyncWorkers
+	overflow := Block
+	if len(cfg) > 0 {
+		c := cfg[0]
+		if c.AsyncWorkers > 0 {
+			workers = c.AsyncWorkers
+		}
+		if c.AsyncOverflow != 0 {
+			overflow = c.AsyncOverflow
+		}
+	}
+	b := &Bus[E]{
+		sem:      make(chan struct{}, workers),
+		overflow: overflow,
+	}
 	b.subs.Store(make(map[uint64]subscriber[E]))
 	return b
 }
@@ -105,9 +168,11 @@ func (b *Bus[E]) Subscribe(ctx context.Context, fn func(E)) func() {
 }
 
 // SubscribeAsync registers a callback that receives every event in its
-// own goroutine. Each publication spawns a new goroutine for the
-// callback, so the publisher never blocks regardless of how long the
-// callback takes.
+// own goroutine. Concurrency is bounded by a semaphore (default 64
+// workers, configurable via [BusConfig].AsyncWorkers). When all worker
+// slots are occupied, the [BusConfig].AsyncOverflow strategy applies:
+// [Block] (default) waits for a slot, [Drop] discards the event, and
+// [Inline] runs the callback in the publisher's goroutine.
 //
 // Use this for external consumers that perform I/O (database writes,
 // HTTP calls, logging) in response to events. For session-bound
@@ -183,7 +248,8 @@ func (b *Bus[E]) remove(id uint64) {
 
 // publish iterates the subscriber map with no lock - the atomic load
 // returns a consistent snapshot. Subscribers whose sessionID matches
-// senderID are skipped. Async subscribers run in their own goroutine.
+// senderID are skipped. Async subscribers are dispatched via the
+// bounded semaphore.
 func (b *Bus[E]) publish(event E, senderID string) {
 	for _, s := range b.loadSubs() {
 		if s.ctx.Err() != nil {
@@ -193,9 +259,35 @@ func (b *Bus[E]) publish(event E, senderID string) {
 			continue // sender filtering
 		}
 		if s.async {
-			go s.fn(event)
+			b.dispatchAsync(s.fn, event)
 		} else {
 			s.fn(event)
+		}
+	}
+}
+
+// dispatchAsync runs an async callback with semaphore bounding. The
+// fast path acquires a slot without blocking. When the semaphore is
+// full, the configured overflow strategy applies.
+func (b *Bus[E]) dispatchAsync(fn func(E), event E) {
+	select {
+	case b.sem <- struct{}{}:
+		go func() {
+			defer func() { <-b.sem }()
+			fn(event)
+		}()
+	default:
+		switch b.overflow {
+		case Drop:
+			slog.Warn("tether: async event dropped, semaphore full")
+		case Inline:
+			fn(event)
+		default: // Block
+			b.sem <- struct{}{}
+			go func() {
+				defer func() { <-b.sem }()
+				fn(event)
+			}()
 		}
 	}
 }
