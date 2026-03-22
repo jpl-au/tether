@@ -14,10 +14,8 @@ import (
 // and re-render. This avoids any locking - only the loop touches
 // session state.
 func (h *Handler[S]) reattach(sess *StatefulSession[S], transport Transport) {
-	// Stop the disconnect timer before writing callback fields
-	// to avoid a data race between wireDisconnect (this goroutine)
-	// and the timer callback (timer goroutine). Timer.Stop is
-	// goroutine-safe; the field read is safe via h.mu happens-before.
+	// Stop the disconnect timer so the session isn't destroyed
+	// while we're reattaching. Timer.Stop is goroutine-safe.
 	if sess.disconnectTimer != nil {
 		sess.disconnectTimer.Stop()
 		sess.disconnectTimer = nil
@@ -26,8 +24,6 @@ func (h *Handler[S]) reattach(sess *StatefulSession[S], transport Transport) {
 	if hb, ok := transport.(Heartbeater); ok && !h.cfg.Timeouts.DisableHeartbeat {
 		hb.StartHeartbeat(h.cfg.Timeouts.Heartbeat)
 	}
-
-	h.wireDisconnect(sess)
 
 	// Try to restore differ snapshots from the store so the
 	// reconnecting client receives targeted patches instead of a
@@ -227,8 +223,6 @@ func (h *Handler[S]) thaw(sess *StatefulSession[S], r *http.Request, transport T
 	sess.lastURL = env.URL
 	sess.lastTitle = env.Title
 
-	h.wireDisconnect(sess)
-
 	if hb, ok := transport.(Heartbeater); ok && !h.cfg.Timeouts.DisableHeartbeat {
 		hb.StartHeartbeat(h.cfg.Timeouts.Heartbeat)
 	}
@@ -276,38 +270,37 @@ func (h *Handler[S]) thaw(sess *StatefulSession[S], r *http.Request, transport T
 	<-sess.loopDone
 }
 
-// wireDisconnect installs the callback that moves a session into the
-// disconnected pool (when reconnection is enabled) or removes it
-// entirely. Called each time a transport is attached because the
-// callback captures the handler's pool references.
-func (h *Handler[S]) wireDisconnect(sess *StatefulSession[S]) {
-	sess.onDisconnect = func() {
-		h.mu.Lock()
-		delete(h.active, sess.id)
-		destroy := h.cfg.Timeouts.DisableReconnect
-		if !destroy {
-			h.disconnected[sess.id] = sess
-		}
-		h.notifyDrain()
-		h.mu.Unlock()
-
-		// destroySession calls g.Remove which may fire OnLeave
-		// callbacks - run it outside h.mu to avoid deadlock if
-		// the callback accesses the Handler (e.g. Health).
-		if destroy {
-			h.destroySession(sess)
-		}
-
-		if h.cfg.OnDisconnect != nil {
-			h.cfg.OnDisconnect(sess)
-		}
+// sessionDisconnected moves a session from the active pool to the
+// disconnected pool (when reconnection is enabled) or destroys it
+// immediately. Called from onTransportClose on the loop goroutine.
+func (h *Handler[S]) sessionDisconnected(sess *StatefulSession[S]) {
+	h.mu.Lock()
+	delete(h.active, sess.id)
+	destroy := h.cfg.Timeouts.DisableReconnect
+	if !destroy {
+		h.disconnected[sess.id] = sess
 	}
+	h.notifyDrain()
+	h.mu.Unlock()
 
-	sess.onTimeout = func() {
-		h.mu.Lock()
-		delete(h.disconnected, sess.id)
-		h.notifyDrain()
-		h.mu.Unlock()
+	// destroySession calls g.Remove which may fire OnLeave
+	// callbacks - run it outside h.mu to avoid deadlock if
+	// the callback accesses the Handler (e.g. Health).
+	if destroy {
 		h.destroySession(sess)
 	}
+
+	if h.cfg.OnDisconnect != nil {
+		h.cfg.OnDisconnect(sess)
+	}
+}
+
+// sessionTimedOut removes a disconnected session whose reconnect
+// timer has fired. Called from the timer goroutine.
+func (h *Handler[S]) sessionTimedOut(sess *StatefulSession[S]) {
+	h.mu.Lock()
+	delete(h.disconnected, sess.id)
+	h.notifyDrain()
+	h.mu.Unlock()
+	h.destroySession(sess)
 }

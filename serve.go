@@ -305,7 +305,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 	h.active[id] = sess
 	h.mu.Unlock()
 
-	h.wireDisconnect(sess)
+	sess.handler = h
 
 	// Start the command loop before OnConnect so that State(),
 	// Update(), Signal(), and other methods that route through the
@@ -495,7 +495,7 @@ func (h *Handler[S]) restoreSession(id string, r *http.Request, transport Transp
 	h.active[id] = sess
 	h.mu.Unlock()
 
-	h.wireDisconnect(sess)
+	sess.handler = h
 
 	go sess.run()
 

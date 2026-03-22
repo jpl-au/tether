@@ -154,15 +154,11 @@ type StatefulSession[S any] struct {
 	pushSender *push.Sender
 	pushSub    atomic.Pointer[push.Subscription]
 
-	// Installed by the Handler. Called when the transport reader
-	// goroutine exits. Handles pool transitions
-	// (active → disconnected or destroy).
-	onDisconnect func()
-
-	// Installed by the Handler. Called when the reconnect timer
-	// fires. Removes the session from the disconnected pool and
-	// calls destroySession.
-	onTimeout func()
+	// handler is the owning Handler. Used by onTransportClose and
+	// the disconnect timer to perform pool transitions without
+	// mutable callback fields. Set once during session creation
+	// and never changed.
+	handler *Handler[S]
 
 	// Optional equality check - skip render when state unchanged.
 	equal func(a, b S) bool

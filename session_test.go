@@ -199,13 +199,26 @@ func TestSessionStructuralChange(t *testing.T) {
 	})
 }
 
-func TestSessionOnDisconnect(t *testing.T) {
+func TestSessionDisconnectCallsHandler(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		mt := &mockTransport{events: []Event{}}
-
 		sess := newTestSession(counterState{Count: 0}, mt)
-		called := false
-		sess.onDisconnect = func() { called = true }
+
+		var called bool
+		h := &Handler[counterState]{
+			app: App{},
+			cfg: StatefulConfig[counterState]{
+				OnDisconnect: func(_ *StatefulSession[counterState]) {
+					called = true
+				},
+			},
+			pending:      make(map[string]*pendingSession[counterState]),
+			active:       map[string]*StatefulSession[counterState]{sess.id: sess},
+			disconnected: make(map[string]*StatefulSession[counterState]),
+			done:         make(chan struct{}),
+		}
+		h.Diagnostics = NewBus[Diagnostic]()
+		sess.handler = h
 
 		go sess.readTransport(sess.events)
 		go sess.run()
@@ -213,7 +226,7 @@ func TestSessionOnDisconnect(t *testing.T) {
 		synctest.Wait()
 
 		if !called {
-			t.Error("onDisconnect should be called when transport closes")
+			t.Error("OnDisconnect should be called when transport closes")
 		}
 	})
 }

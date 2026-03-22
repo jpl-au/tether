@@ -286,8 +286,8 @@ func (s *StatefulSession[S]) onTransportClose() {
 			"timeout", s.reconnectTimeout,
 		)
 		s.disconnectTimer = time.AfterFunc(s.reconnectTimeout, func() {
-			if s.onTimeout != nil {
-				s.onTimeout()
+			if s.handler != nil {
+				s.handler.sessionTimedOut(s)
 			} else {
 				s.stop()
 			}
@@ -323,8 +323,8 @@ func (s *StatefulSession[S]) onTransportClose() {
 		s.saveSessionState(s.ctx, s.reconnectTimeout)
 	}
 
-	if s.onDisconnect != nil {
-		s.onDisconnect()
+	if s.handler != nil {
+		s.handler.sessionDisconnected(s)
 	}
 
 	// Freeze: release state and differ to reclaim memory. The store

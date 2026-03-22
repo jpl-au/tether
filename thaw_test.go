@@ -53,7 +53,7 @@ func freezeSession(t *testing.T, h *Handler[counterState], initial counterState,
 	h.mu.Lock()
 	h.active[sess.id] = sess
 	h.mu.Unlock()
-	h.wireDisconnect(sess)
+	sess.handler = h
 
 	go sess.readTransport(sess.events)
 	go sess.run()
