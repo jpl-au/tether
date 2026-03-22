@@ -230,11 +230,15 @@ type Session interface {
 // an [Effects] struct instead of sending them to a client. It is used
 // during pre-warming, stateless page handling, and testing.
 //
-// Create with a struct literal:
+// Create with a struct literal. In production, set Ctx to the HTTP
+// request context so goroutines spawned via [Session.Go] are cancelled
+// when the client disconnects:
+//
+//	cs := &CaptureSession{Ctx: r.Context(), PushErr: ErrPushPreWarm}
+//
+// In tests, Ctx can be omitted (defaults to context.Background):
 //
 //	cs := &CaptureSession{SessionID: "my-id"}
-//	// ... pass cs as Session ...
-//	// ... read cs.Effects.Toast, cs.Effects.URL, etc.
 //
 // Compile-time interface satisfaction checks.
 var (
@@ -247,6 +251,12 @@ var (
 type CaptureSession struct {
 	// SessionID is returned by ID().
 	SessionID string
+	// Ctx is the context returned by Context() and passed to Go().
+	// When nil, context.Background() is used. Set this to the HTTP
+	// request context during pre-warming and stateless handling so
+	// goroutines spawned via Go() are cancelled when the client
+	// disconnects.
+	Ctx context.Context
 	// PushErr is returned by Push(). Nil by default (appropriate for
 	// tests); set to [ErrPushPreWarm] for pre-warming contexts.
 	PushErr error
@@ -258,16 +268,22 @@ type CaptureSession struct {
 // ID returns the session identifier.
 func (cs *CaptureSession) ID() string { return cs.SessionID }
 
-// Context returns a detached background context. The session's real
-// lifecycle context does not exist until the command loop starts, so
-// pre-warm code cannot rely on cancellation propagation.
-func (cs *CaptureSession) Context() context.Context { return context.Background() }
+// Context returns the context set via the Ctx field. When Ctx is nil
+// (the default in tests), context.Background() is returned. In
+// production, Ctx is the HTTP request context so goroutines are
+// cancelled when the client disconnects.
+func (cs *CaptureSession) Context() context.Context {
+	if cs.Ctx != nil {
+		return cs.Ctx
+	}
+	return context.Background()
+}
 
-// Go spawns a goroutine against a background context. Anything
-// launched during pre-warm runs independently - there is no command
-// loop to synchronise with yet.
+// Go spawns a goroutine bound to the session's context. When Ctx is
+// set to the HTTP request context, the goroutine is cancelled if the
+// client disconnects before it finishes.
 func (cs *CaptureSession) Go(fn func(context.Context)) {
-	go fn(context.Background())
+	go fn(cs.Context())
 }
 
 // enqueue executes fn synchronously. There is no command loop, so

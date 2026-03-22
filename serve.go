@@ -50,7 +50,7 @@ func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 			Path:  r.URL.Path,
 			Query: r.URL.Query(),
 		}
-		cs := &CaptureSession{SessionID: "pre-warm", PushErr: ErrPushPreWarm}
+		cs := &CaptureSession{SessionID: "pre-warm", Ctx: r.Context(), PushErr: ErrPushPreWarm}
 		state = h.cfg.OnNavigate(cs, state, params)
 	}
 	tree := h.cfg.Render(state)
@@ -247,7 +247,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 				Path:  r.URL.Path,
 				Query: r.URL.Query(),
 			}
-			cs := &CaptureSession{SessionID: "pre-warm", PushErr: ErrPushPreWarm}
+			cs := &CaptureSession{SessionID: "pre-warm", Ctx: r.Context(), PushErr: ErrPushPreWarm}
 			state = h.cfg.OnNavigate(cs, state, params)
 		}
 		differ = jit.NewDiffer()

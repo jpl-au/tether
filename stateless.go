@@ -138,7 +138,7 @@ func (p *statelessHandler[S]) serveGET(w http.ResponseWriter, r *http.Request) {
 
 	state := p.cfg.InitialState(r)
 	if p.cfg.OnNavigate != nil {
-		cs := &CaptureSession{PushErr: ErrPushPreWarm}
+		cs := &CaptureSession{Ctx: r.Context(), PushErr: ErrPushPreWarm}
 		params := Params{Path: r.URL.Path, Query: r.URL.Query()}
 		state = p.cfg.OnNavigate(cs, state, params)
 	}
