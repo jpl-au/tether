@@ -72,7 +72,8 @@ func TestFreeze(t *testing.T) {
 }
 
 // TestFreezeDiscardsCommands verifies that enqueue and enqueueFx
-// silently discard work when the session is frozen.
+// discard work when the session is frozen and emit a
+// CommandDiscarded diagnostic for each discard.
 func TestFreezeDiscardsCommands(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		store := newSessionFileStore(t)
@@ -81,6 +82,16 @@ func TestFreezeDiscardsCommands(t *testing.T) {
 		sess.sessionStore = store
 		sess.codec = cborCodec[counterState]{}
 		sess.freeze = true
+
+		diag := NewBus[Diagnostic]()
+		sess.diagnostics = diag
+
+		var discards int
+		diag.Subscribe(sess.ctx, func(d Diagnostic) {
+			if d.Kind == CommandDiscarded {
+				discards++
+			}
+		})
 
 		go sess.readTransport(sess.events)
 		go sess.run()
@@ -104,6 +115,10 @@ func TestFreezeDiscardsCommands(t *testing.T) {
 		synctest.Wait()
 		if fxCalled {
 			t.Error("effect was executed on a frozen session")
+		}
+
+		if discards != 2 {
+			t.Errorf("expected 2 CommandDiscarded diagnostics, got %d", discards)
 		}
 
 		sess.stop()

@@ -22,9 +22,10 @@ const (
 	// Frozen means the session's state has been persisted to the
 	// SessionStore and the command loop has exited. The session
 	// holds only its ID and metadata - S and the differ have been
-	// released. Commands and effects are silently discarded.
-	// A reconnecting client thaws the session by loading state
-	// from the store and starting a new loop.
+	// released. Commands and effects are discarded with a
+	// [CommandDiscarded] diagnostic. A reconnecting client thaws
+	// the session by loading state from the store and starting a
+	// new loop.
 	Frozen
 
 	// Destroyed means the session is permanently gone. The context
@@ -32,3 +33,19 @@ const (
 	// been released.
 	Destroyed
 )
+
+// String returns a human-readable name for the status.
+func (s Status) String() string {
+	switch s {
+	case Pending:
+		return "pending"
+	case Active:
+		return "active"
+	case Frozen:
+		return "frozen"
+	case Destroyed:
+		return "destroyed"
+	default:
+		return "unknown"
+	}
+}

@@ -425,7 +425,13 @@ func (s *StatefulSession[S]) sessionID() string {
 // an overflow goroutine delivers it - same semaphore-bounded
 // pattern as [enqueue].
 func (s *StatefulSession[S]) enqueueFx(fn func(*Effects)) {
-	if Status(s.status.Load()) == Frozen {
+	st := Status(s.status.Load())
+	if st == Frozen || st == Destroyed {
+		s.emitDiagnostic(Diagnostic{
+			Kind:      CommandDiscarded,
+			SessionID: s.id,
+			Detail:    st.String(),
+		})
 		return
 	}
 	select {
@@ -523,7 +529,13 @@ func (s *StatefulSession[S]) sendFx(fx *Effects) {
 // command is dropped and the session is destroyed unless the developer
 // has set [StatefulConfig.OnCommandDropped].
 func (s *StatefulSession[S]) enqueue(fn func()) {
-	if Status(s.status.Load()) == Frozen {
+	st := Status(s.status.Load())
+	if st == Frozen || st == Destroyed {
+		s.emitDiagnostic(Diagnostic{
+			Kind:      CommandDiscarded,
+			SessionID: s.id,
+			Detail:    st.String(),
+		})
 		return
 	}
 	select {

@@ -62,6 +62,14 @@ const (
 	// in-memory state.
 	SessionStoreError DiagnosticKind = "session_store_error"
 
+	// CommandDiscarded signals that a command or effect was silently
+	// discarded because the session is frozen or destroyed. This
+	// happens when code calls Update, Signal, Toast, or other
+	// session methods after the client has disconnected (frozen) or
+	// the session has been permanently destroyed. The Detail field
+	// contains the session status at the time of discard.
+	CommandDiscarded DiagnosticKind = "command_discarded"
+
 	// NavigateRedirectLoop signals that an OnNavigate handler
 	// triggered more than [maxNavigateRedirects] consecutive
 	// redirects via [Session.Navigate]. The framework resolves
