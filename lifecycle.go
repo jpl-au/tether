@@ -142,7 +142,15 @@ func (h *Handler[S]) thaw(sess *StatefulSession[S], r *http.Request, transport T
 		h.notifyDrain()
 		h.mu.Unlock()
 		h.destroySession(sess)
-		transport.Close()
+		if err := transport.Close(); err != nil {
+			dev.Warn("transport close failed on thaw", "session", sess.id, "error", err)
+			h.Diagnostics.Publish(Diagnostic{
+				Kind:      TransportError,
+				SessionID: sess.id,
+				Err:       err,
+				Detail:    "thaw close",
+			})
+		}
 		return
 	}
 
@@ -160,7 +168,15 @@ func (h *Handler[S]) thaw(sess *StatefulSession[S], r *http.Request, transport T
 		h.notifyDrain()
 		h.mu.Unlock()
 		h.destroySession(sess)
-		transport.Close()
+		if err := transport.Close(); err != nil {
+			dev.Warn("transport close failed on thaw", "session", sess.id, "error", err)
+			h.Diagnostics.Publish(Diagnostic{
+				Kind:      TransportError,
+				SessionID: sess.id,
+				Err:       err,
+				Detail:    "thaw close",
+			})
+		}
 		return
 	}
 
@@ -179,7 +195,15 @@ func (h *Handler[S]) thaw(sess *StatefulSession[S], r *http.Request, transport T
 		h.notifyDrain()
 		h.mu.Unlock()
 		h.destroySession(sess)
-		transport.Close()
+		if err := transport.Close(); err != nil {
+			dev.Warn("transport close failed on thaw", "session", sess.id, "error", err)
+			h.Diagnostics.Publish(Diagnostic{
+				Kind:      TransportError,
+				SessionID: sess.id,
+				Err:       err,
+				Detail:    "thaw close",
+			})
+		}
 		return
 	}
 

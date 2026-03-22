@@ -58,7 +58,7 @@ func setField(fv reflect.Value, raw, key string) error {
 	case reflect.String:
 		fv.SetString(raw)
 	case reflect.Int, reflect.Int64:
-		n, err := strconv.ParseInt(raw, 10, 64)
+		n, err := strconv.ParseInt(raw, 10, fv.Type().Bits())
 		if err != nil {
 			return fmt.Errorf("tether: field %q: %w", key, err)
 		}

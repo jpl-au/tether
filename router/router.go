@@ -64,9 +64,14 @@ func New[S any](selector func(S) string) *Router[S] {
 	return r
 }
 
-// Route registers a page for a specific path. Thread-safe via
-// copy-on-write.
+// Route registers a page for a specific path. Panics if both Render
+// and Handle are nil, since such a page would do nothing. Pages with
+// only Handle (events without custom rendering) or only Render
+// (display-only) are valid. Thread-safe via copy-on-write.
 func (r *Router[S]) Route(path string, page Page[S]) {
+	if page.Render == nil && page.Handle == nil {
+		panic("tether/router: Page for path " + path + " has neither Render nor Handle")
+	}
 	r.wmu.Lock()
 	defer r.wmu.Unlock()
 
@@ -88,7 +93,7 @@ func (r *Router[S]) NotFound(page Page[S]) {
 func (r *Router[S]) Render(s S) node.Node {
 	path := r.selector(s)
 	pages := r.loadPages()
-	if p, ok := pages[path]; ok {
+	if p, ok := pages[path]; ok && p.Render != nil {
 		return p.Render(s)
 	}
 	nf := r.loadNotFound()
