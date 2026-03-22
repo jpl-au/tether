@@ -149,21 +149,6 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		h.active[id] = sess
 		h.mu.Unlock()
 
-		// Clean up stored data - Render rebuilds differ snapshots,
-		// and state S is already current in memory (or will be loaded
-		// from the store for frozen sessions).
-		if h.cfg.DiffStore != nil {
-			if err := h.cfg.DiffStore.Delete(sess.ctx, id); err != nil {
-				dev.Warn("store delete failed on reconnect", "session", id, "error", err)
-				h.Diagnostics.Publish(Diagnostic{
-					Kind:      StoreError,
-					SessionID: id,
-					Err:       err,
-					Detail:    "delete",
-				})
-			}
-		}
-
 		started = true
 		if frozen {
 			h.thaw(sess, r, transport)

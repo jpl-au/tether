@@ -28,6 +28,35 @@ func (h *Handler[S]) reattach(sess *StatefulSession[S], transport Transport) {
 
 	h.wireDisconnect(sess)
 
+	// Try to restore differ snapshots from the store so the
+	// reconnecting client receives targeted patches instead of a
+	// full root morph. If the store has no data (or Import fails),
+	// the differ stays unseeded and we fall back to a full morph.
+	// Delete after Load so the data is consumed exactly once.
+	var diffData []byte
+	if h.cfg.DiffStore != nil {
+		if data, err := h.cfg.DiffStore.Load(sess.ctx, sess.id); err != nil {
+			dev.Warn("diff store load failed on reconnect", "session", sess.id, "error", err)
+			h.Diagnostics.Publish(Diagnostic{
+				Kind:      StoreError,
+				SessionID: sess.id,
+				Err:       err,
+				Detail:    "load",
+			})
+		} else {
+			diffData = data
+		}
+		if err := h.cfg.DiffStore.Delete(sess.ctx, sess.id); err != nil {
+			dev.Warn("diff store delete failed on reconnect", "session", sess.id, "error", err)
+			h.Diagnostics.Publish(Diagnostic{
+				Kind:      StoreError,
+				SessionID: sess.id,
+				Err:       err,
+				Detail:    "delete",
+			})
+		}
+	}
+
 	select {
 	case sess.cmds <- func() {
 
@@ -35,15 +64,41 @@ func (h *Handler[S]) reattach(sess *StatefulSession[S], transport Transport) {
 		sess.events = make(chan Event)
 		go sess.readTransport(sess.events)
 
-		// Re-render and send full state to catch the client up.
-		// Include the last URL and title so the browser's address bar
-		// and document title are synced - they live outside the DOM
-		// and would otherwise be stale after reconnection.
-		tree := sess.render(sess.state)
-		html := sess.differ.Render(tree)
-		u := wire.Update{
-			Morphs: []wire.Morph{{Key: "", HTML: html}},
+		// Restore differ snapshots if available.
+		if diffData != nil {
+			if err := sess.differ.Import(diffData); err != nil {
+				dev.Warn("differ import failed, sending full morph",
+					"session", sess.id, "error", err)
+			}
 		}
+
+		// Re-render and send the minimal update to catch the client
+		// up. When the differ has snapshots (from Import or still in
+		// memory), Diff produces targeted patches. Otherwise, Render
+		// sends a full morph. URL and title are always included so
+		// the browser's address bar and document title stay in sync.
+		tree := sess.render(sess.state)
+		patches, change := sess.differ.Diff(tree)
+
+		var u wire.Update
+		if change != nil {
+			// Structural change - full morph required.
+			html := sess.differ.Render(tree)
+			u.Morphs = []wire.Morph{{Key: "", HTML: html}}
+		} else if len(patches) > 0 {
+			wp := make([]wire.Patch, len(patches))
+			for i, p := range patches {
+				wp[i] = wire.Patch{Key: p.Key, HTML: p.HTML}
+			}
+			u.Patches = wp
+		} else if patches == nil {
+			// Unseeded differ (no snapshots) - full morph.
+			html := sess.differ.Render(tree)
+			u.Morphs = []wire.Morph{{Key: "", HTML: html}}
+		}
+		// patches empty but non-nil means nothing changed - still
+		// send URL and title below to sync the address bar.
+
 		if sess.lastURL != "" {
 			u.URL = sess.lastURL
 			u.Replace = true // sync state, don't push a history entry

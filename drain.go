@@ -51,6 +51,11 @@ func (h *Handler[S]) notifyDrain() {
 // Shutdown closes all active sessions and stops the pending cleanup
 // goroutine. It blocks until every session's loop has exited or ctx
 // is cancelled. Safe to call more than once.
+//
+// Shutdown waits for command loops, not for goroutines started via
+// [Session.Go]. Those goroutines receive context cancellation and
+// must exit promptly. A goroutine that ignores its context will leak
+// and may race with the final state save. See [Session.Go].
 func (h *Handler[S]) Shutdown(ctx context.Context) error {
 	h.closeOnce.Do(func() { close(h.done) })
 

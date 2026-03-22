@@ -379,6 +379,11 @@ func (s *StatefulSession[S]) Context() context.Context {
 // destroyed (reaped or shutdown). Use this in OnConnect for background
 // work like tickers, watchers, or change listeners that should stop
 // when the session is gone.
+//
+// The goroutine must respect context cancellation. [Handler.Shutdown]
+// waits for the session's command loop to exit but does not wait for
+// goroutines started via Go. A goroutine that ignores the context
+// will leak and may race with the final state save during shutdown.
 func (s *StatefulSession[S]) Go(fn func(ctx context.Context)) {
 	go fn(s.Context())
 }

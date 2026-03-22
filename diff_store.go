@@ -18,9 +18,11 @@ import "context"
 // bytes - the encoding is an internal detail that may change between
 // framework versions.
 //
-// Load is not called by the framework today - reconnecting sessions
-// re-render from state, which re-seeds the differ. Load is included
-// for tooling, debugging, and future optimisations.
+// On reconnect, the framework calls Load to restore the differ's
+// snapshots. If the restore succeeds, the client receives targeted
+// patches (only what changed during the disconnect) instead of a
+// full root morph. If Load returns nil or an error, the framework
+// falls back to a full re-render.
 //
 // The framework does not ship any DiffStore implementations.
 // Developers provide their own, backed by whatever storage suits
@@ -35,9 +37,8 @@ type DiffStore interface {
 
 	// Load retrieves previously saved snapshot data. Returns the data
 	// and nil on success. If the session ID is not found, returns
-	// (nil, nil) - a missing entry is not an error. The framework
-	// treats a missing entry the same as a Load failure: the client
-	// gets a fresh session.
+	// (nil, nil) - a missing entry is not an error. When data is nil
+	// or Load fails, the framework falls back to a full root morph.
 	Load(ctx context.Context, id string) ([]byte, error)
 
 	// Delete removes snapshot data for a session. Called after a

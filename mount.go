@@ -1,6 +1,9 @@
 package tether
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 // ComponentMount wires a [Component] into the session's event dispatch.
 // Create mounts with [Mount] and list them in [StatefulConfig.Components].
@@ -78,7 +81,11 @@ type componentMount[S any, C Component] struct {
 func (m *componentMount[S, C]) init(sess Session, state S) S {
 	comp := m.getter(state)
 	if mounter, ok := any(comp).(Mounter); ok {
-		updated := mounter.Mount(sess).(C)
+		result := mounter.Mount(sess)
+		updated, ok := result.(C)
+		if !ok {
+			panic(fmt.Sprintf("tether: Mount: %T.Mount returned %T, expected %T", comp, result, comp))
+		}
 		return m.setter(state, updated)
 	}
 	return state
@@ -97,6 +104,10 @@ func (m *componentMount[S, C]) route(sess Session, state S, ev Event) (S, bool) 
 	comp := m.getter(state)
 	scoped := ev.WithAction(strings.TrimPrefix(ev.Action, target))
 	scoped.Target = m.prefix
-	updated := comp.Handle(sess, scoped).(C)
+	result := comp.Handle(sess, scoped)
+	updated, ok := result.(C)
+	if !ok {
+		panic(fmt.Sprintf("tether: Mount: %T.Handle returned %T, expected %T", comp, result, comp))
+	}
 	return m.setter(state, updated), true
 }
