@@ -377,12 +377,11 @@ func (s *StatefulSession[S]) saveSessionState(ctx context.Context, ttl time.Dura
 // destroyed sessions, everything is stopped and the destroyed
 // channel is closed.
 //
-// The destroyed channel has split ownership: cleanup() closes it for
-// sessions that reach Destroyed via the normal path (context
-// cancelled). For frozen sessions, cleanup() returns early and
-// [Handler.destroySession] closes it instead when the session is
-// permanently removed. Both paths are mutually exclusive - a session
-// is either frozen or not - so a double-close cannot occur.
+// cleanup runs when the loop exits. For frozen sessions only the
+// idle timer is stopped - the disconnect timer keeps running so the
+// reaper can destroy the session if it is never thawed. For
+// destroyed sessions, everything is stopped and the destroyed
+// channel is closed via destroyedOnce.
 func (s *StatefulSession[S]) cleanup() {
 	if s.idleTimer != nil {
 		s.idleTimer.Stop()
@@ -400,7 +399,7 @@ func (s *StatefulSession[S]) cleanup() {
 		s.transport.Close()
 	}
 	s.status.Store(int32(Destroyed))
-	close(s.destroyed)
+	s.destroyedOnce.Do(func() { close(s.destroyed) })
 }
 
 // sendDiff is the render-diff-send pipeline extracted from exec and

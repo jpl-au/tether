@@ -3,6 +3,7 @@ package tether
 import (
 	"context"
 	"maps"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -82,7 +83,10 @@ type StatefulSession[S any] struct {
 	// destroyed is closed when the session reaches the Destroyed
 	// state. Shutdown and Drain block on this to wait for permanent
 	// cleanup - not just a loop exit (which also happens on freeze).
-	destroyed chan struct{}
+	// Multiple code paths may attempt to close it (cleanup and
+	// destroySession); destroyedOnce ensures exactly one close.
+	destroyed     chan struct{}
+	destroyedOnce sync.Once
 
 	// Timestamps. lastActivity is atomic so the idle timer reset
 	// (inside the loop) and external readers (Health) don't conflict.

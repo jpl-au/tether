@@ -95,6 +95,19 @@ func (h *Handler[S]) Shutdown(ctx context.Context) error {
 		return ctx.Err()
 	}
 
+	// Wait for active upload handlers to finish so temp files are
+	// cleaned up before the process exits.
+	uploadDone := make(chan struct{})
+	go func() {
+		h.uploadWG.Wait()
+		close(uploadDone)
+	}()
+	select {
+	case <-uploadDone:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+
 	// Loops have exited - state is stable, no goroutine is mutating
 	// s.state. Save with context.Background() since session contexts
 	// are cancelled. TTL uses the shutdown grace period as a recovery

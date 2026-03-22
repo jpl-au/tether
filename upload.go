@@ -132,12 +132,13 @@ func (h *Handler[S]) handleUpload(w http.ResponseWriter, r *http.Request) {
 
 	// Hand ownership of the multipart form to a single goroutine
 	// that processes all files. Temp files are cleaned up after
-	// every callback has returned - not before.
+	// every callback has returned - not before. The WaitGroup
+	// ensures Shutdown waits for active uploads to finish.
 	form := r.MultipartForm
 	handler := h.cfg.Upload.Handle
 	sessionID := sess.id
 	diag := h.Diagnostics
-	go func() {
+	h.uploadWG.Go(func() {
 		defer form.RemoveAll()
 		defer func() {
 			if r := recover(); r != nil {
@@ -161,7 +162,7 @@ func (h *Handler[S]) handleUpload(w http.ResponseWriter, r *http.Request) {
 				})
 			}
 		}
-	}()
+	})
 
 	w.WriteHeader(http.StatusNoContent)
 }

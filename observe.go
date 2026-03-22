@@ -1,6 +1,10 @@
 package tether
 
-import "github.com/jpl-au/tether/dev"
+import (
+	"sync/atomic"
+
+	"github.com/jpl-au/tether/dev"
+)
 
 // Observe subscribes a session to a shared [Value]. The callback
 // receives the shared value and the session's current state, and
@@ -9,6 +13,13 @@ import "github.com/jpl-au/tether/dev"
 // The current value is delivered immediately so the session's state
 // is up to date from the moment of subscription. Future changes via
 // [Value.Store] or [Value.Update] are delivered automatically.
+//
+// Updates are coalesced: if a Value changes faster than the session
+// can render, intermediate values are skipped and only the latest
+// value is applied. This prevents render storms when a shared Value
+// updates at high frequency (e.g. a global counter or ticker). The
+// callback always receives the latest value via [Value.Load], not the
+// value that was current when the change was published.
 //
 // The subscription, initial read, and initial state application all
 // happen within a single session command. A concurrent [Value.Store]
@@ -29,9 +40,19 @@ func Observe[V any, S any](s *StatefulSession[S], val *Value[V], fn func(V, S) S
 	// value delivered." Any concurrent Store that fires the subscriber
 	// callback enqueues its Update after this one, preserving order.
 	s.Update(func(state S) S {
-		current := val.observe(s.Context(), func(v V) {
+		var pending atomic.Bool
+		current := val.observe(s.Context(), func(_ V) {
+			// Coalesce rapid updates: if an Update is already
+			// queued, skip this one. The queued Update reads the
+			// latest value when it runs, so no data is lost.
+			if !pending.CompareAndSwap(false, true) {
+				return
+			}
 			s.Update(func(inner S) S {
-				return fn(v, inner)
+				// Clear pending BEFORE Load so a change that
+				// arrives during Load triggers a new Update.
+				pending.Store(false)
+				return fn(val.Load(), inner)
 			})
 		}, s.ID())
 		return fn(current, state)

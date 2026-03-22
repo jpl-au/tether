@@ -43,6 +43,7 @@ type Handler[S any] struct {
 	closeOnce    sync.Once
 	draining     atomic.Bool
 	drainNotify  chan struct{} // buffered(1), signalled when pools empty during drain
+	uploadWG     sync.WaitGroup
 
 	// csrf checks cross-origin requests using Go 1.25's standard
 	// library CrossOriginProtection. Safe methods (GET, HEAD) are
@@ -99,13 +100,13 @@ func (h *Handler[S]) destroySession(s *StatefulSession[S]) {
 	}
 
 	// For frozen sessions the loop already exited and cleanup()
-	// skipped closing destroyed (see cleanup() comment for the full
-	// ownership contract). Close it now so Shutdown waiters are
-	// unblocked.
+	// skipped closing destroyed. Close it now so Shutdown waiters
+	// are unblocked. destroyedOnce ensures this is safe even if
+	// cleanup() and destroySession() race during thaw.
 	if Status(s.status.Load()) == Frozen {
 		s.status.Store(int32(Destroyed))
-		close(s.destroyed)
 	}
+	s.destroyedOnce.Do(func() { close(s.destroyed) })
 
 	// Remove stored data for sessions that were offloaded during
 	// disconnect. No-op if nothing was stored.
