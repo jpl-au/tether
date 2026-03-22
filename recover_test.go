@@ -3,6 +3,7 @@ package tether
 import (
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"testing/synctest"
 
@@ -10,12 +11,13 @@ import (
 	"github.com/jpl-au/tether/mode"
 )
 
-func TestSessionHandlePanicDoesNotKillSession(t *testing.T) {
+func TestSessionHandlePanicDestroysSession(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
+		// Single event so readTransport exits cleanly after the
+		// panic triggers session destruction.
 		mt := &mockTransport{
 			events: []Event{
 				{Type: event.Click, Action: "crash"},
-				{Type: event.Click, Action: "increment"},
 			},
 		}
 
@@ -32,40 +34,111 @@ func TestSessionHandlePanicDoesNotKillSession(t *testing.T) {
 
 		go sess.readTransport(sess.events)
 		go sess.run()
-		defer func() { sess.stop(); synctest.Wait() }()
 		synctest.Wait()
 
-		if s := sess.State(); s.Count != 1 {
-			t.Errorf("expected Count 1 after recovery, got %d", s.Count)
+		if s := sess.State(); s.Count != 0 {
+			t.Errorf("expected Count 0 (session destroyed), got %d", s.Count)
 		}
 
-		mt.mu.Lock()
-		defer mt.mu.Unlock()
-
-		// Only the second event (increment) should produce a patch.
-		if len(patchMessages(mt.sent)) != 1 {
-			t.Errorf("expected 1 patch update after panic recovery, got %d", len(patchMessages(mt.sent)))
+		select {
+		case <-sess.destroyed:
+			// expected
+		default:
+			t.Error("session should be destroyed after panic")
 		}
 	})
 }
 
-func TestSessionUpdatePanicDoesNotCrashCaller(t *testing.T) {
+func TestSessionHandlePanicCallsOnPanic(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		mt := &mockTransport{
+			events: []Event{
+				{Type: event.Click, Action: "crash"},
+				{Type: event.Click, Action: "increment"},
+			},
+		}
+
+		handle := func(_ Session, s counterState, ev Event) counterState {
+			if ev.Action == "crash" {
+				panic("boom")
+			}
+			s.Count++
+			return s
+		}
+
+		var called atomic.Bool
+		sess := newTestSession(counterState{Count: 0}, mt)
+		sess.handle = handle
+		sess.onPanic = func(_ *StatefulSession[counterState], err error) {
+			called.Store(true)
+		}
+
+		go sess.readTransport(sess.events)
+		go sess.run()
+		defer func() { sess.stop(); synctest.Wait() }()
+		synctest.Wait()
+
+		if !called.Load() {
+			t.Error("OnPanic callback was not called")
+		}
+
+		// With OnPanic set, the session survives and processes
+		// the second event.
+		if s := sess.State(); s.Count != 1 {
+			t.Errorf("expected Count 1 (session survived), got %d", s.Count)
+		}
+	})
+}
+
+func TestSessionUpdatePanicDestroysSession(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		ct := newConnectedTransport()
 		sess := newTestSession(counterState{Count: 0}, ct)
 
 		go sess.readTransport(sess.events)
 		go sess.run()
-		defer func() { sess.stop(); synctest.Wait() }()
+		synctest.Wait()
 
-		// Queue an update that panics. The panic is recovered inside
-		// the command loop - the caller is not affected.
 		sess.Update(func(s counterState) counterState {
 			panic("boom in update")
 		})
 		synctest.Wait()
 
-		// State should be unchanged after a panicking Update.
+		select {
+		case <-sess.destroyed:
+			// expected
+		default:
+			t.Error("session should be destroyed after panic in Update")
+		}
+	})
+}
+
+func TestSessionUpdatePanicCallsOnPanic(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ct := newConnectedTransport()
+		sess := newTestSession(counterState{Count: 0}, ct)
+
+		var called atomic.Bool
+		sess.onPanic = func(_ *StatefulSession[counterState], err error) {
+			called.Store(true)
+		}
+
+		go sess.readTransport(sess.events)
+		go sess.run()
+		defer func() { sess.stop(); synctest.Wait() }()
+		synctest.Wait()
+
+		sess.Update(func(s counterState) counterState {
+			panic("boom in update")
+		})
+		synctest.Wait()
+
+		if !called.Load() {
+			t.Error("OnPanic callback was not called")
+		}
+
+		// State should be unchanged - the panicking Update didn't
+		// complete, but the session survived.
 		if s := sess.State(); s.Count != 0 {
 			t.Errorf("expected Count 0 after panicking Update, got %d", s.Count)
 		}

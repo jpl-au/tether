@@ -88,6 +88,11 @@ func (s *StatefulSession[S]) runCmd(cmd func()) {
 				Err:       err,
 				Detail:    s.endpoint,
 			})
+			if s.onPanic != nil {
+				s.onPanic(s, err)
+			} else {
+				s.stop()
+			}
 		}
 	}()
 	cmd()
@@ -138,6 +143,15 @@ func (s *StatefulSession[S]) exec(ev Event) {
 				Detail:    ev.Action,
 			})
 			s.drainFx(nil)
+			// State may contain partially mutated reference types
+			// (maps, slices) that cannot be trusted. Destroy the
+			// session unless the developer has opted into custom
+			// recovery via OnPanic.
+			if s.onPanic != nil {
+				s.onPanic(s, err)
+			} else {
+				s.stop()
+			}
 		}
 	}()
 

@@ -285,6 +285,9 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 	if h.cfg.OnNoPatch != nil {
 		sess.onNoPatch = h.cfg.OnNoPatch
 	}
+	if h.cfg.OnPanic != nil {
+		sess.onPanic = h.cfg.OnPanic
+	}
 	if h.cfg.Timeouts.MaxLifetime > 0 {
 		sess.lifetimeTimer = time.AfterFunc(h.cfg.Timeouts.MaxLifetime, func() {
 			sess.stop()
@@ -465,6 +468,9 @@ func (h *Handler[S]) restoreSession(id string, r *http.Request, transport Transp
 	}
 	if h.cfg.OnNoPatch != nil {
 		sess.onNoPatch = h.cfg.OnNoPatch
+	}
+	if h.cfg.OnPanic != nil {
+		sess.onPanic = h.cfg.OnPanic
 	}
 	if h.cfg.Timeouts.MaxLifetime > 0 {
 		sess.lifetimeTimer = time.AfterFunc(h.cfg.Timeouts.MaxLifetime, func() {

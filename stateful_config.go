@@ -276,6 +276,24 @@ type StatefulConfig[S any] struct {
 	// where setup is identical for new and restored sessions.
 	OnRestore func(session *StatefulSession[S])
 
+	// OnPanic is called when a panic occurs during Handle or Update.
+	// When nil (the default), the session is destroyed immediately
+	// because the state may contain partially mutated maps or slices
+	// that cannot be trusted. The client is disconnected and must
+	// reload to get a fresh session.
+	//
+	// Set this to opt into custom recovery. The callback receives the
+	// session and the recovered error. If set, the session is kept
+	// alive after the callback returns - the developer assumes
+	// responsibility for the integrity of the state. This is useful
+	// during development (e.g. hot reload) but should not be used in
+	// production unless you are certain your state contains no
+	// reference types that could be corrupted by a partial mutation.
+	//
+	// The callback runs inside the session's command loop. Keep it
+	// fast. Optional.
+	OnPanic func(session *StatefulSession[S], err error)
+
 	// FreezeOnDisconnect enables frozen mode for disconnected
 	// sessions. When true, a session that loses its transport
 	// persists state S to the [SessionStore], releases the state

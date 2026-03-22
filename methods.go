@@ -71,6 +71,11 @@ func (s *StatefulSession[S]) Update(fn func(S) S) {
 					Detail:    s.endpoint,
 				})
 				s.drainFx(nil)
+				if s.onPanic != nil {
+					s.onPanic(s, err)
+				} else {
+					s.stop()
+				}
 			}
 		}()
 

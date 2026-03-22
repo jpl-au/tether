@@ -183,6 +183,12 @@ type StatefulSession[S any] struct {
 	// StatefulConfig.Codec, or defaults to CBOR if nil.
 	codec SessionCodec[S]
 
+	// onPanic is called when a panic occurs during Handle or Update.
+	// When nil, the session is destroyed. When set, the session
+	// survives and the developer assumes responsibility for state
+	// integrity. Set from StatefulConfig.OnPanic.
+	onPanic func(*StatefulSession[S], error)
+
 	// freeze is true when FreezeOnDisconnect is enabled and a
 	// SessionStore is configured. When set, the session persists
 	// state to the store on disconnect, releases S and the differ,
