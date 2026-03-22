@@ -67,10 +67,12 @@ func TestSessionHandlePanicCallsOnPanic(t *testing.T) {
 		}
 
 		var called atomic.Bool
+		var gotErr atomic.Value
 		sess := newTestSession(counterState{Count: 0}, mt)
 		sess.handle = handle
 		sess.onPanic = func(_ *StatefulSession[counterState], err error) {
 			called.Store(true)
+			gotErr.Store(err.Error())
 		}
 
 		go sess.readTransport(sess.events)
@@ -80,6 +82,9 @@ func TestSessionHandlePanicCallsOnPanic(t *testing.T) {
 
 		if !called.Load() {
 			t.Error("OnPanic callback was not called")
+		}
+		if msg, ok := gotErr.Load().(string); !ok || msg != "boom" {
+			t.Errorf("OnPanic error = %q, want %q", msg, "boom")
 		}
 
 		// With OnPanic set, the session survives and processes

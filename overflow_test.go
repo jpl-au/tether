@@ -102,6 +102,56 @@ func TestEnqueueDropWhenExhausted(t *testing.T) {
 	})
 }
 
+// TestEnqueueDropCallsOnCommandDropped verifies that when
+// OnCommandDropped is set, the callback fires and the session
+// survives instead of being destroyed.
+func TestEnqueueDropCallsOnCommandDropped(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ct := newConnectedTransport()
+		sess := newTestSession(counterState{}, ct)
+		sess.cmds = make(chan func(), 1)
+		sess.overflowSem = make(chan struct{}, 1)
+
+		var called bool
+		sess.onCommandDropped = func(_ *StatefulSession[counterState]) {
+			called = true
+		}
+
+		go sess.readTransport(sess.events)
+		go sess.run()
+		defer func() { sess.stop(); synctest.Wait() }()
+		synctest.Wait()
+
+		// Block the loop so it can't drain.
+		block := make(chan struct{})
+		sess.cmds <- func() { <-block }
+		synctest.Wait()
+
+		// Fill the command buffer (cap 1).
+		sess.cmds <- func() {}
+		// Fill the overflow semaphore (cap 1).
+		sess.overflowSem <- struct{}{}
+
+		// Both full - should call onCommandDropped instead of destroying.
+		sess.enqueue(func() {})
+		synctest.Wait()
+
+		if !called {
+			t.Error("OnCommandDropped callback was not called")
+		}
+
+		// Session should still be alive.
+		select {
+		case <-sess.ctx.Done():
+			t.Error("session should not be destroyed when OnCommandDropped is set")
+		default:
+		}
+
+		<-sess.overflowSem
+		close(block)
+	})
+}
+
 // TestEnqueueFxOverflow verifies that enqueueFx also emits a
 // BufferOverflow diagnostic when the effect buffer is full.
 func TestEnqueueFxOverflow(t *testing.T) {

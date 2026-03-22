@@ -360,3 +360,45 @@ func TestThawMultipleCycles(t *testing.T) {
 		synctest.Wait()
 	})
 }
+
+// TestThawRecreatesTransportContext verifies that the transport
+// context from before freeze is cancelled, and thaw creates a
+// fresh one.
+func TestThawRecreatesTransportContext(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		store := newSessionFileStore(t)
+		h := newThawHandler(store)
+
+		sess := freezeSession(t, h, counterState{}, nil)
+
+		// Capture the pre-freeze transport context. It was set
+		// during newTestSession and cancelled in onTransportClose.
+		preFreezeCtx := sess.transportCtx
+		select {
+		case <-preFreezeCtx.Done():
+			// expected - cancelled on disconnect/freeze
+		default:
+			t.Error("pre-freeze transport context should be cancelled after freeze")
+		}
+
+		// Thaw the session.
+		thawMT := &mockTransport{}
+		req, _ := http.NewRequest("GET", "/", nil)
+
+		h.mu.Lock()
+		h.active[sess.id] = sess
+		h.mu.Unlock()
+
+		go h.thaw(sess, req, thawMT)
+		synctest.Wait()
+
+		// After thaw, the session should have a new, live
+		// transport context (created inside thaw).
+		if sess.transportCtx == preFreezeCtx {
+			t.Error("thaw should create a new transport context")
+		}
+
+		sess.stop()
+		synctest.Wait()
+	})
+}

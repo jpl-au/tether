@@ -300,6 +300,39 @@ func TestBusSubscribeAsyncUnsubscribe(t *testing.T) {
 	})
 }
 
+func TestBusConfigDefaults(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		// Only AsyncWorkers set - overflow should default to Block.
+		bus := NewBus[int](BusConfig{AsyncWorkers: 1})
+
+		gate := make(chan struct{})
+		var count int
+		bus.SubscribeAsync(context.Background(), func(int) {
+			<-gate
+			count++
+		})
+
+		bus.Publish(1) // fills the single slot
+		synctest.Wait()
+
+		// Second publish in a goroutine - should block (default),
+		// not drop or inline.
+		go bus.Publish(2)
+		synctest.Wait()
+
+		if count != 0 {
+			t.Fatalf("count = %d, want 0 (both blocked)", count)
+		}
+
+		close(gate)
+		synctest.Wait()
+
+		if count != 2 {
+			t.Errorf("count = %d, want 2 (block delivered both)", count)
+		}
+	})
+}
+
 func TestBusAsyncOverflowBlock(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		// Semaphore of 1 so the second publish must wait.
