@@ -268,7 +268,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		store:            h.cfg.DiffStore,
 		sessionStore:     h.cfg.SessionStore,
 		codec:            h.sessionCodec(),
-		freeze:           h.cfg.FreezeOnDisconnect && h.cfg.SessionStore != nil,
+		freeze:           h.cfg.Freeze != 0 && h.cfg.SessionStore != nil,
 	}
 	sess.lastActivity.Store(now.UnixNano())
 	dev.Debug("session created", "session", id, "endpoint", r.URL.Path, "remote", r.RemoteAddr)
@@ -451,7 +451,7 @@ func (h *Handler[S]) restoreSession(id string, r *http.Request, transport Transp
 		store:            h.cfg.DiffStore,
 		sessionStore:     h.cfg.SessionStore,
 		codec:            codec,
-		freeze:           h.cfg.FreezeOnDisconnect && h.cfg.SessionStore != nil,
+		freeze:           h.cfg.Freeze != 0 && h.cfg.SessionStore != nil,
 	}
 	sess.lastURL = env.URL
 	sess.lastTitle = env.Title

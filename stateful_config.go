@@ -11,6 +11,24 @@ import (
 	"github.com/jpl-au/tether/wire"
 )
 
+// FreezeMode controls how a session behaves when its transport
+// disconnects with freeze enabled. Zero disables freeze.
+type FreezeMode int
+
+const (
+	// FreezeWithRestore requires [StatefulConfig.OnRestore] to be
+	// set. On thaw, the framework calls OnRestore so the developer
+	// can re-fetch authoritative state from the database. The
+	// framework panics at startup if OnRestore is nil.
+	FreezeWithRestore FreezeMode = iota + 1
+
+	// FreezeWithConnect falls back to [StatefulConfig.OnConnect]
+	// on thaw. Use this when OnConnect already performs full
+	// initialisation and a dedicated OnRestore is not needed. The
+	// developer accepts that the restored snapshot may be stale.
+	FreezeWithConnect
+)
+
 // StatefulConfig wires together all the pieces of a stateful page:
 // how to create initial state, how to render it, and how to handle
 // events. The type parameter S is the session state - typically a
@@ -294,23 +312,32 @@ type StatefulConfig[S any] struct {
 	// fast. Optional.
 	OnPanic func(session *StatefulSession[S], err error)
 
-	// FreezeOnDisconnect enables frozen mode for disconnected
-	// sessions. When true, a session that loses its transport
-	// persists state S to the [SessionStore], releases the state
-	// and differ from memory, and exits the command loop. The
-	// session becomes a lightweight stub holding only its ID and
-	// metadata. On reconnect, the framework loads state from the
-	// store, starts a fresh loop, and fires [OnRestore].
+	// Freeze enables frozen mode for disconnected sessions. When
+	// set, a session that loses its transport persists state S to
+	// the [SessionStore], releases the state and differ from
+	// memory, and exits the command loop. The session becomes a
+	// lightweight stub holding only its ID and metadata. On
+	// reconnect, the framework loads state from the store, starts
+	// a fresh loop, and fires the restore callback.
 	//
 	// This dramatically reduces memory for disconnected sessions
 	// at the cost of commands (Update, broadcasts, timer callbacks)
 	// being silently discarded while frozen. Enable this when
 	// sessions do not need background processing during disconnect.
 	//
-	// Requires [SessionStore] to be configured. If SessionStore is
-	// nil and FreezeOnDisconnect is true, the framework logs a
-	// warning at startup and disables freeze.
-	FreezeOnDisconnect bool
+	// Requires [SessionStore] to be configured. The [FreezeMode]
+	// value controls how the session is restored on reconnect:
+	//
+	//   - [FreezeWithRestore] requires [OnRestore] to be set. The
+	//     developer must re-fetch authoritative state from the
+	//     database or other source. The framework refuses to start
+	//     if OnRestore is nil.
+	//   - [FreezeWithConnect] falls back to [OnConnect] on thaw.
+	//     Use this when OnConnect already performs full setup and a
+	//     dedicated OnRestore is not needed.
+	//
+	// Zero (the default) disables freeze entirely.
+	Freeze FreezeMode
 }
 
 // PushConfig enables Web Push notifications for the page. The VAPID

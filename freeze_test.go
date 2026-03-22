@@ -2,9 +2,12 @@ package tether
 
 import (
 	"context"
+	"net/http"
 	"testing"
 	"testing/synctest"
 	"time"
+
+	"github.com/jpl-au/tether/mode"
 )
 
 // TestFreezeOnDisconnect verifies that a session with freeze enabled
@@ -204,6 +207,64 @@ func TestNoFreezeWithoutStore(t *testing.T) {
 	})
 }
 
+// TestFreezeWithRestoreRequiresOnRestore verifies that the framework
+// panics when FreezeWithRestore is used without OnRestore.
+func TestFreezeWithRestoreRequiresOnRestore(t *testing.T) {
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("expected panic for FreezeWithRestore without OnRestore")
+		}
+	}()
+
+	Stateful(App{}, StatefulConfig[counterState]{
+		Mode:         mode.WebSocket,
+		Upgrade:      stubUpgrade,
+		InitialState: func(r *http.Request) counterState { return counterState{} },
+		Render:       renderCounter,
+		Handle:       handleCounter,
+		SessionStore: newSessionFileStore(t),
+		Freeze:       FreezeWithRestore,
+		// OnRestore deliberately nil
+	})
+}
+
+// TestFreezeRequiresSessionStore verifies that the framework panics
+// when Freeze is enabled without a SessionStore.
+func TestFreezeRequiresSessionStore(t *testing.T) {
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("expected panic for Freeze without SessionStore")
+		}
+	}()
+
+	Stateful(App{}, StatefulConfig[counterState]{
+		Mode:         mode.WebSocket,
+		Upgrade:      stubUpgrade,
+		InitialState: func(r *http.Request) counterState { return counterState{} },
+		Render:       renderCounter,
+		Handle:       handleCounter,
+		Freeze:       FreezeWithConnect,
+		// SessionStore deliberately nil
+	})
+}
+
+// TestFreezeWithConnectAllowsNilOnRestore verifies that
+// FreezeWithConnect does not require OnRestore.
+func TestFreezeWithConnectAllowsNilOnRestore(t *testing.T) {
+	// Should not panic.
+	Stateful(App{}, StatefulConfig[counterState]{
+		Mode:         mode.WebSocket,
+		Upgrade:      stubUpgrade,
+		InitialState: func(r *http.Request) counterState { return counterState{} },
+		Render:       renderCounter,
+		Handle:       handleCounter,
+		SessionStore: newSessionFileStore(t),
+		Freeze:       FreezeWithConnect,
+	})
+}
+
 // TestFreezeWithoutFreezeFlag verifies that sessions with a
 // SessionStore but without freeze enabled behave normally - the
 // loop keeps running after disconnect.
@@ -222,7 +283,7 @@ func TestFreezeWithoutFreezeFlag(t *testing.T) {
 
 		// Session should remain active (loop still running), not frozen.
 		if Status(sess.status.Load()) == Frozen {
-			t.Error("session should not be frozen when FreezeOnDisconnect is false")
+			t.Error("session should not be frozen when Freeze is disabled")
 		}
 
 		// Commands should still be processed.

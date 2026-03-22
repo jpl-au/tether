@@ -14,12 +14,12 @@ import (
 // store. Shared setup for thaw tests.
 func newThawHandler(store SessionStore, opts ...func(*StatefulConfig[counterState])) *Handler[counterState] {
 	cfg := StatefulConfig[counterState]{
-		Render:             renderCounter,
-		Handle:             handleCounter,
-		SessionStore:       store,
-		FreezeOnDisconnect: true,
-		Limits:             Limits{CmdBufferSize: defaultCmdBufferSize},
-		Timeouts:           Timeouts{Reconnect: 30 * time.Second},
+		Render:       renderCounter,
+		Handle:       handleCounter,
+		SessionStore: store,
+		Freeze:       FreezeWithConnect,
+		Limits:       Limits{CmdBufferSize: defaultCmdBufferSize},
+		Timeouts:     Timeouts{Reconnect: 30 * time.Second},
 	}
 	for _, opt := range opts {
 		opt(&cfg)
@@ -187,6 +187,7 @@ func TestThawFiresOnRestore(t *testing.T) {
 		var called bool
 
 		h := newThawHandler(store, func(cfg *StatefulConfig[counterState]) {
+			cfg.Freeze = FreezeWithRestore
 			cfg.OnRestore = func(_ *StatefulSession[counterState]) {
 				called = true
 			}

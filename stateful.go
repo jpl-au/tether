@@ -154,9 +154,13 @@ func Stateful[S any](app App, cfg StatefulConfig[S]) *Handler[S] {
 	if cfg.Limits.MaxSessions == 0 && !app.DevMode {
 		slog.Warn("tether: Limits.MaxSessions is 0 (unlimited) - set a limit in production to prevent resource exhaustion")
 	}
-	if cfg.FreezeOnDisconnect && cfg.SessionStore == nil {
-		slog.Warn("tether: FreezeOnDisconnect requires a SessionStore - frozen mode disabled because there is nowhere to persist state")
-		cfg.FreezeOnDisconnect = false
+	if cfg.Freeze != 0 {
+		if cfg.SessionStore == nil {
+			panic("tether: Freeze requires a SessionStore")
+		}
+		if cfg.Freeze == FreezeWithRestore && cfg.OnRestore == nil {
+			panic("tether: FreezeWithRestore requires OnRestore - implement OnRestore to re-fetch state, or use FreezeWithConnect to fall back to OnConnect")
+		}
 	}
 	mounts := app.mountAssets()
 	csrf := app.Security.csrf()
