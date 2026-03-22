@@ -416,7 +416,7 @@ func (s *StatefulSession[S]) enqueueFx(fn func(*Effects)) {
 				defer func() { <-s.overflowSem }()
 				select {
 				case s.fxCh <- fn:
-				case <-s.ctx.Done():
+				case <-s.loopDone:
 				}
 			}()
 		default:
@@ -500,7 +500,7 @@ func (s *StatefulSession[S]) enqueue(fn func()) {
 				defer func() { <-s.overflowSem }()
 				select {
 				case s.cmds <- fn:
-				case <-s.ctx.Done():
+				case <-s.loopDone:
 				}
 			}()
 		default:
