@@ -4,11 +4,13 @@ import (
 	"context"
 	"testing"
 	"testing/synctest"
+	"time"
 
 	jit "github.com/jpl-au/fluent-jit"
 	"github.com/jpl-au/fluent/html5/div"
 	"github.com/jpl-au/fluent/html5/span"
 	"github.com/jpl-au/fluent/node"
+	"github.com/jpl-au/tether/dev"
 	"github.com/jpl-au/tether/event"
 	"github.com/jpl-au/tether/wire"
 )
@@ -228,6 +230,140 @@ func TestSessionDisconnectCallsHandler(t *testing.T) {
 
 		if !called {
 			t.Error("OnDisconnect should be called when transport closes")
+		}
+	})
+}
+
+func TestDisconnectTimerCallsHandlerSessionTimedOut(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		// mockTransport with no events disconnects immediately,
+		// triggering onTransportClose which starts the timer.
+		mt := &mockTransport{}
+		sess := newTestSession(counterState{}, mt)
+		sess.reconnectTimeout = 100 * time.Millisecond
+
+		h := &Handler[counterState]{
+			app:          App{},
+			cfg:          StatefulConfig[counterState]{},
+			pending:      make(map[string]*pendingSession[counterState]),
+			active:       map[string]*StatefulSession[counterState]{sess.id: sess},
+			disconnected: make(map[string]*StatefulSession[counterState]),
+			done:         make(chan struct{}),
+		}
+		h.Diagnostics = NewBus[Diagnostic]()
+		sess.handler = h
+
+		go sess.readTransport(sess.events)
+		go sess.run()
+		synctest.Wait()
+
+		// Transport has disconnected. The handler moved the
+		// session to the disconnected pool and started the timer.
+		h.mu.Lock()
+		_, inDisc := h.disconnected[sess.id]
+		h.mu.Unlock()
+		if !inDisc {
+			t.Fatal("session should be in disconnected pool after transport close")
+		}
+
+		// Advance past the reconnect timeout.
+		time.Sleep(200 * time.Millisecond)
+		synctest.Wait()
+
+		// The handler's sessionTimedOut should have removed the
+		// session from the disconnected pool and destroyed it.
+		h.mu.Lock()
+		_, stillDisc := h.disconnected[sess.id]
+		h.mu.Unlock()
+
+		if stillDisc {
+			t.Error("session should be removed from disconnected pool after timeout")
+		}
+
+		select {
+		case <-sess.ctx.Done():
+			// expected - session destroyed
+		default:
+			t.Error("session context should be cancelled after timeout")
+		}
+	})
+}
+
+func TestStateCalledDuringHandleWarns(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		var stateCalledDuringHandle bool
+		mt := &mockTransport{
+			events: []Event{
+				{Type: event.Click, Action: "read-state"},
+			},
+		}
+		sess := newTestSession(counterState{Count: 0}, mt)
+		sess.handle = func(s Session, state counterState, ev Event) counterState {
+			if ev.Action == "read-state" {
+				// This should trigger a dev-mode warning.
+				live := s.(*StatefulSession[counterState])
+				_ = live.State()
+				stateCalledDuringHandle = true
+			}
+			return state
+		}
+
+		// Enable dev mode so the warning fires.
+		dev.Enable()
+		defer dev.Reset()
+
+		go sess.readTransport(sess.events)
+		go sess.run()
+		defer func() { sess.stop(); synctest.Wait() }()
+		synctest.Wait()
+
+		if !stateCalledDuringHandle {
+			t.Error("handler should have called State()")
+		}
+		// The warning is emitted via dev.Warn - we verify it
+		// doesn't panic and the handling flag is correctly
+		// managed (cleared after Handle returns).
+		if sess.handling {
+			t.Error("handling flag should be false after Handle returns")
+		}
+	})
+}
+
+func TestCommandDiscardedOnDestroyedSession(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ct := newConnectedTransport()
+		sess := newTestSession(counterState{}, ct)
+
+		diag := NewBus[Diagnostic]()
+		sess.diagnostics = diag
+
+		// Use a separate context so the subscriber outlives
+		// the session destruction.
+		diagCtx, diagCancel := context.WithCancel(context.Background())
+		defer diagCancel()
+
+		var discards int
+		diag.Subscribe(diagCtx, func(d Diagnostic) {
+			if d.Kind == CommandDiscarded {
+				discards++
+			}
+		})
+
+		go sess.readTransport(sess.events)
+		go sess.run()
+		synctest.Wait()
+
+		// Destroy the session.
+		sess.stop()
+		synctest.Wait()
+
+		// Commands to a destroyed session should emit
+		// CommandDiscarded, not silently disappear.
+		sess.enqueue(func() {})
+		sess.enqueueFx(func(*Effects) {})
+
+		if discards != 2 {
+			t.Errorf("expected 2 CommandDiscarded diagnostics on destroyed session, got %d", discards)
 		}
 	})
 }
