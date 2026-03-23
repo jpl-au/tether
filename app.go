@@ -24,8 +24,10 @@ type App struct {
 
 	// Logger used for framework log output. When nil, the framework
 	// creates a text handler at INFO level (DEBUG in DevMode) and
-	// sets it as the process-wide slog default once. When provided,
-	// the framework uses it without touching the global default.
+	// configures the dev package's scoped logger. The process-wide
+	// slog default is NEVER modified - tether's logger is scoped
+	// to the framework. When provided, the framework uses it
+	// without touching the global default.
 	Logger *slog.Logger
 
 	// Client groups browser-side settings passed to the client JS
