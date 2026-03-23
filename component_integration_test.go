@@ -175,6 +175,7 @@ func TestComponentIntegrationMultiInstance(t *testing.T) {
 			ctx:       ctx,
 			stop:      cancel,
 		}
+		sess.status.Store(int32(Pending))
 		tree := sess.render(sess.state)
 		differ.Render(tree)
 
@@ -262,6 +263,7 @@ func TestComponentIntegrationSideEffects(t *testing.T) {
 			ctx:       ctx,
 			stop:      cancel,
 		}
+		sess.status.Store(int32(Pending))
 		tree := sess.render(sess.state)
 		differ.Render(tree)
 
@@ -353,6 +355,7 @@ func TestComponentIntegrationToggleAndClear(t *testing.T) {
 			ctx:       ctx,
 			stop:      cancel,
 		}
+		sess.status.Store(int32(Pending))
 		tree := sess.render(sess.state)
 		differ.Render(tree)
 
@@ -413,6 +416,7 @@ func TestComponentManualRouteTyped(t *testing.T) {
 			ctx:       ctx,
 			stop:      cancel,
 		}
+		sess.status.Store(int32(Pending))
 		tree := sess.render(sess.state)
 		differ.Render(tree)
 
@@ -474,6 +478,7 @@ func TestComponentEqualComponentSkipsRender(t *testing.T) {
 				return a.Todo.EqualComponent(b.Todo)
 			},
 		}
+		sess.status.Store(int32(Pending))
 		tree := sess.render(sess.state)
 		differ.Render(tree)
 

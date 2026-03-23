@@ -77,7 +77,7 @@ func (h *Handler[S]) Shutdown(ctx context.Context) error {
 	// destroyed channel is closed to unblock waiters below.
 	for _, sess := range sessions {
 		if sess.freeze && Status(sess.status.Load()) == Frozen {
-			sess.status.Store(int32(Destroyed))
+			sess.transition(Destroyed)
 			sess.destroyedOnce.Do(func() { close(sess.destroyed) })
 			continue
 		}

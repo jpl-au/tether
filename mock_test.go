@@ -228,6 +228,10 @@ func newTestSession(state counterState, mt Transport) *StatefulSession[counterSt
 		ctx:             ctx,
 		stop:            cancel,
 	}
+	// Initial status is set directly, not via transition(), because
+	// there is no prior state to validate against. All subsequent
+	// changes must use transition().
+	sess.status.Store(int32(Pending))
 	tree := sess.render(sess.state)
 	differ.Render(tree)
 	return sess

@@ -172,6 +172,7 @@ func BenchmarkEventCycle(b *testing.B) {
 		ctx:       ctx,
 		stop:      cancel,
 	}
+	sess.status.Store(int32(Pending))
 
 	tree := benchRender(benchState{Count: 0})
 	differ.Render(tree)

@@ -104,7 +104,7 @@ func (h *Handler[S]) destroySession(s *StatefulSession[S]) {
 	// are unblocked. destroyedOnce ensures this is safe even if
 	// cleanup() and destroySession() race during thaw.
 	if Status(s.status.Load()) == Frozen {
-		s.status.Store(int32(Destroyed))
+		s.transition(Destroyed)
 	}
 	s.destroyedOnce.Do(func() { close(s.destroyed) })
 

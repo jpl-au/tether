@@ -65,6 +65,7 @@ func newMountSession(state mountState, mt Transport, mounts []ComponentMount[mou
 		ctx:       ctx,
 		stop:      cancel,
 	}
+	sess.status.Store(int32(Pending))
 	tree := sess.render(sess.state)
 	differ.Render(tree)
 	return sess
@@ -178,6 +179,7 @@ func TestMountRouteSetsEventTarget(t *testing.T) {
 			destroyed: make(chan struct{}),
 			ctx:       ctx, stop: cancel,
 		}
+		sess.status.Store(int32(Pending))
 		tree := sess.render(sess.state)
 		differ.Render(tree)
 

@@ -104,6 +104,7 @@ func TestObserveCrossHandler(t *testing.T) {
 			ctx:       ctxB,
 			stop:      cancelB,
 		}
+		sessB.status.Store(int32(Pending))
 		differB.Render(renderDash(dashState{}))
 
 		go sessB.readTransport(sessB.events)
@@ -197,6 +198,7 @@ func TestObserveMultipleValues(t *testing.T) {
 			ctx:       ctx,
 			stop:      cancel,
 		}
+		sess.status.Store(int32(Pending))
 		differ.Render(render(state{}))
 
 		go sess.readTransport(sess.events)

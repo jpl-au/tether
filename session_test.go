@@ -177,6 +177,7 @@ func TestSessionStructuralChange(t *testing.T) {
 			ctx:       ctx,
 			stop:      cancel,
 		}
+		sess.status.Store(int32(Pending))
 
 		tree := sess.render(sess.state)
 		differ.Render(tree)

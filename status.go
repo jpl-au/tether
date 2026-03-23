@@ -1,5 +1,7 @@
 package tether
 
+import "slices"
+
 // Status represents the lifecycle state of a session. Each session
 // transitions through these states exactly once in forward order,
 // except Frozen which can return to Active on reconnect.
@@ -33,6 +35,28 @@ const (
 	// been released.
 	Destroyed
 )
+
+// validTransitions defines the allowed state machine edges. Any
+// transition not listed here is a bug and will panic.
+var validTransitions = map[Status][]Status{
+	Pending: {Active},
+	Active:  {Frozen, Destroyed},
+	Frozen:  {Active, Destroyed},
+}
+
+// transition atomically moves the session to a new status. Panics
+// if the transition is not valid according to the state machine.
+// This makes invalid transitions impossible - bugs surface
+// immediately during development rather than causing silent state
+// corruption.
+func (s *StatefulSession[S]) transition(to Status) {
+	from := Status(s.status.Load())
+	if slices.Contains(validTransitions[from], to) {
+		s.status.Store(int32(to))
+		return
+	}
+	panic("tether: invalid status transition " + from.String() + " -> " + to.String())
+}
 
 // String returns a human-readable name for the status.
 func (s Status) String() string {

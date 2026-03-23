@@ -180,7 +180,7 @@ func TestFreezeDestroyClosesBoth(t *testing.T) {
 		// Simulate what Handler.destroySession does for frozen sessions.
 		sess.stop()
 		if Status(sess.status.Load()) == Frozen {
-			sess.status.Store(int32(Destroyed))
+			sess.transition(Destroyed)
 			close(sess.destroyed)
 		}
 		synctest.Wait()

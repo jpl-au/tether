@@ -31,7 +31,7 @@ const maxNavigateRedirects = 5
 func (s *StatefulSession[S]) run() {
 	dev.Debug("run loop started", "session", s.id, "endpoint", s.endpoint)
 	s.stateSnap.Store(s.state)
-	s.status.Store(int32(Active))
+	s.transition(Active)
 	defer close(s.loopDone)
 	defer s.cleanup()
 
@@ -333,7 +333,7 @@ func (s *StatefulSession[S]) onTransportClose() {
 		var zero S
 		s.state = zero
 		s.differ = nil
-		s.status.Store(int32(Frozen))
+		s.transition(Frozen)
 		dev.Debug("session frozen", "session", s.id, "endpoint", s.endpoint)
 	}
 }
@@ -414,7 +414,7 @@ func (s *StatefulSession[S]) cleanup() {
 	if s.transport != nil {
 		s.transport.Close()
 	}
-	s.status.Store(int32(Destroyed))
+	s.transition(Destroyed)
 	s.destroyedOnce.Do(func() { close(s.destroyed) })
 }
 

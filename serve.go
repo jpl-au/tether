@@ -273,6 +273,9 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		freeze:           h.cfg.Freeze != 0 && h.cfg.SessionStore != nil,
 	}
 	sess.lastActivity.Store(now.UnixNano())
+	// Initial status is set directly, not via transition(), because
+	// there is no prior state to validate against at construction.
+	sess.status.Store(int32(Pending))
 	dev.Debug("session created", "session", id, "endpoint", r.URL.Path, "remote", r.RemoteAddr)
 
 	if h.cfg.Push != nil && h.cfg.Push.Sender != nil {
@@ -461,6 +464,9 @@ func (h *Handler[S]) restoreSession(id string, r *http.Request, transport Transp
 		codec:            codec,
 		freeze:           h.cfg.Freeze != 0 && h.cfg.SessionStore != nil,
 	}
+	// Initial status is set directly, not via transition(), because
+	// there is no prior state to validate against at construction.
+	sess.status.Store(int32(Pending))
 	sess.lastURL = env.URL
 	sess.lastTitle = env.Title
 	sess.lastActivity.Store(now.UnixNano())
