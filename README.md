@@ -151,7 +151,10 @@ for details and examples.
 | [Stateless pages](docs/stateless.md) | `tether.Stateless` for request/response pages without persistent connections |
 | [Events](docs/events.md) | Event binding, timing, loading states, forms |
 | [Signals](docs/signals.md) | Reactive signals, client directives, optimistic updates |
-| [Server updates](docs/server-updates.md) | Update, Navigate, SetTitle, Flash, Announce, Dynamic keys |
+| [Server updates](docs/server-updates.md) | Side effects, Dynamic keys, diff observability |
+| [Background goroutines](docs/background.md) | `Session.Go`, transport vs session context, session methods |
+| [Components](docs/components.md) | `tether.Component`, declarative mounting, `RouteTyped`, `Mounter` |
+| [URL routing](docs/routing.md) | `OnNavigate`, `bind.Link`, multi-page apps with the `router` package |
 | [Client-side](docs/client-side.md) | Directives, transitions, JS hooks |
 | [Broadcasting](docs/broadcasting.md) | Groups, broadcast, presence |
 | [Extensions](docs/extensions.md) | File uploads, service worker, push notifications |
@@ -161,6 +164,7 @@ for details and examples.
 | [Transport](docs/transport.md) | WebSocket, SSE, resilience |
 | [Push notifications](docs/push-notifications.md) | Web Push with VAPID |
 | [Operations](docs/operations.md) | Health check, drain, dev mode, diagnostics, error reporting |
+| [Scaling](docs/scaling.md) | Per-session overhead, horizontal scaling, capacity planning |
 | [Security](docs/security.md) | TLS, session identity, origin checking, CSRF, rate limiting |
 | [Best practices](docs/best-practices.md) | Common patterns, performance tips, pitfalls to avoid |
 | [Performance](docs/performance.md) | Benchmarks, PGO |

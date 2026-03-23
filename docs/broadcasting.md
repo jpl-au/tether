@@ -229,11 +229,7 @@ Use Value for state that multiple sessions need to stay in sync with (online cou
 
 ## When to use what
 
-| Primitive | Parameterised on | Best for |
-|-----------|-----------------|----------|
-| **Group** | State type | Broadcasting state mutations to sessions of the same handler |
-| **Bus** | Event type | Discrete events across handlers (chat messages, activity feeds) |
-| **Value** | Value type | Shared state all sessions should track (online count, config) |
+See [choosing the right primitive](reactivity.md#choosing-the-right-primitive) for a comparison of Group, Bus, Value, Signals, and client directives.
 
 ---
 
