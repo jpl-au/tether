@@ -3,16 +3,14 @@ package tether
 import (
 	"log/slog"
 	"os"
-	"sync"
 
 	"github.com/jpl-au/tether/dev"
 )
 
-var once sync.Once
-
 // initLog resolves DevMode from the environment, creates a default
-// logger when none is provided, sets the process-wide slog default
-// (once), and enables the dev package.
+// logger when none is provided, configures the dev package's scoped
+// logger, and enables dev mode. The process-wide slog default is
+// never modified - tether's logger is scoped to the framework.
 func (a *App) initLog() {
 	if !a.DevMode && os.Getenv("TETHER_DEV") != "" {
 		a.DevMode = true
@@ -24,8 +22,8 @@ func (a *App) initLog() {
 		}
 		opts := &slog.HandlerOptions{Level: level}
 		a.Logger = slog.New(slog.NewTextHandler(os.Stderr, opts))
-		once.Do(func() { slog.SetDefault(a.Logger) })
 	}
+	dev.SetLogger(a.Logger)
 	if a.DevMode {
 		dev.Enable()
 	}

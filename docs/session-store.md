@@ -168,13 +168,21 @@ setup is identical for new and restored sessions.
 ## Configuration
 
 ```go
+import "github.com/jpl-au/tether-store/fs"
+
 h := tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
-    SessionStore: myRedisStore,
+    SessionStore: fs.NewSessionStore("tmp/sessions"),
     // Codec: myCustomCodec,  // optional, defaults to CBOR
     // OnRestore: func(sess *tether.StatefulSession[State]) { ... },
     // ...
 })
 ```
+
+The [tether-store](https://github.com/jpl-au/tether-store) repository
+provides ready-made implementations. Use `tether-store/fs` for
+development and single-node deployments. For production with multiple
+nodes, implement the `SessionStore` interface with your preferred
+backend (Redis, PostgreSQL, etc.).
 
 ## Failure behaviour
 

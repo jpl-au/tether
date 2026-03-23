@@ -2,6 +2,11 @@
 
 Reactive server-driven UI for [Fluent](https://github.com/jpl-au/fluent). Write Go, get live updates.
 
+> [!WARNING]
+> **API Stability**: Tether is currently in active development and the API is not yet stable. We will break APIs freely to arrive at the best possible design before the v1.0.0 release.
+
+**Requires Go 1.25 or later.**
+
 Tether connects Fluent's node trees to the browser via WebSocket (with SSE fallback). When state changes, only the parts that actually changed are sent as targeted patches. The client morphs the DOM in place, preserving input focus, scroll position, and form state.
 
 Three update modes give you the right tool for every situation:

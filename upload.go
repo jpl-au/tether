@@ -3,12 +3,13 @@ package tether
 import (
 	"errors"
 	"fmt"
-	"log/slog"
 	"mime"
 	"mime/multipart"
 	"net/http"
 	"path/filepath"
 	"strings"
+
+	"github.com/jpl-au/tether/dev"
 )
 
 // defaultMaxUploadSize is used when UploadConfig.MaxSize is zero.
@@ -163,7 +164,7 @@ func (h *Handler[S]) handleUpload(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if r := recover(); r != nil {
 				err := panicErr(r)
-				slog.Error("panic in upload handler", "session", sessionID, "panic", r)
+				dev.Log().Error("panic in upload handler", "session", sessionID, "panic", r)
 				diag.Publish(Diagnostic{
 					Kind:      UploadError,
 					SessionID: sessionID,

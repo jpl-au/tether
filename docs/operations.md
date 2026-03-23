@@ -97,15 +97,41 @@ Dev mode does the following:
 7. **Per-session diagnostics** - all session-level debug logging (events, diffs, reconnections, group membership, etc.) is gated behind dev mode via `dev.Debug`. In production with dev mode off, none of this output fires. For structured observability, use `OnStructuralChange` and `OnNoPatch` callbacks instead
 8. **Discarded effect warnings** - logs a warning when a handler panic discards buffered side effects (Toast, Signal, Navigate, etc.)
 
-Diagnostics are centralised in the `dev` package. During handler construction, `App.DevMode` (or `TETHER_DEV`) calls `dev.Enable()` once. After that, all runtime checks - cache headers, the `data-tether-dev` attribute, diagnostic logging - use `dev.Enabled()`. No code threads the `DevMode` bool downstream; everything goes through the `dev` package.
+### Logging architecture
 
-Call sites use `dev.Warn()`, `dev.Debug()`, and `dev.Error()` which silently no-op outside dev mode.
+Tether never touches the process-wide `slog` default. All framework
+log output flows through the internal `dev` package, which holds a
+scoped logger configured during handler construction.
 
-The `DevMode` bool takes precedence. When it's false (the default), the `TETHER_DEV` environment variable is checked as a fallback.
+There are two categories of log output:
+
+**Dev-only** (`dev.Warn`, `dev.Debug`): gated behind dev mode. These
+help developers catch mistakes early (missing Dynamic keys, discarded
+effects, malformed URLs) but would be noise in production. For
+production observability, subscribe to `Handler.Diagnostics` instead.
+
+**Safety-net** (`dev.Log().Error`): always fires regardless of dev
+mode. Used for panics and critical errors as a last resort - if nobody
+is subscribed to the diagnostics bus, the developer still sees
+something in their logs. The diagnostics bus is the primary
+observability channel; these log calls are the fallback.
+
+All logging is centralised in the `dev` package. During handler
+construction, `App.DevMode` (or `TETHER_DEV`) calls `dev.Enable()`
+once. `App.Logger` (or a default text logger) is installed via
+`dev.SetLogger()`. After that, all runtime checks - cache headers,
+the `data-tether-dev` attribute, diagnostic logging - use
+`dev.Enabled()`. No code threads the `DevMode` bool downstream;
+everything goes through the `dev` package.
+
+The `DevMode` bool takes precedence. When it's false (the default),
+the `TETHER_DEV` environment variable is checked as a fallback.
 
 ### Logger format
 
-By default the framework creates a text logger. For structured JSON output, provide a custom logger via `App.Logger`:
+By default the framework creates a text logger. For structured JSON
+output, provide a custom logger via `App.Logger`. The logger is
+scoped to tether and does not affect the process-wide `slog` default:
 
 ```go
 app := tether.App{

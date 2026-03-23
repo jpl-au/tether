@@ -3,7 +3,6 @@ package tether
 import (
 	"encoding/json"
 	"io"
-	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -77,7 +76,7 @@ func Stateless[S any](app App, cfg StatelessConfig[S]) http.Handler {
 	if app.DevMode {
 		pageArgs = append(pageArgs, "dev", true)
 	}
-	app.Logger.Info("tether: ready", pageArgs...)
+	dev.Log().Info("tether: ready", pageArgs...)
 
 	if cfg.Limits.MaxEventBytes == 0 {
 		cfg.Limits.MaxEventBytes = defaultMaxEventBytes
@@ -132,7 +131,7 @@ func (p *statelessHandler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 func (p *statelessHandler[S]) serveGET(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		if v := recover(); v != nil {
-			slog.Error("panic in page render", "panic", v, "path", r.URL.Path, "remote", r.RemoteAddr)
+			dev.Log().Error("panic in page render", "panic", v, "path", r.URL.Path, "remote", r.RemoteAddr)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		}
 	}()
@@ -179,7 +178,7 @@ func (p *statelessHandler[S]) servePOST(w http.ResponseWriter, r *http.Request) 
 
 	defer func() {
 		if v := recover(); v != nil {
-			slog.Error("panic in page handler", "panic", v, "path", r.URL.Path, "remote", r.RemoteAddr)
+			dev.Log().Error("panic in page handler", "panic", v, "path", r.URL.Path, "remote", r.RemoteAddr)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		}
 	}()
@@ -219,7 +218,7 @@ func (p *statelessHandler[S]) servePOST(w http.ResponseWriter, r *http.Request) 
 			redirectURL := cs.Effects.URL
 			u, err := url.Parse(redirectURL)
 			if err != nil {
-				slog.Warn("malformed navigate redirect URL",
+				dev.Log().Warn("malformed navigate redirect URL",
 					"url", redirectURL, "error", err)
 				break
 			}
@@ -238,7 +237,7 @@ func (p *statelessHandler[S]) servePOST(w http.ResponseWriter, r *http.Request) 
 				break
 			}
 			if i == maxNavigateRedirects-1 {
-				slog.Warn("navigate redirect limit reached",
+				dev.Log().Warn("navigate redirect limit reached",
 					"url", cs.Effects.URL)
 				cs.Effects.Replace = true
 			}
@@ -256,13 +255,13 @@ func (p *statelessHandler[S]) servePOST(w http.ResponseWriter, r *http.Request) 
 
 	data, err := p.encoder.Encode(u)
 	if err != nil {
-		slog.Error("encode response error", "err", err, "path", r.URL.Path, "remote", r.RemoteAddr)
+		dev.Log().Error("encode response error", "err", err, "path", r.URL.Path, "remote", r.RemoteAddr)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	if _, err := w.Write(data); err != nil {
-		slog.Warn("failed to write page response", "path", r.URL.Path, "err", err)
+		dev.Log().Warn("failed to write page response", "path", r.URL.Path, "err", err)
 	}
 }

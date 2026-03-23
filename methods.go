@@ -1,7 +1,6 @@
 package tether
 
 import (
-	"log/slog"
 	"maps"
 	"time"
 
@@ -63,7 +62,7 @@ func (s *StatefulSession[S]) Update(fn func(S) S) {
 		defer func() {
 			if r := recover(); r != nil {
 				err := panicErr(r)
-				slog.Error("panic in Update", "session", s.id, "panic", r)
+				dev.Log().Error("panic in Update", "session", s.id, "panic", r)
 				s.emitDiagnostic(Diagnostic{
 					Kind:      HandlerPanic,
 					SessionID: s.id,

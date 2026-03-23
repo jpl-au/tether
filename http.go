@@ -2,7 +2,6 @@ package tether
 
 import (
 	"encoding/json"
-	"log/slog"
 	"net/http"
 	"net/url"
 	"slices"
@@ -269,7 +268,7 @@ func (h *Handler[S]) handlePushSubscribe(w http.ResponseWriter, r *http.Request)
 		defer func() {
 			if r := recover(); r != nil {
 				err := panicErr(r)
-				slog.Error("panic in OnSubscribe", "session", sess.ID(), "panic", r)
+				dev.Log().Error("panic in OnSubscribe", "session", sess.ID(), "panic", r)
 				sess.emitDiagnostic(Diagnostic{
 					Kind:      HandlerPanic,
 					SessionID: sess.ID(),

@@ -7,9 +7,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"io/fs"
-	"log/slog"
 	"net/http"
 	"sync"
+
+	"github.com/jpl-au/tether/dev"
 )
 
 // clientFS embeds the client-side JS runtime and the idiomorph library.
@@ -50,14 +51,14 @@ func clientVersion() string {
 			}
 			data, err := fs.ReadFile(clientFS, path)
 			if err != nil {
-				slog.Error("tether: failed to read embedded file", "path", path, "error", err)
+				dev.Log().Error("tether: failed to read embedded file", "path", path, "error", err)
 				return nil
 			}
 			h.Write(data)
 			return nil
 		})
 		if err != nil {
-			slog.Error("tether: failed to walk embedded client files", "error", err)
+			dev.Log().Error("tether: failed to walk embedded client files", "error", err)
 		}
 		clientVersionVal = hex.EncodeToString(h.Sum(nil))[:12]
 	})
@@ -141,7 +142,7 @@ func (app *App) jsHandler() http.Handler {
 			w.Header().Set("Service-Worker-Allowed", "/")
 			w.Header().Set("Content-Type", "application/javascript")
 			if _, err := w.Write(workerBody); err != nil {
-				slog.Warn("failed to write worker script", "err", err)
+				dev.Log().Warn("failed to write worker script", "err", err)
 			}
 			return
 		}
@@ -159,7 +160,7 @@ func (app *App) jsHandler() http.Handler {
 			w.Header().Set("Service-Worker-Allowed", "/")
 			w.Header().Set("Content-Type", "application/javascript")
 			if _, err := w.Write(pushWorkerBody); err != nil {
-				slog.Warn("failed to write push worker script", "err", err)
+				dev.Log().Warn("failed to write push worker script", "err", err)
 			}
 			return
 		}

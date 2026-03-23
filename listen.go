@@ -2,7 +2,6 @@ package tether
 
 import (
 	"context"
-	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -10,6 +9,8 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/jpl-au/tether/dev"
 )
 
 // Drainable is satisfied by [*Handler]. It provides graceful shutdown
@@ -141,7 +142,7 @@ func serve(srv *http.Server, start func() error, url string, grace time.Duration
 		errCh <- start()
 	}()
 
-	slog.Info("listening", "url", url)
+	dev.Log().Info("listening", "url", url)
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
@@ -153,7 +154,7 @@ func serve(srv *http.Server, start func() error, url string, grace time.Duration
 	case <-sigCh:
 	}
 
-	slog.Info("shutting down")
+	dev.Log().Info("shutting down")
 
 	// A second signal during shutdown forces an immediate exit.
 	// The channel is closed after clean shutdown to release this
@@ -161,7 +162,7 @@ func serve(srv *http.Server, start func() error, url string, grace time.Duration
 	go func() {
 		_, ok := <-sigCh
 		if ok {
-			slog.Warn("forced exit", "reason", "second signal during shutdown")
+			dev.Log().Warn("forced exit", "reason", "second signal during shutdown")
 			os.Exit(1)
 		}
 	}()
@@ -175,7 +176,7 @@ func serve(srv *http.Server, start func() error, url string, grace time.Duration
 	for _, d := range drainers {
 		wg.Go(func() {
 			if err := d.Drain(ctx); err != nil {
-				slog.Warn("drain timed out", "error", err)
+				dev.Log().Warn("drain timed out", "error", err)
 			}
 		})
 	}
@@ -183,7 +184,7 @@ func serve(srv *http.Server, start func() error, url string, grace time.Duration
 
 	// Stop accepting new HTTP requests.
 	if err := srv.Shutdown(ctx); err != nil {
-		slog.Warn("tether: HTTP server shutdown error", "error", err)
+		dev.Log().Warn("tether: HTTP server shutdown error", "error", err)
 	}
 
 	// Force-close any sessions that didn't drain in time.
@@ -191,7 +192,7 @@ func serve(srv *http.Server, start func() error, url string, grace time.Duration
 		d.Shutdown(ctx)
 	}
 
-	slog.Info("shutdown complete")
+	dev.Log().Info("shutdown complete")
 	signal.Stop(sigCh)
 	close(sigCh) // unblock the second-signal goroutine
 	return nil

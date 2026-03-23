@@ -1,10 +1,11 @@
 package tether
 
 import (
-	"log/slog"
 	"net/url"
 	"strconv"
 	"strings"
+
+	"github.com/jpl-au/tether/dev"
 )
 
 // Params carries URL information from a navigation event. The handler
@@ -62,7 +63,7 @@ func paramsFromEvent(ev Event) Params {
 		var err error
 		p.Query, err = url.ParseQuery(strings.TrimPrefix(search, "?"))
 		if err != nil {
-			slog.Warn("malformed query string in navigate event", "search", search, "err", err)
+			dev.Log().Warn("malformed query string in navigate event", "search", search, "err", err)
 		}
 	}
 	return p

@@ -66,9 +66,19 @@ simpler and eliminates a failure point.
 
 ## Writing a DiffStore implementation
 
-The framework ships no implementations - you provide your own. A DiffStore
-is a dumb key-value store keyed by session ID. Here is a minimal
-in-memory example to show the shape:
+The [tether-store](https://github.com/jpl-au/tether-store) repository
+provides ready-made implementations. Use `tether-store/fs` for
+development and single-node deployments:
+
+```go
+import "github.com/jpl-au/tether-store/fs"
+
+DiffStore: fs.NewDiffStore("tmp/diffs"),
+```
+
+A DiffStore is a dumb key-value store keyed by session ID. If the
+provided implementations don't fit your needs, the interface is simple
+to implement. Here is a minimal in-memory example to show the shape:
 
 ```go
 type MemoryStore struct {

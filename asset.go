@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"io/fs"
-	"log/slog"
 	"maps"
 	"net/http"
 	"slices"
@@ -78,7 +77,7 @@ func (a *Asset) init() {
 			}
 			data, err := fs.ReadFile(a.FS, path)
 			if err != nil {
-				slog.Error("failed to read asset file", "path", path, "err", err)
+				dev.Log().Error("failed to read asset file", "path", path, "err", err)
 				return nil
 			}
 			h := sha256.Sum256(data)
@@ -118,7 +117,7 @@ func (a *Asset) URL(path string) string {
 	}
 	h, ok := a.hashes[path]
 	if !ok {
-		slog.Error("tether: asset not found - check the path and look for earlier read errors", "path", path)
+		dev.Log().Error("tether: asset not found - check the path and look for earlier read errors", "path", path)
 		return a.prefix + path
 	}
 	return a.prefix + path + "?v=" + h

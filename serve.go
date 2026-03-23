@@ -2,7 +2,6 @@ package tether
 
 import (
 	"context"
-	"log/slog"
 	"net/http"
 	"time"
 
@@ -24,7 +23,7 @@ func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 
 	defer func() {
 		if v := recover(); v != nil {
-			slog.Error("panic in initial render", "panic", v, "path", r.URL.Path, "remote", r.RemoteAddr)
+			dev.Log().Error("panic in initial render", "panic", v, "path", r.URL.Path, "remote", r.RemoteAddr)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		}
 	}()

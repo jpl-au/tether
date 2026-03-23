@@ -1,12 +1,12 @@
 package tether
 
 import (
-	"log/slog"
 	"os"
 	"reflect"
 	"runtime"
 	"strings"
 
+	"github.com/jpl-au/tether/dev"
 	"github.com/jpl-au/tether/event"
 	"github.com/jpl-au/tether/mode"
 	"github.com/jpl-au/tether/protocol"
@@ -100,7 +100,7 @@ func Stateful[S any](app App, cfg StatefulConfig[S]) *Handler[S] {
 		case "", "AUTO":
 			cfg.Protocol = protocol.Auto
 		default:
-			slog.Warn("tether: unrecognised TETHER_PROTO value - using Auto",
+			dev.Log().Warn("tether: unrecognised TETHER_PROTO value - using Auto",
 				"value", os.Getenv("TETHER_PROTO"))
 			cfg.Protocol = protocol.Auto
 		}
@@ -152,7 +152,7 @@ func Stateful[S any](app App, cfg StatefulConfig[S]) *Handler[S] {
 	}
 
 	if cfg.Limits.MaxSessions == 0 && !app.DevMode {
-		slog.Warn("tether: Limits.MaxSessions is 0 (unlimited) - set a limit in production to prevent resource exhaustion")
+		dev.Log().Warn("tether: Limits.MaxSessions is 0 (unlimited) - set a limit in production to prevent resource exhaustion")
 	}
 	if cfg.Freeze != 0 {
 		if cfg.SessionStore == nil {
@@ -182,7 +182,7 @@ func Stateful[S any](app App, cfg StatefulConfig[S]) *Handler[S] {
 
 	go h.reapPending()
 
-	app.Logger.Info("tether: ready", handlerAttrs(app, cfg)...)
+	dev.Log().Info("tether: ready", handlerAttrs(app, cfg)...)
 
 	return h
 }

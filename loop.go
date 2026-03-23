@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/url"
 	"time"
 
@@ -81,7 +80,7 @@ func (s *StatefulSession[S]) runCmd(cmd func()) {
 	defer func() {
 		if r := recover(); r != nil {
 			err := panicErr(r)
-			slog.Error("panic in command", "session", s.id, "panic", r)
+			dev.Log().Error("panic in command", "session", s.id, "panic", r)
 			s.emitDiagnostic(Diagnostic{
 				Kind:      HandlerPanic,
 				SessionID: s.id,
@@ -135,7 +134,7 @@ func (s *StatefulSession[S]) exec(ev Event) {
 	defer func() {
 		if r := recover(); r != nil {
 			err := panicErr(r)
-			slog.Error("panic in handler", "session", s.id, "action", ev.Action, "panic", r)
+			dev.Log().Error("panic in handler", "session", s.id, "action", ev.Action, "panic", r)
 			s.emitDiagnostic(Diagnostic{
 				Kind:      HandlerPanic,
 				SessionID: s.id,

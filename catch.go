@@ -1,9 +1,8 @@
 package tether
 
 import (
-	"log/slog"
-
 	"github.com/jpl-au/fluent/node"
+	"github.com/jpl-au/tether/dev"
 )
 
 // Catch calls render and returns its result. If render panics, the
@@ -23,7 +22,7 @@ import (
 func Catch(render func() node.Node, fallback node.Node) (result node.Node) {
 	defer func() {
 		if v := recover(); v != nil {
-			slog.Error("tether.Catch recovered panic", "panic", v)
+			dev.Log().Error("tether.Catch recovered panic", "panic", v)
 			result = fallback
 		}
 	}()

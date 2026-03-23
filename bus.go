@@ -2,10 +2,11 @@ package tether
 
 import (
 	"context"
-	"log/slog"
 	"maps"
 	"sync"
 	"sync/atomic"
+
+	"github.com/jpl-au/tether/dev"
 )
 
 // defaultAsyncWorkers is the semaphore size for async subscribers
@@ -279,7 +280,7 @@ func (b *Bus[E]) dispatchAsync(fn func(E), event E) {
 	default:
 		switch b.overflow {
 		case Drop:
-			slog.Warn("tether: async event dropped, semaphore full")
+			dev.Log().Warn("tether: async event dropped, semaphore full")
 		case Inline:
 			fn(event)
 		default: // Block
