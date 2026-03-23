@@ -2,7 +2,7 @@
 
 Tether is event-driven at every layer. Client interactions, server-side state mutations, cross-session communication, and UI updates all flow through the same reactive model. This guide explains the design, how the primitives compose, and when to reach for each one.
 
-## The command loop — why events, not mutexes
+## The command loop  - why events, not mutexes
 
 Every session has a single goroutine that processes all state changes:
 
@@ -55,7 +55,7 @@ Reactivity in tether flows in three directions. Each direction has its own set o
 
 Tether provides three primitives for cross-session reactivity. They share a common design: lock-free reads, copy-on-write for writes, and automatic cleanup when sessions are destroyed.
 
-### Bus — typed publish/subscribe
+### Bus  - typed publish/subscribe
 
 `Bus[T]` is the general-purpose pub/sub mechanism. It routes typed domain events to subscribers. Any session from any handler can subscribe, because Bus is parameterised on the **event type**, not the state type:
 
@@ -73,12 +73,12 @@ Bus is the foundation. Value is built on Bus internally. `Handler.Diagnostics` i
 
 See [broadcasting](broadcasting.md#bus---typed-cross-session-events) for the full API.
 
-### Value — shared observable state
+### Value  - shared observable state
 
 `Value[T]` holds a single value that sessions can observe. When the value changes, all observers are notified. Built on Bus internally, it adds two things Bus does not provide:
 
-1. **Current value** — `Load()` returns the latest value with a lock-free atomic read
-2. **Immediate sync** — when a session subscribes, the callback fires once with the current value so the session starts in sync
+1. **Current value**  - `Load()` returns the latest value with a lock-free atomic read
+2. **Immediate sync**  - when a session subscribes, the callback fires once with the current value so the session starts in sync
 
 ```go
 var onlineCount = tether.NewValue(0)
@@ -94,7 +94,7 @@ Use Value for state that multiple sessions need to stay in sync with (online cou
 
 See [broadcasting](broadcasting.md#value---shared-observable-state) for the full API.
 
-### Group — same-type broadcast
+### Group  - same-type broadcast
 
 `Group[S]` broadcasts state mutations to sessions that share the same state type. Unlike Bus and Value, Group gives the callback direct access to each target session's state:
 
@@ -113,7 +113,7 @@ See [broadcasting](broadcasting.md#groups) for the full API.
 
 There are two ways to connect a session to Bus or Value. Both deliver events through the session's command loop, so callbacks never run concurrently with Handle.
 
-### Declarative — StatefulConfig.Watchers
+### Declarative  - StatefulConfig.Watchers
 
 The preferred approach. Declare subscriptions alongside the handler configuration:
 
@@ -134,7 +134,7 @@ tether.StatefulConfig[State]{
 
 Watchers are activated during `OnConnect` and cleaned up automatically when the session is destroyed. No manual subscribe/unsubscribe.
 
-### Imperative — tether.On and tether.Observe
+### Imperative  - tether.On and tether.Observe
 
 For conditional subscriptions that depend on runtime state (user role, feature flags, URL path), subscribe in `OnConnect`:
 
@@ -155,7 +155,7 @@ OnConnect: func(sess *tether.StatefulSession[State]) {
 
 `tether.On` subscribes to a Bus. `tether.Observe` subscribes to a Value (and immediately delivers the current value). Both are cleaned up when the session's context is cancelled.
 
-### Raw subscriptions — non-session consumers
+### Raw subscriptions  - non-session consumers
 
 For monitoring, metrics, logging, or bridging to external systems, `Subscribe` and `SubscribeAsync` register callbacks directly on a Bus:
 
@@ -169,7 +169,7 @@ messages.SubscribeAsync(ctx, func(msg MessageSent) {
 })
 ```
 
-These are not session-bound — they run for the lifetime of the context. Use `Subscribe` for non-blocking work (metrics, counters). Use `SubscribeAsync` for I/O (database, HTTP).
+These are not session-bound  - they run for the lifetime of the context. Use `Subscribe` for non-blocking work (metrics, counters). Use `SubscribeAsync` for I/O (database, HTTP).
 
 See [broadcasting](broadcasting.md#raw-subscriptions) for lifetime management guidance.
 
@@ -194,8 +194,8 @@ The primitives are layered, not isolated:
 ```
 
 - **Value wraps Bus.** Every `Store` or `Update` on a Value publishes the new value through its internal Bus. Observers registered via `tether.Observe` or `WatchValue` are Bus subscribers under the hood.
-- **Diagnostics is a Bus.** `Handler.Diagnostics` is a `Bus[Diagnostic]` — the same pub/sub mechanism used for application events. Subscribe to it with `Subscribe` or `SubscribeAsync` for monitoring, alerting, and operational visibility. See [operations](operations.md#diagnostics-bus).
-- **Group is independent.** Group does not use Bus internally — it iterates members and enqueues updates directly. It exists because broadcasting a state mutation ("apply this function to every session's state") is a different operation from publishing an event ("here is a fact, react however you like").
+- **Diagnostics is a Bus.** `Handler.Diagnostics` is a `Bus[Diagnostic]`  - the same pub/sub mechanism used for application events. Subscribe to it with `Subscribe` or `SubscribeAsync` for monitoring, alerting, and operational visibility. See [operations](operations.md#diagnostics-bus).
+- **Group is independent.** Group does not use Bus internally  - it iterates members and enqueues updates directly. It exists because broadcasting a state mutation ("apply this function to every session's state") is a different operation from publishing an event ("here is a fact, react however you like").
 
 ## Choosing the right primitive
 
@@ -208,7 +208,7 @@ The primitives are layered, not isolated:
 | Does the server need to push a value to the DOM without rendering? | Yes | **Signal** (`sess.Signal`) |
 | Does the client need instant feedback without a server round-trip? | Yes | **Client directive** (`bind.ToggleSignal`, `bind.SetSignal`) |
 
-These are not mutually exclusive. A chat application might use Bus for message events, Value for the online user count, Group for typing indicators, and Signals for unread badge counts — all in the same handler.
+These are not mutually exclusive. A chat application might use Bus for message events, Value for the online user count, Group for typing indicators, and Signals for unread badge counts  - all in the same handler.
 
 ## Lifecycle and cleanup
 
@@ -220,7 +220,7 @@ These are not mutually exclusive. A chat application might use Bus for message e
 | `StatefulConfig.Groups` | Automatic add on connect, remove on destroy |
 | `Group.Add` / `Group.Remove` | Manual (typically in `OnConnect` / `OnDisconnect`) |
 
-Session-bound subscriptions never leak. Raw subscriptions are tied to the context passed at registration — use the application's root context (from `signal.NotifyContext`) so they are cleaned up on shutdown.
+Session-bound subscriptions never leak. Raw subscriptions are tied to the context passed at registration  - use the application's root context (from `signal.NotifyContext`) so they are cleaned up on shutdown.
 
 ---
 

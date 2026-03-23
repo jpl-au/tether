@@ -334,8 +334,9 @@ type StatefulConfig[S any] struct {
 	//
 	// This dramatically reduces memory for disconnected sessions
 	// at the cost of commands (Update, broadcasts, timer callbacks)
-	// being silently discarded while frozen. Enable this when
-	// sessions do not need background processing during disconnect.
+	// being discarded while frozen (a [CommandDiscarded] diagnostic
+	// is emitted for each). Enable this when sessions do not need
+	// background processing during disconnect.
 	//
 	// Requires [SessionStore] to be configured. The [FreezeMode]
 	// value controls how the session is restored on reconnect:

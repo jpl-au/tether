@@ -261,8 +261,8 @@ func (s *StatefulSession[S]) exec(ev Event) {
 }
 
 // onTransportClose runs when the client's transport connection drops.
-// It nils the transport so send() silently discards updates during
-// the reconnect window, then persists session data to any configured
+// It nils the transport so send() discards updates during the
+// reconnect window, then persists session data to any configured
 // stores - DiffStore for differ snapshots (memory optimisation) and
 // SessionStore for application state (crash recovery). Persistence
 // happens before the pool transition so data is safely stored before
