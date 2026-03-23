@@ -1,5 +1,22 @@
 # Best practices
 
+## Use the state parameter, not State(), inside Handle
+
+Inside Handle, use the `state` parameter - it is the current value. `State()` returns a stale snapshot from before Handle was called. See [State() and Handle](server-updates.md#state-and-handle) for details and examples.
+
+When broadcasting from Handle, capture values from the parameter:
+
+```go
+state.Count++
+newCount := state.Count
+group.BroadcastOthers(sess, func(t *tether.StatefulSession[State], s State) State {
+    s.Count = newCount // captured from parameter
+    return s
+})
+```
+
+In dev mode, a warning is emitted if `State()` is called during Handle.
+
 ## Keep Handle fast
 
 Handle runs inside the session's command loop. While it executes, no other events, commands, or effects are processed for that session. The client sees a frozen page.

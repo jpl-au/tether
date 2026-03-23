@@ -163,7 +163,9 @@ func (s *StatefulSession[S]) exec(ev Event) {
 
 	// All events flow through the composed Handle function, which
 	// includes middleware, OnNavigate, and component routing.
+	s.handling = true
 	newState := s.handle(s, s.state, ev)
+	s.handling = false
 
 	s.drainFx(fx)
 

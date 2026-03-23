@@ -11,15 +11,24 @@ import (
 // State returns the current session state. Never blocks.
 //
 // When the loop is active, State returns an atomic snapshot updated
-// after every state mutation (Handle return, Update callback). During
-// Handle, the snapshot is the pre-Handle state; outside Handle, it is
-// the most recently completed state. This is lock-free and safe to
-// call from any goroutine at any time.
+// after every state mutation (Handle return, Update callback). The
+// snapshot is lock-free and safe to call from any goroutine at any
+// time.
+//
+// Do not call State() inside Handle - the snapshot is stale (it
+// reflects the state before Handle was called). Use the state
+// parameter passed to Handle instead. In dev mode, a warning is
+// emitted if State() is called during Handle to help catch this
+// mistake early.
 //
 // When the loop is not active (before startup, after destruction, or
 // while frozen), the state field is returned directly - no concurrent
 // mutations are possible.
 func (s *StatefulSession[S]) State() S {
+	if s.handling {
+		dev.Warn("State() called during Handle - the returned value is stale; use the state parameter instead",
+			"session", s.id, "endpoint", s.endpoint)
+	}
 	if Status(s.status.Load()) != Active {
 		return s.state
 	}

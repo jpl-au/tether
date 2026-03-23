@@ -109,6 +109,12 @@ type StatefulSession[S any] struct {
 	// round-trip, no blocking.
 	stateSnap atomic.Value
 
+	// handling is true while Handle or Update is executing on the
+	// loop goroutine. Used by State() to emit a dev-mode warning
+	// when called during Handle - the snapshot is stale and the
+	// developer should use the state parameter instead.
+	handling bool
+
 	// overflows counts how many times the command or effect buffer
 	// was full and a goroutine was spawned to deliver the item.
 	// Each overflow emits a BufferOverflow diagnostic.

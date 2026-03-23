@@ -74,6 +74,44 @@ session.Update(func(s State) State {
 })
 ```
 
+## State() and Handle
+
+`State()` returns an atomic snapshot that is updated after each Handle
+or Update completes. During Handle, the snapshot is stale - it reflects
+the state before Handle was called. This is by design: the command loop
+is executing Handle, so no other mutation has happened yet.
+
+**Do not call `State()` inside Handle.** Use the `state` parameter
+instead - it is the current, authoritative value:
+
+```go
+// Wrong - State() returns the pre-Handle snapshot
+Handle: func(sess tether.Session, state State, ev tether.Event) State {
+    state.Count++
+    live := sess.(*tether.StatefulSession[State])
+    count := live.State().Count // BUG: stale, pre-Handle value
+    return state
+}
+
+// Right - use the state parameter directly
+Handle: func(sess tether.Session, state State, ev tether.Event) State {
+    state.Count++
+    newCount := state.Count // correct, current value
+    group.BroadcastOthers(sess, func(t *tether.StatefulSession[State], s State) State {
+        s.Count = newCount // capture from parameter, not State()
+        return s
+    })
+    return state
+}
+```
+
+In dev mode, a warning is emitted when `State()` is called during
+Handle to help catch this mistake early.
+
+`State()` is designed for external goroutines - background workers,
+timers, and broadcast callbacks that run outside Handle. In those
+contexts it always returns the most recently completed state.
+
 ## Dynamic keys
 
 The diff engine only tracks elements marked with `.Dynamic("key")`. When state changes and the framework re-renders, it compares the HTML of each keyed element with the previous render. Elements without a Dynamic key are invisible to the diff engine - their changes produce no patches and the client never updates.
