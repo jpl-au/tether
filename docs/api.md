@@ -155,7 +155,8 @@ When either callback is configured, the framework's own logging for that event i
 | Field | Type | Description |
 |-------|------|-------------|
 | `TrustedOrigins` | `[]string` | Origins allowed to make state-changing requests |
-| `DisableSessionBinding` | `bool` | Disable User-Agent verification on reconnect (default: enabled) |
+| `DisableSessionBinding` | `bool` | Disable User-Agent verification entirely (default: enabled) |
+| `SessionMatch` | `func(original, reconnect string) bool` | Custom UA comparison. When nil, exact match. See [session binding](security.md#session-binding) |
 
 ---
 

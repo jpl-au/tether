@@ -134,7 +134,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 	// Try to reattach to a disconnected session.
 	h.mu.Lock()
 	if sess, ok := h.disconnected[id]; ok {
-		if !h.app.Security.DisableSessionBinding && r.UserAgent() != sess.userAgent {
+		if !h.app.Security.matchUA(sess.userAgent, r.UserAgent()) {
 			h.mu.Unlock()
 			h.Diagnostics.Publish(Diagnostic{
 				Kind:      SessionBindingFailed,
@@ -191,7 +191,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 
 	h.mu.Lock()
 	if ps, ok := h.pending[id]; ok {
-		if !h.app.Security.DisableSessionBinding && r.UserAgent() != ps.userAgent {
+		if !h.app.Security.matchUA(ps.userAgent, r.UserAgent()) {
 			delete(h.pending, id)
 			h.mu.Unlock()
 			h.Diagnostics.Publish(Diagnostic{
@@ -405,7 +405,7 @@ func (h *Handler[S]) restoreSession(id string, r *http.Request, transport Transp
 	}
 
 	// Verify the reconnecting client matches the original session.
-	if !h.app.Security.DisableSessionBinding && r.UserAgent() != env.UserAgent {
+	if !h.app.Security.matchUA(env.UserAgent, r.UserAgent()) {
 		h.Diagnostics.Publish(Diagnostic{
 			Kind:      SessionBindingFailed,
 			SessionID: id,

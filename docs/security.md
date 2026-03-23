@@ -46,7 +46,29 @@ not prevent spoofing by an attacker who also knows the User-Agent string,
 but it raises the bar for casual attacks and adds a layer of defence
 alongside TLS and origin checking.
 
-To disable (e.g. for environments where User-Agents change mid-session):
+#### Custom matching
+
+By default, the User-Agent must match exactly. For deployments where
+browser auto-updates change the UA version during long-lived frozen
+sessions, provide a custom `SessionMatch` function:
+
+```go
+app := tether.App{
+    Security: tether.Security{
+        SessionMatch: func(original, reconnect string) bool {
+            // Accept any UA with the same browser family prefix.
+            return extractBrowser(original) == extractBrowser(reconnect)
+        },
+    },
+}
+```
+
+The framework does not parse User-Agent strings itself. The developer
+provides the matching logic suited to their deployment.
+
+#### Disabling entirely
+
+To turn off binding completely (e.g. trusted internal environments):
 
 ```go
 app := tether.App{
@@ -54,11 +76,10 @@ app := tether.App{
         DisableSessionBinding: true,
     },
 }
-
-tether.Stateful(app, tether.StatefulConfig[State]{
-    // ...
-})
 ```
+
+When disabled, `SessionMatch` is ignored and any client can reconnect
+to any session.
 
 ### Where the ID appears
 

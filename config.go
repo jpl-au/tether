@@ -189,12 +189,47 @@ type Security struct {
 	TrustedOrigins []string
 
 	// DisableSessionBinding turns off User-Agent verification on
-	// session reconnect. By default, the framework captures the
-	// User-Agent when a session is created and verifies it matches
-	// on every reconnect. This detects stolen session IDs presented
-	// from a different client. Disable only if your environment has
-	// clients whose User-Agent changes mid-session.
+	// session reconnect entirely. When true, [SessionMatch] is
+	// ignored and any client can reconnect to any session. Use
+	// only in trusted environments where session theft is not a
+	// concern.
 	DisableSessionBinding bool
+
+	// SessionMatch customises how the framework compares
+	// User-Agent strings on reconnect. The function receives the
+	// original UA (captured at session creation) and the
+	// reconnecting client's UA. Return true to allow the
+	// reconnect, false to reject it.
+	//
+	// When nil (the default), the framework performs an exact
+	// string match. This is the strictest and safest option.
+	//
+	// Set this when exact matching is too strict for your
+	// deployment - for example, when browser auto-updates change
+	// the UA version during long-lived frozen sessions:
+	//
+	//	Security: tether.Security{
+	//	    SessionMatch: func(original, reconnect string) bool {
+	//	        return extractBrowser(original) == extractBrowser(reconnect)
+	//	    },
+	//	}
+	//
+	// Ignored when [DisableSessionBinding] is true.
+	SessionMatch func(original, reconnect string) bool
+}
+
+// matchUA reports whether the reconnecting client's User-Agent is
+// acceptable for the given original UA. Returns true when session
+// binding is disabled, when the custom matcher accepts the pair, or
+// when no custom matcher is set and the strings match exactly.
+func (s Security) matchUA(original, reconnect string) bool {
+	if s.DisableSessionBinding {
+		return true
+	}
+	if s.SessionMatch != nil {
+		return s.SessionMatch(original, reconnect)
+	}
+	return original == reconnect
 }
 
 // defaultReconnectTimeout gives the client enough time to recover from
