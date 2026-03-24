@@ -913,12 +913,25 @@ window.Tether.signals = window.Tether.signals || {};
         }
       }
 
+      // Save scroll position for containers marked with
+      // data-tether-preserve-scroll so it survives the morph.
+      if (oldNode.hasAttribute("data-tether-preserve-scroll")) {
+        oldNode._tetherScrollTop = oldNode.scrollTop;
+      }
+
       preserveClientState(oldNode, newNode);
       return true;
     },
 
     afterNodeMorphed: function (oldNode) {
       if (oldNode.nodeType !== 1) return;
+
+      // Restore saved scroll position after morph.
+      if (oldNode._tetherScrollTop !== undefined) {
+        oldNode.scrollTop = oldNode._tetherScrollTop;
+        delete oldNode._tetherScrollTop;
+      }
+
       callHook(oldNode, "updated");
       reapplySignals(oldNode);
       observeViewportElements(oldNode);
@@ -1231,6 +1244,7 @@ window.Tether.signals = window.Tether.signals || {};
     root.addEventListener("click", handleToggles);
     root.addEventListener("click", handleLinks);
     root.addEventListener("click", handleClipboard);
+    root.addEventListener("click", handleScrollTo);
     window.addEventListener("keydown", handleFocusTrap);
     window.addEventListener("keydown", handleHotkeys);
 
@@ -1594,6 +1608,20 @@ window.Tether.signals = window.Tether.signals || {};
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text);
     }
+  }
+
+  // --- Client-side scroll ---
+  //
+  // Elements with data-tether-scroll-to="<selector>" scroll the
+  // matched element into view on click. No server round-trip.
+
+  function handleScrollTo(e) {
+    var trigger = e.target.closest("[data-tether-scroll-to]");
+    if (!trigger) return;
+
+    var selector = trigger.getAttribute("data-tether-scroll-to");
+    var target = document.querySelector(selector);
+    if (target) target.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 
   // --- Global hotkeys ---

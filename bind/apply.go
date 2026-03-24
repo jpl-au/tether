@@ -211,6 +211,16 @@ func ToggleTarget(selector string) Option { return Option{"tether-toggle-target"
 // "open") on click without a server round-trip.
 func ToggleAttr(attr string) Option { return Option{"tether-toggle-attr", attr} }
 
+// ScrollTo scrolls the matched element into view on click without a
+// server round-trip. Uses smooth scrolling behaviour.
+func ScrollTo(selector string) Option { return Option{"tether-scroll-to", selector} }
+
+// PreserveScroll marks a scrollable container whose scroll position
+// should survive DOM morphing. Without this, idiomorph may reset the
+// scroll position when the container's content is updated. Use this
+// on columns, chat feeds, or any scrollable region.
+func PreserveScroll() Option { return Option{"tether-preserve-scroll", ""} }
+
 // Cloak hides the element until the tether runtime initialises. The
 // client removes the attribute on startup, making the element visible.
 // Use this to prevent a flash of unbound content - e.g. a signal-bound
