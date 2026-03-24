@@ -201,6 +201,46 @@ func TestEncodeOmitsEmptySignals(t *testing.T) {
 	}
 }
 
+func TestEncodeScrollTo(t *testing.T) {
+	u := Update{ScrollTo: "#card-5"}
+	msg := encodeMessage(u)
+
+	if msg.ScrollTo != "#card-5" {
+		t.Errorf("ScrollTo = %q, want #card-5", msg.ScrollTo)
+	}
+
+	data, err := json.Marshal(msg)
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+
+	var decoded map[string]any
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	if decoded["scroll_to"] != "#card-5" {
+		t.Errorf("decoded scroll_to = %v, want #card-5", decoded["scroll_to"])
+	}
+}
+
+func TestEncodeOmitsEmptyScrollTo(t *testing.T) {
+	u := Update{Toast: "hello"}
+	data, err := json.Marshal(encodeMessage(u))
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+
+	var decoded map[string]any
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	if _, ok := decoded["scroll_to"]; ok {
+		t.Error("scroll_to should be omitted when empty")
+	}
+}
+
 func TestJSONEncoderRoundTrip(t *testing.T) {
 	u := Update{
 		Patches: []Patch{

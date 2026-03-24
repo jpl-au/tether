@@ -153,12 +153,20 @@ func TestCaptureSessionEmitterSessionID(t *testing.T) {
 	}
 }
 
+func TestCaptureSessionScrollTo(t *testing.T) {
+	cs := &CaptureSession{}
+	cs.ScrollTo("#card-5")
+	if cs.Effects.ScrollTo != "#card-5" {
+		t.Errorf("ScrollTo = %q, want #card-5", cs.Effects.ScrollTo)
+	}
+}
+
 func TestCaptureSessionFreshEffects(t *testing.T) {
 	// Verify a fresh CaptureSession has zero-value effects.
 	cs := &CaptureSession{}
 	if cs.Effects.Toast != "" || cs.Effects.URL != "" || cs.Effects.Title != "" ||
 		cs.Effects.Announce != "" || cs.Effects.Flash != nil || cs.Effects.Signals != nil ||
-		cs.Effects.Replace {
+		cs.Effects.ScrollTo != "" || cs.Effects.Replace {
 		t.Error("fresh CaptureSession should have zero-value Effects")
 	}
 }

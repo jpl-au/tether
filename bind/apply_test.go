@@ -44,6 +44,7 @@ func TestApplyEventOptions(t *testing.T) {
 		{"OnFocus", bind.OnFocus("act"), `data-tether-focus="act"`},
 		{"OnBlur", bind.OnBlur("act"), `data-tether-blur="act"`},
 		{"OnViewport", bind.OnViewport("act"), `data-tether-viewport="act"`},
+		{"OnPaste", bind.OnPaste("act"), `data-tether-paste="act"`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -252,5 +253,77 @@ func TestCollectMultipleSelectors(t *testing.T) {
 	html := string(el.Render())
 	if !strings.Contains(html, `data-tether-collect="#query, #filter"`) {
 		t.Errorf("missing collect attribute in:\n%s", html)
+	}
+}
+
+func TestPreventDefault(t *testing.T) {
+	el := bind.Apply(div.New(),
+		bind.Event("contextmenu", "menu.open"),
+		bind.PreventDefault(),
+	)
+	html := string(el.Render())
+	for _, want := range []string{
+		`data-tether-contextmenu="menu.open"`,
+		`data-tether-prevent-default`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Errorf("missing %s in:\n%s", want, html)
+		}
+	}
+}
+
+func TestCopyToClipboard(t *testing.T) {
+	html := string(bind.Apply(button.Text("Copy"), bind.CopyToClipboard("#key")).Render())
+	if !strings.Contains(html, `data-tether-copy="#key"`) {
+		t.Errorf("missing copy attribute in:\n%s", html)
+	}
+}
+
+func TestHotkey(t *testing.T) {
+	html := string(bind.Apply(div.New(), bind.Hotkey("ctrl+k", "search.open")).Render())
+	if !strings.Contains(html, `data-tether-hotkey-ctrl-k="search.open"`) {
+		t.Errorf("missing hotkey attribute in:\n%s", html)
+	}
+}
+
+func TestHotkeyNormalisesPlus(t *testing.T) {
+	html := string(bind.Apply(div.New(), bind.Hotkey("ctrl+shift+p", "palette")).Render())
+	if !strings.Contains(html, `data-tether-hotkey-ctrl-shift-p="palette"`) {
+		t.Errorf("missing normalised hotkey in:\n%s", html)
+	}
+}
+
+func TestDraggable(t *testing.T) {
+	html := string(bind.Apply(div.New(), bind.Draggable()).Render())
+	if !strings.Contains(html, `data-tether-draggable`) {
+		t.Errorf("missing draggable attribute in:\n%s", html)
+	}
+}
+
+func TestDropTarget(t *testing.T) {
+	html := string(bind.Apply(div.New(), bind.DropTarget("card.move")).Render())
+	if !strings.Contains(html, `data-tether-drop-target="card.move"`) {
+		t.Errorf("missing drop-target attribute in:\n%s", html)
+	}
+}
+
+func TestSortable(t *testing.T) {
+	html := string(bind.Apply(div.New(), bind.Sortable("card.reorder")).Render())
+	if !strings.Contains(html, `data-tether-sortable="card.reorder"`) {
+		t.Errorf("missing sortable attribute in:\n%s", html)
+	}
+}
+
+func TestScrollToClient(t *testing.T) {
+	html := string(bind.Apply(button.Text("Top"), bind.ScrollTo("#top")).Render())
+	if !strings.Contains(html, `data-tether-scroll-to="#top"`) {
+		t.Errorf("missing scroll-to attribute in:\n%s", html)
+	}
+}
+
+func TestPreserveScroll(t *testing.T) {
+	html := string(bind.Apply(div.New(), bind.PreserveScroll()).Render())
+	if !strings.Contains(html, `data-tether-preserve-scroll`) {
+		t.Errorf("missing preserve-scroll attribute in:\n%s", html)
 	}
 }
