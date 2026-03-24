@@ -6,9 +6,9 @@
 // draggable elements (e.g. a login page), add a hidden marker element
 // with the attribute so the script loads upfront.
 //
-// Handles the HTML5 Drag and Drop API: marks draggable elements,
-// manages drop targets, provides visual feedback, and fires tether
-// events on drop with merged data from source and target.
+// Uses event delegation on the tether root - consistent with the core
+// tether.js architecture. No per-element listeners are attached, so
+// DOM morphing cannot create ghost listeners.
 
 (function () {
   "use strict";
@@ -27,75 +27,54 @@
     root = document.querySelector("[data-tether-root]");
     if (!root) return;
     devMode = root.hasAttribute("data-tether-dev");
-    log("init", "draggables:", root.querySelectorAll("[data-tether-draggable]").length,
-        "targets:", root.querySelectorAll("[data-tether-drop-target]").length);
-    bindDraggables(root);
-    bindDropTargets(root);
-  }
 
-  // --- Draggable elements ---
+    markDraggable(root);
 
-  function bindDraggables(container) {
-    var els = container.querySelectorAll("[data-tether-draggable]");
-    for (var i = 0; i < els.length; i++) {
-      setupDraggable(els[i]);
-    }
-  }
+    // All DnD events are delegated to the root. This avoids ghost
+    // listeners when idiomorph reuses DOM nodes during morphs.
 
-  function setupDraggable(el) {
-    if (el.hasAttribute("data-tether-drag-bound")) return;
-    el.setAttribute("data-tether-drag-bound", "");
-    el.setAttribute("draggable", "true");
-
-    el.addEventListener("dragstart", function (e) {
+    root.addEventListener("dragstart", function (e) {
+      var el = e.target.closest("[data-tether-draggable]");
+      if (!el) return;
       el.classList.add(dragClass);
-
-      // Collect all tether-data-* attributes and store them on the
-      // drag transfer so the drop target can read them.
       var data = collectData(el);
       log("dragstart", data);
       e.dataTransfer.setData("application/tether", JSON.stringify(data));
       e.dataTransfer.effectAllowed = "move";
     });
 
-    el.addEventListener("dragend", function () {
-      el.classList.remove(dragClass);
+    root.addEventListener("dragend", function (e) {
+      var el = e.target.closest("[data-tether-draggable]");
+      if (el) el.classList.remove(dragClass);
       clearOverStates();
     });
-  }
 
-  // --- Drop targets ---
-
-  function bindDropTargets(container) {
-    var els = container.querySelectorAll("[data-tether-drop-target]");
-    for (var i = 0; i < els.length; i++) {
-      setupDropTarget(els[i]);
-    }
-  }
-
-  function setupDropTarget(el) {
-    if (el.hasAttribute("data-tether-drop-bound")) return;
-    el.setAttribute("data-tether-drop-bound", "");
-
-    el.addEventListener("dragover", function (e) {
-      // Must preventDefault to allow drop.
+    root.addEventListener("dragover", function (e) {
+      var el = e.target.closest("[data-tether-drop-target]");
+      if (!el) return;
       e.preventDefault();
       e.dataTransfer.dropEffect = "move";
     });
 
-    el.addEventListener("dragenter", function (e) {
+    root.addEventListener("dragenter", function (e) {
+      var el = e.target.closest("[data-tether-drop-target]");
+      if (!el) return;
       e.preventDefault();
       el.classList.add(overClass);
     });
 
-    el.addEventListener("dragleave", function (e) {
+    root.addEventListener("dragleave", function (e) {
+      var el = e.target.closest("[data-tether-drop-target]");
+      if (!el) return;
       // Only remove the class when leaving the target itself, not
       // when entering a child element.
       if (e.relatedTarget && el.contains(e.relatedTarget)) return;
       el.classList.remove(overClass);
     });
 
-    el.addEventListener("drop", function (e) {
+    root.addEventListener("drop", function (e) {
+      var el = e.target.closest("[data-tether-drop-target]");
+      if (!el) return;
       e.preventDefault();
       el.classList.remove(overClass);
 
@@ -135,9 +114,21 @@
 
       Tether.sendEvent("drop", action, merged);
     });
+
+    log("init (delegated)", "draggables:", root.querySelectorAll("[data-tether-draggable]").length,
+        "targets:", root.querySelectorAll("[data-tether-drop-target]").length);
   }
 
-  // --- Helpers ---
+  // markDraggable sets draggable="true" on all elements with the
+  // data-tether-draggable attribute. The HTML5 DnD API requires this
+  // attribute for non-image, non-link elements. Called on init and
+  // after each morph.
+  function markDraggable(container) {
+    var els = container.querySelectorAll("[data-tether-draggable]");
+    for (var i = 0; i < els.length; i++) {
+      els[i].setAttribute("draggable", "true");
+    }
+  }
 
   // collectData gathers all data-tether-data-* attributes from an element.
   function collectData(el) {
@@ -168,7 +159,6 @@
   }
 
   // clearOverStates removes the drag-over class from all targets.
-  // Called on dragend to clean up any lingering visual state.
   function clearOverStates() {
     var overs = root ? root.querySelectorAll("." + overClass) : [];
     for (var i = 0; i < overs.length; i++) {
@@ -176,15 +166,13 @@
     }
   }
 
-  // Re-bind after server updates.
+  // After server morphs, re-mark new draggable elements. Event
+  // listeners are delegated so no re-binding is needed.
   document.addEventListener("tether:update", function (e) {
     var target = e.detail && e.detail.root ? e.detail.root : root;
     if (target) {
-      var d = target.querySelectorAll("[data-tether-draggable]").length;
-      var t = target.querySelectorAll("[data-tether-drop-target]").length;
-      log("tether:update rebind", "draggables:", d, "targets:", t);
-      bindDraggables(target);
-      bindDropTargets(target);
+      markDraggable(target);
+      log("tether:update", "draggables:", target.querySelectorAll("[data-tether-draggable]").length);
     }
   });
 
