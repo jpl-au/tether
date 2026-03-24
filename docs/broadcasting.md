@@ -54,7 +54,7 @@ Handle: func(sess tether.Session, s State, ev tether.Event) State {
 },
 ```
 
-## Presence
+## Presence (Group callbacks)
 
 Track who is online with callbacks and iteration:
 
@@ -77,6 +77,39 @@ log.Printf("online: %d", group.Len())
 ```
 
 `OnJoin` fires when `Add` is called with a new session. `OnLeave` fires when `Remove` is called for a session that was in the group. Duplicate adds and absent removes are no-ops.
+
+## Presence tracking (tether.Presence)
+
+`tether.Presence[T]` tracks per-session metadata and makes it available
+to all sessions. Use it for collaborative features: who is viewing a
+card, who is typing, which page each user is on.
+
+```go
+type ViewInfo struct {
+    Card string
+    Name string
+}
+
+var viewers = tether.NewPresence[ViewInfo]()
+
+// In Handle - set when viewing a card:
+viewers.Set(sess.ID(), ViewInfo{Card: id, Name: s.Name})
+
+// In Handle - clear when leaving:
+viewers.Clear(sess.ID())
+
+// In OnDisconnect - clean up:
+viewers.Clear(sess.ID())
+
+// In Render - show what others are doing:
+viewers.Each(s.SessionID, func(sid string, v ViewInfo) {
+    // v.Name is viewing v.Card - skip the current session
+})
+```
+
+Methods: `Set`, `Clear`, `Get`, `All`, `Each`, `Len`. The `Each`
+method accepts an exclude parameter so renders skip the current
+session's own entry.
 
 ## Bus - typed cross-session events
 

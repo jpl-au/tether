@@ -74,6 +74,59 @@ bind.Apply(
 // Shorthand for: bind.Apply(el, bind.BindAttr("value", "upload:avatar:progress"))
 ```
 
+## Drag and drop
+
+Mark elements as draggable and define drop zones using bind options:
+
+```go
+// Draggable card with identifying data
+bind.Apply(cardDiv,
+    bind.Draggable(),
+    bind.EventData("id", card.ID),
+)
+
+// Drop target receives the action with merged source + target data
+bind.Apply(columnDiv,
+    bind.DropTarget("card.move"),
+    bind.EventData("column", "1"),
+)
+```
+
+For within-container reordering, use `Sortable` instead of `DropTarget`.
+The drop event includes an `"index"` key with the position:
+
+```go
+bind.Apply(todoColumn,
+    bind.Sortable("card.reorder"),
+    bind.EventData("column", "0"),
+)
+
+// In Handle:
+case "card.reorder":
+    id, _ := ev.Get("id")        // from the dragged item
+    col, _ := ev.Int("column")   // from the target container
+    idx, _ := ev.Int("index")    // drop position within the container
+```
+
+### How it works
+
+The `tether-drag-and-drop.js` extension is auto-included when any element
+renders `data-tether-draggable` or `data-tether-sortable`. It uses event
+delegation on the tether root (consistent with the core runtime) so DOM
+morphing cannot create ghost listeners.
+
+CSS classes for visual feedback:
+- `.tether-dragging` - applied to the source element during drag
+- `.tether-drag-over` - applied to the drop target on hover
+
+### Extension auto-loading
+
+Extension scripts (`tether-upload.js`, `tether-drag-and-drop.js`) are
+included in the initial page when their marker attribute appears in the
+rendered HTML. If the marker first appears after a morph (e.g. a login
+page transitions to a board), the runtime lazily loads the script by
+inserting a `<script>` tag dynamically.
+
 ## Service worker
 
 Enable asset caching and offline page shells:

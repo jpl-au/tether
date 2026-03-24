@@ -50,6 +50,10 @@ const (
 	// and "search" keys.
 	Navigate Type = "navigate"
 
+	// Paste fires when the user pastes content into an element with a
+	// data-tether-paste attribute. The pasted text is in Data["value"].
+	Paste Type = "paste"
+
 	// Viewport fires when a [bind.Viewport]-marked sentinel element
 	// enters the visible viewport. Use this to implement infinite
 	// scroll: load the next page of data when the sentinel is reached.

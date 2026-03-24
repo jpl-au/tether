@@ -186,6 +186,7 @@ Call these inside `Handle` to buffer effects into the same update message, or fr
 s.Toast("Settings saved")              // global notification
 s.Announce("Item added to cart")       // screen reader live region
 s.Flash("#notice", "Saved")            // notification at selector (5s)
+s.ScrollTo("#new-item")               // smooth scroll element into view
 s.Navigate("/success")                 // pushState
 s.ReplaceURL("/current?saved=1")       // replaceState
 s.SetTitle("Settings - My App")        // document.title
@@ -208,7 +209,7 @@ func todoHandle(sess tether.Session, ts TodoState, ev tether.Event) TodoState {
 }
 ```
 
-Methods: `ID`, `Context`, `Go`, `Toast`, `Navigate`, `ReplaceURL`, `SetTitle`, `Announce`, `Flash`, `Signal`, `Signals`, `Push`, `Close`.
+Methods: `ID`, `Context`, `Go`, `Toast`, `Navigate`, `ReplaceURL`, `SetTitle`, `Announce`, `Flash`, `ScrollTo`, `Signal`, `Signals`, `Push`, `Close`.
 
 `ID` returns an empty string in stateless page mode (StatelessConfig) - there is no persistent session. `Push` returns an error during pre-warming (initial GET) since no browser subscription exists yet. `Close` terminates the session's transport; in stateless page mode and tethertest it is a no-op. During stateful sessions all methods work normally.
 
@@ -393,6 +394,7 @@ bind.OnClick("act")         bind.OnSubmit("act")
 bind.OnInput("act")         bind.OnChange("act")
 bind.OnKeyDown("act")       bind.OnFocus("act")
 bind.OnBlur("act")          bind.OnViewport("act")
+bind.OnPaste("act")
 bind.Event("dblclick", "act")
 bind.Collect("#selector")
 ```
@@ -412,6 +414,7 @@ bind.EventData("key", "val")
 bind.Disable("...")     bind.Confirm("...")
 bind.Reset()            bind.AutoFocus()
 bind.Indicator("#el")   bind.FocusTrap()
+bind.PreventDefault()
 ```
 
 ### Signal bindings
@@ -428,6 +431,9 @@ bind.BindAttr("disabled", "busy") bind.BindValue("email")
 bind.Link()             bind.Cloak()
 bind.Permanent()        bind.ToggleClass("cls")
 bind.ToggleTarget("#x") bind.ToggleAttr("hidden")
+bind.CopyToClipboard("#selector")
+bind.ScrollTo("#selector")
+bind.PreserveScroll()
 ```
 
 ### Signal directives
@@ -447,6 +453,33 @@ bind.UploadInput("#avatar-input")
 bind.UploadProgress("avatar")
 bind.PushSubscribe()
 ```
+
+### Keyboard shortcuts
+
+```go
+bind.Hotkey("ctrl+k", "search.open")
+bind.Hotkey("escape", "modal.close")
+```
+
+Global hotkeys that fire regardless of which element has focus. The combo
+format uses `+` between modifiers and the key name. Multiple hotkeys can
+be applied to the same element.
+
+### Drag and drop
+
+```go
+bind.Draggable()             // mark as draggable
+bind.DropTarget("card.move") // mark drop zone
+bind.Sortable("card.reorder") // reorderable container
+```
+
+`Draggable` marks an element for dragging. Pair with `bind.EventData` to
+carry identifying data. `DropTarget` fires the action on drop with merged
+data from both the source and target. `Sortable` is like DropTarget but
+also calculates the drop index for within-container reordering.
+
+The `tether-drag-and-drop.js` extension is auto-included when any element
+renders `data-tether-draggable` or `data-tether-sortable`.
 
 ### Lifecycle
 

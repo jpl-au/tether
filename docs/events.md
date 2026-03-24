@@ -15,6 +15,7 @@ Event type constants live in the `event` package. Import `github.com/jpl-au/teth
 | `event.Blur` | `"blur"` | Element loses focus |
 | `event.Navigate` | `"navigate"` | Client-side navigation (pushState) |
 | `event.Viewport` | `"viewport"` | Element enters the viewport - used for infinite scroll |
+| `event.Paste` | `"paste"` | Paste from clipboard - pasted text in `ev.Data["value"]` |
 | `event.Online` | `"online"` | Browser connection restored |
 | `event.Offline` | `"offline"` | Browser connection lost |
 | `event.AppInstalled` | `"appinstalled"` | PWA installed to home screen |
@@ -36,7 +37,32 @@ bind.Apply(input.Text("name", ""), bind.OnFocus("focus"))
 bind.Apply(input.Text("name", ""), bind.OnBlur("blur"))
 bind.Apply(div.New(), bind.OnViewport("load-more"))
 bind.Apply(el, bind.Event("dblclick", "open-editor"))
+bind.Apply(input.Text("q", ""), bind.OnPaste("paste-search"))
 ```
+
+### PreventDefault
+
+By default only submit events get `preventDefault`. Use `bind.PreventDefault()` to suppress the browser's default behaviour for any event:
+
+```go
+bind.Apply(el,
+    bind.Event("contextmenu", "menu.open"),
+    bind.PreventDefault(),
+)
+```
+
+### Global hotkeys
+
+`bind.Hotkey` registers keyboard shortcuts that fire regardless of which element has focus:
+
+```go
+bind.Apply(container,
+    bind.Hotkey("ctrl+k", "search.open"),
+    bind.Hotkey("escape", "modal.close"),
+)
+```
+
+Multiple hotkeys can be applied to the same element. The combo format uses `+` between modifiers and the key: `"ctrl+k"`, `"ctrl+shift+p"`, `"escape"`. The event arrives in Handle with `ev.Data["combo"]` set to the normalised combo string.
 
 ### Collecting input values on click
 
