@@ -336,7 +336,8 @@ Broadcast state changes to multiple sessions:
 group := tether.NewGroup[State]()
 group.Add(sess)
 group.Remove(sess)
-group.Len()       // member count
+group.Len()       // member count (point-in-time)
+group.Count()     // *Value[int] - reactive member count
 group.All()       // iter.Seq[*StatefulSession[S]]
 
 group.Broadcast(func(target *tether.StatefulSession[State], s State) State {

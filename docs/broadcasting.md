@@ -78,6 +78,29 @@ log.Printf("online: %d", group.Len())
 
 `OnJoin` fires when `Add` is called with a new session. `OnLeave` fires when `Remove` is called for a session that was in the group. Duplicate adds and absent removes are no-ops.
 
+### Reactive member count
+
+`group.Count()` returns a `*tether.Value[int]` that updates
+automatically when sessions join or leave. Wire it with `WatchValue`
+for an always-accurate online count:
+
+```go
+group := tether.NewGroup[State]()
+
+Watchers: []tether.Watcher[State]{
+    tether.WatchValue(group.Count(), func(n int, s State) State {
+        s.OnlineCount = n
+        return s
+    }),
+},
+```
+
+This is the recommended way to track online users. Do not use manual
+increment/decrement counters in OnConnect/OnDisconnect - those
+callbacks fire before the group membership changes, so `group.Len()`
+is stale when read from them. `group.Count()` is updated after the
+Add/Remove, so it is always accurate.
+
 ## Presence tracking (tether.Presence)
 
 `tether.Presence[T]` tracks per-session metadata and makes it available

@@ -207,3 +207,89 @@ func TestGroupAllEmpty(t *testing.T) {
 		t.Errorf("expected 0 sessions, got %d", count)
 	}
 }
+
+func TestGroupCountStartsAtZero(t *testing.T) {
+	g := NewGroup[counterState]()
+	if n := g.Count().Load(); n != 0 {
+		t.Errorf("Count() = %d, want 0", n)
+	}
+}
+
+func TestGroupCountIncrementsOnAdd(t *testing.T) {
+	g := NewGroup[counterState]()
+	mt := &mockTransport{events: []Event{}}
+	sess := newTestSession(counterState{}, mt)
+
+	g.Add(sess)
+	if n := g.Count().Load(); n != 1 {
+		t.Errorf("Count() = %d after Add, want 1", n)
+	}
+}
+
+func TestGroupCountDecrementsOnRemove(t *testing.T) {
+	g := NewGroup[counterState]()
+	mt := &mockTransport{events: []Event{}}
+	sess := newTestSession(counterState{}, mt)
+
+	g.Add(sess)
+	g.Remove(sess)
+	if n := g.Count().Load(); n != 0 {
+		t.Errorf("Count() = %d after Remove, want 0", n)
+	}
+}
+
+func TestGroupCountUnchangedOnDuplicateAdd(t *testing.T) {
+	g := NewGroup[counterState]()
+	mt := &mockTransport{events: []Event{}}
+	sess := newTestSession(counterState{}, mt)
+
+	g.Add(sess)
+	g.Add(sess) // duplicate
+	if n := g.Count().Load(); n != 1 {
+		t.Errorf("Count() = %d after duplicate Add, want 1", n)
+	}
+}
+
+func TestGroupCountUnchangedOnAbsentRemove(t *testing.T) {
+	g := NewGroup[counterState]()
+	mt := &mockTransport{events: []Event{}}
+	sess := newTestSession(counterState{}, mt)
+
+	g.Remove(sess) // not in group
+	if n := g.Count().Load(); n != 0 {
+		t.Errorf("Count() = %d after absent Remove, want 0", n)
+	}
+}
+
+func TestGroupCountAccurateInOnJoin(t *testing.T) {
+	g := NewGroup[counterState]()
+	var countInJoin int
+	g.OnJoin = func(_ *StatefulSession[counterState]) {
+		countInJoin = g.Count().Load()
+	}
+
+	mt := &mockTransport{events: []Event{}}
+	sess := newTestSession(counterState{}, mt)
+	g.Add(sess)
+
+	if countInJoin != 1 {
+		t.Errorf("Count() in OnJoin = %d, want 1", countInJoin)
+	}
+}
+
+func TestGroupCountAccurateInOnLeave(t *testing.T) {
+	g := NewGroup[counterState]()
+	var countInLeave int
+	g.OnLeave = func(_ *StatefulSession[counterState]) {
+		countInLeave = g.Count().Load()
+	}
+
+	mt := &mockTransport{events: []Event{}}
+	sess := newTestSession(counterState{}, mt)
+	g.Add(sess)
+	g.Remove(sess)
+
+	if countInLeave != 0 {
+		t.Errorf("Count() in OnLeave = %d, want 0", countInLeave)
+	}
+}

@@ -36,6 +36,7 @@ type Group[S any] struct {
 	// atomic.Value and need no lock.
 	wmu      sync.Mutex
 	sessions atomic.Value // holds map[string]*StatefulSession[S]
+	count    *Value[int]  // reactive member count, updated by Add/Remove
 
 	// OnJoin is called after a session is added to the group.
 	// Runs outside the write lock so it is safe to call Broadcast
@@ -52,10 +53,21 @@ type Group[S any] struct {
 // Typically called once at program startup and shared across the
 // OnConnect/OnDisconnect callbacks and any code that broadcasts.
 func NewGroup[S any]() *Group[S] {
-	g := &Group[S]{}
+	g := &Group[S]{count: NewValue(0)}
 	g.sessions.Store(make(map[string]*StatefulSession[S]))
 	return g
 }
+
+// Count returns a reactive Value tracking the number of sessions in
+// the group. Updated automatically by Add and Remove - after the
+// membership change, not before. Wire it with WatchValue for an
+// always-accurate online count:
+//
+//	tether.WatchValue(group.Count(), func(n int, s State) State {
+//	    s.OnlineCount = n
+//	    return s
+//	})
+func (g *Group[S]) Count() *Value[int] { return g.count }
 
 // Add registers a session with the group. If the session is new and
 // OnJoin is set, the callback fires after the session is added.
@@ -75,7 +87,9 @@ func (g *Group[S]) Add(s *StatefulSession[S]) {
 	g.wmu.Unlock()
 
 	if !exists {
-		dev.Debug("group.Add", "session", s.id, "endpoint", s.endpoint, "members", len(g.loadSessions()))
+		n := len(g.loadSessions())
+		g.count.Store(n)
+		dev.Debug("group.Add", "session", s.id, "endpoint", s.endpoint, "members", n)
 		if onJoin != nil {
 			onJoin(s)
 		}
@@ -103,7 +117,9 @@ func (g *Group[S]) Remove(s *StatefulSession[S]) {
 	g.wmu.Unlock()
 
 	if exists {
-		dev.Debug("group.Remove", "session", s.id, "endpoint", s.endpoint, "members", len(g.loadSessions()))
+		n := len(g.loadSessions())
+		g.count.Store(n)
+		dev.Debug("group.Remove", "session", s.id, "endpoint", s.endpoint, "members", n)
 		if onLeave != nil {
 			onLeave(s)
 		}
