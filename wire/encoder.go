@@ -24,6 +24,7 @@ type Update struct {
 	Signals  map[string]any    // key: signal name, value: pushed to bound elements
 	Announce string            // if non-empty, inject into an aria-live region
 	Toast    string            // if non-empty, show a global notification
+	ScrollTo string            // if non-empty, scroll element into view
 	EventID  string            // echoed from the triggering Event for correlation
 }
 

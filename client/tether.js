@@ -627,6 +627,10 @@ window.Tether.signals = window.Tether.signals || {};
       if (msg.toast) {
         toast(msg.toast);
       }
+      if (msg.scroll_to) {
+        var scrollTarget = document.querySelector(msg.scroll_to);
+        if (scrollTarget) scrollTarget.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
       if (msg.signals) {
         applySignals(msg.signals);
       }
@@ -636,6 +640,11 @@ window.Tether.signals = window.Tether.signals || {};
       // event binding attribute for the Focus helper).
       var focusEl = root.querySelector("[data-tether-autofocus]");
       if (focusEl) focusEl.focus();
+
+      // Lazy-load extension scripts when their marker attributes first
+      // appear in the DOM after a morph. This eliminates the need for
+      // hidden marker elements on the initial page.
+      loadExtensions();
 
       // Notify extensions that the DOM has been updated so they can
       // re-scan for new elements (e.g. upload triggers added by a morph).
@@ -1211,7 +1220,8 @@ window.Tether.signals = window.Tether.signals || {};
     ["submit", "tether-submit"],
     ["keydown", "tether-keydown"],
     ["focus", "tether-focus"],
-    ["blur", "tether-blur"]
+    ["blur", "tether-blur"],
+    ["paste", "tether-paste"]
   ];
 
   function bindEvents() {
@@ -1319,7 +1329,7 @@ window.Tether.signals = window.Tether.signals || {};
       // sending so the input fields clear. The server re-renders with
       // empty values but the form isn't inside a Dynamic key, so the
       // client needs to clear it locally.
-      if (domEvent === "submit") {
+      if (domEvent === "submit" || target.hasAttribute("data-tether-prevent-default")) {
         e.preventDefault();
       }
 
@@ -1385,6 +1395,11 @@ window.Tether.signals = window.Tether.signals || {};
               data[key] = value;
             }
           });
+          break;
+
+        case "paste":
+          var clipData = (e.clipboardData || window.clipboardData);
+          data.value = clipData ? clipData.getData("text") : "";
           break;
       }
 
@@ -1670,6 +1685,39 @@ window.Tether.signals = window.Tether.signals || {};
   window.addEventListener("appinstalled", function () {
     sendEvent("appinstalled", "", {});
   });
+
+  // --- Extension lazy loading ---
+  //
+  // Extension scripts are included on the initial page load when their
+  // marker attribute appears in the rendered HTML. This function handles
+  // the case where the marker first appears after a morph (e.g. a login
+  // page transitions to a board with draggable elements). It dynamically
+  // inserts the script tag so the extension loads without a page reload.
+
+  var extensionMarkers = [
+    { attr: "data-tether-upload", script: "tether-upload.js" },
+    { attr: "data-tether-draggable", script: "tether-drag-and-drop.js" }
+  ];
+  var loadedExtensions = {};
+
+  function loadExtensions() {
+    for (var i = 0; i < extensionMarkers.length; i++) {
+      var ext = extensionMarkers[i];
+      if (loadedExtensions[ext.script]) continue;
+      if (!root.querySelector("[" + ext.attr + "]")) continue;
+      // Check if already loaded by the initial page render.
+      var scripts = document.querySelectorAll("script[src*='" + ext.script + "']");
+      if (scripts.length > 0) {
+        loadedExtensions[ext.script] = true;
+        continue;
+      }
+      loadedExtensions[ext.script] = true;
+      var tag = document.createElement("script");
+      tag.src = "/_tether/" + ext.script + "?v=" + Date.now();
+      document.body.appendChild(tag);
+      if (devMode) console.log("tether: lazy-loaded extension", ext.script);
+    }
+  }
 
   // --- Extension API ---
   //

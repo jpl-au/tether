@@ -179,6 +179,13 @@ func (s *StatefulSession[S]) Flash(selector, text string) {
 	})
 }
 
+// ScrollTo scrolls the matched element into view on the client.
+// Inside Handle the command is buffered; outside it is sent as a
+// standalone update.
+func (s *StatefulSession[S]) ScrollTo(selector string) {
+	s.enqueueFx(func(fx *Effects) { fx.ScrollTo = selector })
+}
+
 // Signal pushes a reactive value to the client. Elements bound to the
 // signal name via [BindText], [BindShow], [BindClass], or [BindAttr]
 // update instantly - no render cycle, no diff, no HTML. Inside Handle

@@ -85,6 +85,11 @@ func OnFocus(action string) Option { return Option{"tether-focus", action} }
 // loses keyboard focus. Useful for validating input on exit.
 func OnBlur(action string) Option { return Option{"tether-blur", action} }
 
+// OnPaste forwards paste events to the server. The pasted text is
+// included in [tether.Event].Data["value"]. Use this for
+// paste-to-search, paste-to-import, or paste-from-clipboard features.
+func OnPaste(action string) Option { return Option{"tether-paste", action} }
+
 // OnViewport fires when the element enters the visible viewport, using
 // an IntersectionObserver internally. Place this on a sentinel element
 // at the bottom of a list to implement infinite scroll - when the
@@ -112,6 +117,13 @@ func Disable(text string) Option { return Option{"tether-disable", text} }
 // Confirm shows a browser confirmation dialog before the event is sent.
 // If the user cancels, the event is silently dropped.
 func Confirm(message string) Option { return Option{"tether-confirm", message} }
+
+// PreventDefault suppresses the browser's default behaviour for the
+// event. Use this with [Event] to handle events like contextmenu
+// without the browser's native menu appearing:
+//
+//	bind.Apply(el, bind.Event("contextmenu", "menu.open"), bind.PreventDefault())
+func PreventDefault() Option { return Option{"tether-prevent-default", ""} }
 
 // Reset clears all form fields after a successful submit. Useful for
 // chat-style inputs where the form should be ready for the next message

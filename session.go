@@ -240,6 +240,7 @@ type Session interface {
 	SetTitle(title string)
 	Announce(text string)
 	Flash(selector, text string)
+	ScrollTo(selector string)
 	Signal(key string, value any)
 	Signals(signals map[string]any)
 	Push(n push.Notification) error
@@ -354,6 +355,9 @@ func (cs *CaptureSession) Push(push.Notification) error {
 // Close is a no-op. There is no transport to shut down and no
 // command loop to stop.
 func (cs *CaptureSession) Close() {}
+
+// ScrollTo buffers a scroll-into-view command for replay after connection.
+func (cs *CaptureSession) ScrollTo(selector string) { cs.Effects.ScrollTo = selector }
 
 // Flash buffers a targeted flash message keyed by CSS selector.
 func (cs *CaptureSession) Flash(selector, text string) {

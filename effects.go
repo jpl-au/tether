@@ -19,12 +19,13 @@ type Effects struct {
 	Title    string
 	URL      string
 	Replace  bool // true for replaceState, false for pushState
+	ScrollTo string
 }
 
 // Any reports whether any side effects have been buffered.
 func (fx *Effects) Any() bool {
 	return fx.Announce != "" || fx.Flash != nil || fx.Signals != nil ||
-		fx.Toast != "" || fx.Title != "" || fx.URL != ""
+		fx.Toast != "" || fx.Title != "" || fx.URL != "" || fx.ScrollTo != ""
 }
 
 // merge copies buffered effects into an update message.
@@ -47,5 +48,8 @@ func (fx *Effects) merge(u *wire.Update) {
 	if fx.URL != "" {
 		u.URL = fx.URL
 		u.Replace = fx.Replace
+	}
+	if fx.ScrollTo != "" {
+		u.ScrollTo = fx.ScrollTo
 	}
 }
