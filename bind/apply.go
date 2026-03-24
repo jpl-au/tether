@@ -2,6 +2,7 @@ package bind
 
 import (
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -346,3 +347,65 @@ func Hook(name string) Option { return Option{"tether-hook", name} }
 // DOM, the enter classes are applied; when removed, the leave classes
 // animate the element out before it is actually deleted.
 func Transition(name string) Option { return Option{"tether-transition", name} }
+
+// Clipboard options - copy text to the clipboard without a server
+// round-trip. Handled entirely on the client.
+
+// CopyToClipboard copies the text content of the element matched by
+// selector to the clipboard on click. No server round-trip - the copy
+// happens entirely in the browser. Use this for "copy" buttons next
+// to API keys, code snippets, or share URLs.
+func CopyToClipboard(selector string) Option { return Option{"tether-copy", selector} }
+
+// Keyboard shortcut options - global hotkeys that fire regardless of
+// which element has focus.
+
+// Hotkey registers a global keyboard shortcut. When the key combo is
+// pressed anywhere on the page, the action fires as a normal tether
+// event. The combo format is modifier keys joined with + followed by
+// the key name: "ctrl+k", "escape", "shift+?", "ctrl+shift+p".
+//
+// Multiple hotkeys can be applied to the same element - each creates
+// a unique data attribute:
+//
+//	bind.Apply(container,
+//	    bind.Hotkey("ctrl+k", "search.open"),
+//	    bind.Hotkey("escape", "modal.close"),
+//	)
+func Hotkey(combo, action string) Option {
+	norm := strings.ReplaceAll(combo, "+", "-")
+	return Option{"tether-hotkey-" + norm, action}
+}
+
+// Drag and drop options - mark elements as draggable or as drop
+// targets. Handled by the tether-drag-and-drop.js extension which is
+// auto-included when any element with data-tether-draggable appears
+// in the initial page render.
+//
+// Extension scripts are loaded once during the initial GET. If the
+// initial view does not contain draggable elements (e.g. a login
+// page renders first), include a hidden marker so the script loads
+// upfront:
+//
+//	bind.Apply(div.New().Class("sr-only"), bind.Draggable())
+
+// Draggable marks an element as draggable. Pair with [EventData] to
+// attach identifying data (e.g. an item ID) that travels with the
+// drag:
+//
+//	bind.Apply(card,
+//	    bind.Draggable(),
+//	    bind.EventData("id", card.ID),
+//	)
+func Draggable() Option { return Option{"tether-draggable", ""} }
+
+// DropTarget marks an element as a valid drop zone. When a draggable
+// element is dropped onto this target, the action fires with event
+// data merged from both the dragged element and the target. Pair with
+// [EventData] to identify the target:
+//
+//	bind.Apply(column,
+//	    bind.DropTarget("card.move"),
+//	    bind.EventData("column", "1"),
+//	)
+func DropTarget(action string) Option { return Option{"tether-drop-target", action} }

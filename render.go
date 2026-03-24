@@ -24,6 +24,7 @@ type extension struct {
 // when new extension scripts are created in client/.
 var extensions = []extension{
 	{marker: []byte("data-tether-upload"), script: "tether-upload.js"},
+	{marker: []byte("data-tether-draggable"), script: "tether-drag-and-drop.js"},
 }
 
 // tetherBody implements node.Node for the tether root div and client

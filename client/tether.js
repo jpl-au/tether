@@ -1220,7 +1220,9 @@ window.Tether.signals = window.Tether.signals || {};
     }
     root.addEventListener("click", handleToggles);
     root.addEventListener("click", handleLinks);
+    root.addEventListener("click", handleClipboard);
     window.addEventListener("keydown", handleFocusTrap);
+    window.addEventListener("keydown", handleHotkeys);
 
     window.addEventListener("popstate", function () {
       sendNavigate(location.pathname + location.search);
@@ -1557,6 +1559,71 @@ window.Tether.signals = window.Tether.signals || {};
       set.push(attrName);
     }
     el.setAttribute("data-tether-client-attrs", set.join(" "));
+  }
+
+  // --- Clipboard ---
+  //
+  // Elements with data-tether-copy="<selector>" copy the text content
+  // of the matched element to the clipboard on click. No server
+  // round-trip.
+
+  function handleClipboard(e) {
+    var trigger = e.target.closest("[data-tether-copy]");
+    if (!trigger) return;
+
+    var selector = trigger.getAttribute("data-tether-copy");
+    var source = document.querySelector(selector);
+    if (!source) return;
+
+    var text = source.value !== undefined && source.value !== "" ? source.value : source.textContent;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text);
+    }
+  }
+
+  // --- Global hotkeys ---
+  //
+  // Elements with data-tether-hotkey-<combo>="<action>" register
+  // global keyboard shortcuts. The combo is in the attribute name
+  // (e.g. data-tether-hotkey-ctrl-k) and the action is the value.
+  // On keydown, all hotkey attributes in the DOM are checked against
+  // the pressed key combo.
+
+  var hotkeyPrefix = "data-tether-hotkey-";
+
+  function handleHotkeys(e) {
+    // Build the combo string from the pressed key and modifiers.
+    var parts = [];
+    if (e.ctrlKey || e.metaKey) parts.push("ctrl");
+    if (e.shiftKey) parts.push("shift");
+    if (e.altKey) parts.push("alt");
+
+    var key = e.key.toLowerCase();
+    // Normalise special keys.
+    if (key === " ") key = "space";
+    if (key !== "control" && key !== "shift" && key !== "alt" && key !== "meta") {
+      parts.push(key);
+    }
+    if (parts.length === 0) return;
+
+    var combo = parts.join("-");
+
+    // Find any element with a matching hotkey attribute.
+    var attr = hotkeyPrefix + combo;
+    var el = root ? root.querySelector("[" + attr + "]") : null;
+    if (!el) return;
+
+    var action = el.getAttribute(attr);
+    if (!action) return;
+
+    e.preventDefault();
+
+    var prefix = findPrefix(el);
+    if (prefix && action.indexOf(prefix + ".") !== 0) {
+      action = prefix + "." + action;
+    }
+
+    sendEvent("hotkey", action, { combo: combo });
   }
 
   // --- Client-side signal actions ---
