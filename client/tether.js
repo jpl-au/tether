@@ -1234,7 +1234,8 @@ window.Tether.signals = window.Tether.signals || {};
     ["keydown", "tether-keydown"],
     ["focus", "tether-focus"],
     ["blur", "tether-blur"],
-    ["paste", "tether-paste"]
+    ["paste", "tether-paste"],
+    ["contextmenu", "tether-contextmenu"]
   ];
 
   function bindEvents() {
