@@ -45,6 +45,7 @@ type updateMessage struct {
 	Announce string            `json:"announce,omitempty"`
 	Toast    string            `json:"toast,omitempty"`
 	ScrollTo string            `json:"scroll_to,omitempty"`
+	Download string            `json:"download,omitempty"`
 	EventID  string            `json:"event_id,omitempty"`
 }
 
@@ -94,6 +95,7 @@ func encodeMessage(u Update) updateMessage {
 	msg.Announce = u.Announce
 	msg.Toast = u.Toast
 	msg.ScrollTo = u.ScrollTo
+	msg.Download = u.Download
 	msg.EventID = u.EventID
 
 	return msg

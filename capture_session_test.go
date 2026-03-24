@@ -161,12 +161,20 @@ func TestCaptureSessionScrollTo(t *testing.T) {
 	}
 }
 
+func TestCaptureSessionDownload(t *testing.T) {
+	cs := &CaptureSession{}
+	cs.Download("/export/report.csv")
+	if cs.Effects.Download != "/export/report.csv" {
+		t.Errorf("Download = %q, want /export/report.csv", cs.Effects.Download)
+	}
+}
+
 func TestCaptureSessionFreshEffects(t *testing.T) {
 	// Verify a fresh CaptureSession has zero-value effects.
 	cs := &CaptureSession{}
 	if cs.Effects.Toast != "" || cs.Effects.URL != "" || cs.Effects.Title != "" ||
 		cs.Effects.Announce != "" || cs.Effects.Flash != nil || cs.Effects.Signals != nil ||
-		cs.Effects.ScrollTo != "" || cs.Effects.Replace {
+		cs.Effects.ScrollTo != "" || cs.Effects.Download != "" || cs.Effects.Replace {
 		t.Error("fresh CaptureSession should have zero-value Effects")
 	}
 }

@@ -241,6 +241,7 @@ type Session interface {
 	Announce(text string)
 	Flash(selector, text string)
 	ScrollTo(selector string)
+	Download(url string)
 	Signal(key string, value any)
 	Signals(signals map[string]any)
 	Push(n push.Notification) error
@@ -358,6 +359,9 @@ func (cs *CaptureSession) Close() {}
 
 // ScrollTo buffers a scroll-into-view command for replay after connection.
 func (cs *CaptureSession) ScrollTo(selector string) { cs.Effects.ScrollTo = selector }
+
+// Download buffers a file download URL for replay after connection.
+func (cs *CaptureSession) Download(url string) { cs.Effects.Download = url }
 
 // Flash buffers a targeted flash message keyed by CSS selector.
 func (cs *CaptureSession) Flash(selector, text string) {

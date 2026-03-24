@@ -241,6 +241,46 @@ func TestEncodeOmitsEmptyScrollTo(t *testing.T) {
 	}
 }
 
+func TestEncodeDownload(t *testing.T) {
+	u := Update{Download: "/export/report.csv"}
+	msg := encodeMessage(u)
+
+	if msg.Download != "/export/report.csv" {
+		t.Errorf("Download = %q, want /export/report.csv", msg.Download)
+	}
+
+	data, err := json.Marshal(msg)
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+
+	var decoded map[string]any
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	if decoded["download"] != "/export/report.csv" {
+		t.Errorf("decoded download = %v, want /export/report.csv", decoded["download"])
+	}
+}
+
+func TestEncodeOmitsEmptyDownload(t *testing.T) {
+	u := Update{Toast: "hello"}
+	data, err := json.Marshal(encodeMessage(u))
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+
+	var decoded map[string]any
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	if _, ok := decoded["download"]; ok {
+		t.Error("download should be omitted when empty")
+	}
+}
+
 func TestJSONEncoderRoundTrip(t *testing.T) {
 	u := Update{
 		Patches: []Patch{

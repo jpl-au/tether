@@ -631,6 +631,15 @@ window.Tether.signals = window.Tether.signals || {};
         var scrollTarget = document.querySelector(msg.scroll_to);
         if (scrollTarget) scrollTarget.scrollIntoView({ behavior: "smooth", block: "nearest" });
       }
+      if (msg.download) {
+        var a = document.createElement("a");
+        a.href = msg.download;
+        a.download = "";
+        a.style.display = "none";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
       if (msg.signals) {
         applySignals(msg.signals);
       }

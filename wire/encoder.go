@@ -25,6 +25,7 @@ type Update struct {
 	Announce string            // if non-empty, inject into an aria-live region
 	Toast    string            // if non-empty, show a global notification
 	ScrollTo string            // if non-empty, scroll element into view
+	Download string            // if non-empty, trigger a file download from this URL
 	EventID  string            // echoed from the triggering Event for correlation
 }
 

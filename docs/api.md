@@ -187,6 +187,7 @@ s.Toast("Settings saved")              // global notification
 s.Announce("Item added to cart")       // screen reader live region
 s.Flash("#notice", "Saved")            // notification at selector (5s)
 s.ScrollTo("#new-item")               // smooth scroll element into view
+s.Download("/export/report.csv")      // trigger file download via HTTP
 s.Navigate("/success")                 // pushState
 s.ReplaceURL("/current?saved=1")       // replaceState
 s.SetTitle("Settings - My App")        // document.title
@@ -209,7 +210,7 @@ func todoHandle(sess tether.Session, ts TodoState, ev tether.Event) TodoState {
 }
 ```
 
-Methods: `ID`, `Context`, `Go`, `Toast`, `Navigate`, `ReplaceURL`, `SetTitle`, `Announce`, `Flash`, `ScrollTo`, `Signal`, `Signals`, `Push`, `Close`.
+Methods: `ID`, `Context`, `Go`, `Toast`, `Navigate`, `ReplaceURL`, `SetTitle`, `Announce`, `Flash`, `ScrollTo`, `Download`, `Signal`, `Signals`, `Push`, `Close`.
 
 `ID` returns an empty string in stateless page mode (StatelessConfig) - there is no persistent session. `Push` returns an error during pre-warming (initial GET) since no browser subscription exists yet. `Close` terminates the session's transport; in stateless page mode and tethertest it is a no-op. During stateful sessions all methods work normally.
 

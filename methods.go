@@ -186,6 +186,14 @@ func (s *StatefulSession[S]) ScrollTo(selector string) {
 	s.enqueueFx(func(fx *Effects) { fx.ScrollTo = selector })
 }
 
+// Download triggers a file download in the browser from the given
+// URL. The browser makes a normal HTTP GET - the file is served via
+// standard HTTP, not over the WebSocket. Inside Handle the URL is
+// buffered; outside it is sent as a standalone update.
+func (s *StatefulSession[S]) Download(url string) {
+	s.enqueueFx(func(fx *Effects) { fx.Download = url })
+}
+
 // Signal pushes a reactive value to the client. Elements bound to the
 // signal name via [BindText], [BindShow], [BindClass], or [BindAttr]
 // update instantly - no render cycle, no diff, no HTML. Inside Handle
