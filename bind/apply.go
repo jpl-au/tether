@@ -431,3 +431,16 @@ func Draggable() Option { return Option{"tether-draggable", ""} }
 //	    bind.EventData("column", "1"),
 //	)
 func DropTarget(action string) Option { return Option{"tether-drop-target", action} }
+
+// Sortable marks a container for within-container reordering. When a
+// draggable element is dropped inside a sortable container, the
+// action fires with the drop index in event data ("index"). This
+// enables priority reordering within a list or column. Sortable
+// containers are also valid drop targets - items can be dragged in
+// from outside.
+//
+//	bind.Apply(todoColumn,
+//	    bind.Sortable("card.reorder"),
+//	    bind.EventData("column", "0"),
+//	)
+func Sortable(action string) Option { return Option{"tether-sortable", action} }

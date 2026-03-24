@@ -50,35 +50,34 @@
     });
 
     root.addEventListener("dragover", function (e) {
-      var el = e.target.closest("[data-tether-drop-target]");
+      var el = findDropZone(e.target);
       if (!el) return;
       e.preventDefault();
       e.dataTransfer.dropEffect = "move";
     });
 
     root.addEventListener("dragenter", function (e) {
-      var el = e.target.closest("[data-tether-drop-target]");
+      var el = findDropZone(e.target);
       if (!el) return;
       e.preventDefault();
       el.classList.add(overClass);
     });
 
     root.addEventListener("dragleave", function (e) {
-      var el = e.target.closest("[data-tether-drop-target]");
+      var el = findDropZone(e.target);
       if (!el) return;
-      // Only remove the class when leaving the target itself, not
-      // when entering a child element.
       if (e.relatedTarget && el.contains(e.relatedTarget)) return;
       el.classList.remove(overClass);
     });
 
     root.addEventListener("drop", function (e) {
-      var el = e.target.closest("[data-tether-drop-target]");
+      var el = findDropZone(e.target);
       if (!el) return;
       e.preventDefault();
       el.classList.remove(overClass);
 
-      var action = el.getAttribute("data-tether-drop-target");
+      var action = el.getAttribute("data-tether-drop-target") ||
+                   el.getAttribute("data-tether-sortable");
       if (!action) return;
 
       // Merge data from the dragged element and the drop target.
@@ -91,10 +90,6 @@
 
       var targetData = collectData(el);
       var merged = {};
-
-      // Source data first, then target data overlays. This lets the
-      // drop target add context (e.g. which column was dropped on)
-      // while preserving the dragged item's identity.
       var key;
       for (key in sourceData) {
         if (sourceData.hasOwnProperty(key)) merged[key] = sourceData[key];
@@ -103,10 +98,14 @@
         if (targetData.hasOwnProperty(key)) merged[key] = targetData[key];
       }
 
+      // For sortable containers, calculate the drop index based on
+      // the cursor position relative to the draggable children.
+      if (el.hasAttribute("data-tether-sortable")) {
+        merged.index = String(dropIndex(el, e.clientY));
+      }
+
       log("drop merged:", merged, "action:", action);
 
-      // Prefix support: if the drop target is inside a prefixed
-      // container, prepend the prefix to the action.
       var prefix = findPrefix(el);
       if (prefix && action.indexOf(prefix + ".") !== 0) {
         action = prefix + "." + action;
@@ -128,6 +127,25 @@
     for (var i = 0; i < els.length; i++) {
       els[i].setAttribute("draggable", "true");
     }
+  }
+
+  // findDropZone walks up from the event target to find the nearest
+  // drop target or sortable container.
+  function findDropZone(target) {
+    return target.closest("[data-tether-drop-target], [data-tether-sortable]");
+  }
+
+  // dropIndex calculates where in a sortable container the cursor is.
+  // Returns the index at which the dropped item should be inserted,
+  // based on the vertical midpoint of each draggable child.
+  function dropIndex(container, clientY) {
+    var children = container.querySelectorAll("[data-tether-draggable]");
+    for (var i = 0; i < children.length; i++) {
+      var rect = children[i].getBoundingClientRect();
+      var mid = rect.top + rect.height / 2;
+      if (clientY < mid) return i;
+    }
+    return children.length;
   }
 
   // collectData gathers all data-tether-data-* attributes from an element.
