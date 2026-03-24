@@ -227,7 +227,8 @@ func formatURL(scheme, addr string) string {
 	if err != nil {
 		return scheme + "://localhost" + addr
 	}
-	if host == "" || host == "0.0.0.0" || host == "::" {
+	switch host {
+	case "", "0.0.0.0", "::":
 		host = "localhost"
 	}
 	return scheme + "://" + net.JoinHostPort(host, port)

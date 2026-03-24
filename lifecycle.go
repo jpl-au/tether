@@ -79,23 +79,24 @@ func (h *Handler[S]) reattach(sess *StatefulSession[S], transport Transport) {
 		patches, change := sess.differ.Diff(tree)
 
 		var u wire.Update
-		if change != nil {
+		switch {
+		case change != nil:
 			// Structural change - full morph required.
 			html := sess.differ.Render(tree)
 			u.Morphs = []wire.Morph{{Key: "", HTML: html}}
-		} else if len(patches) > 0 {
+		case patches == nil:
+			// Unseeded differ (no snapshots) - full morph.
+			html := sess.differ.Render(tree)
+			u.Morphs = []wire.Morph{{Key: "", HTML: html}}
+		case len(patches) > 0:
 			wp := make([]wire.Patch, len(patches))
 			for i, p := range patches {
 				wp[i] = wire.Patch{Key: p.Key, HTML: p.HTML}
 			}
 			u.Patches = wp
-		} else if patches == nil {
-			// Unseeded differ (no snapshots) - full morph.
-			html := sess.differ.Render(tree)
-			u.Morphs = []wire.Morph{{Key: "", HTML: html}}
 		}
-		// patches empty but non-nil means nothing changed - still
-		// send URL and title below to sync the address bar.
+		// Empty non-nil patches means nothing changed - still send
+		// URL and title below to sync the address bar.
 
 		if sess.lastURL != "" {
 			u.URL = sess.lastURL

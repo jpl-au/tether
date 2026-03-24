@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"io/fs"
 	"net/http"
+	"strings"
 	"sync"
 
 	"github.com/jpl-au/tether/dev"
@@ -132,10 +133,9 @@ func (app *App) jsHandler() http.Handler {
 	var pushWorkerBody []byte
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// The service worker needs the content-hash cache version
-		// injected and the scope header set, so it is served directly
-		// rather than through the static file server.
-		if r.URL.Path == "/tether-worker.js" || r.URL.Path == "tether-worker.js" {
+		p := strings.TrimPrefix(r.URL.Path, "/")
+		switch p {
+		case "tether-worker.js":
 			workerOnce.Do(func() {
 				workerBody = buildWorkerJS(app.Assets)
 			})
@@ -144,12 +144,8 @@ func (app *App) jsHandler() http.Handler {
 			if _, err := w.Write(workerBody); err != nil {
 				dev.Log().Warn("failed to write worker script", "err", err)
 			}
-			return
-		}
-		// The push-only worker also needs the scope header so it can
-		// be registered at the handler's endpoint (e.g. /app/) rather
-		// than being restricted to /_tether/.
-		if r.URL.Path == "/tether-push-worker.js" || r.URL.Path == "tether-push-worker.js" {
+
+		case "tether-push-worker.js":
 			pushWorkerOnce.Do(func() {
 				raw, err := fs.ReadFile(clientFiles(), "tether-push-worker.js")
 				if err != nil {
@@ -162,8 +158,9 @@ func (app *App) jsHandler() http.Handler {
 			if _, err := w.Write(pushWorkerBody); err != nil {
 				dev.Log().Warn("failed to write push worker script", "err", err)
 			}
-			return
+
+		default:
+			fileServer.ServeHTTP(w, r)
 		}
-		fileServer.ServeHTTP(w, r)
 	})
 }

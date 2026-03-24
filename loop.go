@@ -237,19 +237,17 @@ func (s *StatefulSession[S]) exec(ev Event) {
 		"structural", change != nil,
 	)
 	if len(patches) == 0 && change == nil {
-		if s.onNoPatch != nil {
-			source := "event"
-			if ev.Type == "navigate" {
-				source = "navigate"
-			}
+		source := string(ev.Type)
+		switch {
+		case s.onNoPatch != nil:
 			s.onNoPatch(s, NoPatch{Source: source, Action: ev.Action})
-		} else if ev.Type == "navigate" {
+		case ev.Type == "navigate":
 			dev.Debug("navigate produced no patches",
 				"session", s.id,
 				"endpoint", s.endpoint,
 				"url", s.lastURL,
 			)
-		} else {
+		default:
 			dev.Debug("event produced no patches",
 				"session", s.id,
 				"endpoint", s.endpoint,

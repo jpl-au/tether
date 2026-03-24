@@ -185,9 +185,10 @@ func (app *App) mountAssets() []assetMount {
 func cacheHandler(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
-		if dev.Enabled() {
+		switch {
+		case dev.Enabled():
 			w.Header().Set("Cache-Control", "no-store")
-		} else if r.URL.Query().Get("v") != "" {
+		case r.URL.Query().Get("v") != "":
 			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 		}
 		h.ServeHTTP(w, r)
