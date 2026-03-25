@@ -196,7 +196,7 @@ window.Tether.signals = window.Tether.signals || {};
     }
   }
 
-  var sessionStorageKey = "tether_session_" + endpoint;
+  function storageKey() { return "tether_session_" + endpoint; }
 
   function connectWS() {
     var protocol = location.protocol === "https:" ? "wss:" : "ws:";
@@ -206,7 +206,7 @@ window.Tether.signals = window.Tether.signals || {};
     // If a previous session exists in sessionStorage (from a page
     // refresh), tell the server to destroy it immediately rather
     // than waiting for the 30s disconnect timer.
-    var prev = sessionStorage.getItem(sessionStorageKey);
+    var prev = sessionStorage.getItem(storageKey());
     if (prev && prev !== sessionID) {
       url += (url.indexOf("?") === -1 ? "?" : "&") + "replaces=" + prev;
     }
@@ -226,7 +226,7 @@ window.Tether.signals = window.Tether.signals || {};
       resyncPushSubscription();
       // Store the session ID so a page refresh can tell the server
       // to destroy this session immediately via the replaces param.
-      if (sessionID) sessionStorage.setItem(sessionStorageKey, sessionID);
+      if (sessionID) sessionStorage.setItem(storageKey(), sessionID);
       if (isReconnect) {
         // Sync the current URL with the server - the user may have
         // navigated via back/forward while disconnected.
@@ -269,7 +269,7 @@ window.Tether.signals = window.Tether.signals || {};
     var url = location.protocol + "//" + location.host + endpoint;
     if (sessionID) url += "?session=" + sessionID;
 
-    var prev = sessionStorage.getItem(sessionStorageKey);
+    var prev = sessionStorage.getItem(storageKey());
     if (prev && prev !== sessionID) {
       url += (url.indexOf("?") === -1 ? "?" : "&") + "replaces=" + prev;
     }
@@ -285,7 +285,7 @@ window.Tether.signals = window.Tether.signals || {};
       if (root) root.setAttribute("data-tether-state", "connected");
       hideReconnectBar();
       resyncPushSubscription();
-      if (sessionID) sessionStorage.setItem(sessionStorageKey, sessionID);
+      if (sessionID) sessionStorage.setItem(storageKey(), sessionID);
       if (isReconnect) {
         if (backgroundSync) replayQueuedEvents();
         sendNavigate(location.pathname + location.search);
