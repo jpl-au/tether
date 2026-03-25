@@ -250,6 +250,27 @@ When `Equal` returns true, the render, diff, and send are skipped entirely. Side
 
 For struct types with slice or map fields, `a == b` does not compile - use `reflect.DeepEqual` or write a field-by-field comparison. A manual comparison is faster and avoids reflecting over fields that don't affect rendering.
 
+## Leave idle timeout disabled unless you need it
+
+The default `Timeouts.Idle` is 0 (disabled). Sessions stay alive
+as long as the transport is connected, regardless of user activity.
+This is the correct default for most applications - dashboards,
+kanban boards, chat rooms, and any page a user might leave open.
+
+Only enable an idle timeout if you genuinely need to reclaim server
+resources from abandoned sessions. When enabled, sessions that
+receive no client events within the duration are closed, the
+browser sees a disconnect, and the user has to reconnect. This is
+disruptive and should not be the default experience.
+
+```go
+// Don't do this unless you have a specific reason:
+Timeouts: tether.Timeouts{Idle: 10 * time.Minute},
+
+// The default (zero) is almost always correct:
+// Timeouts: tether.Timeouts{},
+```
+
 ## Choose the right asset mode
 
 Tether supports two asset modes. Use the one that fits your deployment:
