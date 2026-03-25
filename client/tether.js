@@ -101,12 +101,16 @@ window.Tether.signals = window.Tether.signals || {};
       if (root) root.setAttribute("data-tether-state", "connected");
       bindEvents();
       mountExistingHooks();
+      applyValidation(root);
+      bindEditables(root);
       observeViewportElements(root);
     } else {
       connectionMode = (transportMode === "sse") ? "sse" : "ws";
       if (root) root.setAttribute("data-tether-state", "connecting");
       connect();
       bindEvents();
+      applyValidation(root);
+      bindEditables(root);
       observeViewportElements(root);
     }
 
@@ -684,6 +688,8 @@ window.Tether.signals = window.Tether.signals || {};
       // appear in the DOM after a morph. This eliminates the need for
       // hidden marker elements on the initial page.
       loadExtensions();
+      applyValidation(root);
+      bindEditables(root);
 
       // Notify extensions that the DOM has been updated so they can
       // re-scan for new elements (e.g. upload triggers added by a morph).
@@ -1387,6 +1393,11 @@ window.Tether.signals = window.Tether.signals || {};
         e.preventDefault();
       }
 
+      // Client-side validation: if the form contains fields with
+      // tether validation attributes, check them before sending.
+      // Uses the browser's native constraint validation API.
+      if (domEvent === "submit" && !validateForm(target)) return;
+
       var data = {};
 
       // Collect custom data attributes (data-tether-data-*)
@@ -1548,6 +1559,85 @@ window.Tether.signals = window.Tether.signals || {};
       console.log("tether: ws.send", action);
     }
     return id;
+  }
+
+  // --- Client-side validation ---
+  //
+  // Fields with data-tether-required, data-tether-minlength,
+  // data-tether-maxlength, or data-tether-pattern get native HTML
+  // validation attributes applied. The browser handles the UI
+  // (tooltip, red outline). validateForm checks validity before
+  // the event is sent.
+
+  function applyValidation(container) {
+    var fields = container.querySelectorAll(
+      "[data-tether-required], [data-tether-minlength], [data-tether-maxlength], [data-tether-pattern]"
+    );
+    for (var i = 0; i < fields.length; i++) {
+      var el = fields[i];
+      var req = el.getAttribute("data-tether-required");
+      if (req !== null) {
+        el.required = true;
+        if (req) el.title = req;
+      }
+      var ml = el.getAttribute("data-tether-minlength");
+      if (ml) {
+        var idx = ml.indexOf(" ");
+        el.minLength = parseInt(idx === -1 ? ml : ml.substring(0, idx));
+        if (idx !== -1) el.title = ml.substring(idx + 1);
+      }
+      var xl = el.getAttribute("data-tether-maxlength");
+      if (xl) {
+        var idx = xl.indexOf(" ");
+        el.maxLength = parseInt(idx === -1 ? xl : xl.substring(0, idx));
+        if (idx !== -1) el.title = xl.substring(idx + 1);
+      }
+      var pat = el.getAttribute("data-tether-pattern");
+      if (pat) {
+        var idx = pat.indexOf(" ");
+        el.pattern = idx === -1 ? pat : pat.substring(0, idx);
+        if (idx !== -1) el.title = pat.substring(idx + 1);
+      }
+    }
+  }
+
+  function validateForm(form) {
+    if (typeof form.checkValidity !== "function") return true;
+    if (form.checkValidity()) return true;
+    form.reportValidity();
+    return false;
+  }
+
+  // --- Content editable ---
+  //
+  // Elements with data-tether-editable="action" forward their text
+  // content to the server on blur. The element must have
+  // contenteditable="true" set in the HTML.
+
+  function bindEditables(container) {
+    var els = container.querySelectorAll("[data-tether-editable]");
+    for (var i = 0; i < els.length; i++) {
+      setupEditable(els[i]);
+    }
+  }
+
+  function setupEditable(el) {
+    if (el.hasAttribute("data-tether-editable-bound")) return;
+    el.setAttribute("data-tether-editable-bound", "");
+    el.setAttribute("contenteditable", "true");
+
+    el.addEventListener("blur", function () {
+      var action = el.getAttribute("data-tether-editable");
+      if (!action) return;
+
+      var prefix = findPrefix(el);
+      if (prefix && action.indexOf(prefix + ".") !== 0) {
+        action = prefix + "." + action;
+      }
+
+      var data = { value: el.textContent || "" };
+      sendEvent("blur", action, data);
+    });
   }
 
   // --- Client-side toggles ---

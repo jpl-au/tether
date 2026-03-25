@@ -417,6 +417,8 @@ bind.Disable("...")     bind.Confirm("...")
 bind.Reset()            bind.AutoFocus()
 bind.Indicator("#el")   bind.FocusTrap()
 bind.PreventDefault()
+bind.Required("msg")    bind.MinLength(8, "msg")
+bind.MaxLength(140, "msg") bind.Pattern("regex", "msg")
 ```
 
 ### Signal bindings
@@ -436,6 +438,7 @@ bind.ToggleTarget("#x") bind.ToggleAttr("hidden")
 bind.CopyToClipboard("#selector")
 bind.ScrollTo("#selector")
 bind.PreserveScroll()
+bind.Editable("action")
 ```
 
 ### Signal directives

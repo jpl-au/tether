@@ -327,3 +327,38 @@ func TestPreserveScroll(t *testing.T) {
 		t.Errorf("missing preserve-scroll attribute in:\n%s", html)
 	}
 }
+
+func TestRequired(t *testing.T) {
+	html := string(bind.Apply(input.Text("name", ""), bind.Required("Name is required")).Render())
+	if !strings.Contains(html, `data-tether-required="Name is required"`) {
+		t.Errorf("missing required attribute in:\n%s", html)
+	}
+}
+
+func TestMinLength(t *testing.T) {
+	html := string(bind.Apply(input.Text("pw", ""), bind.MinLength(8, "At least 8 characters")).Render())
+	if !strings.Contains(html, `data-tether-minlength="8 At least 8 characters"`) {
+		t.Errorf("missing minlength attribute in:\n%s", html)
+	}
+}
+
+func TestMaxLength(t *testing.T) {
+	html := string(bind.Apply(input.Text("bio", ""), bind.MaxLength(140, "Too long")).Render())
+	if !strings.Contains(html, `data-tether-maxlength="140 Too long"`) {
+		t.Errorf("missing maxlength attribute in:\n%s", html)
+	}
+}
+
+func TestPattern(t *testing.T) {
+	html := string(bind.Apply(input.Text("email", ""), bind.Pattern("[^@]+@[^@]+", "Invalid email")).Render())
+	if !strings.Contains(html, `data-tether-pattern="[^@]+@[^@]+ Invalid email"`) {
+		t.Errorf("missing pattern attribute in:\n%s", html)
+	}
+}
+
+func TestEditable(t *testing.T) {
+	html := string(bind.Apply(div.New(), bind.Editable("item.rename")).Render())
+	if !strings.Contains(html, `data-tether-editable="item.rename"`) {
+		t.Errorf("missing editable attribute in:\n%s", html)
+	}
+}

@@ -64,6 +64,39 @@ bind.Apply(container,
 
 Multiple hotkeys can be applied to the same element. The combo format uses `+` between modifiers and the key: `"ctrl+k"`, `"ctrl+shift+p"`, `"escape"`. The event arrives in Handle with `ev.Data["combo"]` set to the normalised combo string.
 
+### Client-side validation
+
+Validation attributes suppress form submission when fields are invalid, using the browser's native constraint validation (tooltips, red outlines). The server-side Handle remains authoritative for complex rules.
+
+```go
+bind.Apply(input.Text("name", ""),
+    bind.Required("Name is required"),
+)
+bind.Apply(input.Text("pw", ""),
+    bind.MinLength(8, "At least 8 characters"),
+)
+bind.Apply(input.Text("bio", ""),
+    bind.MaxLength(140, "Too long"),
+)
+bind.Apply(input.Text("email", ""),
+    bind.Pattern("[^@]+@[^@]+", "Invalid email"),
+)
+```
+
+### Content editable
+
+`bind.Editable` marks an element for inline editing. The element gets `contenteditable="true"` and its text content is sent to the server on blur:
+
+```go
+bind.Apply(span.Text("Click to edit"),
+    bind.Editable("item.rename"),
+)
+
+// In Handle:
+case "item.rename":
+    text := ev.Value() // the edited text
+```
+
 ### Collecting input values on click
 
 `bind.Collect` lets a button gather values from inputs elsewhere in the DOM at click time, without requiring a form wrapper:

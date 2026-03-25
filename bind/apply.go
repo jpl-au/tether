@@ -444,3 +444,40 @@ func DropTarget(action string) Option { return Option{"tether-drop-target", acti
 //	    bind.EventData("column", "0"),
 //	)
 func Sortable(action string) Option { return Option{"tether-sortable", action} }
+
+// Client-side validation options - suppress form submission when
+// validation fails, showing an error without a server round-trip.
+// The server-side Handle remains authoritative for complex rules.
+
+// Required prevents form submission if the field is empty. The
+// message is shown as a browser validation tooltip.
+func Required(message string) Option { return Option{"tether-required", message} }
+
+// MinLength prevents form submission if the field value is shorter
+// than n characters. The message is shown as a validation tooltip.
+func MinLength(n int, message string) Option {
+	return Option{"tether-minlength", strconv.Itoa(n) + " " + message}
+}
+
+// MaxLength prevents form submission if the field value exceeds n
+// characters. The message is shown as a validation tooltip.
+func MaxLength(n int, message string) Option {
+	return Option{"tether-maxlength", strconv.Itoa(n) + " " + message}
+}
+
+// Pattern prevents form submission if the field value does not match
+// the regular expression. The message is shown as a validation tooltip.
+func Pattern(regex, message string) Option {
+	return Option{"tether-pattern", regex + " " + message}
+}
+
+// Content editable options - forward inline-edited text to the server.
+
+// Editable marks a contenteditable element and forwards its text
+// content to the server when the element loses focus (blur). The
+// action receives the edited text in ev.Value().
+//
+//	bind.Apply(span.Text("Click to edit").Attr("contenteditable", "true"),
+//	    bind.Editable("item.rename"),
+//	)
+func Editable(action string) Option { return Option{"tether-editable", action} }
