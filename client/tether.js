@@ -1916,7 +1916,9 @@ window.Tether.signals = window.Tether.signals || {};
   var extensionMarkers = [
     { attr: "data-tether-upload", script: "tether-upload.js" },
     { attr: "data-tether-draggable", script: "tether-drag-and-drop.js" },
-    { attr: "data-tether-sortable", script: "tether-drag-and-drop.js" }
+    { attr: "data-tether-sortable", script: "tether-drag-and-drop.js" },
+    { attr: "data-tether-swipe", script: "tether-touch.js" },
+    { attr: "data-tether-longpress", script: "tether-touch.js" }
   ];
   var loadedExtensions = {};
 

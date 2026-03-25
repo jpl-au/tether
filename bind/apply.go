@@ -508,3 +508,17 @@ func Selectable() Option { return Option{"tether-selectable", ""} }
 //	// In Handle:
 //	ids := strings.Split(ev.Data["selected"], ",")
 func CollectSelected(selector string) Option { return Option{"tether-collect-selected", selector} }
+
+// Touch gesture options - handled by the tether-touch.js extension
+// which is auto-included when any element renders data-tether-swipe
+// or data-tether-longpress.
+
+// OnSwipe fires when the user swipes on the element. The swipe
+// direction is included in ev.Data["direction"] as "left", "right",
+// "up", or "down". Only fires on touch devices.
+func OnSwipe(action string) Option { return Option{"tether-swipe", action} }
+
+// OnLongPress fires after a sustained touch (~500ms) on the element.
+// Cancelled if the finger moves before the timeout. Common mobile
+// alternative to right-click. Only fires on touch devices.
+func OnLongPress(action string) Option { return Option{"tether-longpress", action} }

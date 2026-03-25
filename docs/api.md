@@ -441,6 +441,8 @@ bind.PreserveScroll()
 bind.Editable("action")
 bind.Selectable()
 bind.CollectSelected("#list")
+bind.OnSwipe("action")
+bind.OnLongPress("action")
 ```
 
 ### Signal directives

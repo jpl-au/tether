@@ -376,3 +376,17 @@ func TestCollectSelected(t *testing.T) {
 		t.Errorf("missing collect-selected attribute in:\n%s", html)
 	}
 }
+
+func TestOnSwipe(t *testing.T) {
+	html := string(bind.Apply(div.New(), bind.OnSwipe("card.dismiss")).Render())
+	if !strings.Contains(html, `data-tether-swipe="card.dismiss"`) {
+		t.Errorf("missing swipe attribute in:\n%s", html)
+	}
+}
+
+func TestOnLongPress(t *testing.T) {
+	html := string(bind.Apply(div.New(), bind.OnLongPress("item.menu")).Render())
+	if !strings.Contains(html, `data-tether-longpress="item.menu"`) {
+		t.Errorf("missing longpress attribute in:\n%s", html)
+	}
+}

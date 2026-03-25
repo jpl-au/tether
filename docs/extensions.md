@@ -127,6 +127,27 @@ rendered HTML. If the marker first appears after a morph (e.g. a login
 page transitions to a board), the runtime lazily loads the script by
 inserting a `<script>` tag dynamically.
 
+## Touch gestures
+
+Swipe and long-press gestures for touch devices:
+
+```go
+// Swipe detection - direction in ev.Data["direction"]
+bind.Apply(card, bind.OnSwipe("card.dismiss"))
+
+// Long-press - fires after ~500ms sustained touch
+bind.Apply(item, bind.OnLongPress("item.menu"))
+```
+
+The `tether-touch.js` extension is auto-included when any element
+renders `data-tether-swipe` or `data-tether-longpress`. Uses event
+delegation on the root. Only fires on touch devices - mouse events
+are ignored.
+
+Swipe parameters: minimum 30px distance within 500ms. Direction is
+`"left"`, `"right"`, `"up"`, or `"down"`. Long-press cancels if
+the finger moves more than 10px before the timeout.
+
 ## Service worker
 
 Enable asset caching and offline page shells:
