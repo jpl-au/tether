@@ -106,7 +106,18 @@ func (s *StatefulSession[S]) readTransport(out chan<- Event) {
 	for {
 		ev, err := s.transport.ReceiveEvent()
 		if err != nil {
-			if !errors.Is(err, io.EOF) {
+			switch {
+			case errors.Is(err, io.EOF):
+				dev.Debug("transport EOF (normal close)",
+					"session", s.id,
+					"endpoint", s.endpoint,
+				)
+			default:
+				dev.Debug("transport error",
+					"session", s.id,
+					"endpoint", s.endpoint,
+					"error", err,
+				)
 				s.emitDiagnostic(Diagnostic{
 					Kind:      TransportError,
 					SessionID: s.id,
