@@ -137,3 +137,24 @@ func (h *Handler[S]) destroySession(s *StatefulSession[S]) {
 		g.Remove(s)
 	}
 }
+
+// destroyByID looks up a session by ID in the disconnected pool and
+// destroys it immediately. Used by the session handoff (replaces
+// param) and the beforeunload beacon (destroy param) to skip the
+// disconnect timer when the client knows the session is abandoned.
+func (h *Handler[S]) destroyByID(id string) {
+	h.mu.Lock()
+	sess, ok := h.disconnected[id]
+	if ok {
+		delete(h.disconnected, id)
+		h.notifyDrain()
+	}
+	h.mu.Unlock()
+	if ok {
+		dev.Debug("session replaced", "session", id, "endpoint", sess.endpoint)
+		h.destroySession(sess)
+		if h.cfg.OnDisconnect != nil {
+			h.cfg.OnDisconnect(sess)
+		}
+	}
+}

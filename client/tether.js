@@ -110,6 +110,17 @@ window.Tether.signals = window.Tether.signals || {};
       observeViewportElements(root);
     }
 
+    // On page unload, send a beacon so the server can destroy the
+    // session immediately instead of waiting for the disconnect timer.
+    // sendBeacon is fire-and-forget but works for the common case of
+    // clean navigations and tab closes. The sessionStorage handoff
+    // covers the cases where beforeunload doesn't fire (crash, kill).
+    window.addEventListener("beforeunload", function () {
+      if (sessionID) {
+        navigator.sendBeacon(endpoint + "?destroy=" + sessionID);
+      }
+    });
+
     // Dev mode: expose a disconnect helper for integration testing.
     // Closes the transport so the server sees a clean disconnect.
     // Not available in production - devMode is only set when the
@@ -185,10 +196,20 @@ window.Tether.signals = window.Tether.signals || {};
     }
   }
 
+  var sessionStorageKey = "tether_session_" + endpoint;
+
   function connectWS() {
     var protocol = location.protocol === "https:" ? "wss:" : "ws:";
     var url = protocol + "//" + location.host + endpoint;
     if (sessionID) url += "?session=" + sessionID;
+
+    // If a previous session exists in sessionStorage (from a page
+    // refresh), tell the server to destroy it immediately rather
+    // than waiting for the 30s disconnect timer.
+    var prev = sessionStorage.getItem(sessionStorageKey);
+    if (prev && prev !== sessionID) {
+      url += (url.indexOf("?") === -1 ? "?" : "&") + "replaces=" + prev;
+    }
 
     ws = new WebSocket(url);
 
@@ -203,6 +224,9 @@ window.Tether.signals = window.Tether.signals || {};
       if (root) root.setAttribute("data-tether-state", "connected");
       hideReconnectBar();
       resyncPushSubscription();
+      // Store the session ID so a page refresh can tell the server
+      // to destroy this session immediately via the replaces param.
+      if (sessionID) sessionStorage.setItem(sessionStorageKey, sessionID);
       if (isReconnect) {
         // Sync the current URL with the server - the user may have
         // navigated via back/forward while disconnected.
@@ -245,6 +269,11 @@ window.Tether.signals = window.Tether.signals || {};
     var url = location.protocol + "//" + location.host + endpoint;
     if (sessionID) url += "?session=" + sessionID;
 
+    var prev = sessionStorage.getItem(sessionStorageKey);
+    if (prev && prev !== sessionID) {
+      url += (url.indexOf("?") === -1 ? "?" : "&") + "replaces=" + prev;
+    }
+
     eventSource = new EventSource(url);
 
     eventSource.onopen = function () {
@@ -256,6 +285,7 @@ window.Tether.signals = window.Tether.signals || {};
       if (root) root.setAttribute("data-tether-state", "connected");
       hideReconnectBar();
       resyncPushSubscription();
+      if (sessionID) sessionStorage.setItem(sessionStorageKey, sessionID);
       if (isReconnect) {
         if (backgroundSync) replayQueuedEvents();
         sendNavigate(location.pathname + location.search);

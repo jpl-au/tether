@@ -33,6 +33,15 @@ func (h *Handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Beacon destroy signal: the client sends a POST with ?destroy=ID
+	// via navigator.sendBeacon on page unload. Destroy the session
+	// immediately so it doesn't sit in the disconnect timer.
+	if destroy := r.URL.Query().Get("destroy"); destroy != "" {
+		h.destroyByID(destroy)
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
 	// File uploads arrive as multipart POST with an X-Tether-Upload
 	// header. Handle them before the mode switch so they work with
 	// all transport modes.

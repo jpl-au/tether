@@ -131,6 +131,14 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 
 	id := r.URL.Query().Get("session")
 
+	// If the client is replacing a previous session (page refresh),
+	// destroy the old session immediately instead of waiting for the
+	// 30s disconnect timer. sessionStorage on the client tracks which
+	// session was active in this tab before the refresh.
+	if replaces := r.URL.Query().Get("replaces"); replaces != "" {
+		h.destroyByID(replaces)
+	}
+
 	// Try to reattach to a disconnected session.
 	h.mu.Lock()
 	if sess, ok := h.disconnected[id]; ok {
