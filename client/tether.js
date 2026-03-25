@@ -1291,6 +1291,7 @@ window.Tether.signals = window.Tether.signals || {};
     root.addEventListener("click", handleLinks);
     root.addEventListener("click", handleClipboard);
     root.addEventListener("click", handleScrollTo);
+    root.addEventListener("click", handleSelectable);
     window.addEventListener("keydown", handleFocusTrap);
     window.addEventListener("keydown", handleHotkeys);
 
@@ -1423,6 +1424,17 @@ window.Tether.signals = window.Tether.signals || {};
             data[key] = el.value || "";
           }
         });
+      }
+
+      // Collect selected item IDs from a selectable container.
+      var collectSelected = target.getAttribute("data-tether-collect-selected");
+      if (collectSelected) {
+        var ids = [];
+        document.querySelectorAll(collectSelected + " .tether-selected").forEach(function (el) {
+          var id = el.getAttribute("data-tether-data-id");
+          if (id) ids.push(id);
+        });
+        data.selected = ids.join(",");
       }
 
       // Collect event-specific data
@@ -1559,6 +1571,55 @@ window.Tether.signals = window.Tether.signals || {};
       console.log("tether: ws.send", action);
     }
     return id;
+  }
+
+  // --- Multi-select ---
+  //
+  // Containers with data-tether-selectable enable click, ctrl+click,
+  // and shift+click selection on children that have data-tether-data-id.
+  // Selection is purely client-side via the tether-selected CSS class.
+  // Use data-tether-collect-selected on an action button to gather IDs.
+
+  var lastSelected = null;
+
+  function handleSelectable(e) {
+    var container = e.target.closest("[data-tether-selectable]");
+    if (!container) return;
+
+    var item = e.target.closest("[data-tether-data-id]");
+    if (!item || !container.contains(item)) return;
+
+    var items = container.querySelectorAll("[data-tether-data-id]");
+
+    if (e.shiftKey && lastSelected) {
+      // Range select: from lastSelected to this item.
+      var start = -1, end = -1;
+      for (var i = 0; i < items.length; i++) {
+        if (items[i] === lastSelected) start = i;
+        if (items[i] === item) end = i;
+      }
+      if (start > -1 && end > -1) {
+        var lo = Math.min(start, end);
+        var hi = Math.max(start, end);
+        for (var i = 0; i < items.length; i++) {
+          items[i].classList.toggle("tether-selected", i >= lo && i <= hi);
+        }
+        trackClientClasses(item, ["tether-selected"]);
+      }
+    } else if (e.ctrlKey || e.metaKey) {
+      // Toggle this item.
+      item.classList.toggle("tether-selected");
+      trackClientClasses(item, ["tether-selected"]);
+    } else {
+      // Single select: deselect all, select this one.
+      for (var i = 0; i < items.length; i++) {
+        items[i].classList.remove("tether-selected");
+      }
+      item.classList.add("tether-selected");
+      trackClientClasses(item, ["tether-selected"]);
+    }
+
+    lastSelected = item;
   }
 
   // --- Client-side validation ---

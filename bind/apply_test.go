@@ -362,3 +362,17 @@ func TestEditable(t *testing.T) {
 		t.Errorf("missing editable attribute in:\n%s", html)
 	}
 }
+
+func TestSelectable(t *testing.T) {
+	html := string(bind.Apply(div.New(), bind.Selectable()).Render())
+	if !strings.Contains(html, `data-tether-selectable`) {
+		t.Errorf("missing selectable attribute in:\n%s", html)
+	}
+}
+
+func TestCollectSelected(t *testing.T) {
+	html := string(bind.Apply(button.Text("Delete"), bind.OnClick("del"), bind.CollectSelected("#list")).Render())
+	if !strings.Contains(html, `data-tether-collect-selected="#list"`) {
+		t.Errorf("missing collect-selected attribute in:\n%s", html)
+	}
+}

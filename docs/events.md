@@ -97,6 +97,35 @@ case "item.rename":
     text := ev.Value() // the edited text
 ```
 
+### Multi-select
+
+`bind.Selectable` enables click, Ctrl+click, and Shift+click selection
+on items within a container. Selection is purely client-side via the
+`.tether-selected` CSS class - no server round-trip per click. Use
+`bind.CollectSelected` on an action button to gather the selected IDs:
+
+```go
+// Container with selectable items:
+bind.Apply(div.New(items...), bind.Selectable()).ID("item-list")
+
+// Each item needs an id via EventData:
+bind.Apply(div.New(span.Text(item.Name)), bind.EventData("id", item.ID))
+
+// Action button collects selected IDs:
+bind.Apply(button.Text("Delete Selected"),
+    bind.OnClick("items.delete"),
+    bind.CollectSelected("#item-list"),
+)
+
+// In Handle:
+case "items.delete":
+    ids := strings.Split(ev.Data["selected"], ",")
+```
+
+Selected items receive the `tether-selected` CSS class for styling.
+Selection state survives DOM morphs via the client state preservation
+mechanism.
+
 ### Collecting input values on click
 
 `bind.Collect` lets a button gather values from inputs elsewhere in the DOM at click time, without requiring a form wrapper:

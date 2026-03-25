@@ -481,3 +481,30 @@ func Pattern(regex, message string) Option {
 //	    bind.Editable("item.rename"),
 //	)
 func Editable(action string) Option { return Option{"tether-editable", action} }
+
+// Multi-select options - click, ctrl+click, and shift+click
+// selection of items within a container.
+
+// Selectable marks a container for multi-select. Children with
+// [EventData] "id" attributes become selectable items. Click selects
+// one (deselects others), Ctrl/Cmd+click toggles, Shift+click
+// selects a range. Selected items receive the "tether-selected" CSS
+// class. Selection is purely client-side - no server round-trip per
+// click. Use [CollectSelected] on an action button to gather the
+// selected IDs when needed.
+func Selectable() Option { return Option{"tether-selectable", ""} }
+
+// CollectSelected gathers the IDs of all selected items (those with
+// the "tether-selected" class) within the container matched by
+// selector. The IDs are included in the event data as a
+// comma-separated "selected" key. Pair with [OnClick] on an action
+// button:
+//
+//	bind.Apply(button.Text("Delete Selected"),
+//	    bind.OnClick("items.delete"),
+//	    bind.CollectSelected("#item-list"),
+//	)
+//
+//	// In Handle:
+//	ids := strings.Split(ev.Data["selected"], ",")
+func CollectSelected(selector string) Option { return Option{"tether-collect-selected", selector} }

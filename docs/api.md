@@ -439,6 +439,8 @@ bind.CopyToClipboard("#selector")
 bind.ScrollTo("#selector")
 bind.PreserveScroll()
 bind.Editable("action")
+bind.Selectable()
+bind.CollectSelected("#list")
 ```
 
 ### Signal directives
