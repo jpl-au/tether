@@ -120,6 +120,17 @@ window.Tether.signals = window.Tether.signals || {};
     // clean navigations and tab closes. The sessionStorage handoff
     // covers the cases where beforeunload doesn't fire (crash, kill).
     window.addEventListener("beforeunload", function () {
+      // Close the WebSocket with a normal close code (1000) so
+      // Firefox doesn't apply its RFC 6455 reconnection throttle.
+      // Without this, Firefox sees the page-unload connection drop
+      // as an abnormal termination and delays the next WebSocket
+      // connection by up to 60 seconds with exponential backoff.
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.close(1000, "page unload");
+      }
+      if (eventSource) {
+        eventSource.close();
+      }
       if (sessionID) {
         navigator.sendBeacon(endpoint + "?destroy=" + sessionID);
       }
