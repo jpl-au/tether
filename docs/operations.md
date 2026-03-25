@@ -97,6 +97,27 @@ Dev mode does the following:
 7. **Per-session diagnostics** - all session-level debug logging (events, diffs, reconnections, group membership, etc.) is gated behind dev mode via `dev.Debug`. In production with dev mode off, none of this output fires. For structured observability, use `OnStructuralChange` and `OnNoPatch` callbacks instead
 8. **Discarded effect warnings** - logs a warning when a handler panic discards buffered side effects (Toast, Signal, Navigate, etc.)
 
+### Filesystem asset watching
+
+When assets live outside the binary (e.g. `os.DirFS`), set `WatchDir`
+on the Asset to enable automatic hash invalidation:
+
+```go
+var assets = &tether.Asset{
+    FS:       os.DirFS("./static"),
+    Prefix:   "/static/",
+    WatchDir: "./static",
+}
+```
+
+The watcher uses `fsnotify` to detect file changes. When a file is
+modified, only that file's hash is recomputed. The next request gets
+the new hash in the URL, so browsers fetch the updated asset. The
+watcher logs events at debug level when dev mode is enabled.
+
+Call `assets.Close()` during graceful shutdown to stop the watcher
+goroutine and release the file descriptors.
+
 ### Logging architecture
 
 Tether never touches the process-wide `slog` default. All framework

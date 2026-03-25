@@ -250,6 +250,44 @@ When `Equal` returns true, the render, diff, and send are skipped entirely. Side
 
 For struct types with slice or map fields, `a == b` does not compile - use `reflect.DeepEqual` or write a field-by-field comparison. A manual comparison is faster and avoids reflecting over fields that don't affect rendering.
 
+## Choose the right asset mode
+
+Tether supports two asset modes. Use the one that fits your deployment:
+
+**Embedded assets** (default) - bundle everything into the binary:
+
+```go
+//go:embed static
+var staticFS embed.FS
+
+var assets = &tether.Asset{
+    FS:     staticFS,
+    Prefix: "/static/",
+}
+```
+
+Use this for production single-binary deployments. Hashes are computed
+once at startup and never change. Zero filesystem dependencies at
+runtime.
+
+**Filesystem assets** - serve from disk with live updates:
+
+```go
+var assets = &tether.Asset{
+    FS:       os.DirFS("./static"),
+    Prefix:   "/static/",
+    WatchDir: "./static",
+}
+```
+
+Use this when assets are managed separately from the binary (CDN
+deploys, design team editing CSS independently, or development without
+`embed`). The watcher recomputes hashes only when files change. Call
+`assets.Close()` on shutdown to stop the watcher goroutine.
+
+Do not use `WatchDir` with `embed.FS` - embedded filesystems are
+immutable and cannot trigger change events.
+
 ---
 
 [← Back to documentation](../README.md#documentation)
