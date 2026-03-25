@@ -69,8 +69,8 @@ type Asset struct {
 
 	once    sync.Once
 	prefix  string
-	mu      sync.RWMutex           // guards hashes
-	hashes  map[string]string      // path → 12-char hex hash
+	mu      sync.RWMutex      // guards hashes
+	hashes  map[string]string // path → 12-char hex hash
 	handler http.Handler
 	watcher *fsnotify.Watcher
 }
