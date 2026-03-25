@@ -3,9 +3,12 @@ package tether
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"testing/fstest"
+	"time"
 
 	"github.com/jpl-au/tether/dev"
 	"github.com/jpl-au/tether/mode"
@@ -295,6 +298,48 @@ func TestMultipleAssets(t *testing.T) {
 		if !strings.Contains(w.Body.String(), tc.want) {
 			t.Errorf("%s: expected %q in body", tc.url, tc.want)
 		}
+	}
+}
+
+func TestAssetWatchDirRehashesOnChange(t *testing.T) {
+	dir := t.TempDir()
+	cssPath := filepath.Join(dir, "styles.css")
+	if err := os.WriteFile(cssPath, []byte("body{color:red}"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	a := &Asset{
+		FS:       os.DirFS(dir),
+		Prefix:   "/static/",
+		WatchDir: dir,
+	}
+
+	url1 := a.URL("styles.css")
+	if !strings.Contains(url1, "?v=") {
+		t.Fatalf("expected hashed URL, got %q", url1)
+	}
+
+	// Modify the file.
+	if err := os.WriteFile(cssPath, []byte("body{color:blue}"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Give fsnotify time to deliver the event and rehash.
+	time.Sleep(100 * time.Millisecond)
+
+	url2 := a.URL("styles.css")
+	if url1 == url2 {
+		t.Errorf("hash should change after file modification: %q == %q", url1, url2)
+	}
+
+	a.Close()
+}
+
+func TestAssetWatchDirNoWatcherWithoutDir(t *testing.T) {
+	a := testAssetFS()
+	a.init()
+	if a.watcher != nil {
+		t.Error("watcher should be nil when WatchDir is empty")
 	}
 }
 

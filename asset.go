@@ -6,10 +6,12 @@ import (
 	"io/fs"
 	"maps"
 	"net/http"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/jpl-au/fluent/html5/attr/rel"
 	"github.com/jpl-au/fluent/html5/link"
 	"github.com/jpl-au/fluent/html5/script"
@@ -17,10 +19,12 @@ import (
 	"github.com/jpl-au/tether/dev"
 )
 
-// Asset manages an embedded asset filesystem with content-hashed URLs.
+// Asset manages an asset filesystem with content-hashed URLs.
 // Construct one as a struct literal and pass it to [StatefulConfig].Assets.
 // The first call to [Asset.URL], [Asset.Stylesheet], or [Asset.Script]
 // (or handler startup) walks the filesystem and hashes every file.
+//
+// For embedded assets (single-binary deployments):
 //
 //	//go:embed static
 //	var staticFS embed.FS
@@ -30,12 +34,21 @@ import (
 //	    Prefix: "/static/",
 //	}
 //
-//	// In your Layout:
-//	assets.Stylesheet("styles.css") // <link rel="stylesheet" href="/static/styles.css?v=a1b2c3d4e5f6">
+// For filesystem assets (external, mutable):
+//
+//	var assets = &tether.Asset{
+//	    FS:       os.DirFS("./static"),
+//	    Prefix:   "/static/",
+//	    WatchDir: "./static",
+//	}
+//
+// When WatchDir is set, the asset manager watches the directory for
+// changes and recomputes hashes only for files that change. This
+// allows deploying new assets without restarting the server.
 type Asset struct {
 	// FS is the filesystem containing application assets (CSS, images,
 	// JS). Use embed.FS for single-binary deployments or os.DirFS for
-	// development with live reloading. Required.
+	// external assets with live updates. Required.
 	FS fs.FS
 
 	// Prefix is the URL path prefix where assets are served. Must end
@@ -47,15 +60,25 @@ type Asset struct {
 	// content-hashed query strings for cache-busting. Optional.
 	Precache []string
 
+	// WatchDir is the filesystem path to watch for changes. When set,
+	// the asset manager uses fsnotify to detect file modifications and
+	// recomputes hashes only for changed files. Leave empty for
+	// embedded assets (which are immutable). The path should correspond
+	// to the directory used in os.DirFS.
+	WatchDir string
+
 	once    sync.Once
 	prefix  string
-	hashes  map[string]string // path → 12-char hex hash
+	mu      sync.RWMutex           // guards hashes
+	hashes  map[string]string      // path → 12-char hex hash
 	handler http.Handler
+	watcher *fsnotify.Watcher
 }
 
 // init walks the filesystem and computes per-file content hashes.
 // Called lazily via sync.Once on first access. Panics on invalid
-// configuration so typos surface at startup.
+// configuration so typos surface at startup. If WatchDir is set,
+// starts the filesystem watcher.
 func (a *Asset) init() {
 	a.once.Do(func() {
 		if a.FS == nil {
@@ -70,25 +93,128 @@ func (a *Asset) init() {
 			panic("tether: Asset.Prefix must end with \"/\"")
 		}
 
-		a.hashes = make(map[string]string)
-		if err := fs.WalkDir(a.FS, ".", func(path string, d fs.DirEntry, err error) error {
-			if err != nil || d.IsDir() {
-				return err
-			}
-			data, err := fs.ReadFile(a.FS, path)
-			if err != nil {
-				dev.Log().Error("failed to read asset file", "path", path, "err", err)
-				return nil
-			}
-			h := sha256.Sum256(data)
-			a.hashes[path] = hex.EncodeToString(h[:])[:12]
-			return nil
-		}); err != nil {
-			panic("tether: failed to walk asset filesystem: " + err.Error())
-		}
-
+		a.rehashAll()
 		a.handler = http.FileServer(http.FS(a.FS))
+
+		if a.WatchDir != "" {
+			a.startWatcher()
+		}
 	})
+}
+
+// rehashAll walks the entire filesystem and computes hashes for all
+// files. Called on init and can be called to force a full rehash.
+func (a *Asset) rehashAll() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.hashes = make(map[string]string)
+	if err := fs.WalkDir(a.FS, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		a.hashes[path] = hashFile(a.FS, path)
+		return nil
+	}); err != nil {
+		panic("tether: failed to walk asset filesystem: " + err.Error())
+	}
+}
+
+// rehashFile recomputes the hash for a single file. Called by the
+// watcher when a file modification is detected.
+func (a *Asset) rehashFile(path string) {
+	h := hashFile(a.FS, path)
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if h == "" {
+		// File was deleted.
+		delete(a.hashes, path)
+	} else {
+		a.hashes[path] = h
+	}
+}
+
+// hashFile reads a file and returns its 12-char hex hash. Returns
+// empty string if the file cannot be read.
+func hashFile(fsys fs.FS, path string) string {
+	data, err := fs.ReadFile(fsys, path)
+	if err != nil {
+		return ""
+	}
+	h := sha256.Sum256(data)
+	return hex.EncodeToString(h[:])[:12]
+}
+
+// startWatcher creates an fsnotify watcher on WatchDir and
+// recomputes hashes when files change.
+func (a *Asset) startWatcher() {
+	w, err := fsnotify.NewWatcher()
+	if err != nil {
+		dev.Log().Error("tether: failed to create asset watcher", "dir", a.WatchDir, "error", err)
+		return
+	}
+	a.watcher = w
+
+	// Watch the directory and all subdirectories.
+	if err := filepath.Walk(a.WatchDir, func(path string, info fs.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return w.Add(path)
+		}
+		return nil
+	}); err != nil {
+		dev.Log().Error("tether: failed to watch asset directory", "dir", a.WatchDir, "error", err)
+		return
+	}
+
+	dev.Debug("asset watcher started", "dir", a.WatchDir)
+
+	go func() {
+		for {
+			select {
+			case event, ok := <-w.Events:
+				if !ok {
+					return
+				}
+				switch {
+				case event.Has(fsnotify.Write) || event.Has(fsnotify.Create):
+					rel, err := filepath.Rel(a.WatchDir, event.Name)
+					if err != nil {
+						continue
+					}
+					// Normalise to forward slashes for fs.FS compatibility.
+					rel = filepath.ToSlash(rel)
+					dev.Debug("asset changed", "path", rel)
+					a.rehashFile(rel)
+				case event.Has(fsnotify.Remove) || event.Has(fsnotify.Rename):
+					rel, err := filepath.Rel(a.WatchDir, event.Name)
+					if err != nil {
+						continue
+					}
+					rel = filepath.ToSlash(rel)
+					dev.Debug("asset removed", "path", rel)
+					a.mu.Lock()
+					delete(a.hashes, rel)
+					a.mu.Unlock()
+				}
+			case err, ok := <-w.Errors:
+				if !ok {
+					return
+				}
+				dev.Log().Error("tether: asset watcher error", "error", err)
+			}
+		}
+	}()
+}
+
+// Close stops the filesystem watcher if one is running. Call this
+// on shutdown to clean up the watcher goroutine.
+func (a *Asset) Close() error {
+	if a.watcher != nil {
+		return a.watcher.Close()
+	}
+	return nil
 }
 
 // URL returns the hashed URL for the given asset path. The path is
@@ -97,16 +223,13 @@ func (a *Asset) init() {
 //	assets.URL("styles.css") // "/static/styles.css?v=a1b2c3d4e5f6"
 //
 // If the path is not found in the filesystem (typo, read failure),
-// the unhashed URL is returned and an error is logged. The asset
-// file server will still serve the file - only cache-busting is
-// lost.
+// the unhashed URL is returned and an error is logged.
 func (a *Asset) URL(path string) string {
 	a.init()
-	if dev.Enabled() {
-		// Recompute the hash on every call so edited files get fresh
-		// cache-busting parameters without a server restart. Slightly
-		// slower per request but correctness matters more than speed
-		// during development.
+	if dev.Enabled() && a.WatchDir == "" {
+		// Embedded assets in dev mode: recompute per-request so
+		// developers using embed.FS with DevMode still get fresh
+		// hashes during development.
 		data, err := fs.ReadFile(a.FS, path)
 		if err != nil {
 			dev.Warn("asset not found", "path", path, "error", err)
@@ -115,7 +238,9 @@ func (a *Asset) URL(path string) string {
 		h := sha256.Sum256(data)
 		return a.prefix + path + "?v=" + hex.EncodeToString(h[:])[:12]
 	}
+	a.mu.RLock()
 	h, ok := a.hashes[path]
+	a.mu.RUnlock()
 	if !ok {
 		dev.Log().Error("tether: asset not found - check the path and look for earlier read errors", "path", path)
 		return a.prefix + path
@@ -125,27 +250,22 @@ func (a *Asset) URL(path string) string {
 
 // Stylesheet returns a <link rel="stylesheet"> node for the given
 // asset path with a content-hashed URL.
-//
-//	assets.Stylesheet("styles.css")
-//	// <link rel="stylesheet" href="/static/styles.css?v=a1b2c3d4e5f6">
 func (a *Asset) Stylesheet(path string) node.Node {
 	return link.New().Rel(rel.Stylesheet).Href(a.URL(path))
 }
 
 // Script returns a <script> node for the given asset path with a
 // content-hashed URL.
-//
-//	assets.Script("app.js")
-//	// <script src="/static/app.js?v=a1b2c3d4e5f6"></script>
 func (a *Asset) Script(path string) node.Node {
 	return script.New().Src(a.URL(path))
 }
 
 // hash returns a single hash representing all files in the asset
 // filesystem. Used to mix into the service worker CACHE_VERSION.
-// Keys are sorted so the result is deterministic across restarts.
 func (a *Asset) hash() string {
 	a.init()
+	a.mu.RLock()
+	defer a.mu.RUnlock()
 	h := sha256.New()
 	for _, path := range slices.Sorted(maps.Keys(a.hashes)) {
 		h.Write([]byte(path))
@@ -164,9 +284,7 @@ func (a *Asset) precacheURLs() []string {
 	return urls
 }
 
-// mountAssets creates an [assetMount] for each [Asset], wrapping
-// the file server with cache headers that respect [dev.Enabled] at
-// request time.
+// mountAssets creates an [assetMount] for each [Asset].
 func (app *App) mountAssets() []assetMount {
 	mounts := make([]assetMount, len(app.Assets))
 	for i, a := range app.Assets {
@@ -178,10 +296,7 @@ func (app *App) mountAssets() []assetMount {
 	return mounts
 }
 
-// cacheHandler sets Cache-Control headers based on dev mode. In dev
-// mode, assets are served with no-store so the browser always fetches
-// fresh copies. In production, versioned assets (?v=…) get immutable
-// cache headers.
+// cacheHandler sets Cache-Control headers based on dev mode.
 func cacheHandler(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")

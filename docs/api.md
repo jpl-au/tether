@@ -18,7 +18,7 @@ app := tether.App{
 |-------|------|-------------|
 | `DevMode` | `bool` | Development mode (or set `TETHER_DEV=1`). See [operations](operations.md#dev-mode) |
 | `Logger` | `*slog.Logger` | When nil, creates a text handler at INFO level (DEBUG in DevMode) and sets it as the process default once. When provided, used for this handler without touching the global default |
-| `Assets` | `[]*Asset` | Embedded asset collections - auto-served with content-hashed URLs |
+| `Assets` | `[]*Asset` | Asset collections (embedded or filesystem) - auto-served with content-hashed URLs. Set `WatchDir` on filesystem assets for automatic rehashing on file change |
 | `Client` | `Client` | Browser-side settings (debounce, transitions, flash duration, etc.) |
 | `Security` | `Security` | CSRF protection and session binding settings |
 
@@ -374,6 +374,44 @@ tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
     OnNavigate: r.OnNavigate(func(s *State, p tether.Params) { s.Page = p.Path }),
 })
 ```
+
+---
+
+## Assets
+
+Two modes of operation:
+
+**Embedded** (single binary, immutable):
+```go
+//go:embed static
+var staticFS embed.FS
+
+var assets = &tether.Asset{
+    FS:     staticFS,
+    Prefix: "/static/",
+}
+```
+
+**Filesystem** (external, watched for changes):
+```go
+var assets = &tether.Asset{
+    FS:       os.DirFS("./static"),
+    Prefix:   "/static/",
+    WatchDir: "./static",
+}
+```
+
+When `WatchDir` is set, the asset manager uses `fsnotify` to watch the
+directory. When a file changes, only that file's hash is recomputed.
+Subsequent requests get the new hash in the URL, so browsers fetch the
+updated asset. Call `assets.Close()` on shutdown to stop the watcher.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `FS` | `fs.FS` | Asset filesystem. `embed.FS` or `os.DirFS`. Required |
+| `Prefix` | `string` | URL path prefix (must end with `/`). Default `/assets/` |
+| `WatchDir` | `string` | Filesystem path to watch. Empty disables watching |
+| `Precache` | `[]string` | Asset paths for service worker pre-caching |
 
 ---
 
