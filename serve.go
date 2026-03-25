@@ -325,6 +325,29 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 	started = true
 	go sess.run()
 
+	// Recover from panics during session initialisation (OnConnect,
+	// component mounts, watcher subscriptions). Without this, a panic
+	// kills the HTTP goroutine silently - net/http recovers it but
+	// closes the connection, leaving a zombie session in the run loop
+	// that blocks reconnection for the full disconnect timer.
+	defer func() {
+		if r := recover(); r != nil {
+			err := panicErr(r)
+			dev.Log().Error("panic during session initialisation",
+				"session", sess.id,
+				"endpoint", sess.endpoint,
+				"panic", r,
+			)
+			sess.emitDiagnostic(Diagnostic{
+				Kind:      HandlerPanic,
+				SessionID: sess.id,
+				Err:       err,
+				Detail:    "session initialisation",
+			})
+			sess.stop()
+		}
+	}()
+
 	// Mount components that implement Mounter before any events arrive.
 	// Uses Update so side effects (Toast, Signal) are rendered and sent.
 	if len(h.cfg.Components) > 0 {
