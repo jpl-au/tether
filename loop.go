@@ -50,6 +50,25 @@ func (s *StatefulSession[S]) run() {
 
 		case cmd := <-s.cmds:
 			s.runCmd(cmd)
+			// Drain additional pending commands to coalesce Updates.
+			// Multiple rapid Updates (broadcasts, watchers) execute
+			// their mutations sequentially but share a single
+			// render-diff-send cycle. Bounded by current channel
+			// length so ctx.Done is checked on the next iteration.
+			for range len(s.cmds) {
+				if s.ctx.Err() != nil {
+					break
+				}
+				select {
+				case cmd := <-s.cmds:
+					s.runCmd(cmd)
+				default:
+				}
+			}
+			if s.needsRender && s.ctx.Err() == nil {
+				s.needsRender = false
+				s.coalescedRender()
+			}
 
 		case fn := <-s.fxCh:
 			// Effect arriving outside of Handle - send immediately.
@@ -524,6 +543,49 @@ func (s *StatefulSession[S]) send(u wire.Update) {
 			Detail:    s.endpoint,
 		})
 	}
+}
+
+// coalescedRender runs the render-diff-send pipeline once after one
+// or more Update mutations have been drained from the command channel.
+// Effects enqueued during the mutations are collected from fxCh and
+// sent atomically with the diff.
+func (s *StatefulSession[S]) coalescedRender() {
+	fx := &Effects{}
+	defer func() {
+		if r := recover(); r != nil {
+			err := panicErr(r)
+			dev.Log().Error("panic in coalesced render", "session", s.id, "panic", r)
+			s.emitDiagnostic(Diagnostic{
+				Kind:      HandlerPanic,
+				SessionID: s.id,
+				Err:       err,
+				Detail:    s.endpoint,
+			})
+			s.drainFx(nil)
+			if s.onPanic != nil {
+				s.onPanic(s, err)
+			} else {
+				s.stop()
+			}
+		}
+	}()
+
+	s.drainFx(fx)
+
+	tree := s.render(s.state)
+	patches, change := s.differ.Diff(tree)
+	if len(patches) == 0 && change == nil {
+		if s.onNoPatch != nil {
+			s.onNoPatch(s, NoPatch{Source: "update"})
+		} else {
+			dev.Debug("Update produced no patches",
+				"session", s.id,
+				"endpoint", s.endpoint,
+				"url", s.lastURL,
+			)
+		}
+	}
+	s.sendDiff("", patches, change, tree, fx)
 }
 
 // startTimers sets up per-session lifecycle timers. Called once during

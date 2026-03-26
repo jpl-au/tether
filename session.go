@@ -212,6 +212,10 @@ type StatefulSession[S any] struct {
 	// navigate event. Set from Limits.MaxNavigateRedirects.
 	maxNavigateRedirects int
 
+	// needsRender is set by Update mutations and cleared after the
+	// coalesced render runs. Only accessed on the loop goroutine.
+	needsRender bool
+
 	// maxStateBytes warns when serialised state exceeds this size.
 	// Zero disables. Set from Limits.MaxStateBytes.
 	maxStateBytes int64

@@ -39,14 +39,16 @@ func (s *StatefulSession[S]) State() S {
 }
 
 // Update applies a state change and pushes the resulting diff to the
-// client. This is the primary way to push server-initiated updates  -
+// client. This is the primary way to push server-initiated updates -
 // call it from timers, database change listeners, message queue
 // consumers, or [Group.Broadcast].
 //
-// A full render-diff-send cycle is queued as a command and runs after
-// the current event (if any) has been fully processed. This means
-// that when called inside Handle, the update does not take effect
-// until Handle returns - the Handle return value is always
+// The state mutation is queued as a command and runs after the current
+// event (if any) has been fully processed. Multiple rapid Updates
+// (e.g. from a broadcast storm) are coalesced - mutations execute
+// sequentially but only one render-diff-send cycle runs for the batch.
+// This means that when called inside Handle, the update does not take
+// effect until Handle returns - the Handle return value is always
 // authoritative for the triggering event. Non-blocking - returns
 // immediately after queuing.
 //
@@ -67,7 +69,6 @@ func (s *StatefulSession[S]) State() S {
 func (s *StatefulSession[S]) Update(fn func(S) S) {
 	s.enqueue(func() {
 		s.stateSnap.Store(s.state)
-		fx := &Effects{}
 		defer func() {
 			if r := recover(); r != nil {
 				err := panicErr(r)
@@ -78,6 +79,7 @@ func (s *StatefulSession[S]) Update(fn func(S) S) {
 					Err:       err,
 					Detail:    s.endpoint,
 				})
+				s.needsRender = false
 				s.drainFx(nil)
 				if s.onPanic != nil {
 					s.onPanic(s, err)
@@ -93,24 +95,7 @@ func (s *StatefulSession[S]) Update(fn func(S) S) {
 		}
 		s.state = fn(s.state)
 		s.stateSnap.Store(s.state)
-
-		// Collect effects enqueued during fn.
-		s.drainFx(fx)
-
-		tree := s.render(s.state)
-		patches, change := s.differ.Diff(tree)
-		if len(patches) == 0 && change == nil {
-			if s.onNoPatch != nil {
-				s.onNoPatch(s, NoPatch{Source: "update"})
-			} else {
-				dev.Debug("Update produced no patches",
-					"session", s.id,
-					"endpoint", s.endpoint,
-					"url", s.lastURL,
-				)
-			}
-		}
-		s.sendDiff("", patches, change, tree, fx)
+		s.needsRender = true
 	})
 }
 
