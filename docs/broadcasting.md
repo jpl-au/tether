@@ -21,7 +21,11 @@ group.Broadcast(func(target *tether.StatefulSession[State], s State) State {
 })
 ```
 
-Each session is updated concurrently so a slow render in one session does not block delivery to the rest.
+Each session's Update is non-blocking - it queues a mutation on the
+session's command channel. Multiple rapid broadcasts are coalesced
+automatically: the command loop drains all pending mutations and runs
+a single render-diff-send cycle for the batch. See
+[architecture](architecture.md#update-coalescing) for details.
 
 For convenience, use `StatefulConfig.Groups` to auto-register sessions without `OnConnect`/`OnDisconnect` boilerplate:
 

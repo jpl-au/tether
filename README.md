@@ -167,7 +167,8 @@ for details and examples.
 | [Scaling](docs/scaling.md) | Per-session overhead, horizontal scaling, capacity planning |
 | [Security](docs/security.md) | TLS, session identity, origin checking, CSRF, rate limiting |
 | [Best practices](docs/best-practices.md) | Common patterns, performance tips, pitfalls to avoid |
-| [Performance](docs/performance.md) | Benchmarks, PGO |
+| [Performance](docs/performance.md) | Benchmarks, coalescing, PGO |
+| [Windowing](docs/windowing.md) | Virtual scrolling for large lists |
 
 ## Third-party libraries
 

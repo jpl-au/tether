@@ -10,6 +10,39 @@ button.Text("+").SetData("tether-click", "increment")
 
 In practice the difference is ~250ns per element - negligible unless you're rendering thousands of event-bound elements per frame.
 
+## Update coalescing
+
+When multiple Updates arrive in quick succession (broadcasts, Value
+changes, watcher callbacks), the command loop drains all pending
+commands before rendering. Each mutation runs, but only one
+render-diff-send cycle executes for the batch. This is automatic -
+no configuration needed.
+
+Under broadcast load, this reduces redundant renders from O(N) to
+O(1) per loop iteration. Under normal interactive load (one event
+at a time), behaviour is identical - there is nothing to coalesce.
+
+## Windowing
+
+For large lists, render only the visible portion using the `window`
+package. See the [windowing guide](windowing.md) for details.
+
+```go
+import "github.com/jpl-au/tether/window"
+
+window.New(window.Config{
+    Total:     len(s.Items),
+    Offset:    s.ScrollOffset,
+    PageSize:  30,
+    RowHeight: 40,
+    Row:       func(i int) node.Node { return renderRow(s.Items[i]) },
+})
+```
+
+This keeps the tree at O(viewport) regardless of dataset size. A
+10,000-item list with 30 visible rows is ~99% cheaper to render and
+diff than rendering all 10,000 rows.
+
 ## Profile-Guided Optimisation (PGO)
 
 Applications using tether benefit from [Profile-Guided Optimisation](https://go.dev/doc/pgo) (Go 1.21+). Expect **10-20% speed improvements** with no code changes.

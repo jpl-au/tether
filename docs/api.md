@@ -922,4 +922,30 @@ pub, priv, err := push.GenerateVAPIDKeys()
 
 ---
 
+## Window
+
+Virtual scrolling helper for large lists. See the [windowing guide](windowing.md) for full usage.
+
+```go
+import "github.com/jpl-au/tether/window"
+
+window.New(window.Config{
+    Total:     len(s.Items),
+    Offset:    s.ScrollOffset,
+    PageSize:  30,
+    RowHeight: 40,
+    Row:       func(i int) node.Node { return renderRow(s.Items[i]) },
+})
+```
+
+| `Config` field | Type | Description |
+|----------------|------|-------------|
+| `Total` | `int` | Full dataset size |
+| `Offset` | `int` | First visible item index |
+| `PageSize` | `int` | Items to render (viewport + buffer) |
+| `RowHeight` | `int` | Uniform row height in pixels |
+| `Row` | `func(int) node.Node` | Renders a single item by index |
+
+---
+
 [← Back to documentation](../README.md#documentation)

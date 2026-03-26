@@ -94,6 +94,19 @@ All state mutations happen inside this goroutine. `Session.Update()` enqueues a 
 
 The `cmds` channel is buffered (default 64, configurable via `Limits.CmdBufferSize`). When the buffer is full - typically during broadcast storms - commands overflow to short-lived goroutines rather than blocking the caller. This prevents cross-session deadlocks where two sessions broadcast to each other simultaneously.
 
+### Update coalescing
+
+When multiple Updates arrive in rapid succession (broadcasts, Value
+changes, watcher callbacks), the loop drains all pending commands
+before rendering. Each mutation executes sequentially, but only one
+render-diff-send cycle runs for the batch. Under sustained broadcast
+load, a session renders at most once per loop iteration regardless
+of how many Updates arrived.
+
+Client events (from the transport) are not coalesced - each event
+gets its own render cycle because events carry client correlation
+IDs that must be echoed back.
+
 ## Event pipeline
 
 When a client event arrives, `exec()` runs the full pipeline:
