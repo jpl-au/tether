@@ -32,10 +32,10 @@ type Transport interface {
 }
 
 // Heartbeater is an optional interface for transports that need
-// periodic keep-alive writes to prevent intermediate proxies from
-// closing idle connections. The SSE transport implements this; the
-// WebSocket transport does not need it because the WebSocket protocol
-// has its own ping/pong frames.
+// periodic keep-alive activity. Both built-in transports implement
+// it: SSE sends comment lines to prevent proxy timeouts; WebSocket
+// sends ping frames and sets read deadlines to detect silently
+// dropped connections.
 //
 // When the handler detects that a transport implements Heartbeater,
 // it calls StartHeartbeat with the configured interval after the

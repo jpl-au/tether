@@ -34,17 +34,18 @@ type Timeouts struct {
 	// remaining sessions are force-closed. Zero defaults to 10 seconds.
 	ShutdownGrace time.Duration
 
-	// Heartbeat controls how often the SSE transport sends a keep-alive
-	// comment to prevent intermediate proxies (AWS ALB, Nginx,
-	// Cloudflare) from closing idle connections. Has no effect on
-	// WebSocket transports which have their own ping/pong frames.
-	// Zero defaults to 20 seconds. Ignored when DisableHeartbeat is
-	// true.
+	// Heartbeat controls how often transports send keep-alive frames.
+	// SSE sends comment lines to prevent proxy timeouts. WebSocket
+	// sends ping frames and sets read deadlines to detect silently
+	// dropped connections. Zero defaults to 20 seconds. Ignored when
+	// DisableHeartbeat is true.
 	Heartbeat time.Duration
 
-	// DisableHeartbeat stops the SSE transport from sending periodic
-	// keep-alive comments. Only use this when you know that no
-	// intermediate proxy will close idle connections.
+	// DisableHeartbeat stops transports from sending periodic
+	// keep-alive frames. For SSE this risks proxy timeouts. For
+	// WebSocket this disables dead-connection detection - sessions
+	// with no idle timeout may hang indefinitely if a middlebox
+	// silently drops the connection.
 	DisableHeartbeat bool
 
 	// Retry is the initial delay before the client JS attempts to

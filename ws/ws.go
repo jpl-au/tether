@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	tether "github.com/jpl-au/tether"
 	"github.com/lxzan/gws"
@@ -172,6 +173,13 @@ func (h *eventHandler) OnMessage(conn *gws.Conn, msg *gws.Message) {
 	}
 }
 
+func (h *eventHandler) OnPong(conn *gws.Conn, _ []byte) {
+	// Reset the read deadline so the connection stays alive as long
+	// as the client is responding. The zero time removes the deadline
+	// entirely; StartHeartbeat will set a fresh one on the next tick.
+	conn.SetDeadline(time.Time{})
+}
+
 func (h *eventHandler) OnClose(conn *gws.Conn, err error) {
 	t := sessionTransport(conn)
 	if t == nil {
@@ -196,8 +204,12 @@ func isNormalClose(err error) bool {
 	return strings.Contains(s, "code=1000") || strings.Contains(s, "code=1001")
 }
 
-// Compile-time check: *transport must satisfy tether.Transport.
-var _ tether.Transport = (*transport)(nil)
+// Compile-time checks: *transport must satisfy tether.Transport
+// and tether.Heartbeater (WebSocket ping/pong keep-alive).
+var (
+	_ tether.Transport   = (*transport)(nil)
+	_ tether.Heartbeater = (*transport)(nil)
+)
 
 // transport implements [tether.Transport] over a single WebSocket
 // connection. Reads are driven by gws's ReadLoop goroutine which
@@ -241,6 +253,34 @@ func (t *transport) ReceiveEvent() (tether.Event, error) {
 		return tether.Event{}, io.EOF
 	}
 	return ev, nil
+}
+
+// StartHeartbeat sends WebSocket ping frames at the given interval
+// and sets a read deadline so that connections with no pong response
+// are detected and closed. This prevents goroutine leaks when a
+// middlebox silently drops the connection without sending a FIN.
+//
+// On each tick the transport sends a ping and sets a read deadline
+// of 2x the interval. If the client responds with a pong, OnPong
+// resets the deadline. If no pong arrives, the deadline fires, gws's
+// ReadLoop returns an error, and the normal disconnect flow runs.
+func (t *transport) StartHeartbeat(interval time.Duration) {
+	deadline := 2 * interval
+	ticker := time.NewTicker(interval)
+	go func() {
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				t.conn.SetDeadline(time.Now().Add(deadline))
+				if err := t.conn.WritePing(nil); err != nil {
+					return
+				}
+			case <-t.done:
+				return
+			}
+		}
+	}()
 }
 
 // Close sends a normal closure frame and terminates the connection.

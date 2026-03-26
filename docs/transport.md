@@ -157,9 +157,14 @@ Use it in CSS to style elements based on connection state:
 [data-tether-state="disconnected"] .status { color: red; }
 ```
 
-### SSE keep-alive
+### Keep-alive
 
-SSE connections send keep-alive comments at `Timeouts.Heartbeat` (default 20s) to prevent proxies from closing idle connections.
+Both transports send keep-alive frames at `Timeouts.Heartbeat` (default
+20s). SSE sends comment lines to prevent proxies from closing idle
+connections. WebSocket sends ping frames and sets read deadlines - if the
+client fails to respond with a pong, the connection is closed and the
+normal disconnect flow runs. This detects silently dropped connections
+that would otherwise leave sessions hanging indefinitely.
 
 ## Service worker
 

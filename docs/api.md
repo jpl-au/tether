@@ -100,8 +100,8 @@ When either callback is configured, the framework's own logging for that event i
 | `Reconnect` | `time.Duration` | 30s | Keep disconnected sessions alive for reconnection |
 | `DisableReconnect` | `bool` | false | Destroy sessions immediately on disconnect |
 | `Pending` | `time.Duration` | 30s | Wait for browser to claim pre-warmed session |
-| `Heartbeat` | `time.Duration` | 20s | SSE keep-alive interval |
-| `DisableHeartbeat` | `bool` | false | Stop SSE keep-alive comments |
+| `Heartbeat` | `time.Duration` | 20s | Keep-alive interval (SSE comments, WebSocket pings) |
+| `DisableHeartbeat` | `bool` | false | Stop transport keep-alive frames |
 | `ShutdownGrace` | `time.Duration` | 10s | Grace period for `ListenAndServe` shutdown |
 | `PendingCheck` | `time.Duration` | 10s | How often the background goroutine scans for expired pending sessions |
 | `Retry` | `time.Duration` | 1s | Initial client reconnection delay |
