@@ -14,7 +14,10 @@ func TestPendingSessionRemovedAfterTimeout(t *testing.T) {
 		h := &Handler[counterState]{
 			app: App{Logger: slog.Default()},
 			cfg: StatefulConfig[counterState]{
-				Timeouts: Timeouts{Pending: 100 * time.Millisecond},
+				Timeouts: Timeouts{
+					Pending:      100 * time.Millisecond,
+					PendingCheck: defaultPendingCheckInterval,
+				},
 			},
 			pending: map[string]*pendingSession[counterState]{
 				"p1": {

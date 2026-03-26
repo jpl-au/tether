@@ -70,6 +70,13 @@ type Timeouts struct {
 	// (the default), each delay is multiplied by a random factor in
 	// [0.5, 1.0), spreading clients across time.
 	DisableJitter bool
+
+	// PendingCheck controls how often the background goroutine scans
+	// for expired pending sessions (pre-warmed sessions whose browser
+	// never connected). This is the only polling in the framework -
+	// active and disconnected sessions use per-session timers. Zero
+	// defaults to 10 seconds.
+	PendingCheck time.Duration
 }
 
 // Limits groups capacity constraints for sessions and requests.
@@ -111,6 +118,14 @@ type Limits struct {
 	// and vendor-specific endpoint URLs that are typically larger than
 	// UI events. Zero defaults to 4 KB.
 	MaxPushSubscriptionBytes int64
+
+	// MaxNavigateRedirects caps how many consecutive server-side
+	// redirects the framework resolves within a single navigate event.
+	// When OnNavigate calls Navigate(), the framework re-processes the
+	// target URL inline rather than round-tripping to the client. This
+	// limit prevents infinite loops when OnNavigate unconditionally
+	// redirects. Zero defaults to 5.
+	MaxNavigateRedirects int
 }
 
 // Client groups settings that control the browser-side JS runtime.
@@ -255,6 +270,14 @@ const defaultMaxPending = 128
 // defaultShutdownGrace is how long ListenAndServe waits for sessions to
 // drain during graceful shutdown before force-closing them.
 const defaultShutdownGrace = 10 * time.Second
+
+// defaultPendingCheckInterval is how often the background goroutine
+// scans for expired pending sessions.
+const defaultPendingCheckInterval = 10 * time.Second
+
+// defaultMaxNavigateRedirects caps inline server-side redirects per
+// navigate event.
+const defaultMaxNavigateRedirects = 5
 
 const (
 	defaultRetryDelay        = 500 * time.Millisecond

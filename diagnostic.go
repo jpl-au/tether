@@ -71,7 +71,7 @@ const (
 	CommandDiscarded DiagnosticKind = "command_discarded"
 
 	// NavigateRedirectLoop signals that an OnNavigate handler
-	// triggered more than [maxNavigateRedirects] consecutive
+	// triggered more than [Limits].MaxNavigateRedirects consecutive
 	// redirects via [Session.Navigate]. The framework resolves
 	// redirects inline (no client round-trip), but caps the depth
 	// to prevent infinite loops. The final redirect URL is sent to

@@ -142,6 +142,12 @@ func Stateful[S any](app App, cfg StatefulConfig[S]) *Handler[S] {
 	if cfg.Limits.CmdBufferSize == 0 {
 		cfg.Limits.CmdBufferSize = defaultCmdBufferSize
 	}
+	if cfg.Limits.MaxNavigateRedirects == 0 {
+		cfg.Limits.MaxNavigateRedirects = defaultMaxNavigateRedirects
+	}
+	if cfg.Timeouts.PendingCheck == 0 {
+		cfg.Timeouts.PendingCheck = defaultPendingCheckInterval
+	}
 
 	// Validate boundaries now that defaults are applied.
 	if cfg.Timeouts.Retry > cfg.Timeouts.MaxRetry {

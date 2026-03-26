@@ -24,6 +24,26 @@ import (
 	tether "github.com/jpl-au/tether"
 )
 
+// defaultWriteBuffer is the capacity of the write channel when
+// [Options].WriteBuffer is zero.
+const defaultWriteBuffer = 4
+
+// Options configures the SSE transport.
+type Options struct {
+	// WriteBuffer sets the capacity of the internal channel that
+	// buffers encoded updates between the session's command loop and
+	// the HTTP response writer. When the channel is full, Send blocks
+	// until the writer drains it, stalling the session loop.
+	//
+	// Increase this for high-frequency update scenarios (live
+	// dashboards, streaming data) where the client may fall a few
+	// frames behind. The memory cost is small - each slot holds one
+	// pre-encoded update (typically a few hundred bytes).
+	//
+	// Zero uses the default (4).
+	WriteBuffer int
+}
+
 // heartbeatMsg is the SSE comment written by the heartbeat ticker.
 // Allocated once and shared across all transports - read-only.
 var heartbeatMsg = []byte(": heartbeat\n\n")
@@ -33,7 +53,12 @@ var heartbeatMsg = []byte(": heartbeat\n\n")
 // GET with Accept: text/event-stream, it calls this function to
 // establish the SSE stream. The stream stays open for the lifetime of
 // the session; server updates are written as SSE "data" lines.
-func Upgrade() func(http.ResponseWriter, *http.Request) (tether.Transport, error) {
+func Upgrade(opts ...Options) func(http.ResponseWriter, *http.Request) (tether.Transport, error) {
+	writeBuf := defaultWriteBuffer
+	if len(opts) > 0 && opts[0].WriteBuffer > 0 {
+		writeBuf = opts[0].WriteBuffer
+	}
+
 	return func(w http.ResponseWriter, r *http.Request) (tether.Transport, error) {
 		flusher, ok := w.(http.Flusher)
 		if !ok {
@@ -65,7 +90,7 @@ func Upgrade() func(http.ResponseWriter, *http.Request) (tether.Transport, error
 		flusher.Flush()
 
 		t := &transport{
-			writes: make(chan []byte, 4),
+			writes: make(chan []byte, writeBuf),
 			done:   make(chan struct{}),
 		}
 

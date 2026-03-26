@@ -14,11 +14,6 @@ import (
 	"github.com/jpl-au/tether/wire"
 )
 
-// maxNavigateRedirects caps how many consecutive Navigate calls the
-// framework resolves inline during a single navigate event. This
-// prevents infinite loops when OnNavigate unconditionally redirects.
-const maxNavigateRedirects = 5
-
 // run is the session's command loop. It processes transport events,
 // commands from external callers, and effect closures in a single
 // goroutine - no mutex needed. The loop exits when the session
@@ -185,7 +180,7 @@ func (s *StatefulSession[S]) exec(ev Event) {
 	// than round-tripping to the client. Effects from intermediate
 	// steps are preserved unless the redirect target overwrites them.
 	if ev.Type == "navigate" && fx.URL != "" {
-		for i := range maxNavigateRedirects {
+		for i := range s.maxNavigateRedirects {
 			redirectURL := fx.URL
 			u, err := url.Parse(redirectURL)
 			if err != nil {
@@ -211,13 +206,13 @@ func (s *StatefulSession[S]) exec(ev Event) {
 				fx.Replace = true
 				break
 			}
-			if i == maxNavigateRedirects-1 {
+			if i == s.maxNavigateRedirects-1 {
 				dev.Warn("navigate redirect limit reached",
 					"session", s.id, "url", fx.URL)
 				s.emitDiagnostic(Diagnostic{
 					Kind:      NavigateRedirectLoop,
 					SessionID: s.id,
-					Err:       fmt.Errorf("redirect limit exceeded after %d redirects", maxNavigateRedirects),
+					Err:       fmt.Errorf("redirect limit exceeded after %d redirects", s.maxNavigateRedirects),
 					Detail:    fx.URL,
 				})
 				fx.Replace = true

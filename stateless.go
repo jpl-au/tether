@@ -81,6 +81,9 @@ func Stateless[S any](app App, cfg StatelessConfig[S]) http.Handler {
 	if cfg.Limits.MaxEventBytes == 0 {
 		cfg.Limits.MaxEventBytes = defaultMaxEventBytes
 	}
+	if cfg.Limits.MaxNavigateRedirects == 0 {
+		cfg.Limits.MaxNavigateRedirects = defaultMaxNavigateRedirects
+	}
 	app.Client.defaults()
 
 	csrf := app.Security.csrf()
@@ -214,7 +217,7 @@ func (p *statelessHandler[S]) servePOST(w http.ResponseWriter, r *http.Request) 
 	// Resolve navigate redirects inline, matching the stateful
 	// behaviour in exec(). See loop.go for the full explanation.
 	if ev.Type == event.Navigate && cs.Effects.URL != "" {
-		for i := range maxNavigateRedirects {
+		for i := range p.cfg.Limits.MaxNavigateRedirects {
 			redirectURL := cs.Effects.URL
 			u, err := url.Parse(redirectURL)
 			if err != nil {
@@ -236,7 +239,7 @@ func (p *statelessHandler[S]) servePOST(w http.ResponseWriter, r *http.Request) 
 				cs.Effects.Replace = true
 				break
 			}
-			if i == maxNavigateRedirects-1 {
+			if i == p.cfg.Limits.MaxNavigateRedirects-1 {
 				dev.Log().Warn("navigate redirect limit reached",
 					"url", cs.Effects.URL)
 				cs.Effects.Replace = true

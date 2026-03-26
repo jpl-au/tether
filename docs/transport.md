@@ -77,6 +77,23 @@ ws.Upgrade(ws.Options{
 
 Set `ReadLimit` to match `StatefulConfig.Limits.MaxEventBytes` for consistent limits across transport modes. Messages exceeding the limit cause the connection to be closed with a protocol error.
 
+### SSE options
+
+Pass `sse.Options` to configure the SSE transport:
+
+```go
+sse.Upgrade(sse.Options{
+    WriteBuffer: 16,  // internal channel capacity (default 4)
+})
+```
+
+`WriteBuffer` sets the capacity of the channel that buffers encoded
+updates between the session's command loop and the HTTP response writer.
+When the channel is full, `Send` blocks until the writer drains it,
+stalling the session loop. Increase this for high-frequency update
+scenarios (live dashboards, streaming data) where the client may fall a
+few frames behind.
+
 ### Compression
 
 WebSocket per-message deflate (RFC 7692) is **enabled by default**. The

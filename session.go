@@ -208,6 +208,10 @@ type StatefulSession[S any] struct {
 	// command loop - reducing memory to metadata only.
 	freeze bool
 
+	// maxNavigateRedirects caps inline server-side redirects per
+	// navigate event. Set from Limits.MaxNavigateRedirects.
+	maxNavigateRedirects int
+
 	// diagnostics is the handler's diagnostic bus. The session emits
 	// transport errors, encode failures, panics, and buffer overflows.
 	diagnostics *Bus[Diagnostic]

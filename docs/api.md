@@ -103,6 +103,7 @@ When either callback is configured, the framework's own logging for that event i
 | `Heartbeat` | `time.Duration` | 20s | SSE keep-alive interval |
 | `DisableHeartbeat` | `bool` | false | Stop SSE keep-alive comments |
 | `ShutdownGrace` | `time.Duration` | 10s | Grace period for `ListenAndServe` shutdown |
+| `PendingCheck` | `time.Duration` | 10s | How often the background goroutine scans for expired pending sessions |
 | `Retry` | `time.Duration` | 1s | Initial client reconnection delay |
 | `MaxRetry` | `time.Duration` | 30s | Maximum exponential backoff |
 
@@ -117,6 +118,7 @@ When either callback is configured, the framework's own logging for that event i
 | `CmdBufferSize` | `int` | 64 | Session command channel capacity |
 | `MaxEventBytes` | `int64` | 64 KB | Maximum POST event body size |
 | `MaxPushSubscriptionBytes` | `int64` | 4 KB | Maximum push subscription body size |
+| `MaxNavigateRedirects` | `int` | 5 | Maximum consecutive server-side redirects per navigate event |
 
 ### Client
 

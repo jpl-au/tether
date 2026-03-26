@@ -122,8 +122,11 @@ func TestShutdownSkipsFrozenSessions(t *testing.T) {
 func TestShutdownStopsPendingCleanup(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		h := &Handler[counterState]{
-			app:          App{},
-			cfg:          StatefulConfig[counterState]{Timeouts: Timeouts{Pending: 30 * time.Second}},
+			app: App{},
+			cfg: StatefulConfig[counterState]{Timeouts: Timeouts{
+				Pending:      30 * time.Second,
+				PendingCheck: defaultPendingCheckInterval,
+			}},
 			pending:      make(map[string]*pendingSession[counterState]),
 			active:       make(map[string]*StatefulSession[counterState]),
 			disconnected: make(map[string]*StatefulSession[counterState]),

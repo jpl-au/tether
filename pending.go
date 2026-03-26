@@ -2,17 +2,11 @@ package tether
 
 import "time"
 
-// pendingCheckInterval controls how often expired pending sessions are
-// cleaned up. This is the only polling that remains after removing the
-// centralised reaper - active and disconnected sessions use per-session
-// timers instead.
-const pendingCheckInterval = 10 * time.Second
-
 // reapPending runs in a background goroutine, periodically removing
 // pre-warmed sessions whose browser never connected. It exits when
 // the done channel is closed by Shutdown.
 func (h *Handler[S]) reapPending() {
-	ticker := time.NewTicker(pendingCheckInterval)
+	ticker := time.NewTicker(h.cfg.Timeouts.PendingCheck)
 	defer ticker.Stop()
 
 	for {
