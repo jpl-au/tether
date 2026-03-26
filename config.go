@@ -119,6 +119,13 @@ type Limits struct {
 	// UI events. Zero defaults to 4 KB.
 	MaxPushSubscriptionBytes int64
 
+	// MaxStateBytes warns when the serialised session state exceeds
+	// this size. The save still proceeds - this is a diagnostic
+	// guardrail, not a hard limit. Large state increases write
+	// amplification on disconnect and reconnect. Zero disables the
+	// check.
+	MaxStateBytes int64
+
 	// MaxNavigateRedirects caps how many consecutive server-side
 	// redirects the framework resolves within a single navigate event.
 	// When OnNavigate calls Navigate(), the framework re-processes the

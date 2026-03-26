@@ -118,6 +118,7 @@ When either callback is configured, the framework's own logging for that event i
 | `CmdBufferSize` | `int` | 64 | Session command channel capacity |
 | `MaxEventBytes` | `int64` | 64 KB | Maximum POST event body size |
 | `MaxPushSubscriptionBytes` | `int64` | 4 KB | Maximum push subscription body size |
+| `MaxStateBytes` | `int64` | 0 (disabled) | Warn when serialised session state exceeds this size (save still proceeds) |
 | `MaxNavigateRedirects` | `int` | 5 | Maximum consecutive server-side redirects per navigate event |
 
 ### Client

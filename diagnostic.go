@@ -70,6 +70,14 @@ const (
 	// contains the session status at the time of discard.
 	CommandDiscarded DiagnosticKind = "command_discarded"
 
+	// StateSizeExceeded signals that the serialised session state
+	// exceeded [Limits].MaxStateBytes. The save proceeds regardless
+	// - this is a warning, not a hard limit. Large state increases
+	// write amplification on disconnect and reconnect, especially
+	// on mobile networks. The Detail field contains the size in
+	// bytes.
+	StateSizeExceeded DiagnosticKind = "state_size_exceeded"
+
 	// NavigateRedirectLoop signals that an OnNavigate handler
 	// triggered more than [Limits].MaxNavigateRedirects consecutive
 	// redirects via [Session.Navigate]. The framework resolves

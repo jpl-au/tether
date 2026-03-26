@@ -212,6 +212,10 @@ type StatefulSession[S any] struct {
 	// navigate event. Set from Limits.MaxNavigateRedirects.
 	maxNavigateRedirects int
 
+	// maxStateBytes warns when serialised state exceeds this size.
+	// Zero disables. Set from Limits.MaxStateBytes.
+	maxStateBytes int64
+
 	// diagnostics is the handler's diagnostic bus. The session emits
 	// transport errors, encode failures, panics, and buffer overflows.
 	diagnostics *Bus[Diagnostic]

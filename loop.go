@@ -363,6 +363,20 @@ func (s *StatefulSession[S]) saveSessionState(ctx context.Context, ttl time.Dura
 		return
 	}
 
+	if s.maxStateBytes > 0 && int64(len(stateBytes)) > s.maxStateBytes {
+		dev.Warn("session state exceeds MaxStateBytes",
+			"session", s.id,
+			"size", len(stateBytes),
+			"limit", s.maxStateBytes,
+		)
+		s.emitDiagnostic(Diagnostic{
+			Kind:      StateSizeExceeded,
+			SessionID: s.id,
+			Err:       fmt.Errorf("state size %d exceeds limit %d", len(stateBytes), s.maxStateBytes),
+			Detail:    fmt.Sprintf("%d bytes", len(stateBytes)),
+		})
+	}
+
 	env := sessionEnvelope{
 		State:     stateBytes,
 		Endpoint:  s.endpoint,
