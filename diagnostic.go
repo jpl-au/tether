@@ -91,6 +91,20 @@ const (
 	// to prevent infinite loops. The final redirect URL is sent to
 	// the client regardless.
 	NavigateRedirectLoop DiagnosticKind = "navigate_redirect_loop"
+
+	// RenderCoalesced signals that multiple commands were batched
+	// into a single render-diff-send cycle. The Detail field contains
+	// the number of commands in the batch. This fires only when the
+	// batch size exceeds one, confirming that coalescing is active
+	// under load.
+	RenderCoalesced DiagnosticKind = "render_coalesced"
+
+	// HighMemoMissRate signals that the memo cache miss rate for a
+	// render cycle exceeded the [Timeouts].MemoMissThreshold. A high
+	// miss rate usually indicates broken or overly granular cache
+	// keys. The Detail field contains the miss ratio. Configure the
+	// threshold via [Timeouts].MemoMissThreshold; zero disables.
+	HighMemoMissRate DiagnosticKind = "high_memo_miss_rate"
 )
 
 // Diagnostic carries a framework-level event from the session lifecycle,

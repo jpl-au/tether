@@ -84,6 +84,13 @@ type Timeouts struct {
 	// functions in production and identify candidates for memoisation.
 	// Zero disables the diagnostic.
 	SlowRender time.Duration
+
+	// MemoMissThreshold emits a [HighMemoMissRate] diagnostic when
+	// the proportion of memo cache misses in a render cycle exceeds
+	// this value. For example, 0.8 fires when more than 80% of memo
+	// nodes miss. Only applies when [StatefulConfig].Memo is true.
+	// Zero disables the diagnostic.
+	MemoMissThreshold float64
 }
 
 // Limits groups capacity constraints for sessions and requests.

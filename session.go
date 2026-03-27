@@ -215,9 +215,19 @@ type StatefulSession[S any] struct {
 	// coalesced render runs. Only accessed on the loop goroutine.
 	needsRender bool
 
+	// coalescedCount tracks the number of commands in the current
+	// coalesced batch. Set during the drain loop, read by
+	// coalescedRender. Only accessed on the loop goroutine.
+	coalescedCount int
+
 	// slowRender is the threshold for emitting a SlowRender
 	// diagnostic. Zero disables. Set from Timeouts.SlowRender.
 	slowRender time.Duration
+
+	// memoMissThreshold emits a HighMemoMissRate diagnostic when the
+	// miss ratio exceeds this value. Zero disables. Set from
+	// Timeouts.MemoMissThreshold.
+	memoMissThreshold float64
 
 	// maxStateBytes warns when serialised state exceeds this size.
 	// Zero disables. Set from Limits.MaxStateBytes.
