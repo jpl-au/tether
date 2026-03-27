@@ -177,6 +177,10 @@ s.Update(func(s State) State {  // mutate state from outside Handle
     s.Count++
     return s
 })
+s.Patch("row-47", func(s State) (State, node.Node) {  // targeted update for one key
+    s.Items[47].Count++
+    return s, renderRow(s.Items[47])
+})
 s.ID()                          // unique session identifier
 s.Context()                     // cancelled on permanent destruction (session lifetime)
 s.Go(func(ctx context.Context) { ... }) // goroutine bound to transport lifetime (stops on disconnect)

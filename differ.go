@@ -14,6 +14,7 @@ import (
 type engine interface {
 	Render(root node.Node, w ...io.Writer) []byte
 	Diff(root node.Node) ([]jit.Patch, *jit.StructuralChange)
+	DiffKey(key string, subtree node.Node) *jit.Patch
 	Export() []byte
 	Import(data []byte) error
 	Clear()

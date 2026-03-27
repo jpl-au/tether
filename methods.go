@@ -4,8 +4,10 @@ import (
 	"maps"
 	"time"
 
+	"github.com/jpl-au/fluent/node"
 	"github.com/jpl-au/tether/dev"
 	"github.com/jpl-au/tether/push"
+	"github.com/jpl-au/tether/wire"
 )
 
 // State returns the current session state. Never blocks.
@@ -96,6 +98,79 @@ func (s *StatefulSession[S]) Update(fn func(S) S) {
 		s.state = fn(s.state)
 		s.stateSnap.Store(s.state)
 		s.needsRender = true
+	})
+}
+
+// Patch applies a targeted state change and re-renders a single
+// Dynamic key. Unlike [Update] which re-renders the full tree, Patch
+// only diffs the targeted key against the stored snapshot. Use this
+// from timers, broadcast callbacks, or [Go] goroutines when you know
+// exactly which region changed.
+//
+// The closure receives the current state and returns the new state
+// plus the rendered subtree for the target key. Both come from the
+// same closure so they cannot get out of sync.
+//
+// Inside Handle, prefer returning the new state directly - Handle
+// already triggers a full render. Patch is for server-initiated
+// updates where a full render is unnecessary.
+//
+// In dev mode, a warning is emitted if the key has no stored
+// snapshot, which usually indicates a typo.
+//
+// Safe to call from any goroutine.
+func (s *StatefulSession[S]) Patch(key string, fn func(S) (S, node.Node)) {
+	s.enqueue(func() {
+		s.stateSnap.Store(s.state)
+		defer func() {
+			if r := recover(); r != nil {
+				err := panicErr(r)
+				dev.Log().Error("panic in Patch", "session", s.id, "key", key, "panic", r)
+				s.emitDiagnostic(Diagnostic{
+					Kind:      HandlerPanic,
+					SessionID: s.id,
+					Err:       err,
+					Detail:    "patch:" + key,
+				})
+				if s.onPanic != nil {
+					s.onPanic(s, err)
+				} else {
+					s.stop()
+				}
+			}
+		}()
+
+		s.lastActivity.Store(time.Now().UnixNano())
+		if s.idleTimer != nil {
+			s.idleTimer.Reset(s.idleTimeout)
+		}
+
+		newState, subtree := fn(s.state)
+		s.state = newState
+		s.stateSnap.Store(s.state)
+
+		renderStart := time.Now()
+		patch := s.engine.DiffKey(key, subtree)
+		renderDuration := time.Since(renderStart)
+		dev.Debug("patch complete",
+			"session", s.id,
+			"key", key,
+			"changed", patch != nil,
+			"duration", renderDuration,
+		)
+		if s.slowRender > 0 && renderDuration > s.slowRender {
+			s.emitDiagnostic(Diagnostic{
+				Kind:      SlowRender,
+				SessionID: s.id,
+				Detail:    renderDuration.String(),
+			})
+		}
+
+		if patch != nil {
+			s.send(wire.Update{
+				Patches: []wire.Patch{{Key: patch.Key, HTML: patch.HTML}},
+			})
+		}
 	})
 }
 

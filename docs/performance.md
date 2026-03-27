@@ -124,6 +124,33 @@ re-rendered, so cheap regions work normally alongside memoised ones.
 Use one strategy per handler, not both. The `Memo` config field
 selects which engine the session uses.
 
+## Targeted updates
+
+When you know exactly which Dynamic region changed, skip the full
+render pipeline entirely. `Patch` re-renders a single key and sends
+the diff for just that region:
+
+```go
+sess.Patch("row-47", func(s State) (State, node.Node) {
+    s.Items[47].Count++
+    return s, renderRow(s.Items[47])
+})
+```
+
+The closure returns both the new state and the rendered subtree.
+The framework updates state, diffs only the targeted key, and sends
+the patch. No full tree render, no full diff walk. For a page with
+50 Dynamic regions, Patch is over 1,000x faster than Update.
+
+Use Patch from timers, broadcast callbacks, and `Go` goroutines -
+anywhere you know the exact key that changed. Inside Handle, return
+the new state directly and let the full render run.
+
+**Consistency**: the targeted render must produce the same output
+that the full render would for that key. If they diverge, the
+client has a brief inconsistency until the next full render
+corrects it. This is the tradeoff for the performance gain.
+
 ## Windowing
 
 For large lists, render only the visible portion using the `window`
