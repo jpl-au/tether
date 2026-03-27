@@ -103,9 +103,12 @@ func (s *StatefulSession[S]) Update(fn func(S) S) {
 
 // Patch applies a targeted state change and re-renders a single
 // Dynamic key. Unlike [Update] which re-renders the full tree, Patch
-// only diffs the targeted key against the stored snapshot. Use this
-// from timers, broadcast callbacks, or [Go] goroutines when you know
-// exactly which region changed.
+// only diffs the targeted key against the stored snapshot. Over
+// 1,000x faster than Update for targeting one key out of many.
+//
+// Patch works with either engine (Differ or Memoiser). It does not
+// require [StatefulConfig].Memo to be true. Any handler with Dynamic
+// keys can use it.
 //
 // The closure receives the current state and returns the new state
 // plus the rendered subtree for the target key. Both come from the

@@ -115,10 +115,10 @@ re-renders a single key and diffs only that key against the stored
 snapshot. The rest of the page is untouched.
 
 Use Patch from timers, broadcast callbacks, and `Go` goroutines
-when you know exactly which Dynamic region changed. Patch and Memo
-are complementary - Memo optimises the full render path (page loads,
-reconnects), Patch optimises targeted server-push updates. Both can
-be used on the same handler.
+when you know exactly which Dynamic region changed. Patch works
+with either engine (Differ or Memoiser). See the
+[engine guide](engine.md) for how coalescing, Patch, and Memo
+compose.
 
 ## Event pipeline
 

@@ -1,5 +1,12 @@
 # Performance
 
+## Engine strategies
+
+Tether provides multiple strategies for reducing render+diff cost:
+coalescing, memoisation, targeted updates (Patch), and windowing.
+See the [engine guide](engine.md) for a comprehensive reference on
+how each works, when to use them, and how they compose.
+
 ## Generic helpers vs SetData
 
 The generic helpers are ~47% slower than calling `SetData` directly. For performance-sensitive render paths, use `SetData`:
@@ -9,170 +16,6 @@ button.Text("+").SetData("tether-click", "increment")
 ```
 
 In practice the difference is ~250ns per element - negligible unless you're rendering thousands of event-bound elements per frame.
-
-## Update coalescing
-
-When multiple Updates arrive in quick succession (broadcasts, Value
-changes, watcher callbacks), the command loop drains all pending
-commands before rendering. Each mutation runs, but only one
-render-diff-send cycle executes for the batch. This is automatic -
-no configuration needed.
-
-Under broadcast load, this reduces redundant renders from O(N) to
-O(1) per loop iteration. Under normal interactive load (one event
-at a time), behaviour is identical - there is nothing to coalesce.
-
-## Memoisation
-
-For pages with expensive render functions, enable memoisation to skip
-unchanged subtrees entirely. Set `Memo: true` on `StatefulConfig`
-and wrap expensive Dynamic regions in `node.Memo` with a
-`tether.Versioned` key.
-
-### How it works
-
-When a memo key matches the previous render, the closure never runs
-and no HTML is rendered for that region. For a page with 50 Dynamic
-regions where only one changed, the Memoiser is up to 40x faster
-than the standard Differ.
-
-Cheap regions that change frequently (counters, input fields) can
-use plain Dynamic keys without Memo. They re-render every cycle as
-usual. Use Memo only where the render function is expensive enough
-to justify the version tracking.
-
-### Versioned helper
-
-`tether.Versioned[T]` bundles data with an automatic version counter.
-The version increments on every `With` call, so the memo key always
-tracks data changes without manual bookkeeping.
-
-```go
-type State struct {
-    Items  tether.Versioned[[]Item]  // expensive table - memoised
-    Search string                     // cheap input - plain Dynamic
-    Count  int                        // cheap counter - plain Dynamic
-}
-```
-
-Update data via `With` (version increments automatically). Read
-data directly via `Val`:
-
-```go
-// Handle
-func handle(sess tether.Session, s State, ev tether.Event) State {
-    switch ev.Action {
-    case "add-item":
-        s.Items = s.Items.With(append(s.Items.Val, newItem(ev)))
-    case "search":
-        s.Search = ev.Value()
-    case "increment":
-        s.Count++
-        // Items.Version() unchanged - table render is skipped
-    }
-    return s
-}
-```
-
-In the render function, wrap expensive regions in `node.Memo` using
-the version as the key. Cheap regions use plain Dynamic keys:
-
-```go
-// Render
-func render(s State) node.Node {
-    return div.New(
-        // Expensive table - memoised. Only re-renders when
-        // Items.Version() changes (i.e. when With was called).
-        div.New(
-            node.Memo(s.Items.Version(), func() node.Node {
-                return renderTable(s.Items.Val)
-            }),
-        ).Dynamic("items"),
-
-        // Cheap regions - plain Dynamic. Always re-render.
-        input.New().Value(s.Search).Dynamic("search"),
-        span.Text(strconv.Itoa(s.Count)).Dynamic("count"),
-    )
-}
-```
-
-Enable memoisation on the handler:
-
-```go
-tether.Stateful(app, tether.StatefulConfig[State]{
-    Memo:         true,
-    InitialState: func(r *http.Request) State {
-        return State{Items: tether.NewVersioned(loadItems())}
-    },
-    Render: render,
-    Handle: handle,
-    // ...
-})
-```
-
-### Diff vs Memo
-
-Diff is the default. It requires zero developer effort - write a
-render function and it works. Every Dynamic region is rendered and
-compared on every cycle.
-
-Memo is opt-in for handlers with expensive render functions. It
-requires `Versioned` fields (or comparable keys) for memoised
-regions. Dynamic regions without a `node.Memo` child are always
-re-rendered, so cheap regions work normally alongside memoised ones.
-
-Use one strategy per handler, not both. The `Memo` config field
-selects which engine the session uses.
-
-## Targeted updates
-
-`Patch` works with either engine (Differ or Memoiser). It does not
-require `Memo: true` - any handler with Dynamic keys can use it.
-
-When you know exactly which Dynamic region changed, skip the full
-render pipeline entirely. `Patch` re-renders a single key and sends
-the diff for just that region:
-
-```go
-sess.Patch("row-47", func(s State) (State, node.Node) {
-    s.Items[47].Count++
-    return s, renderRow(s.Items[47])
-})
-```
-
-The closure returns both the new state and the rendered subtree.
-The framework updates state, diffs only the targeted key, and sends
-the patch. No full tree render, no full diff walk. For a page with
-50 Dynamic regions, Patch is over 1,000x faster than Update.
-
-Use Patch from timers, broadcast callbacks, and `Go` goroutines -
-anywhere you know the exact key that changed. Inside Handle, return
-the new state directly and let the full render run.
-
-**Consistency**: the targeted render must produce the same output
-that the full render would for that key. If they diverge, the
-client has a brief inconsistency until the next full render
-corrects it. This is the tradeoff for the performance gain.
-
-### Combining Patch with Memo
-
-Patch and Memo are complementary. They optimise different paths:
-
-- **Memo** optimises the full render path. Page loads, reconnects,
-  and any `Update` call benefit from skipping unchanged subtrees.
-  Set `Memo: true` and wrap regions in `node.Memo`.
-- **Patch** optimises targeted server-push updates. Timers,
-  broadcasts, and background goroutines that know which key changed
-  skip the full render entirely. Call `sess.Patch` with the key.
-
-Both work through either engine (Differ or Memoiser). A handler
-can use `Memo: true` for efficient full renders AND `sess.Patch`
-for efficient targeted updates on the same page.
-
-Example: a real-time dashboard with three charts. On page load,
-Memo skips unchanged charts. On each timer tick, Patch updates
-each chart independently at ~5-10µs per chart instead of ~5-12ms
-for a full render.
 
 ## Windowing
 

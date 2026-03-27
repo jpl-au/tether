@@ -167,7 +167,8 @@ for details and examples.
 | [Scaling](docs/scaling.md) | Per-session overhead, horizontal scaling, capacity planning |
 | [Security](docs/security.md) | TLS, session identity, origin checking, CSRF, rate limiting |
 | [Best practices](docs/best-practices.md) | Common patterns, performance tips, pitfalls to avoid |
-| [Performance](docs/performance.md) | Coalescing, memoisation, targeted updates (Patch), PGO |
+| [Engine](docs/engine.md) | Differ, Memoiser, Patch, coalescing, and how they compose |
+| [Performance](docs/performance.md) | Benchmarks, windowing, PGO |
 | [Windowing](docs/windowing.md) | Virtual scrolling for large lists |
 
 ## Third-party libraries
