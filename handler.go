@@ -35,7 +35,7 @@ const defaultPendingTimeout = 30 * time.Second
 type Handler[S any] struct {
 	app          App
 	cfg          StatefulConfig[S]
-	mu           sync.Mutex
+	mu           sync.RWMutex
 	pending      map[string]*pendingSession[S]
 	active       map[string]*StatefulSession[S]
 	disconnected map[string]*StatefulSession[S]

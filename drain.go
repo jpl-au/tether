@@ -18,9 +18,9 @@ func (h *Handler[S]) Drain(ctx context.Context) error {
 	h.draining.Store(true)
 
 	// Check immediately in case all pools are already empty.
-	h.mu.Lock()
+	h.mu.RLock()
 	empty := len(h.pending) == 0 && len(h.active) == 0 && len(h.disconnected) == 0
-	h.mu.Unlock()
+	h.mu.RUnlock()
 	if empty {
 		return nil
 	}

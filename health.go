@@ -12,8 +12,8 @@ type HealthStatus struct {
 // from any goroutine. Useful for load balancer health checks,
 // readiness probes, or metrics collection.
 func (h *Handler[S]) Health() HealthStatus {
-	h.mu.Lock()
-	defer h.mu.Unlock()
+	h.mu.RLock()
+	defer h.mu.RUnlock()
 	return HealthStatus{
 		Pending:      len(h.pending),
 		Active:       len(h.active),

@@ -30,18 +30,18 @@ func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 
 	dev.Debug("serving initial page", "path", r.URL.Path, "remote", r.RemoteAddr)
 
-	h.mu.Lock()
+	h.mu.RLock()
 	if h.cfg.Limits.MaxPending > 0 && len(h.pending) >= h.cfg.Limits.MaxPending {
-		h.mu.Unlock()
+		h.mu.RUnlock()
 		http.Error(w, "too many pending sessions", http.StatusServiceUnavailable)
 		return
 	}
 	if h.cfg.Limits.MaxSessions > 0 && len(h.pending)+len(h.active)+len(h.disconnected) >= h.cfg.Limits.MaxSessions {
-		h.mu.Unlock()
+		h.mu.RUnlock()
 		http.Error(w, "too many sessions", http.StatusServiceUnavailable)
 		return
 	}
-	h.mu.Unlock()
+	h.mu.RUnlock()
 
 	state := h.cfg.InitialState(r)
 	if h.cfg.OnNavigate != nil {
@@ -224,9 +224,9 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 
 		// Enforce MaxSessions.
 		if h.cfg.Limits.MaxSessions > 0 {
-			h.mu.Lock()
+			h.mu.RLock()
 			full := len(h.pending)+len(h.active)+len(h.disconnected) >= h.cfg.Limits.MaxSessions
-			h.mu.Unlock()
+			h.mu.RUnlock()
 			if full {
 				return
 			}

@@ -93,9 +93,9 @@ func (h *Handler[S]) handleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.mu.Lock()
+	h.mu.RLock()
 	sess, ok := h.active[id]
-	h.mu.Unlock()
+	h.mu.RUnlock()
 	if !ok {
 		http.Error(w, "session not found", http.StatusNotFound)
 		return
