@@ -29,7 +29,7 @@
 package window
 
 import (
-	"fmt"
+	"strconv"
 
 	"github.com/jpl-au/fluent/html5/div"
 	"github.com/jpl-au/fluent/node"
@@ -92,7 +92,7 @@ func New(cfg Config) node.Node {
 // is zero, the div is still rendered (height: 0px) so the node count
 // stays stable across frames.
 func spacer(height int) node.Node {
-	return div.New().Style(fmt.Sprintf("height:%dpx", height))
+	return div.New().Style("height:" + strconv.Itoa(height) + "px")
 }
 
 func clamp(v, lo, hi int) int {

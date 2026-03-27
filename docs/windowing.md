@@ -105,11 +105,79 @@ height. Variable-height rows require a height map or estimation,
 which is significantly more complex. For variable-height content,
 consider server-side pagination instead of virtualisation.
 
+## Button-based pagination
+
+For cases where scroll-based virtualisation is not needed, render
+the visible slice directly without `window.New`. This is simpler
+and avoids the spacer divs:
+
+```go
+func render(s State) node.Node {
+    end := min(s.Offset+pageSize, len(s.Items))
+    visible := s.Items[s.Offset:end]
+
+    rows := make([]node.Node, len(visible))
+    for i, item := range visible {
+        rows[i] = renderRow(item)
+    }
+    return div.New(rows...).Dynamic("items")
+}
+```
+
+Handle the page buttons:
+
+```go
+case "next":
+    s.Offset += pageSize
+case "prev":
+    s.Offset -= pageSize
+```
+
+### URL-based pagination
+
+Use `OnNavigate` and `ReplaceURL` so the current page survives
+refresh and can be shared as a link:
+
+```go
+OnNavigate: func(_ tether.Session, s State, p tether.Params) State {
+    s.Offset = (p.IntDefault("page", 1) - 1) * pageSize
+    return s
+},
+```
+
+In Handle, update the URL after each page change:
+
+```go
+page := s.Offset/pageSize + 1
+sess.ReplaceURL("/items/?page=" + strconv.Itoa(page))
+```
+
+This gives URLs like `/items/?page=3` that land on the correct
+page when refreshed or shared.
+
+## Data source
+
+The windowing pattern works with any data source. The examples hold
+the full dataset in memory, but in production you would typically
+fetch only the current page from a database:
+
+```go
+case "next":
+    s.Page++
+    s.Items = db.FetchPage(s.Page, pageSize)
+```
+
+The render function only sees the current page of data. The
+database handles the full dataset.
+
 ## Accessibility
 
 Screen readers and find-in-page only see the rendered rows. This is
 a known tradeoff with virtualisation. For fully accessible
 alternatives, use server-side pagination with page controls.
+Button-based pagination is inherently more accessible than
+scroll-based virtualisation because the page structure is
+predictable.
 
 ---
 

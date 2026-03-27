@@ -1,7 +1,7 @@
 package window
 
 import (
-	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -10,7 +10,7 @@ import (
 )
 
 func row(i int) node.Node {
-	return span.Text(fmt.Sprintf("row-%d", i))
+	return span.Text("row-" + strconv.Itoa(i))
 }
 
 func TestNewRendersVisibleRows(t *testing.T) {
@@ -24,7 +24,7 @@ func TestNewRendersVisibleRows(t *testing.T) {
 	html := string(n.Render())
 
 	for i := 10; i < 15; i++ {
-		want := fmt.Sprintf("row-%d", i)
+		want := "row-" + strconv.Itoa(i)
 		if !strings.Contains(html, want) {
 			t.Errorf("expected %q in output", want)
 		}
