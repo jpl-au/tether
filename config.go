@@ -78,6 +78,12 @@ type Timeouts struct {
 	// active and disconnected sessions use per-session timers. Zero
 	// defaults to 10 seconds.
 	PendingCheck time.Duration
+
+	// SlowRender emits a [SlowRender] diagnostic when a render+diff
+	// cycle exceeds this duration. Use this to detect expensive render
+	// functions in production and identify candidates for memoisation.
+	// Zero disables the diagnostic.
+	SlowRender time.Duration
 }
 
 // Limits groups capacity constraints for sessions and requests.

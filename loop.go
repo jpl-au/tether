@@ -254,13 +254,23 @@ func (s *StatefulSession[S]) exec(ev Event) {
 	s.state = newState
 	s.stateSnap.Store(s.state)
 
+	renderStart := time.Now()
 	tree := s.render(s.state)
 	patches, change := s.engine.Diff(tree)
+	renderDuration := time.Since(renderStart)
 	dev.Debug("render complete",
 		"session", s.id,
 		"patches", len(patches),
 		"structural", change != nil,
+		"duration", renderDuration,
 	)
+	if s.slowRender > 0 && renderDuration > s.slowRender {
+		s.emitDiagnostic(Diagnostic{
+			Kind:      SlowRender,
+			SessionID: s.id,
+			Detail:    renderDuration.String(),
+		})
+	}
 	if len(patches) == 0 && change == nil {
 		source := string(ev.Type)
 		switch {
@@ -572,8 +582,24 @@ func (s *StatefulSession[S]) coalescedRender() {
 
 	s.drainFx(fx)
 
+	renderStart := time.Now()
 	tree := s.render(s.state)
 	patches, change := s.engine.Diff(tree)
+	renderDuration := time.Since(renderStart)
+	dev.Debug("render complete",
+		"session", s.id,
+		"patches", len(patches),
+		"structural", change != nil,
+		"duration", renderDuration,
+		"coalesced", true,
+	)
+	if s.slowRender > 0 && renderDuration > s.slowRender {
+		s.emitDiagnostic(Diagnostic{
+			Kind:      SlowRender,
+			SessionID: s.id,
+			Detail:    renderDuration.String(),
+		})
+	}
 	if len(patches) == 0 && change == nil {
 		if s.onNoPatch != nil {
 			s.onNoPatch(s, NoPatch{Source: "update"})

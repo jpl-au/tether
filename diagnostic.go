@@ -78,6 +78,12 @@ const (
 	// bytes.
 	StateSizeExceeded DiagnosticKind = "state_size_exceeded"
 
+	// SlowRender signals that a render+diff cycle exceeded the
+	// [Timeouts].SlowRender threshold. The Detail field contains the
+	// duration. Use this to detect expensive render functions in
+	// production and identify candidates for memoisation.
+	SlowRender DiagnosticKind = "slow_render"
+
 	// NavigateRedirectLoop signals that an OnNavigate handler
 	// triggered more than [Limits].MaxNavigateRedirects consecutive
 	// redirects via [Session.Navigate]. The framework resolves

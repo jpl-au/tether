@@ -215,6 +215,10 @@ type StatefulSession[S any] struct {
 	// coalesced render runs. Only accessed on the loop goroutine.
 	needsRender bool
 
+	// slowRender is the threshold for emitting a SlowRender
+	// diagnostic. Zero disables. Set from Timeouts.SlowRender.
+	slowRender time.Duration
+
 	// maxStateBytes warns when serialised state exceeds this size.
 	// Zero disables. Set from Limits.MaxStateBytes.
 	maxStateBytes int64

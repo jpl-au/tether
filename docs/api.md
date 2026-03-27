@@ -104,6 +104,7 @@ When either callback is configured, the framework's own logging for that event i
 | `DisableHeartbeat` | `bool` | false | Stop transport keep-alive frames |
 | `ShutdownGrace` | `time.Duration` | 10s | Grace period for `ListenAndServe` shutdown |
 | `PendingCheck` | `time.Duration` | 10s | How often the background goroutine scans for expired pending sessions |
+| `SlowRender` | `time.Duration` | 0 (disabled) | Emit a `SlowRender` diagnostic when render+diff exceeds this duration |
 | `Retry` | `time.Duration` | 1s | Initial client reconnection delay |
 | `MaxRetry` | `time.Duration` | 30s | Maximum exponential backoff |
 

@@ -281,6 +281,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		freeze:               h.cfg.Freeze != 0 && h.cfg.SessionStore != nil,
 		maxNavigateRedirects: h.cfg.Limits.MaxNavigateRedirects,
 		maxStateBytes:        h.cfg.Limits.MaxStateBytes,
+		slowRender:           h.cfg.Timeouts.SlowRender,
 	}
 	sess.lastActivity.Store(now.UnixNano())
 	// Initial status is set directly, not via transition(), because
@@ -498,6 +499,7 @@ func (h *Handler[S]) restoreSession(id string, r *http.Request, transport Transp
 		freeze:               h.cfg.Freeze != 0 && h.cfg.SessionStore != nil,
 		maxNavigateRedirects: h.cfg.Limits.MaxNavigateRedirects,
 		maxStateBytes:        h.cfg.Limits.MaxStateBytes,
+		slowRender:           h.cfg.Timeouts.SlowRender,
 	}
 	// Initial status is set directly, not via transition(), because
 	// there is no prior state to validate against at construction.
