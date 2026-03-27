@@ -107,6 +107,19 @@ Client events (from the transport) are not coalesced - each event
 gets its own render cycle because events carry client correlation
 IDs that must be echoed back.
 
+### Targeted updates (Patch)
+
+`Session.Patch` bypasses the full render pipeline entirely. Instead
+of rendering the whole tree and diffing every Dynamic key, Patch
+re-renders a single key and diffs only that key against the stored
+snapshot. The rest of the page is untouched.
+
+Use Patch from timers, broadcast callbacks, and `Go` goroutines
+when you know exactly which Dynamic region changed. Patch and Memo
+are complementary - Memo optimises the full render path (page loads,
+reconnects), Patch optimises targeted server-push updates. Both can
+be used on the same handler.
+
 ## Event pipeline
 
 When a client event arrives, `exec()` runs the full pipeline:

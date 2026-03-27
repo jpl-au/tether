@@ -126,6 +126,9 @@ selects which engine the session uses.
 
 ## Targeted updates
 
+`Patch` works with either engine (Differ or Memoiser). It does not
+require `Memo: true` - any handler with Dynamic keys can use it.
+
 When you know exactly which Dynamic region changed, skip the full
 render pipeline entirely. `Patch` re-renders a single key and sends
 the diff for just that region:
@@ -150,6 +153,26 @@ the new state directly and let the full render run.
 that the full render would for that key. If they diverge, the
 client has a brief inconsistency until the next full render
 corrects it. This is the tradeoff for the performance gain.
+
+### Combining Patch with Memo
+
+Patch and Memo are complementary. They optimise different paths:
+
+- **Memo** optimises the full render path. Page loads, reconnects,
+  and any `Update` call benefit from skipping unchanged subtrees.
+  Set `Memo: true` and wrap regions in `node.Memo`.
+- **Patch** optimises targeted server-push updates. Timers,
+  broadcasts, and background goroutines that know which key changed
+  skip the full render entirely. Call `sess.Patch` with the key.
+
+Both work through either engine (Differ or Memoiser). A handler
+can use `Memo: true` for efficient full renders AND `sess.Patch`
+for efficient targeted updates on the same page.
+
+Example: a real-time dashboard with three charts. On page load,
+Memo skips unchanged charts. On each timer tick, Patch updates
+each chart independently at ~5-10µs per chart instead of ~5-12ms
+for a full render.
 
 ## Windowing
 
