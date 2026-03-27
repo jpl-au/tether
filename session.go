@@ -9,7 +9,6 @@ import (
 
 	"github.com/jpl-au/tether/wire"
 
-	jit "github.com/jpl-au/fluent-jit"
 	"github.com/jpl-au/fluent/node"
 	"github.com/jpl-au/tether/push"
 )
@@ -59,7 +58,7 @@ type StatefulSession[S any] struct {
 
 	render    RenderFunc[S]
 	handle    HandleFunc[S]
-	differ    *jit.Differ
+	engine    engine
 	encoder   wire.Encoder
 	transport Transport
 

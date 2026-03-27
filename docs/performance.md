@@ -22,6 +22,48 @@ Under broadcast load, this reduces redundant renders from O(N) to
 O(1) per loop iteration. Under normal interactive load (one event
 at a time), behaviour is identical - there is nothing to coalesce.
 
+## Memoisation
+
+For pages with expensive render functions, enable memoisation to skip
+unchanged subtrees entirely. Set `Memo: true` on `StatefulConfig` and
+wrap each Dynamic region's content in `node.Memo`:
+
+```go
+tether.Stateful(app, tether.StatefulConfig[State]{
+    Memo: true,
+    Render: func(s State) node.Node {
+        return div.New(
+            div.New(
+                node.Memo(s.HeaderVersion, func() node.Node {
+                    return renderHeader(s)
+                }),
+            ).Dynamic("header"),
+            div.New(
+                node.Memo(s.ItemsVersion, func() node.Node {
+                    return renderTable(s.Items)
+                }),
+            ).Dynamic("items"),
+        )
+    },
+    // ...
+})
+```
+
+When a memo key matches the previous render, the closure never runs
+and no HTML is rendered for that region. For a page with 50 Dynamic
+regions where only one changed, the Memoiser is up to 40x faster
+than the standard Differ.
+
+The memo key can be any type - strings, ints, bools, and other
+common types are converted efficiently with no reflection. Use a
+version counter (`s.ItemsVersion++` when items change) for the
+cheapest comparison.
+
+**Diff vs Memo**: Diff is the default and requires zero developer
+effort. Memo is opt-in for expensive subtrees. Use one or the other
+per handler, not both. Dynamic regions without a `node.Memo` child
+are always re-rendered when using the Memoiser.
+
 ## Windowing
 
 For large lists, render only the visible portion using the `window`

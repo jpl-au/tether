@@ -64,7 +64,7 @@ func (h *Handler[S]) reattach(sess *StatefulSession[S], transport Transport) {
 
 		// Restore differ snapshots if available.
 		if diffData != nil {
-			if err := sess.differ.Import(diffData); err != nil {
+			if err := sess.engine.Import(diffData); err != nil {
 				dev.Warn("differ import failed, sending full morph",
 					"session", sess.id, "error", err)
 			}
@@ -76,17 +76,17 @@ func (h *Handler[S]) reattach(sess *StatefulSession[S], transport Transport) {
 		// sends a full morph. URL and title are always included so
 		// the browser's address bar and document title stay in sync.
 		tree := sess.render(sess.state)
-		patches, change := sess.differ.Diff(tree)
+		patches, change := sess.engine.Diff(tree)
 
 		var u wire.Update
 		switch {
 		case change != nil:
 			// Structural change - full morph required.
-			html := sess.differ.Render(tree)
+			html := sess.engine.Render(tree)
 			u.Morphs = []wire.Morph{{Key: "", HTML: html}}
 		case patches == nil:
 			// Unseeded differ (no snapshots) - full morph.
-			html := sess.differ.Render(tree)
+			html := sess.engine.Render(tree)
 			u.Morphs = []wire.Morph{{Key: "", HTML: html}}
 		case len(patches) > 0:
 			wp := make([]wire.Patch, len(patches))
@@ -212,7 +212,7 @@ func (h *Handler[S]) thaw(sess *StatefulSession[S], r *http.Request, transport T
 	differ.Render(tree)
 
 	sess.state = state
-	sess.differ = differ
+	sess.engine = h.engine(differ, state)
 	sess.transport = transport
 	sess.transportCtx, sess.transportCancel = context.WithCancel(sess.ctx)
 	sess.events = make(chan Event)

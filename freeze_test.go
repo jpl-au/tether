@@ -34,9 +34,9 @@ func TestFreeze(t *testing.T) {
 			t.Errorf("status = %d, want Frozen (%d)", sess.status.Load(), Frozen)
 		}
 
-		// Differ should be released.
-		if sess.differ != nil {
-			t.Error("differ should be nil after freeze")
+		// Engine should be released.
+		if sess.engine != nil {
+			t.Error("engine should be nil after freeze")
 		}
 
 		// State should be zeroed.

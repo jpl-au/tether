@@ -168,7 +168,7 @@ func TestSessionStructuralChange(t *testing.T) {
 			state:     state{Count: 0, ShowHelp: false},
 			render:    render,
 			handle:    handle,
-			differ:    differ,
+			engine:    differ,
 			encoder:   wire.JSONEncoder{},
 			transport: mt,
 			events:    make(chan Event),

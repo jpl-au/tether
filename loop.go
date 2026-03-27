@@ -255,7 +255,7 @@ func (s *StatefulSession[S]) exec(ev Event) {
 	s.stateSnap.Store(s.state)
 
 	tree := s.render(s.state)
-	patches, change := s.differ.Diff(tree)
+	patches, change := s.engine.Diff(tree)
 	dev.Debug("render complete",
 		"session", s.id,
 		"patches", len(patches),
@@ -323,7 +323,7 @@ func (s *StatefulSession[S]) onTransportClose() {
 	// reconnectable. Export copies without clearing; Clear is only
 	// called after a confirmed successful save.
 	if s.store != nil {
-		if data := s.differ.Export(); data != nil {
+		if data := s.engine.Export(); data != nil {
 			if err := s.store.Save(s.ctx, s.id, data); err != nil {
 				dev.Warn("store save failed, keeping snapshots in memory",
 					"session", s.id, "error", err)
@@ -334,7 +334,7 @@ func (s *StatefulSession[S]) onTransportClose() {
 					Detail:    "save",
 				})
 			} else {
-				s.differ.Clear()
+				s.engine.Clear()
 			}
 		}
 	}
@@ -357,7 +357,7 @@ func (s *StatefulSession[S]) onTransportClose() {
 	if s.freeze {
 		var zero S
 		s.state = zero
-		s.differ = nil
+		s.engine = nil
 		s.transition(Frozen)
 		dev.Debug("session frozen", "session", s.id, "endpoint", s.endpoint)
 	}
@@ -463,7 +463,7 @@ func (s *StatefulSession[S]) cleanup() {
 // effects to merge into the update message.
 func (s *StatefulSession[S]) sendDiff(eventID string, patches []jit.Patch, change *jit.StructuralChange, tree node.Node, fx *Effects) {
 	if change != nil {
-		html := s.differ.Render(tree)
+		html := s.engine.Render(tree)
 		sc := StructuralChange{
 			Added:     change.Added,
 			Removed:   change.Removed,
@@ -573,7 +573,7 @@ func (s *StatefulSession[S]) coalescedRender() {
 	s.drainFx(fx)
 
 	tree := s.render(s.state)
-	patches, change := s.differ.Diff(tree)
+	patches, change := s.engine.Diff(tree)
 	if len(patches) == 0 && change == nil {
 		if s.onNoPatch != nil {
 			s.onNoPatch(s, NoPatch{Source: "update"})

@@ -161,7 +161,7 @@ func BenchmarkEventCycle(b *testing.B) {
 		state:     benchState{Count: 0},
 		render:    benchRender,
 		handle:    benchHandle,
-		differ:    differ,
+		engine:    differ,
 		encoder:   wire.JSONEncoder{},
 		transport: dt,
 		events:    make(chan Event),

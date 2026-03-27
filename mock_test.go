@@ -214,7 +214,7 @@ func newTestSession(state counterState, mt Transport) *StatefulSession[counterSt
 		state:           state,
 		render:          renderCounter,
 		handle:          handleCounter,
-		differ:          differ,
+		engine:          differ,
 		encoder:         wire.JSONEncoder{},
 		transport:       mt,
 		transportCtx:    tctx,
