@@ -949,4 +949,38 @@ window.New(window.Config{
 
 ---
 
+## Versioned
+
+`tether.Versioned[T]` wraps data with an automatic version counter
+for use with `node.Memo`. The version increments on every `With`
+call, ensuring the memo key tracks data changes without manual
+bookkeeping.
+
+```go
+type State struct {
+    Items tether.Versioned[[]Item]
+}
+
+// Read:
+renderTable(s.Items.Val)
+
+// Update (version increments automatically):
+s.Items = s.Items.With(append(s.Items.Val, newItem))
+
+// Memo key:
+node.Memo(s.Items.Version(), func() node.Node { ... })
+```
+
+| Method | Description |
+|--------|-------------|
+| `NewVersioned(data)` | Create with initial data (version 1) |
+| `v.Val` | The wrapped data (read directly) |
+| `v.With(data)` | Return new Versioned with updated data and incremented version |
+| `v.Version()` | Current version counter (use as memo key) |
+
+Versioned is a value type - it works naturally with tether's state
+model. The zero value is valid (version 0).
+
+---
+
 [← Back to documentation](../README.md#documentation)

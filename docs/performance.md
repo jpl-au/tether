@@ -25,44 +25,104 @@ at a time), behaviour is identical - there is nothing to coalesce.
 ## Memoisation
 
 For pages with expensive render functions, enable memoisation to skip
-unchanged subtrees entirely. Set `Memo: true` on `StatefulConfig` and
-wrap each Dynamic region's content in `node.Memo`:
+unchanged subtrees entirely. Set `Memo: true` on `StatefulConfig`
+and wrap expensive Dynamic regions in `node.Memo` with a
+`tether.Versioned` key.
 
-```go
-tether.Stateful(app, tether.StatefulConfig[State]{
-    Memo: true,
-    Render: func(s State) node.Node {
-        return div.New(
-            div.New(
-                node.Memo(s.HeaderVersion, func() node.Node {
-                    return renderHeader(s)
-                }),
-            ).Dynamic("header"),
-            div.New(
-                node.Memo(s.ItemsVersion, func() node.Node {
-                    return renderTable(s.Items)
-                }),
-            ).Dynamic("items"),
-        )
-    },
-    // ...
-})
-```
+### How it works
 
 When a memo key matches the previous render, the closure never runs
 and no HTML is rendered for that region. For a page with 50 Dynamic
 regions where only one changed, the Memoiser is up to 40x faster
 than the standard Differ.
 
-The memo key can be any type - strings, ints, bools, and other
-common types are converted efficiently with no reflection. Use a
-version counter (`s.ItemsVersion++` when items change) for the
-cheapest comparison.
+Cheap regions that change frequently (counters, input fields) can
+use plain Dynamic keys without Memo. They re-render every cycle as
+usual. Use Memo only where the render function is expensive enough
+to justify the version tracking.
 
-**Diff vs Memo**: Diff is the default and requires zero developer
-effort. Memo is opt-in for expensive subtrees. Use one or the other
-per handler, not both. Dynamic regions without a `node.Memo` child
-are always re-rendered when using the Memoiser.
+### Versioned helper
+
+`tether.Versioned[T]` bundles data with an automatic version counter.
+The version increments on every `With` call, so the memo key always
+tracks data changes without manual bookkeeping.
+
+```go
+type State struct {
+    Items  tether.Versioned[[]Item]  // expensive table - memoised
+    Search string                     // cheap input - plain Dynamic
+    Count  int                        // cheap counter - plain Dynamic
+}
+```
+
+Update data via `With` (version increments automatically). Read
+data directly via `Val`:
+
+```go
+// Handle
+func handle(sess tether.Session, s State, ev tether.Event) State {
+    switch ev.Action {
+    case "add-item":
+        s.Items = s.Items.With(append(s.Items.Val, newItem(ev)))
+    case "search":
+        s.Search = ev.Value()
+    case "increment":
+        s.Count++
+        // Items.Version() unchanged - table render is skipped
+    }
+    return s
+}
+```
+
+In the render function, wrap expensive regions in `node.Memo` using
+the version as the key. Cheap regions use plain Dynamic keys:
+
+```go
+// Render
+func render(s State) node.Node {
+    return div.New(
+        // Expensive table - memoised. Only re-renders when
+        // Items.Version() changes (i.e. when With was called).
+        div.New(
+            node.Memo(s.Items.Version(), func() node.Node {
+                return renderTable(s.Items.Val)
+            }),
+        ).Dynamic("items"),
+
+        // Cheap regions - plain Dynamic. Always re-render.
+        input.New().Value(s.Search).Dynamic("search"),
+        span.Text(strconv.Itoa(s.Count)).Dynamic("count"),
+    )
+}
+```
+
+Enable memoisation on the handler:
+
+```go
+tether.Stateful(app, tether.StatefulConfig[State]{
+    Memo:         true,
+    InitialState: func(r *http.Request) State {
+        return State{Items: tether.NewVersioned(loadItems())}
+    },
+    Render: render,
+    Handle: handle,
+    // ...
+})
+```
+
+### Diff vs Memo
+
+Diff is the default. It requires zero developer effort - write a
+render function and it works. Every Dynamic region is rendered and
+compared on every cycle.
+
+Memo is opt-in for handlers with expensive render functions. It
+requires `Versioned` fields (or comparable keys) for memoised
+regions. Dynamic regions without a `node.Memo` child are always
+re-rendered, so cheap regions work normally alongside memoised ones.
+
+Use one strategy per handler, not both. The `Memo` config field
+selects which engine the session uses.
 
 ## Windowing
 
