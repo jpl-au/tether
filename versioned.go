@@ -1,11 +1,11 @@
 package tether
 
 // Versioned wraps a value with an automatic version counter for use
-// with [node.Memo]. The version increments on every call to [With],
-// ensuring the memo key changes when the data changes.
+// with [node.Memoise]. The version increments on every call to [With],
+// ensuring the memoisation key changes when the data changes.
 //
 // Use Versioned for state fields that back memoised Dynamic regions.
-// The version is the memo key - when it matches the previous render,
+// The version is the memoisation key - when it matches the previous render,
 // the Memoiser skips the subtree entirely.
 //
 //	type State struct {
@@ -21,9 +21,9 @@ package tether
 //
 //	s.Items = s.Items.With(append(s.Items.Val, newItem))
 //
-// Use the version as the memo key in Render:
+// Use the version as the memoisation key in Render:
 //
-//	node.Memo(s.Items.Version(), func() node.Node {
+//	node.Memoise(s.Items.Version(), func() node.Node {
 //	    return renderTable(s.Items.Val)
 //	})
 //
@@ -56,9 +56,9 @@ func (v Versioned[T]) With(data T) Versioned[T] {
 }
 
 // Version returns the current version counter. Use this as the
-// key for [node.Memo]:
+// key for [node.Memoise]:
 //
-//	node.Memo(s.Items.Version(), func() node.Node { ... })
+//	node.Memoise(s.Items.Version(), func() node.Node { ... })
 func (v Versioned[T]) Version() int {
 	return v.version
 }

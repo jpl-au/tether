@@ -379,6 +379,33 @@ func Transition(name string) Option { return Option{"tether-transition", name} }
 // to API keys, code snippets, or share URLs.
 func CopyToClipboard(selector string) Option { return Option{"tether-copy", selector} }
 
+// Client-side action feedback - temporary visual response after a
+// client-only action (clipboard copy, scroll-to, etc.) without a
+// server round-trip.
+
+// FlashText temporarily replaces the element's text content after a
+// client-side action succeeds (e.g. clipboard copy). The original
+// text is restored after the configured flash duration
+// (Client.FlashDuration, default 2s). No server round-trip. Pair
+// with [CopyToClipboard] or other client-side actions:
+//
+//	bind.Apply(btn,
+//	    bind.CopyToClipboard("#key"),
+//	    bind.FlashText("Copied!"),
+//	)
+func FlashText(text string) Option { return Option{"tether-flash-text", text} }
+
+// FlashClass temporarily adds a CSS class to the element after a
+// client-side action succeeds. The class is removed after the
+// configured flash duration. Use this for richer feedback like
+// colour changes, icon swaps, or animations:
+//
+//	bind.Apply(btn,
+//	    bind.CopyToClipboard("#key"),
+//	    bind.FlashClass("copied"),
+//	)
+func FlashClass(class string) Option { return Option{"tether-flash-class", class} }
+
 // Keyboard shortcut options - global hotkeys that fire regardless of
 // which element has focus.
 

@@ -21,15 +21,15 @@ func TestEngineDefaultIsDiffer(t *testing.T) {
 
 	e := h.engine(d, counterState{})
 	if _, ok := e.(*jit.Differ); !ok {
-		t.Errorf("expected *jit.Differ when Memo is false, got %T", e)
+		t.Errorf("expected *jit.Differ when Memoise is false, got %T", e)
 	}
 }
 
-func TestEngineMemoIsMemoiser(t *testing.T) {
+func TestEngineMemoiseIsMemoiser(t *testing.T) {
 	d := jit.NewDiffer()
 	h := &Handler[counterState]{
 		cfg: StatefulConfig[counterState]{
-			Memo: true,
+			Memoise: true,
 			Render: func(s counterState) node.Node {
 				return div.New(span.Text("x").Dynamic("x"))
 			},
@@ -38,6 +38,6 @@ func TestEngineMemoIsMemoiser(t *testing.T) {
 
 	e := h.engine(d, counterState{})
 	if _, ok := e.(*jit.Memoiser); !ok {
-		t.Errorf("expected *jit.Memoiser when Memo is true, got %T", e)
+		t.Errorf("expected *jit.Memoiser when Memoise is true, got %T", e)
 	}
 }

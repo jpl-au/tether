@@ -10,7 +10,7 @@ import (
 // engine is the internal interface for the session's diff strategy.
 // Both [jit.Differ] and [jit.Memoiser] satisfy it. The session does
 // not know which implementation it holds - the choice is made at
-// session creation time based on [StatefulConfig.Memo].
+// session creation time based on [StatefulConfig.Memoise].
 type engine interface {
 	Render(root node.Node, w ...io.Writer) []byte
 	Diff(root node.Node) ([]jit.Patch, *jit.StructuralChange)
@@ -20,13 +20,13 @@ type engine interface {
 	Clear()
 }
 
-// engine returns the diff strategy for this handler. When Memo is
+// engine returns the diff strategy for this handler. When Memoise is
 // enabled, a Memoiser is created and seeded with the tree. When
 // disabled, the pre-seeded Differ from the pending session is used
-// directly. The Memoiser needs its own Render call to collect memo
+// directly. The Memoiser needs its own Render call to collect memoisation
 // keys from the tree.
 func (h *Handler[S]) engine(d *jit.Differ, state S) engine {
-	if h.cfg.Memo {
+	if h.cfg.Memoise {
 		m := jit.NewMemoiser()
 		tree := h.cfg.Render(state)
 		m.Render(tree)

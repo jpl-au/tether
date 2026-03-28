@@ -26,7 +26,7 @@ developer effort, no correctness obligations.
 
 ```go
 tether.Stateful(app, tether.StatefulConfig[State]{
-    // No Memo field - Differ is used automatically.
+    // No Memoise field - Differ is used automatically.
     Render: render,
     Handle: handle,
 })
@@ -42,17 +42,17 @@ the render+diff cost is a bottleneck.
 ## Memoiser (opt-in)
 
 The Memoiser is an alternative engine that skips unchanged subtrees.
-Each Dynamic region wraps its content in `node.Memo` with a cache
+Each Dynamic region wraps its content in `node.Memoise` with a cache
 key. When the key matches the previous render, the closure never
 runs and no HTML is produced for that region.
 
 ```go
 tether.Stateful(app, tether.StatefulConfig[State]{
-    Memo: true,
+    Memoise: true,
     Render: func(s State) node.Node {
         return div.New(
             div.New(
-                node.Memo(s.Items.Version(), func() node.Node {
+                node.Memoise(s.Items.Version(), func() node.Node {
                     return renderTable(s.Items.Val)
                 }),
             ).Dynamic("items"),
@@ -85,7 +85,7 @@ type State struct {
 s.Items = s.Items.With(append(s.Items.Val, newItem))
 
 // Render:
-node.Memo(s.Items.Version(), func() node.Node { ... })
+node.Memoise(s.Items.Version(), func() node.Node { ... })
 ```
 
 The version increments on every `With` call. No manual bookkeeping.
@@ -97,7 +97,7 @@ rendering the whole tree and diffing every Dynamic key, Patch
 re-renders a single key and diffs only that key against the stored
 snapshot.
 
-**Patch works with either engine.** It does not require `Memo: true`.
+**Patch works with either engine.** It does not require `Memoise: true`.
 Any handler with Dynamic keys can use it.
 
 ```go
@@ -170,14 +170,14 @@ sess.Go(func(ctx context.Context) {
 
 ### Memoiser + Patch
 
-Maximum performance. Memo skips unchanged regions during full
+Maximum performance. Memoisation skips unchanged regions during full
 renders (page load, reconnect, client events). Patch skips the full
 render entirely for targeted server-push updates:
 
 ```go
 tether.StatefulConfig[State]{
-    Memo: true,
-    Render: render,  // uses node.Memo for expensive regions
+    Memoise: true,
+    Render: render,  // uses node.Memoise for expensive regions
 }
 
 // Timer updates one chart via Patch:
@@ -187,7 +187,7 @@ sess.Patch("chart-cpu", func(s State) (State, node.Node) {
 })
 ```
 
-On page load, Memo skips unchanged charts. On each tick, Patch
+On page load, Memoisation skips unchanged charts. On each tick, Patch
 updates one chart at ~5-10µs instead of ~5-12ms for a full render.
 
 ## Developer journey
@@ -200,10 +200,10 @@ updates one chart at ~5-10µs instead of ~5-12ms for a full render.
    `sess.Update`. Immediate 1,000x improvement for that path.
 
 3. **Switch to Memoiser for expensive pages.** When profiling shows
-   the full render is slow, set `Memo: true` and wrap expensive
-   regions in `node.Memo` with Versioned keys.
+   the full render is slow, set `Memoise: true` and wrap expensive
+   regions in `node.Memoise` with Versioned keys.
 
-4. **Combine them.** Memo handles full renders efficiently. Patch
+4. **Combine them.** Memoisation handles full renders efficiently. Patch
    handles targeted updates efficiently. Both on the same handler.
 
 Each step is independent. You do not need to use all of them. Most
@@ -214,7 +214,7 @@ cases. Steps 3 and 4 are for dashboards and data-heavy pages.
 
 | | Differ | Memoiser |
 |---|---|---|
-| Config | Default (no config) | `Memo: true` |
+| Config | Default (no config) | `Memoise: true` |
 | Developer effort | Zero | Must provide cache keys |
 | Full render cost | O(tree size) | O(changed subtrees) |
 | Correctness | Automatic | Developer maintains key accuracy |

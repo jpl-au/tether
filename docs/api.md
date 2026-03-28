@@ -150,7 +150,7 @@ When either callback is configured, the framework's own logging for that event i
 | `OnCommandDropped` | `func(*StatefulSession[S])` | Called when a command is dropped because buffers are full. When nil (default), the session is destroyed to prevent silent drift. When set, the developer handles it |
 | `Freeze` | `FreezeMode` | Frozen mode for disconnected sessions. `FreezeWithRestore` requires OnRestore; `FreezeWithConnect` falls back to OnConnect. Zero disables. See [frozen mode](frozen-mode.md) |
 | `Protocol` | `protocol.Protocol` | HTTP protocol (default `protocol.Auto` - detects per request). See [transport](transport.md#protocol-awareness) |
-| `Memo` | `bool` | Use the Memoiser engine instead of the Differ. Render functions must use `node.Memo` for each Dynamic region. See [engine guide](engine.md#memoiser-opt-in) |
+| `Memoise` | `bool` | Use the Memoiser engine instead of the Differ. Render functions must use `node.Memoise` for each Dynamic region. See [engine guide](engine.md#memoiser-opt-in) |
 | `WireFormat` | `wire.Format` | Encoding for server-to-client updates (default `wire.JSON`) |
 
 ### Security
@@ -957,8 +957,8 @@ window.New(window.Config{
 ## Versioned
 
 `tether.Versioned[T]` wraps data with an automatic version counter
-for use with `node.Memo`. The version increments on every `With`
-call, ensuring the memo key tracks data changes without manual
+for use with `node.Memoise`. The version increments on every `With`
+call, ensuring the memoisation key tracks data changes without manual
 bookkeeping.
 
 ```go
@@ -972,8 +972,8 @@ renderTable(s.Items.Val)
 // Update (version increments automatically):
 s.Items = s.Items.With(append(s.Items.Val, newItem))
 
-// Memo key:
-node.Memo(s.Items.Version(), func() node.Node { ... })
+// Memoisation key:
+node.Memoise(s.Items.Version(), func() node.Node { ... })
 ```
 
 | Method | Description |
@@ -981,7 +981,7 @@ node.Memo(s.Items.Version(), func() node.Node { ... })
 | `NewVersioned(data)` | Create with initial data (version 1) |
 | `v.Val` | The wrapped data (read directly) |
 | `v.With(data)` | Return new Versioned with updated data and incremented version |
-| `v.Version()` | Current version counter (use as memo key) |
+| `v.Version()` | Current version counter (use as memoisation key) |
 
 Versioned is a value type - it works naturally with tether's state
 model. The zero value is valid (version 0).

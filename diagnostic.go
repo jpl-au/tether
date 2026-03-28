@@ -99,12 +99,12 @@ const (
 	// under load.
 	RenderCoalesced DiagnosticKind = "render_coalesced"
 
-	// HighMemoMissRate signals that the memo cache miss rate for a
-	// render cycle exceeded the [Timeouts].MemoMissThreshold. A high
+	// HighMemoiseMissRate signals that the memoisation cache miss rate for a
+	// render cycle exceeded the [Timeouts].MemoiseMissThreshold. A high
 	// miss rate usually indicates broken or overly granular cache
 	// keys. The Detail field contains the miss ratio. Configure the
-	// threshold via [Timeouts].MemoMissThreshold; zero disables.
-	HighMemoMissRate DiagnosticKind = "high_memo_miss_rate"
+	// threshold via [Timeouts].MemoiseMissThreshold; zero disables.
+	HighMemoiseMissRate DiagnosticKind = "high_memoise_miss_rate"
 )
 
 // Diagnostic carries a framework-level event from the session lifecycle,

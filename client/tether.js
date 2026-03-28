@@ -1792,11 +1792,48 @@ window.Tether.signals = window.Tether.signals || {};
     el.setAttribute("data-tether-client-attrs", set.join(" "));
   }
 
+  // --- Client-side action feedback ---
+  //
+  // flashFeedback provides temporary visual feedback on an element
+  // after a client-side action succeeds. Two mechanisms:
+  //
+  //   data-tether-flash-text="Copied!"  - swaps textContent temporarily
+  //   data-tether-flash-class="copied"  - adds a CSS class temporarily
+  //
+  // Both revert after flashDuration (default 2s). The "tether-flashed"
+  // class is always added so developers can style any flashed element.
+  // Called by handleClipboard and any future client-side action.
+
+  function flashFeedback(el) {
+    var flashText = el.getAttribute("data-tether-flash-text");
+    var flashClass = el.getAttribute("data-tether-flash-class");
+    if (!flashText && !flashClass) return;
+
+    var duration = (Tether.config && Tether.config.flashDuration) || 2000;
+    var originalText;
+
+    if (flashText) {
+      originalText = el.textContent;
+      el.textContent = flashText;
+    }
+    if (flashClass) {
+      el.classList.add(flashClass);
+    }
+    el.classList.add("tether-flashed");
+
+    setTimeout(function() {
+      if (flashText) el.textContent = originalText;
+      if (flashClass) el.classList.remove(flashClass);
+      el.classList.remove("tether-flashed");
+    }, duration);
+  }
+
   // --- Clipboard ---
   //
   // Elements with data-tether-copy="<selector>" copy the text content
   // of the matched element to the clipboard on click. No server
-  // round-trip.
+  // round-trip. Calls flashFeedback on the trigger for visual
+  // confirmation.
 
   function handleClipboard(e) {
     var trigger = e.target.closest("[data-tether-copy]");
@@ -1808,7 +1845,9 @@ window.Tether.signals = window.Tether.signals || {};
 
     var text = source.value !== undefined && source.value !== "" ? source.value : source.textContent;
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text);
+      navigator.clipboard.writeText(text).then(function() {
+        flashFeedback(trigger);
+      });
     }
   }
 

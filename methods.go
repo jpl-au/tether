@@ -107,7 +107,7 @@ func (s *StatefulSession[S]) Update(fn func(S) S) {
 // 1,000x faster than Update for targeting one key out of many.
 //
 // Patch works with either engine (Differ or Memoiser). It does not
-// require [StatefulConfig].Memo to be true. Any handler with Dynamic
+// require [StatefulConfig].Memoise to be true. Any handler with Dynamic
 // keys can use it.
 //
 // The closure receives the current state and returns the new state

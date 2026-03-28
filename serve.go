@@ -282,7 +282,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		maxNavigateRedirects: h.cfg.Limits.MaxNavigateRedirects,
 		maxStateBytes:        h.cfg.Limits.MaxStateBytes,
 		slowRender:           h.cfg.Timeouts.SlowRender,
-		memoMissThreshold:    h.cfg.Timeouts.MemoMissThreshold,
+		memoiseMissThreshold: h.cfg.Timeouts.MemoiseMissThreshold,
 	}
 	sess.lastActivity.Store(now.UnixNano())
 	// Initial status is set directly, not via transition(), because
@@ -501,7 +501,7 @@ func (h *Handler[S]) restoreSession(id string, r *http.Request, transport Transp
 		maxNavigateRedirects: h.cfg.Limits.MaxNavigateRedirects,
 		maxStateBytes:        h.cfg.Limits.MaxStateBytes,
 		slowRender:           h.cfg.Timeouts.SlowRender,
-		memoMissThreshold:    h.cfg.Timeouts.MemoMissThreshold,
+		memoiseMissThreshold: h.cfg.Timeouts.MemoiseMissThreshold,
 	}
 	// Initial status is set directly, not via transition(), because
 	// there is no prior state to validate against at construction.

@@ -48,6 +48,13 @@ transport upgraders, middleware, lifecycle callbacks, timeouts, and limits.
 Required fields: `InitialState`, `Render`, `Handle`, and at least one of
 `Upgrade` or `Fallback` (depending on `Mode`).
 
+Notable optional fields:
+- `Memoise bool` - use the Memoiser engine instead of the Differ. Render
+  functions must wrap each Dynamic region in `node.Memoise(key, fn)`.
+- `Timeouts.SlowRender` - threshold for emitting `SlowRender` diagnostics.
+- `Timeouts.MemoiseMissThreshold` - threshold (0.0-1.0) for emitting
+  `HighMemoiseMissRate` diagnostics. Only applies when `Memoise` is true.
+
 ### Session (interface)
 
 The interface every handler receives. Provides side-effect methods (`Toast`,
@@ -59,12 +66,21 @@ identically in stateful mode, stateless page mode, and tests. `OnNavigate`,
 ### StatefulSession[S]
 
 One per browser tab. Implements `Session` and adds state-aware methods:
-`State` and `Update`. Owns its own state, diff engine, and command-loop
-goroutine. All exported methods are safe to call from any goroutine.
+`State`, `Update`, and `Patch`. Owns its own state, diff engine, and
+command-loop goroutine. All exported methods are safe to call from any
+goroutine.
+
+- `Update(fn func(S) S)` - applies a state change and pushes the
+  resulting diff. Multiple rapid Updates are coalesced into a single
+  render cycle.
+- `Patch(key string, fn func(S) (S, node.Node))` - targeted update
+  for a single Dynamic key. Over 1,000x faster than Update for one
+  key out of many. Works with either engine (Differ or Memoiser).
+- `State() S` - lock-free read of the current state.
 
 Type-assert to `*StatefulSession[S]` only when you need methods that are not on
-`Session` - `Update` and `State`. These are lifecycle concerns and belong
-in `OnConnect`/`OnDisconnect`, not in `Handle`.
+`Session` - `Update`, `Patch`, and `State`. These are lifecycle concerns
+and belong in `OnConnect`/`OnDisconnect`, not in `Handle`.
 
 ### Event
 
@@ -137,6 +153,26 @@ Declarative reactive subscription for StatefulConfig. `WatchValue(val, mapper)`
 creates a watcher that observes a Value; `WatchBus(bus, mapper)` creates
 one that subscribes to a Bus. Listed in `StatefulConfig.Watchers`, they are
 subscribed automatically before `OnConnect` runs.
+
+### Versioned[T]
+
+A value wrapper that tracks a version counter. Every call to `With(newVal)`
+increments the version, producing a new `Versioned[T]`. Use `Version()` as
+the cache key for `node.Memoise`:
+
+```go
+type State struct {
+    Items tether.Versioned[[]Item]
+    Count int
+}
+
+node.Memoise(s.Items.Version(), func() node.Node {
+    return renderTable(s.Items.Val)
+})
+```
+
+`Versioned` is a value type - it works naturally with tether's state model
+where Handle receives S by value and returns a new S.
 
 ### DiffStore
 
@@ -213,6 +249,16 @@ three channels:
 
 All state mutations happen inside this goroutine. No mutexes in the hot
 path.
+
+### Update coalescing
+
+When multiple commands arrive while the loop is processing one, they are
+drained and executed sequentially before a single render-diff-send cycle
+runs. This means a broadcast to 100 sessions that arrives during another
+broadcast produces one render, not two. Transport events (`exec`) are not
+coalesced - each gets its own render because events carry client
+correlation IDs. A `RenderCoalesced` diagnostic fires when the batch size
+exceeds one.
 
 ### Overflow handling
 
@@ -352,10 +398,29 @@ h.Diagnostics.Subscribe(ctx, func(d tether.Diagnostic) {
 
 The framework is quiet by default - `slog` is only used for panics
 (as a critical safety net). All other operational signals flow through
-the diagnostic bus. `DiagnosticKind` constants: `TransportError`,
-`EncodeError`, `BufferOverflow`, `CommandDropped`, `HandlerPanic`,
-`UploadError`, `SessionBindingFailed`, `StoreError`. See [operations](docs/operations.md#diagnostics-bus) for
-details.
+the diagnostic bus. `DiagnosticKind` constants:
+
+| Kind | Fires when |
+|------|------------|
+| `TransportError` | Read/write failure on the transport (not normal EOF) |
+| `EncodeError` | Wire update serialisation failed |
+| `BufferOverflow` | Command channel full, overflow goroutine spawned |
+| `CommandDropped` | Buffer and overflow semaphore both full, command lost |
+| `CommandDiscarded` | Command sent to a frozen or destroyed session |
+| `HandlerPanic` | Recovered panic in Handle, Update, or command callback |
+| `UploadError` | Failure in an upload handler callback |
+| `UploadRejected` | Upload MIME type not in Accept list |
+| `SessionBindingFailed` | User-Agent mismatch on reconnect or session claim |
+| `StoreError` | DiffStore save/load/delete failure |
+| `SessionStoreError` | SessionStore save/load/delete/marshal failure |
+| `StateSizeExceeded` | Serialised state exceeds `Limits.MaxStateBytes` |
+| `SlowRender` | Render+diff cycle exceeds `Timeouts.SlowRender` |
+| `NavigateRedirectLoop` | OnNavigate exceeded `Limits.MaxNavigateRedirects` |
+| `RenderCoalesced` | Multiple commands batched into one render cycle |
+| `HighMemoiseMissRate` | Memoisation miss ratio exceeds `Timeouts.MemoiseMissThreshold` |
+
+See [operations](docs/operations.md#diagnostics-bus) for subscription
+examples and detailed descriptions.
 
 Prefer `StatefulConfig.Watchers` for declarative subscriptions (`WatchValue`,
 `WatchBus`). Use `OnConnect` for imperative setup (incrementing counters,
@@ -373,7 +438,13 @@ Subscriptions are cleaned up automatically when the session is destroyed.
 | `loop.go` | Command loop (run), exec pipeline, readTransport, send |
 | `methods.go` | Session methods - State, Update, Close, Toast, Navigate, Signal, Push |
 | `handle.go` | HandleFunc type, middleware chain |
-| `serve.go` | HTTP handler (ServeHTTP), session creation, reattach |
+| `serve.go` | HTTP handler (ServeHTTP), session creation, restore from store |
+| `lifecycle.go` | Reattach (reconnect), thaw (frozen restore), pool transitions |
+| `pending.go` | Background reaper for expired pre-warmed sessions |
+| `upload.go` | File upload handler with MIME validation |
+| `http.go` | POST event handler, push subscription handler |
+| `versioned.go` | Versioned[T] - version-tracked values for memoisation cache keys |
+| `differ.go` | Engine interface, Memoise/Differ selection |
 | `component.go` | Component interface, EqualComponent, Route, RouteTyped |
 | `mount.go` | ComponentMount interface, Mount constructor, RouteMount dispatch |
 | `bus.go` | Bus - typed pub/sub with atomic reads and copy-on-write |

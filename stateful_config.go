@@ -352,23 +352,23 @@ type StatefulConfig[S any] struct {
 	// Zero (the default) disables freeze entirely.
 	Freeze FreezeMode
 
-	// Memo enables subtree memoisation for the render/diff pipeline.
+	// Memoise enables subtree memoisation for the render/diff pipeline.
 	// When true, the session uses a [jit.Memoiser] instead of a
-	// [jit.Differ]. Render functions that use [node.Memo] nodes will
+	// [jit.Differ]. Render functions that use [node.Memoise] nodes will
 	// skip unchanged subtrees entirely - the closure never runs and
-	// no HTML is rendered for regions whose memo key matches the
+	// no HTML is rendered for regions whose memoisation key matches the
 	// previous render.
 	//
 	// This is an opt-in performance optimisation for pages with
 	// expensive render functions. Every Dynamic region should contain
-	// a [node.Memo] child with a cache key. Dynamic regions without
-	// a memo child are always re-rendered (treated as a miss).
+	// a [node.Memoise] child with a cache key. Dynamic regions without
+	// a memoised child are always re-rendered (treated as a miss).
 	//
 	// When false (the default), the session uses the standard Differ
 	// which renders and compares every Dynamic region on each cycle.
 	// This is correct for all render functions and requires no
 	// developer effort.
-	Memo bool
+	Memoise bool
 }
 
 // PushConfig enables Web Push notifications for the page. The VAPID

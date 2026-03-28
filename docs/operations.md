@@ -220,11 +220,18 @@ h.Diagnostics.SubscribeAsync(ctx, func(d tether.Diagnostic) {
 | `EncodeError` | JSON serialisation failure - usually an unencodable type in state or render output |
 | `BufferOverflow` | Command channel was full; an overflow goroutine was spawned to deliver the command |
 | `CommandDropped` | Both the command buffer and the overflow goroutine cap were exhausted. By default the session is destroyed to prevent silent client drift. Set `OnCommandDropped` to override |
+| `CommandDiscarded` | A command or effect was silently discarded because the session is frozen or destroyed. Happens when code calls Update, Signal, Toast, etc. after disconnection |
 | `HandlerPanic` | Recovered panic inside Handle, Update, or a command callback. By default the session is destroyed because state may be corrupted. Set `OnPanic` to override |
 | `UploadError` | Failure or recovered panic in an upload handler callback |
+| `UploadRejected` | An upload was rejected because its MIME type did not match the `UploadConfig.Accept` list. Detail contains the rejected content type |
 | `SessionBindingFailed` | A reconnect or session claim was rejected because the User-Agent did not match the original |
 | `StoreError` | Failure saving or deleting differ snapshots from the configured DiffStore. The Detail field indicates the operation ("save" or "delete"). Store failures are non-fatal - the framework falls back to in-memory behaviour |
 | `SessionStoreError` | Failure saving, loading, or deleting session state from the configured SessionStore. The Detail field indicates the operation ("save", "load", "delete", "marshal", "unmarshal", or "envelope"). Non-fatal - the framework continues with in-memory state |
+| `StateSizeExceeded` | Serialised session state exceeded `Limits.MaxStateBytes`. The save proceeds - this is a warning, not a hard limit. Detail contains the size in bytes |
+| `SlowRender` | A render+diff cycle exceeded `Timeouts.SlowRender`. Detail contains the duration. Use this to identify candidates for memoisation |
+| `NavigateRedirectLoop` | An OnNavigate handler triggered more consecutive redirects than `Limits.MaxNavigateRedirects` allows |
+| `RenderCoalesced` | Multiple commands were batched into a single render-diff-send cycle. Detail contains the batch count. Only fires when the batch size exceeds one |
+| `HighMemoiseMissRate` | The memoisation cache miss ratio for a render cycle exceeded `Timeouts.MemoiseMissThreshold`. Usually indicates broken or overly granular cache keys. Only fires when Memoise is enabled |
 
 `BufferOverflow` means the system coped (spawned a goroutine). `CommandDropped`
 means the session was critically overwhelmed - by default it is destroyed to

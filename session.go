@@ -224,10 +224,10 @@ type StatefulSession[S any] struct {
 	// diagnostic. Zero disables. Set from Timeouts.SlowRender.
 	slowRender time.Duration
 
-	// memoMissThreshold emits a HighMemoMissRate diagnostic when the
+	// memoiseMissThreshold emits a HighMemoiseMissRate diagnostic when the
 	// miss ratio exceeds this value. Zero disables. Set from
-	// Timeouts.MemoMissThreshold.
-	memoMissThreshold float64
+	// Timeouts.MemoiseMissThreshold.
+	memoiseMissThreshold float64
 
 	// maxStateBytes warns when serialised state exceeds this size.
 	// Zero disables. Set from Limits.MaxStateBytes.

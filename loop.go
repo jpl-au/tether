@@ -274,7 +274,7 @@ func (s *StatefulSession[S]) exec(ev Event) {
 			Detail:    renderDuration.String(),
 		})
 	}
-	s.checkMemoStats()
+	s.checkMemoiseStats()
 	if len(patches) == 0 && change == nil {
 		source := string(ev.Type)
 		switch {
@@ -612,7 +612,7 @@ func (s *StatefulSession[S]) coalescedRender() {
 			Detail:    renderDuration.String(),
 		})
 	}
-	s.checkMemoStats()
+	s.checkMemoiseStats()
 	if len(patches) == 0 && change == nil {
 		if s.onNoPatch != nil {
 			s.onNoPatch(s, NoPatch{Source: "update"})
@@ -627,12 +627,12 @@ func (s *StatefulSession[S]) coalescedRender() {
 	s.sendDiff("", patches, change, tree, fx)
 }
 
-// checkMemoStats reads hit/miss counters from the Memoiser after a
+// checkMemoiseStats reads hit/miss counters from the Memoiser after a
 // Diff call. In dev mode, per-node hit/miss detail is logged. In all
-// modes, a HighMemoMissRate diagnostic is emitted when the miss ratio
+// modes, a HighMemoiseMissRate diagnostic is emitted when the miss ratio
 // exceeds the configured threshold. Only applies when the engine is a
 // Memoiser. Called on the loop goroutine after every Diff.
-func (s *StatefulSession[S]) checkMemoStats() {
+func (s *StatefulSession[S]) checkMemoiseStats() {
 	ms, ok := s.engine.(*jit.Memoiser)
 	if !ok {
 		return
@@ -642,16 +642,16 @@ func (s *StatefulSession[S]) checkMemoStats() {
 	if total == 0 {
 		return
 	}
-	dev.Debug("memo stats",
+	dev.Debug("memoiser stats",
 		"session", s.id,
 		"hits", hits,
 		"misses", misses,
 	)
-	if s.memoMissThreshold > 0 {
+	if s.memoiseMissThreshold > 0 {
 		ratio := float64(misses) / float64(total)
-		if ratio > s.memoMissThreshold {
+		if ratio > s.memoiseMissThreshold {
 			s.emitDiagnostic(Diagnostic{
-				Kind:      HighMemoMissRate,
+				Kind:      HighMemoiseMissRate,
 				SessionID: s.id,
 				Detail:    fmt.Sprintf("%.0f%% miss rate (%d/%d)", ratio*100, misses, total),
 			})
