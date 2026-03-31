@@ -42,18 +42,20 @@ const (
 // request/response pages, use [StatelessConfig] with [Stateless]
 // instead.
 //
-// At minimum, set InitialState, Render, Handle, and either Upgrade or
-// Fallback (depending on Mode). Everything else is optional and has
-// sensible defaults.
+// At minimum, set InitialState, Render, and Handle. Everything else
+// is optional and has sensible defaults - including transports, which
+// default to WebSocket with SSE fallback.
 type StatefulConfig[S any] struct {
 	// Upgrade converts an HTTP request into a Transport connection.
-	// Use ws.Upgrade for WebSocket connections. Required unless Mode
-	// is [mode.ServerSentEvents].
+	// Defaults to ws.Upgrade() (WebSocket). When nil, inherits from
+	// [App].Upgrade, then falls back to the built-in default. Set
+	// this to customise WebSocket options for a specific handler.
 	Upgrade func(w http.ResponseWriter, r *http.Request) (Transport, error)
 
 	// Fallback converts an HTTP request into a Transport connection
-	// using SSE+POST. Required when Mode is [mode.ServerSentEvents]
-	// or [mode.Both]. Use sse.Upgrade() for SSE+POST.
+	// using SSE+POST. Defaults to sse.Upgrade(). When nil, inherits
+	// from [App].Fallback, then falls back to the built-in default.
+	// Set this to customise SSE options for a specific handler.
 	Fallback func(w http.ResponseWriter, r *http.Request) (Transport, error)
 
 	// Mode selects which transports the handler accepts. Defaults to

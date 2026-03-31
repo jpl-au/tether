@@ -1,11 +1,19 @@
 package tether
 
-import "log/slog"
+import (
+	"log/slog"
+	"net/http"
+)
 
 // App holds configuration shared across all handlers in an
-// application: logging, client-side behaviour, security, and
-// assets. Create one App and pass it to [Stateful] and [Stateless] - each
-// handler gets its own copy, so shared settings are defined once.
+// application: logging, client-side behaviour, security, assets,
+// and transports. Create one App and pass it to [Stateful] and
+// [Stateless] - each handler gets its own copy, so shared settings
+// are defined once.
+//
+// The zero value provides sensible defaults: WebSocket as the
+// primary transport and SSE as the fallback. Override Upgrade
+// and/or Fallback to customise transport options.
 //
 //	app := tether.App{
 //	    DevMode: true,
@@ -42,4 +50,15 @@ type App struct {
 	// Assets are served at their configured prefix (default
 	// "/assets/") with appropriate cache headers.
 	Assets []*Asset
+
+	// Upgrade is the primary transport upgrade function for stateful
+	// handlers. Defaults to ws.Upgrade() (WebSocket) when nil.
+	// Per-handler overrides on [StatefulConfig] take precedence.
+	Upgrade func(w http.ResponseWriter, r *http.Request) (Transport, error)
+
+	// Fallback is the secondary transport upgrade function for
+	// stateful handlers. Defaults to sse.Upgrade() (Server-Sent
+	// Events) when nil. Per-handler overrides on [StatefulConfig]
+	// take precedence.
+	Fallback func(w http.ResponseWriter, r *http.Request) (Transport, error)
 }

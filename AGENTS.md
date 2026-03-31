@@ -45,8 +45,9 @@ tether/              Root package - StatefulConfig, Handler, Session, Bus, Group
 transport upgraders, middleware, lifecycle callbacks, timeouts, and limits.
 `Stateful(app, cfg)` returns a `*Handler[S]` which is an `http.Handler`.
 
-Required fields: `InitialState`, `Render`, `Handle`, and at least one of
-`Upgrade` or `Fallback` (depending on `Mode`).
+Required fields: `InitialState`, `Render`, `Handle`. Transports default
+to WebSocket with SSE fallback. Override on `App` or `StatefulConfig`
+to customise.
 
 Notable optional fields:
 - `Memoise bool` - use the Memoiser engine instead of the Differ. Render

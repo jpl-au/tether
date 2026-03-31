@@ -1,6 +1,6 @@
 package tether
 
-import "time"
+import xport "github.com/jpl-au/tether/internal/transport"
 
 // Transport abstracts the persistent connection between server and
 // client. The session event loop calls ReceiveEvent in a tight loop
@@ -14,22 +14,7 @@ import "time"
 //
 // See the ws sub-package for WebSocket and the sse sub-package for
 // Server-Sent Events.
-type Transport interface {
-	// Send writes pre-encoded bytes to the client. The session
-	// encodes updates via [wire.Encoder] before calling Send, so
-	// implementations only need to frame and transmit the data.
-	Send(data []byte) error
-
-	// ReceiveEvent blocks until the next client event arrives. Returns
-	// io.EOF when the connection is closed cleanly. Any other error is
-	// treated as an unrecoverable connection failure and terminates the
-	// session.
-	ReceiveEvent() (Event, error)
-
-	// Close terminates the connection. Must be safe to call from any
-	// goroutine and safe to call more than once.
-	Close() error
-}
+type Transport = xport.Transport
 
 // Heartbeater is an optional interface for transports that need
 // periodic keep-alive activity. Both built-in transports implement
@@ -40,6 +25,4 @@ type Transport interface {
 // When the handler detects that a transport implements Heartbeater,
 // it calls StartHeartbeat with the configured interval after the
 // session is established.
-type Heartbeater interface {
-	StartHeartbeat(interval time.Duration)
-}
+type Heartbeater = xport.Heartbeater

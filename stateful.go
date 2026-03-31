@@ -10,7 +10,9 @@ import (
 	"github.com/jpl-au/tether/event"
 	"github.com/jpl-au/tether/mode"
 	"github.com/jpl-au/tether/protocol"
+	"github.com/jpl-au/tether/sse"
 	"github.com/jpl-au/tether/wire"
+	"github.com/jpl-au/tether/ws"
 )
 
 // Stateful creates a [Handler] that maintains a persistent connection
@@ -45,14 +47,25 @@ func Stateful[S any](app App, cfg StatefulConfig[S]) *Handler[S] {
 	if cfg.Mode == mode.HTTP {
 		panic("tether: mode.HTTP is for tether.Page - use mode.WebSocket, mode.ServerSentEvents, or mode.Both")
 	}
+	// Inherit transport functions from App when the handler does not
+	// set its own. Per-handler values always take precedence. When
+	// neither App nor StatefulConfig provides a value, apply the
+	// built-in default (WebSocket for Upgrade, SSE for Fallback).
+	if cfg.Upgrade == nil {
+		cfg.Upgrade = app.Upgrade
+	}
+	if cfg.Upgrade == nil {
+		cfg.Upgrade = ws.Upgrade()
+	}
+	if cfg.Fallback == nil {
+		cfg.Fallback = app.Fallback
+	}
+	if cfg.Fallback == nil {
+		cfg.Fallback = sse.Upgrade()
+	}
+	// Default to mode.Both when Mode is not set.
 	if cfg.Mode == 0 {
 		cfg.Mode = mode.Both
-	}
-	if cfg.Mode != mode.ServerSentEvents && cfg.Upgrade == nil {
-		panic("tether: StatefulConfig.Upgrade is required - use ws.Upgrade() or set Mode to mode.ServerSentEvents")
-	}
-	if cfg.Mode != mode.WebSocket && cfg.Fallback == nil {
-		panic("tether: StatefulConfig.Fallback is required - use sse.Upgrade() or set Mode to mode.WebSocket")
 	}
 	// Compose component routing into Handle so that mounted component
 	// events flow through middleware. Without this, component events

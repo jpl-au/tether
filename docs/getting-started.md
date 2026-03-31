@@ -13,7 +13,6 @@ import (
 
     "github.com/jpl-au/tether"
     "github.com/jpl-au/tether/bind"
-    "github.com/jpl-au/tether/ws"
     "github.com/jpl-au/fluent/html5/button"
     "github.com/jpl-au/fluent/html5/div"
     "github.com/jpl-au/fluent/html5/span"
@@ -21,7 +20,6 @@ import (
 )
 
 mux.Handle("/counter", tether.Stateful(tether.App{}, tether.StatefulConfig[CounterState]{
-    Upgrade: ws.Upgrade(),
     InitialState: func(r *http.Request) CounterState {
         return CounterState{Count: 0}
     },
@@ -73,9 +71,6 @@ trapping, and graceful shutdown:
 
 ```go
 h := tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
-    Upgrade:      ws.Upgrade(),
-    Fallback:     sse.Upgrade(),
-    Mode:         mode.Both,
     InitialState: func(r *http.Request) State { return State{} },
     Render:       render,
     Handle:       handle,

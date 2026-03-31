@@ -17,6 +17,8 @@ app := tether.App{
 | Field | Type | Description |
 |-------|------|-------------|
 | `DevMode` | `bool` | Development mode (or set `TETHER_DEV=1`). See [operations](operations.md#dev-mode) |
+| `Upgrade` | `func(w, r) (Transport, error)` | Primary transport. Defaults to `ws.Upgrade()` (WebSocket). Per-handler overrides on `StatefulConfig` take precedence |
+| `Fallback` | `func(w, r) (Transport, error)` | Secondary transport. Defaults to `sse.Upgrade()` (SSE). Per-handler overrides on `StatefulConfig` take precedence |
 | `Logger` | `*slog.Logger` | When nil, creates a text handler at INFO level (DEBUG in DevMode) and sets it as the process default once. When provided, used for this handler without touching the global default |
 | `Assets` | `[]*Asset` | Asset collections (embedded or filesystem) - auto-served with content-hashed URLs. Set `WatchDir` on filesystem assets for automatic rehashing on file change |
 | `Client` | `Client` | Browser-side settings (debounce, transitions, flash duration, etc.) |
@@ -26,11 +28,10 @@ app := tether.App{
 
 ## StatefulConfig
 
-`tether.StatefulConfig[S]` configures a handler. `InitialState`, `Render`, and `Handle` are required, plus a transport (`Upgrade` and/or `Fallback` depending on `Mode`). Everything else has sensible defaults.
+`tether.StatefulConfig[S]` configures a handler. `InitialState`, `Render`, and `Handle` are required. Everything else has sensible defaults - including transports, which default to WebSocket with SSE fallback.
 
 ```go
 tether.Stateful(app, tether.StatefulConfig[State]{
-    Upgrade:      ws.Upgrade(),
     InitialState: func(r *http.Request) State { return State{} },
     Render:       render,
     Handle:       handle,
@@ -53,8 +54,8 @@ tether.Stateful(app, tether.StatefulConfig[State]{
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `Upgrade` | `func(w, r) (Transport, error)` | - | Primary transport (typically `ws.Upgrade()`) |
-| `Fallback` | `func(w, r) (Transport, error)` | - | Secondary transport (typically `sse.Upgrade()`) |
+| `Upgrade` | `func(w, r) (Transport, error)` | `ws.Upgrade()` | Primary transport. Inherits from `App`, then falls back to built-in default |
+| `Fallback` | `func(w, r) (Transport, error)` | `sse.Upgrade()` | Secondary transport. Inherits from `App`, then falls back to built-in default |
 | `Mode` | `mode.Transport` | `mode.Both` | Which transports to accept |
 
 Mode constants: `mode.HTTP`, `mode.WebSocket`, `mode.ServerSentEvents`, `mode.Both`.

@@ -16,7 +16,7 @@ import (
 	"sync"
 	"time"
 
-	tether "github.com/jpl-au/tether"
+	xport "github.com/jpl-au/tether/internal/transport"
 	"github.com/lxzan/gws"
 )
 
@@ -98,7 +98,7 @@ type Options struct {
 // Origin checking is handled by the tether handler via
 // [tether.StatefulConfig].TrustedOrigins, so the upgrader does not perform its
 // own origin verification.
-func Upgrade(opts ...Options) func(http.ResponseWriter, *http.Request) (tether.Transport, error) {
+func Upgrade(opts ...Options) func(http.ResponseWriter, *http.Request) (xport.Transport, error) {
 	var o Options
 	if len(opts) > 0 {
 		o = opts[0]
@@ -122,14 +122,14 @@ func Upgrade(opts ...Options) func(http.ResponseWriter, *http.Request) (tether.T
 
 	upgrader := gws.NewUpgrader(&eventHandler{}, serverOpts)
 
-	return func(w http.ResponseWriter, r *http.Request) (tether.Transport, error) {
+	return func(w http.ResponseWriter, r *http.Request) (xport.Transport, error) {
 		conn, err := upgrader.Upgrade(w, r)
 		if err != nil {
 			return nil, err
 		}
 		t := &transport{
 			conn:   conn,
-			events: make(chan tether.Event),
+			events: make(chan xport.Event),
 			done:   make(chan struct{}),
 		}
 		conn.Session().Store("t", t)
@@ -160,7 +160,7 @@ func (h *eventHandler) OnMessage(conn *gws.Conn, msg *gws.Message) {
 		return
 	}
 
-	var ev tether.Event
+	var ev xport.Event
 	if err := json.Unmarshal(msg.Bytes(), &ev); err != nil {
 		t.closeWithErr(err)
 		conn.WriteClose(1007, []byte("invalid payload"))
@@ -204,20 +204,20 @@ func isNormalClose(err error) bool {
 	return strings.Contains(s, "code=1000") || strings.Contains(s, "code=1001")
 }
 
-// Compile-time checks: *transport must satisfy tether.Transport
-// and tether.Heartbeater (WebSocket ping/pong keep-alive).
+// Compile-time checks: *transport must satisfy xport.Transport
+// and xport.Heartbeater (WebSocket ping/pong keep-alive).
 var (
-	_ tether.Transport   = (*transport)(nil)
-	_ tether.Heartbeater = (*transport)(nil)
+	_ xport.Transport   = (*transport)(nil)
+	_ xport.Heartbeater = (*transport)(nil)
 )
 
-// transport implements [tether.Transport] over a single WebSocket
+// transport implements [xport.Transport] over a single WebSocket
 // connection. Reads are driven by gws's ReadLoop goroutine which
 // delivers events via a channel. Writes are serialised by gws
 // internally, so Send is safe to call from any goroutine.
 type transport struct {
 	conn   *gws.Conn
-	events chan tether.Event
+	events chan xport.Event
 	done   chan struct{}
 	err    error
 	once   sync.Once
@@ -244,13 +244,13 @@ func (t *transport) Send(data []byte) error {
 // ReceiveEvent blocks until the client sends a JSON event message.
 // Returns io.EOF when the connection is closed cleanly. All other
 // errors propagate as-is and will terminate the session.
-func (t *transport) ReceiveEvent() (tether.Event, error) {
+func (t *transport) ReceiveEvent() (xport.Event, error) {
 	ev, ok := <-t.events
 	if !ok {
 		if t.err != nil {
-			return tether.Event{}, t.err
+			return xport.Event{}, t.err
 		}
-		return tether.Event{}, io.EOF
+		return xport.Event{}, io.EOF
 	}
 	return ev, nil
 }

@@ -9,8 +9,8 @@ import (
 	"sync"
 	"testing"
 
-	tether "github.com/jpl-au/tether"
 	"github.com/jpl-au/tether/event"
+	xport "github.com/jpl-au/tether/internal/transport"
 	"github.com/lxzan/gws"
 )
 
@@ -168,7 +168,7 @@ func TestSendPreservesAngleBrackets(t *testing.T) {
 func TestReceiveEventReadsClientJSON(t *testing.T) {
 	tp, client := dial(t)
 
-	want := tether.Event{Type: event.Click, Action: "increment"}
+	want := xport.Event{Type: event.Click, Action: "increment"}
 	data, _ := json.Marshal(want)
 	if err := client.writeMessage(data); err != nil {
 		t.Fatalf("client write: %v", err)

@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	tether "github.com/jpl-au/tether"
+	xport "github.com/jpl-au/tether/internal/transport"
 )
 
 // defaultWriteBuffer is the capacity of the write channel when
@@ -53,13 +53,13 @@ var heartbeatMsg = []byte(": heartbeat\n\n")
 // GET with Accept: text/event-stream, it calls this function to
 // establish the SSE stream. The stream stays open for the lifetime of
 // the session; server updates are written as SSE "data" lines.
-func Upgrade(opts ...Options) func(http.ResponseWriter, *http.Request) (tether.Transport, error) {
+func Upgrade(opts ...Options) func(http.ResponseWriter, *http.Request) (xport.Transport, error) {
 	writeBuf := defaultWriteBuffer
 	if len(opts) > 0 && opts[0].WriteBuffer > 0 {
 		writeBuf = opts[0].WriteBuffer
 	}
 
-	return func(w http.ResponseWriter, r *http.Request) (tether.Transport, error) {
+	return func(w http.ResponseWriter, r *http.Request) (xport.Transport, error) {
 		flusher, ok := w.(http.Flusher)
 		if !ok {
 			return nil, fmt.Errorf("response writer does not support flushing")
@@ -107,17 +107,17 @@ func Upgrade(opts ...Options) func(http.ResponseWriter, *http.Request) (tether.T
 	}
 }
 
-// transport implements [tether.Transport] using SSE for the server→client
+// transport implements [xport.Transport] using SSE for the server→client
 // direction. A dedicated writer goroutine owns the http.ResponseWriter
 // - Send and StartHeartbeat submit payloads to the writes channel, and
 // the writer serialises them onto the wire.
 //
 // ReceiveEvent blocks until the transport is closed. It returns the
-// Compile-time checks: *transport must satisfy tether.Transport
-// and tether.Heartbeater (periodic keep-alive writes).
+// Compile-time checks: *transport must satisfy xport.Transport
+// and xport.Heartbeater (periodic keep-alive writes).
 var (
-	_ tether.Transport   = (*transport)(nil)
-	_ tether.Heartbeater = (*transport)(nil)
+	_ xport.Transport   = (*transport)(nil)
+	_ xport.Heartbeater = (*transport)(nil)
 )
 
 // write error that caused the closure (if any) so the session can
@@ -177,12 +177,12 @@ func (t *transport) Send(data []byte) error {
 // through this method. The session's readTransport goroutine calls
 // ReceiveEvent in a loop; it exits when Close is called (HTTP
 // connection drop or session shutdown).
-func (t *transport) ReceiveEvent() (tether.Event, error) {
+func (t *transport) ReceiveEvent() (xport.Event, error) {
 	<-t.done
 	if t.err != nil {
-		return tether.Event{}, t.err
+		return xport.Event{}, t.err
 	}
-	return tether.Event{}, io.EOF
+	return xport.Event{}, io.EOF
 }
 
 // StartHeartbeat sends SSE comment lines at the given interval to

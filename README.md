@@ -19,7 +19,6 @@ Three update modes give you the right tool for every situation:
 
 ```go
 mux.Handle("/counter", tether.Stateful(tether.App{}, tether.StatefulConfig[CounterState]{
-    Upgrade: ws.Upgrade(),
     InitialState: func(r *http.Request) CounterState {
         return CounterState{Count: 0}
     },
@@ -47,7 +46,7 @@ When the handler is not at root, mount the client JS runtime separately:
 mux.Handle("/_tether/", http.StripPrefix("/_tether/", tether.ServeClient()))
 ```
 
-No WebSocket boilerplate. No JavaScript to write. No diff algorithm to understand.
+No JavaScript to write. No diff algorithm to understand.
 
 ## Stateful vs Stateless
 
@@ -76,9 +75,6 @@ signal trapping, graceful shutdown, and sensible defaults:
 
 ```go
 h := tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
-    Upgrade:      ws.Upgrade(),
-    Fallback:     sse.Upgrade(),
-    Mode:         mode.Both,
     InitialState: func(r *http.Request) State { return State{} },
     Render:       render,
     Handle:       handle,

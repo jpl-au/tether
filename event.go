@@ -1,10 +1,6 @@
 package tether
 
-import (
-	"strconv"
-
-	"github.com/jpl-au/tether/event"
-)
+import xport "github.com/jpl-au/tether/internal/transport"
 
 // Event is the message the client sends to the server when the user
 // interacts with the page. The client JS intercepts DOM events on
@@ -40,58 +36,4 @@ import (
 // it to correlate responses with specific events, which allows loading
 // state indicators (e.g. disabled buttons) to be restored on exactly
 // the element that triggered the action rather than globally.
-type Event struct {
-	Type    event.Type        `json:"type"`
-	Action  string            `json:"action"`
-	Target  string            `json:"target,omitempty"`
-	Data    map[string]string `json:"data,omitempty"`
-	EventID string            `json:"event_id,omitempty"`
-}
-
-// Value returns the input element's value from the event data. This is
-// a convenience for ev.Data["value"], which the client JS populates
-// automatically for input and change events.
-func (e Event) Value() string {
-	return e.Data["value"]
-}
-
-// Key returns the key name from a keydown event. This is a convenience
-// for ev.Data["key"], which the client JS populates automatically for
-// keydown events (e.g. "Enter", "Escape", "ArrowUp").
-func (e Event) Key() string {
-	return e.Data["key"]
-}
-
-// Get returns the value for a data key and reports whether it was present.
-func (e Event) Get(key string) (string, bool) {
-	v, ok := e.Data[key]
-	return v, ok
-}
-
-// Int returns the data value for key parsed as an integer. If the key
-// is missing or the value is not a valid integer, it returns 0 and an
-// error.
-func (e Event) Int(key string) (int, error) {
-	return strconv.Atoi(e.Data[key])
-}
-
-// Float64 returns the data value for key parsed as a float. If the key
-// is missing or the value is not a valid number, it returns 0 and an
-// error.
-func (e Event) Float64(key string) (float64, error) {
-	return strconv.ParseFloat(e.Data[key], 64)
-}
-
-// Bool returns true when the data value for key is the string "true".
-// All other values - including missing keys - return false.
-func (e Event) Bool(key string) bool {
-	return e.Data[key] == "true"
-}
-
-// WithAction returns a copy of the event with a different Action.
-// Used by [Route] and [RouteTyped] to strip the component prefix
-// before forwarding the event to a component's Handle method.
-func (e Event) WithAction(action string) Event {
-	e.Action = action
-	return e
-}
+type Event = xport.Event

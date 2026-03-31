@@ -6,24 +6,34 @@ Control which transports the handler accepts with the `Mode` field.
 When `Mode` is not set, it defaults to `mode.Both`.
 
 ```go
-// Default (mode.Both) - WebSocket with SSE fallback
+// Default (mode.Both) - WebSocket with SSE fallback.
+// Both transports are provided automatically.
 tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
-    Upgrade:  ws.Upgrade(),
-    Fallback: sse.Upgrade(),
     // ...
 })
 
-// WebSocket only
+// WebSocket only.
 tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
+    Mode: mode.WebSocket,
+    // ...
+})
+
+// SSE only.
+tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
+    Mode: mode.ServerSentEvents,
+    // ...
+})
+```
+
+Per-handler overrides on `StatefulConfig` take precedence, then `App`
+values, then built-in defaults. Use this when a specific handler needs
+custom transport options:
+
+```go
+// One handler needs a larger read limit.
+tether.Stateful(app, tether.StatefulConfig[State]{
     Mode:    mode.WebSocket,
-    Upgrade: ws.Upgrade(),
-    // ...
-})
-
-// SSE only
-tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
-    Mode:     mode.ServerSentEvents,
-    Fallback: sse.Upgrade(),
+    Upgrade: ws.Upgrade(ws.Options{ReadLimit: 128 << 10}),
     // ...
 })
 ```
