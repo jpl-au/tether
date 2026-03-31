@@ -13,13 +13,13 @@ package mode
 // updates flow over a long-lived EventSource stream, and client→server
 // events arrive as individual HTTP POSTs. [Both] tries WebSocket first
 // and falls back to SSE+POST automatically. [HTTP] is plain
-// request/response with no persistent connection, used by [tether.Page].
+// request/response with no persistent connection, used by [tether.Stateless].
 type Transport int
 
 const (
 	// HTTP uses plain request/response - no persistent connection.
 	// Client events are sent as individual POST requests and the
-	// response carries the update. Used internally by [tether.Page].
+	// response carries the update. Used internally by [tether.Stateless].
 	HTTP Transport = iota + 1
 
 	// WebSocket accepts only WebSocket connections. The Fallback
