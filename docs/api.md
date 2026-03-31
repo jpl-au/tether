@@ -4,25 +4,32 @@
 
 `tether.App` holds application-wide configuration shared across handlers. Pass it as the first argument to `tether.Stateful` and `tether.Stateless`.
 
+The zero value provides sensible defaults: WebSocket as the primary
+transport, SSE as the fallback, 10-second shutdown grace, and 128
+max pending sessions. Override fields as needed:
+
 ```go
 app := tether.App{
-    DevMode:  true,
-    Assets:   []*tether.Asset{assets},
-    Logger:   slog.New(slog.NewJSONHandler(os.Stderr, nil)),
-    Client:   tether.Client{DefaultDebounce: 200 * time.Millisecond},
-    Security: tether.Security{TrustedOrigins: []string{"https://example.com"}},
+    DevMode:       true,
+    MaxSessions:   500,
+    ShutdownGrace: 15 * time.Second,
+    Assets:        []*tether.Asset{assets},
+    Security:      tether.Security{TrustedOrigins: []string{"https://example.com"}},
 }
 ```
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `DevMode` | `bool` | Development mode (or set `TETHER_DEV=1`). See [operations](operations.md#dev-mode) |
-| `Upgrade` | `func(w, r) (Transport, error)` | Primary transport. Defaults to `ws.Upgrade()` (WebSocket). Per-handler overrides on `StatefulConfig` take precedence |
-| `Fallback` | `func(w, r) (Transport, error)` | Secondary transport. Defaults to `sse.Upgrade()` (SSE). Per-handler overrides on `StatefulConfig` take precedence |
-| `Logger` | `*slog.Logger` | When nil, creates a text handler at INFO level (DEBUG in DevMode) and sets it as the process default once. When provided, used for this handler without touching the global default |
-| `Assets` | `[]*Asset` | Asset collections (embedded or filesystem) - auto-served with content-hashed URLs. Set `WatchDir` on filesystem assets for automatic rehashing on file change |
-| `Client` | `Client` | Browser-side settings (debounce, transitions, flash duration, etc.) |
-| `Security` | `Security` | CSRF protection and session binding settings |
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `DevMode` | `bool` | false | Development mode (or set `TETHER_DEV=1`). See [operations](operations.md#dev-mode) |
+| `ShutdownGrace` | `time.Duration` | 10s | Grace period for `ListenAndServe` shutdown. Also used as TTL when saving session state to the SessionStore during shutdown |
+| `MaxSessions` | `int` | 0 (unlimited) | Maximum concurrent sessions (pending + active + disconnected). **Set this in production** |
+| `MaxPending` | `int` | 128 | Maximum pre-warmed sessions awaiting transport connection |
+| `Upgrade` | `func(w, r) (Transport, error)` | `ws.Upgrade()` | Primary transport. Per-handler overrides on `StatefulConfig` take precedence |
+| `Fallback` | `func(w, r) (Transport, error)` | `sse.Upgrade()` | Secondary transport. Per-handler overrides on `StatefulConfig` take precedence |
+| `Logger` | `*slog.Logger` | auto | When nil, creates a text handler at INFO (DEBUG in DevMode). The dev package logger is scoped to the framework and never touches the process-wide slog default |
+| `Assets` | `[]*Asset` | nil | Asset collections (embedded or filesystem) - auto-served with content-hashed URLs |
+| `Client` | `Client` | | Browser-side settings (debounce, transitions, flash duration, etc.) |
+| `Security` | `Security` | | CSRF protection and session binding settings |
 
 ---
 
@@ -89,17 +96,6 @@ Mode constants: `mode.HTTP`, `mode.WebSocket`, `mode.ServerSentEvents`, `mode.Bo
 | `Action` | `string` | Event action; empty for `"update"` source |
 
 When either callback is configured, the framework's own logging for that event is suppressed - the callback controls the output. When nil and DevMode is active, a debug message is logged instead.
-
-### App capacity and shutdown
-
-These settings live on `App` because they are server-level concerns
-shared across all handlers:
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `ShutdownGrace` | `time.Duration` | 10s | Grace period for `ListenAndServe` shutdown |
-| `MaxSessions` | `int` | 0 (unlimited) | Maximum concurrent sessions (pending + active + disconnected) |
-| `MaxPending` | `int` | 128 | Maximum pre-warmed sessions awaiting transport connection |
 
 ### Timeouts
 

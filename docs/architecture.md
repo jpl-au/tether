@@ -215,13 +215,16 @@ The server sends JSON messages containing any combination of:
 |-------|---------|
 | `patches` | Targeted content updates - each patch carries a Dynamic key and new HTML |
 | `morphs` | Structural DOM changes - the client applies them via idiomorph, preserving focus and scroll |
+| `session` | New session ID when the server reassigns a stale client on reconnect |
 | `url` | Browser URL update (pushState or replaceState) |
 | `title` | Document title |
 | `toast` | Global notification |
 | `flash` | Selector-targeted notification |
 | `signals` | Reactive values pushed to bound elements |
 | `announce` | Screen-reader text via aria-live region |
-| `eventID` | Echo of the triggering event for client-side de-duplication |
+| `scroll_to` | Smooth-scroll an element into view |
+| `download` | Trigger a file download from a URL |
+| `event_id` | Echo of the triggering event for client-side correlation |
 
 ### Patches vs morphs
 

@@ -100,11 +100,15 @@ func bridgeBus(ctx context.Context, bus *tether.Bus[Message]) {
 
 ## Capacity planning
 
+`MaxSessions` and `MaxPending` live on `App` (shared across all
+handlers). `CmdBufferSize` lives on `StatefulConfig.Limits`
+(per-handler).
+
 | Setting | Default | Guidance |
 |---------|---------|----------|
-| `MaxSessions` | 0 (unlimited) | **Set this in production.** Caps total sessions (pending + active + disconnected) |
-| `MaxPending` | 128 | Caps pre-warmed sessions awaiting transport connection |
-| `CmdBufferSize` | 64 | Increase if `BufferOverflow` diagnostics are frequent |
+| `App.MaxSessions` | 0 (unlimited) | **Set this in production.** Caps total sessions (pending + active + disconnected) |
+| `App.MaxPending` | 128 | Caps pre-warmed sessions awaiting transport connection |
+| `Limits.CmdBufferSize` | 64 | Increase if `BufferOverflow` diagnostics are frequent |
 
 Use the [health check](operations.md#health-check) endpoint to monitor pool sizes and
 feed them into your load balancer's readiness probe.

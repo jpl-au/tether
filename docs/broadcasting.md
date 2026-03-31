@@ -40,6 +40,24 @@ tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
 
 Sessions are automatically added when the transport connects and removed when the session is permanently destroyed.
 
+## Signal-only iteration
+
+When you only need to push signals (presence indicators, status text)
+without changing state, use `Each` instead of `Broadcast`. Each
+iterates sessions without triggering a state update or render cycle:
+
+```go
+group.Each(func(sess *tether.StatefulSession[State]) {
+    sess.Signals(map[string]any{
+        "typing-" + cardID: "Alice is editing...",
+        "viewing-" + cardID: "Bob is viewing this",
+    })
+})
+```
+
+Use `Broadcast` when the state struct changes (triggers render).
+Use `Each` when only signal-bound values change (skips render).
+
 ## Broadcasting from Handle
 
 When broadcasting from inside `Handle`, use `BroadcastOthers` to exclude the sender. Handle already updates the sender's state via the return value - broadcasting to everyone would double-apply the change on the sender:

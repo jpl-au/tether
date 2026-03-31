@@ -199,12 +199,16 @@ intentionally left to the deployment layer:
 
 ### Capacity defaults
 
+`MaxSessions` and `MaxPending` are on `App` (server-wide).
+`MaxEventBytes` and `MaxPushSubscriptionBytes` are on
+`StatefulConfig.Limits` (per-handler).
+
 | Limit | Default | Purpose |
 |-------|---------|---------|
-| `MaxSessions` | 0 (unlimited) | Total concurrent sessions - **set this in production** |
-| `MaxPending` | 128 | Pre-warmed sessions awaiting transport connection |
-| `MaxEventBytes` | 64 KB | POST event body size |
-| `MaxPushSubscriptionBytes` | 4 KB | Push subscription body size |
+| `App.MaxSessions` | 0 (unlimited) | Total concurrent sessions - **set this in production** |
+| `App.MaxPending` | 128 | Pre-warmed sessions awaiting transport connection |
+| `Limits.MaxEventBytes` | 64 KB | POST event body size |
+| `Limits.MaxPushSubscriptionBytes` | 4 KB | Push subscription body size |
 
 `MaxPending` protects against GET-flooding where an attacker scripts
 thousands of requests without connecting. `MaxSessions` caps total resource
@@ -300,7 +304,7 @@ XSS and session ID exfiltration from the DOM.
 | CSRF | Sec-Fetch-Site + Origin + custom headers, no cookies | Configure `TrustedOrigins` for production |
 | WebSocket origin | Two-layer check (Sec-Fetch-Site then Origin) | Configure `TrustedOrigins` |
 | TLS | - | Deploy behind TLS |
-| Capacity limits | `MaxSessions`, `MaxPending`, `MaxEventBytes` | Set `MaxSessions` in production |
+| Capacity limits | `App.MaxSessions`, `App.MaxPending`, `Limits.MaxEventBytes` | Set `App.MaxSessions` in production |
 | Per-IP rate limiting | - | Reverse proxy or Go middleware |
 | HTML escaping | Delegated to fluent's `Text()` (auto-escapes) | Audit any use of `UnsafeRaw` / `RawText` |
 | Content sanitisation | - | Use fluent's `security` package for dynamic content |

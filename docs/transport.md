@@ -240,7 +240,17 @@ type Encoder interface {
 
 `wire.Update` carries patches, morphs, signals, and side effects in a
 format-agnostic struct. The session builds a `wire.Update` after each
-state change and hands it to the encoder.
+state change and hands it to the encoder. Key fields:
+
+- `Patches` - targeted content replacements for Dynamic-keyed elements
+- `Morphs` - structural changes applied via idiomorph (full or keyed)
+- `Session` - new session ID when the server reassigns a stale client
+- `URL`, `Replace` - push/replace browser URL
+- `Title` - update document title
+- `Signals` - reactive values pushed to bound elements
+- `Toast`, `Flash`, `Announce` - notifications and accessibility
+- `ScrollTo`, `Download` - client-side actions
+- `EventID` - correlation with the triggering event
 
 ## Event resilience (SSE)
 

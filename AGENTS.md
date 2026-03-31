@@ -137,8 +137,9 @@ Lock-free reads via `atomic.Value`, copy-on-write for writes.
 
 Session pool for broadcasting. `Add`/`Remove` in `OnConnect`/`OnDisconnect`
 (or use `StatefulConfig.Groups` for automatic membership). `Broadcast(fn)` calls
-`Update` on every member - non-blocking. `BroadcastOthers` skips the
-sender. Lock-free reads, copy-on-write writes.
+`Update` on every member (triggers render). `BroadcastOthers` skips the
+sender. `Each(fn)` iterates sessions without state updates or renders -
+use for signal-only pushes. Lock-free reads, copy-on-write writes.
 
 ### Value[V]
 
@@ -242,7 +243,8 @@ a selector function. Lock-free dispatch via `atomic.Value`.
 ### The command loop
 
 Every session has a single goroutine (`run()` in `loop.go`) that processes
-three channels:
+three channels. Event handling is in `exec.go`, the render-diff-send
+pipeline in `send.go`, and disconnect/cleanup in `disconnect.go`:
 
 - `events` - client events from the transport reader goroutine
 - `cmds` - commands from `Update`, `Broadcast`, `Observe`, bus callbacks
@@ -320,7 +322,7 @@ Pending  →  Active  ⇄  Disconnected  →  Destroyed
 
 ## Event pipeline
 
-When a client event arrives, `exec()` in `loop.go` runs:
+When a client event arrives, `exec()` in `exec.go` runs:
 
 1. Track activity - update timestamp, reset idle timer
 2. Snapshot state - store atomically for concurrent `State()` readers
@@ -436,7 +438,10 @@ Subscriptions are cleaned up automatically when the session is destroyed.
 | `handler.go` | Handler - session pools, routing, transport upgrade |
 | `diagnostic.go` | Diagnostic struct, DiagnosticKind constants, panicErr helper |
 | `session.go` | Session struct, enqueue, enqueueFx, drainFx, emitDiagnostic |
-| `loop.go` | Command loop (run), exec pipeline, readTransport, send |
+| `loop.go` | Command loop (run), runCmd, readTransport |
+| `exec.go` | Event dispatch, navigate redirects, render after handle |
+| `disconnect.go` | Transport close, session persistence, cleanup, timers |
+| `send.go` | Render-diff-send pipeline, encoding, memoiser stats |
 | `methods.go` | Session methods - State, Update, Close, Toast, Navigate, Signal, Push |
 | `handle.go` | HandleFunc type, middleware chain |
 | `serve.go` | HTTP handler (ServeHTTP), session creation, restore from store |
@@ -449,7 +454,7 @@ Subscriptions are cleaned up automatically when the session is destroyed.
 | `component.go` | Component interface, EqualComponent, Route, RouteTyped |
 | `mount.go` | ComponentMount interface, Mount constructor, RouteMount dispatch |
 | `bus.go` | Bus - typed pub/sub with atomic reads and copy-on-write |
-| `group.go` | Group - session pool with Broadcast/BroadcastOthers |
+| `group.go` | Group - session pool with Broadcast/BroadcastOthers/Each |
 | `value.go` | Value - shared observable state with Bus internally |
 | `observe.go` | Observe - atomic subscribe + initial value delivery |
 | `emit.go` | On - subscribe a session to a Bus with sender filtering |
