@@ -506,6 +506,160 @@ func TestStatelessPOSTComponentsDispatch(t *testing.T) {
 	}
 }
 
+func TestStatelessPOSTMorphTargetedKeys(t *testing.T) {
+	type pageState struct {
+		Count int
+		Title string
+	}
+
+	handler := Stateless(App{}, StatelessConfig[pageState]{
+		InitialState: func(r *http.Request) pageState { return pageState{Title: "hello"} },
+		Render: func(s pageState) node.Node {
+			return div.New(
+				span.Textf("Count: %d", s.Count).Dynamic("count"),
+				span.Textf("Title: %s", s.Title).Dynamic("title"),
+			)
+		},
+		Handle: func(sess Session, s pageState, ev Event) pageState {
+			if ev.Action == "increment" {
+				s.Count++
+				sess.Morph("count")
+			}
+			return s
+		},
+	})
+
+	body := `{"type":"click","action":"increment","data":{},"event_id":"1"}`
+	req := httptest.NewRequest("POST", "/app", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	var msg testMessage
+	if err := json.Unmarshal(w.Body.Bytes(), &msg); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(msg.Morphs) != 1 {
+		t.Fatalf("morphs = %d, want 1", len(msg.Morphs))
+	}
+	if msg.Morphs[0].Key != "count" {
+		t.Errorf("morph key = %q, want %q", msg.Morphs[0].Key, "count")
+	}
+	if !strings.Contains(msg.Morphs[0].HTML, "Count: 1") {
+		t.Errorf("morph HTML should contain Count: 1, got %s", msg.Morphs[0].HTML)
+	}
+}
+
+func TestStatelessPOSTMorphMultipleKeys(t *testing.T) {
+	type pageState struct {
+		Count int
+		Title string
+	}
+
+	handler := Stateless(App{}, StatelessConfig[pageState]{
+		InitialState: func(r *http.Request) pageState { return pageState{} },
+		Render: func(s pageState) node.Node {
+			return div.New(
+				span.Textf("Count: %d", s.Count).Dynamic("count"),
+				span.Textf("Title: %s", s.Title).Dynamic("title"),
+			)
+		},
+		Handle: func(sess Session, s pageState, ev Event) pageState {
+			if ev.Action == "update-both" {
+				s.Count++
+				s.Title = "updated"
+				sess.Morph("count", "title")
+			}
+			return s
+		},
+	})
+
+	body := `{"type":"click","action":"update-both","data":{},"event_id":"1"}`
+	req := httptest.NewRequest("POST", "/app", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	var msg testMessage
+	if err := json.Unmarshal(w.Body.Bytes(), &msg); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(msg.Morphs) != 2 {
+		t.Fatalf("morphs = %d, want 2", len(msg.Morphs))
+	}
+
+	// Collect morphs by key for order-independent assertions.
+	byKey := make(map[string]string, len(msg.Morphs))
+	for _, m := range msg.Morphs {
+		byKey[m.Key] = m.HTML
+	}
+	if !strings.Contains(byKey["count"], "Count: 1") {
+		t.Errorf("count morph should contain Count: 1, got %s", byKey["count"])
+	}
+	if !strings.Contains(byKey["title"], "Title: updated") {
+		t.Errorf("title morph should contain Title: updated, got %s", byKey["title"])
+	}
+}
+
+func TestStatelessPOSTMorphFallsBackToRoot(t *testing.T) {
+	handler := newTestStatelessHandler()
+
+	// No Morph call in handle - should fall back to root morph.
+	body := `{"type":"click","action":"increment","data":{},"event_id":"1"}`
+	req := httptest.NewRequest("POST", "/app", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	var msg testMessage
+	json.Unmarshal(w.Body.Bytes(), &msg)
+	if len(msg.Morphs) != 1 {
+		t.Fatalf("morphs = %d, want 1", len(msg.Morphs))
+	}
+	if msg.Morphs[0].Key != "" {
+		t.Errorf("morph key = %q, want empty (root)", msg.Morphs[0].Key)
+	}
+}
+
+func TestStatelessPOSTMorphWithEffects(t *testing.T) {
+	type pageState struct {
+		Count int
+	}
+
+	handler := Stateless(App{}, StatelessConfig[pageState]{
+		InitialState: func(r *http.Request) pageState { return pageState{} },
+		Render: func(s pageState) node.Node {
+			return div.New(
+				span.Textf("Count: %d", s.Count).Dynamic("count"),
+			)
+		},
+		Handle: func(sess Session, s pageState, ev Event) pageState {
+			s.Count++
+			sess.Morph("count")
+			sess.Toast("incremented")
+			return s
+		},
+	})
+
+	body := `{"type":"click","action":"increment","data":{},"event_id":"1"}`
+	req := httptest.NewRequest("POST", "/app", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	var msg testMessage
+	json.Unmarshal(w.Body.Bytes(), &msg)
+	if len(msg.Morphs) != 1 {
+		t.Fatalf("morphs = %d, want 1", len(msg.Morphs))
+	}
+	if msg.Morphs[0].Key != "count" {
+		t.Errorf("morph key = %q, want %q", msg.Morphs[0].Key, "count")
+	}
+	if msg.Toast != "incremented" {
+		t.Errorf("toast = %q, want %q", msg.Toast, "incremented")
+	}
+}
+
 // Verify the event.Type import compiles (used for event constants in
 // tests above via string literals, but callers use event.Click etc.).
 var _ event.Type = event.Click

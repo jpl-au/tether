@@ -275,6 +275,13 @@ type Session interface {
 	Signal(key string, value any)
 	Signals(signals map[string]any)
 	Push(n push.Notification) error
+	// Morph declares which Dynamic keys should be returned as targeted
+	// morphs instead of a full root morph. Only meaningful in stateless
+	// mode - the handler extracts the named subtrees from the rendered
+	// tree and returns them as individual keyed morphs. In stateful
+	// mode the differ handles targeting automatically, so Morph is a
+	// no-op with a dev warning.
+	Morph(keys ...string)
 	// Close terminates the session by closing its transport. In
 	// stateless mode ([CaptureSession]) and tethertest this is
 	// a no-op - there is no persistent connection to close.
@@ -318,6 +325,10 @@ type CaptureSession struct {
 	// Effects holds the buffered side effects from the most recent
 	// event cycle. Callers read these fields after Handle returns.
 	Effects Effects
+	// MorphKeys holds the Dynamic keys declared via Morph. When
+	// non-empty, the stateless handler returns targeted keyed morphs
+	// instead of a full root morph.
+	MorphKeys []string
 }
 
 // ID returns the session identifier.
@@ -415,6 +426,12 @@ func (cs *CaptureSession) Signals(signals map[string]any) {
 		cs.Effects.Signals = make(map[string]any, len(signals))
 	}
 	maps.Copy(cs.Effects.Signals, signals)
+}
+
+// Morph declares which Dynamic keys should be returned as targeted
+// morphs. Multiple calls accumulate keys.
+func (cs *CaptureSession) Morph(keys ...string) {
+	cs.MorphKeys = append(cs.MorphKeys, keys...)
 }
 
 // ID returns the unique session identifier. This is a cryptographically

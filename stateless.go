@@ -248,11 +248,32 @@ func (p *statelessHandler[S]) servePOST(w http.ResponseWriter, r *http.Request) 
 	}
 
 	tree := p.cfg.Render(state)
-	html := tree.Render()
 
-	u := wire.Update{
-		Morphs:  []wire.Morph{{Key: "", HTML: html}},
-		EventID: ev.EventID,
+	var u wire.Update
+	if len(cs.MorphKeys) > 0 {
+		morphs := extractMorphs(tree, cs.MorphKeys)
+		if dev.Enabled() {
+			found := make(map[string]bool, len(morphs))
+			for _, m := range morphs {
+				found[m.Key] = true
+			}
+			for _, key := range cs.MorphKeys {
+				if !found[key] {
+					dev.Warn("Morph key not found in rendered tree",
+						"key", key, "path", r.URL.Path)
+				}
+			}
+		}
+		u = wire.Update{
+			Morphs:  morphs,
+			EventID: ev.EventID,
+		}
+	} else {
+		html := tree.Render()
+		u = wire.Update{
+			Morphs:  []wire.Morph{{Key: "", HTML: html}},
+			EventID: ev.EventID,
+		}
 	}
 	cs.Effects.merge(&u)
 

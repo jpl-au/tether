@@ -212,6 +212,7 @@ s.SetTitle("Settings - My App")        // document.title
 s.Signal("count", 42)                  // push reactive value
 s.Signals(map[string]any{"a": 1})      // push multiple values
 s.Push(push.Notification{...})         // Web Push notification
+s.Morph("count", "title")             // targeted morphs (stateless only)
 ```
 
 ### Session (interface)
@@ -228,9 +229,9 @@ func todoHandle(sess tether.Session, ts TodoState, ev tether.Event) TodoState {
 }
 ```
 
-Methods: `ID`, `Context`, `Go`, `Toast`, `Navigate`, `ReplaceURL`, `SetTitle`, `Announce`, `Flash`, `ScrollTo`, `Download`, `Signal`, `Signals`, `Push`, `Close`.
+Methods: `ID`, `Context`, `Go`, `Toast`, `Navigate`, `ReplaceURL`, `SetTitle`, `Announce`, `Flash`, `ScrollTo`, `Download`, `Signal`, `Signals`, `Push`, `Morph`, `Close`.
 
-`ID` returns an empty string in stateless page mode (StatelessConfig) - there is no persistent session. `Push` returns an error during pre-warming (initial GET) since no browser subscription exists yet. `Close` terminates the session's transport; in stateless page mode and tethertest it is a no-op. During stateful sessions all methods work normally.
+`ID` returns an empty string in stateless page mode (StatelessConfig) - there is no persistent session. `Push` returns an error during pre-warming (initial GET) since no browser subscription exists yet. `Close` terminates the session's transport; in stateless page mode and tethertest it is a no-op. `Morph` declares targeted Dynamic keys for stateless responses (see [stateless pages](stateless.md#targeted-morphs)); in stateful mode the differ handles targeting automatically, so `Morph` is a no-op with a dev warning.
 
 ---
 
@@ -633,6 +634,7 @@ h.Title()       // last title change
 h.Announce()    // last screen reader announcement
 h.Flash()       // last flash messages (map[string]string)
 h.Signals()     // last signal values (map[string]any)
+h.MorphKeys()   // last targeted morph keys ([]string, nil if none)
 ```
 
 ### Lifecycle

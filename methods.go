@@ -294,6 +294,16 @@ func (s *StatefulSession[S]) Signals(signals map[string]any) {
 	})
 }
 
+// Morph is a no-op on stateful sessions. The differ handles targeted
+// patches automatically via Dynamic keys - there is no need for the
+// developer to declare which keys changed. Calling Morph on a
+// stateful session indicates a misunderstanding of the model and
+// emits a dev warning.
+func (s *StatefulSession[S]) Morph(keys ...string) {
+	dev.Warn("Morph() called on a stateful session - the differ handles targeting automatically via Dynamic keys; Morph is only meaningful in stateless mode",
+		"session", s.id, "keys", keys)
+}
+
 // Push sends a Web Push notification to the browser. Only works when
 // the session has an active push subscription and a [push.Sender] is
 // configured. Returns an error if either is missing.

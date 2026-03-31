@@ -86,7 +86,8 @@ tether.Stateless(app, tether.StatelessConfig[State]{
 | Push notifications | No | Yes (PushConfig) |
 | Service worker | No | Yes (Worker) |
 | Signals | Client-side only | Server push + client-side |
-| Dynamic keys | Not needed (always root morph) | Required for targeted patches |
+| Dynamic keys | Optional (needed for `sess.Morph`) | Required for targeted patches |
+| Targeted updates | Explicit via `sess.Morph("key")` | Automatic via differ |
 
 ## Carrying state across requests
 
@@ -114,6 +115,76 @@ func handle(_ tether.Session, s State, ev tether.Event) State {
 ```
 
 This is the fundamental difference from stateful mode: stateful handlers accumulate state in memory across events, while stateless handlers reconstruct it each time.
+
+## Targeted morphs
+
+By default, every POST response contains a root morph - the full rendered tree. The client morphs the entire page via idiomorph, which is efficient (it only touches changed DOM nodes), but the server still serialises and transmits the full HTML.
+
+When you know which parts of the page an event affects, call `sess.Morph` to return only those subtrees instead:
+
+```go
+func handle(sess tether.Session, s State, ev tether.Event) State {
+    if ev.Action == "increment" {
+        s.Count++
+        sess.Morph("count")
+    }
+    return s
+}
+
+func render(s State) node.Node {
+    return div.New(
+        span.Textf("Count: %d", s.Count).Dynamic("count"),
+        span.Text("This large sidebar never changes").Dynamic("sidebar"),
+        // ... more content
+    )
+}
+```
+
+The response contains a single keyed morph for `"count"` instead of the full page. The client finds the element with `data-tether-key="count"` and morphs only that subtree.
+
+### Multiple keys
+
+Pass multiple keys in a single call or across multiple calls - they accumulate:
+
+```go
+sess.Morph("count", "title")
+// or equivalently:
+sess.Morph("count")
+sess.Morph("title")
+```
+
+Both produce a response with two keyed morphs.
+
+### When to use targeted morphs
+
+Use `Morph` when the page has large static sections that the event does not affect. The savings come from not serialising and transmitting unchanged HTML. On small pages with little static content, root morphs are fine - idiomorph makes the DOM update efficient regardless.
+
+**Do not use Morph when:**
+- The event could affect any part of the page (use root morph)
+- The page is small enough that the full HTML is negligible
+- You are unsure which keys changed (root morph is always safe)
+
+**Do use Morph when:**
+- The page has large static sections (navigation, sidebars, tables)
+- The event affects a known, bounded set of elements
+- Bandwidth matters (mobile, high-latency connections)
+
+### How it works
+
+The full tree is always rendered - `Render(state)` runs in full so the tree is correct. The handler then walks the tree, finds nodes whose Dynamic key matches a requested key, renders each subtree individually, and returns them as keyed morphs. Keys not found in the tree are silently skipped (with a dev-mode warning).
+
+### Targeted morphs vs stateful patches
+
+In stateful mode, the differ automatically detects which Dynamic keys changed and sends targeted patches. There is no need to call `Morph` - the differ handles it. Calling `Morph` on a stateful session is a no-op with a dev warning.
+
+In stateless mode, there is no previous tree to diff against, so the developer explicitly declares which keys to morph. This is the trade-off: stateless mode avoids the memory cost of storing a previous tree, but requires the developer to know which keys their event affected.
+
+| Concern | Stateful | Stateless |
+|---------|----------|-----------|
+| Targeting | Automatic (differ) | Explicit (`sess.Morph`) |
+| Memory | Stores previous tree snapshots | No stored state |
+| Default | Targeted patches | Root morph |
+| Developer action | Add `.Dynamic("key")` to elements | Add `.Dynamic("key")` and call `sess.Morph("key")` |
 
 ## Multi-page routing
 

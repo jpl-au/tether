@@ -81,8 +81,9 @@ type Harness[S any] struct {
 	onDisconnect func(tether.Session)
 
 	// Last captured effects and rendered HTML.
-	last     tether.Effects
-	lastHTML string
+	last      tether.Effects
+	lastHTML  string
+	morphKeys []string
 }
 
 // New creates a test harness. The harness invokes Handle directly  -
@@ -172,6 +173,7 @@ func (h *Harness[S]) SendEvent(ev tether.Event) {
 	cs := &tether.CaptureSession{SessionID: "tethertest"}
 	h.state = h.dispatch(cs, ev)
 	h.last = cs.Effects
+	h.morphKeys = cs.MorphKeys
 	h.lastHTML = ""
 	if h.render != nil {
 		h.lastHTML = string(h.renderHTML(h.state))
@@ -247,6 +249,12 @@ func (h *Harness[S]) Flash() map[string]string {
 // Go types - no JSON round-tripping.
 func (h *Harness[S]) Signals() map[string]any {
 	return h.last.Signals
+}
+
+// MorphKeys returns the Dynamic keys declared via [tether.Session.Morph]
+// in the most recent Send call. Returns nil if Morph was not called.
+func (h *Harness[S]) MorphKeys() []string {
+	return h.morphKeys
 }
 
 // Render returns the rendered HTML for the current state. When Layout

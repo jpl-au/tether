@@ -511,6 +511,50 @@ func TestBusEmitStateAndBus(t *testing.T) {
 	}
 }
 
+func TestMorphKeys(t *testing.T) {
+	h := tethertest.New(tethertest.Config[state]{
+		State:  state{},
+		Render: render,
+		Handle: func(sess tether.Session, s state, ev tether.Event) state {
+			if ev.Action == "increment" {
+				s.Count++
+				sess.Morph("count")
+			}
+			return s
+		},
+	})
+
+	h.Send("increment")
+	keys := h.MorphKeys()
+	if len(keys) != 1 || keys[0] != "count" {
+		t.Errorf("MorphKeys() = %v, want [count]", keys)
+	}
+}
+
+func TestMorphKeysResetBetweenSends(t *testing.T) {
+	h := tethertest.New(tethertest.Config[state]{
+		State:  state{},
+		Render: render,
+		Handle: func(sess tether.Session, s state, ev tether.Event) state {
+			if ev.Action == "morph" {
+				sess.Morph("count")
+			}
+			s.Count++
+			return s
+		},
+	})
+
+	h.Send("morph")
+	if len(h.MorphKeys()) != 1 {
+		t.Fatalf("MorphKeys() = %v, want [count]", h.MorphKeys())
+	}
+
+	h.Send("other")
+	if len(h.MorphKeys()) != 0 {
+		t.Errorf("MorphKeys() = %v, want empty after non-morph event", h.MorphKeys())
+	}
+}
+
 func contains(s, substr string) bool {
 	return len(s) > 0 && len(substr) > 0 && // avoid trivial matches
 		stringContains(s, substr)
