@@ -147,6 +147,27 @@ func (g *Group[S]) All() iter.Seq[*StatefulSession[S]] {
 	}
 }
 
+// Each calls fn for every session in the group. Unlike [Broadcast],
+// it does not trigger a state update or render cycle. Use this for
+// signal-only pushes where the DOM structure is unchanged and only
+// bound values need updating:
+//
+//	group.Each(func(sess *tether.StatefulSession[State]) {
+//	    sess.Signal("status", "updated")
+//	})
+//
+// The callback runs on the caller's goroutine. Signal, Signals,
+// Toast, and other side-effect methods are safe to call - they
+// enqueue effects that are sent as standalone updates without
+// triggering a render.
+//
+// Safe to call from any goroutine, including from within Handle.
+func (g *Group[S]) Each(fn func(target *StatefulSession[S])) {
+	for _, t := range g.loadSessions() {
+		fn(t)
+	}
+}
+
 // Broadcast applies fn to every session in the group. The callback
 // receives the target session so side-effect methods (Toast, Navigate,
 // etc.) are called on the correct session. Each session's Update is
