@@ -1,14 +1,34 @@
 // Package dev provides tether's internal logging and development mode.
-// All log output from the framework flows through this package so the
-// logger is scoped to tether and never touches the process-wide slog
-// default.
+// It is a debugging aid for framework developers, not a production
+// observability API. For production monitoring, alerting, and metrics,
+// subscribe to [tether.Handler].Diagnostics which provides typed,
+// per-handler events via [tether.Bus].
+//
+// # Design: two-tier observability
+//
+// Tether separates observability into two tiers:
+//
+//   - dev (this package): verbose, human-readable log output gated
+//     behind DevMode. Process-wide and intentionally global - dev mode
+//     is a property of the development session, not of individual
+//     handlers. When enabled, every handler logs to the same scoped
+//     logger. This is by design: during development you want to see
+//     the full picture, not per-handler silos.
+//
+//   - Diagnostics ([tether.Bus]): typed, per-handler events for
+//     production use. Subscribe to observe panics, transport errors,
+//     buffer overflows, and render statistics. Route them to your
+//     metrics pipeline, alerting system, or structured logger.
+//
+// The logger and enabled flag are package-level globals. This is safe
+// because dev mode is set once at startup (from [tether.App].DevMode
+// or the TETHER_DEV environment variable) and applies uniformly to all
+// handlers in the process. Multiple App instances sharing the same dev
+// state is the intended behaviour, not a bug.
 //
 // [Warn] and [Debug] are gated behind dev mode - they help developers
-// catch mistakes early but would be noise in production. For
-// production observability, subscribe to [tether.Handler].Diagnostics.
-//
-// The package also provides [Log] for direct access to the scoped
-// logger. The framework uses this for safety-net logging (panics,
+// catch mistakes early but would be noise in production. [Log] gives
+// direct access to the scoped logger for safety-net logging (panics,
 // critical errors) that must always fire regardless of dev mode.
 //
 // Call [SetLogger] at startup to configure the logger; when not set,

@@ -22,6 +22,25 @@ import (
 //
 //	live := tether.Stateful(app, tether.StatefulConfig[State]{...})
 //	page := tether.Stateless(app, tether.StatelessConfig[State]{...})
+//
+// # Value semantics
+//
+// App is passed by value. Each handler receives an independent copy
+// so settings cannot be mutated from outside after construction.
+// Internally the handler configures the [dev] package's process-wide
+// logger and dev-mode flag. This global state is intentional: dev
+// mode is a property of the development session, not of individual
+// handlers. See the [dev] package documentation for the full
+// rationale.
+//
+// # Observability
+//
+// App.Logger configures the [dev] package's scoped logger, which is a
+// development debugging aid (verbose, human-readable, gated behind
+// DevMode). For production observability, subscribe to
+// [Handler].Diagnostics which provides typed, per-handler events for
+// metrics, alerting, and structured logging. See [Diagnostic] and
+// [Bus] for details.
 type App struct {
 	// DevMode enables development conveniences: debug logging by
 	// default, Cache-Control: no-store on all responses, service
