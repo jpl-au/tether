@@ -19,7 +19,7 @@ func TestEngineDefaultIsDiffer(t *testing.T) {
 		},
 	}
 
-	e := h.engine(d, counterState{})
+	e := h.engine(d, counterState{}, true)
 	if _, ok := e.(*jit.Differ); !ok {
 		t.Errorf("expected *jit.Differ when Memoise is false, got %T", e)
 	}
@@ -36,7 +36,7 @@ func TestEngineMemoiseIsMemoiser(t *testing.T) {
 		},
 	}
 
-	e := h.engine(d, counterState{})
+	e := h.engine(d, counterState{}, true)
 	if _, ok := e.(*jit.Memoiser); !ok {
 		t.Errorf("expected *jit.Memoiser when Memoise is true, got %T", e)
 	}

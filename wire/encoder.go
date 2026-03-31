@@ -17,6 +17,7 @@ type Encoder interface {
 type Update struct {
 	Patches  []Patch
 	Morphs   []Morph
+	Session  string            // if non-empty, client must adopt this session ID
 	URL      string            // if non-empty, push/replace browser URL
 	Replace  bool              // true for replaceState, false for pushState
 	Title    string            // if non-empty, set document.title

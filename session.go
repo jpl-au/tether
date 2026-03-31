@@ -215,6 +215,11 @@ type StatefulSession[S any] struct {
 	// coalesced render runs. Only accessed on the loop goroutine.
 	needsRender bool
 
+	// pendingSession is set when the server assigns a new session ID
+	// to a stale client. The next send includes it so the client can
+	// update its stored ID. Cleared after first use.
+	pendingSession string
+
 	// coalescedCount tracks the number of commands in the current
 	// coalesced batch. Set during the drain loop, read by
 	// coalescedRender. Only accessed on the loop goroutine.

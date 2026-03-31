@@ -7,6 +7,7 @@ import (
 
 	jit "github.com/jpl-au/fluent-jit"
 	"github.com/jpl-au/tether/dev"
+	"github.com/jpl-au/tether/wire"
 )
 
 // serveInitialPage handles the initial GET request. It pre-warms the
@@ -215,6 +216,14 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 	}
 	h.mu.Unlock()
 
+	// When the client sent a session ID that wasn't found in any
+	// pool or store, the client has stale DOM from a previous server
+	// instance. The engine is left unseeded so the first render
+	// produces a full morph, replacing whatever stale content the
+	// client is showing. False for the pending-session path where
+	// the differ was already seeded during GET.
+	var stale bool
+
 	if differ == nil {
 		// Direct transport connection without a prior GET (e.g. bogus
 		// or missing session ID). Reject during drain.
@@ -232,6 +241,8 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 			}
 		}
 
+		stale = id != ""
+
 		id = newID()
 		state = h.cfg.InitialState(r)
 		if h.cfg.OnNavigate != nil {
@@ -244,8 +255,19 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		}
 		differ = jit.NewDiffer()
 
-		tree := h.cfg.Render(state)
-		differ.Render(tree)
+		if !stale {
+			// Fresh visit (no prior session) - the client received
+			// the initial HTML from the GET that created the pending
+			// session, or this is a direct WebSocket connection with
+			// no session ID. Seed the differ so the first diff
+			// produces targeted patches.
+			tree := h.cfg.Render(state)
+			differ.Render(tree)
+		}
+		// When stale is true, the differ stays unseeded. The
+		// session's first render will produce a full morph via the
+		// coalescedRender nil-patches path, replacing whatever stale
+		// content the client is showing.
 	}
 
 	now := time.Now()
@@ -256,7 +278,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		state:                state,
 		render:               h.cfg.Render,
 		handle:               h.cfg.Handle,
-		engine:               h.engine(differ, state),
+		engine:               h.engine(differ, state, !stale),
 		encoder:              h.encoder,
 		transport:            transport,
 		transportCtx:         tctx,
@@ -288,6 +310,9 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 	// Initial status is set directly, not via transition(), because
 	// there is no prior state to validate against at construction.
 	sess.status.Store(int32(Pending))
+	if stale {
+		sess.pendingSession = id
+	}
 	dev.Debug("session created", "session", id, "endpoint", r.URL.Path, "remote", r.RemoteAddr)
 
 	if h.cfg.Push != nil && h.cfg.Push.Sender != nil {
@@ -475,7 +500,7 @@ func (h *Handler[S]) restoreSession(id string, r *http.Request, transport Transp
 		state:                state,
 		render:               h.cfg.Render,
 		handle:               h.cfg.Handle,
-		engine:               h.engine(differ, state),
+		engine:               h.engine(differ, state, true),
 		encoder:              h.encoder,
 		transport:            transport,
 		transportCtx:         tctx,
@@ -542,6 +567,27 @@ func (h *Handler[S]) restoreSession(id string, r *http.Request, transport Transp
 	sess.handler = h
 
 	go sess.run()
+
+	// Send the restored content to the client. The differ is seeded
+	// with the current state, so Diff returns empty patches (nothing
+	// changed). Render the tree as a full morph and include the saved
+	// URL and title so the browser's address bar and document title
+	// are in sync. This mirrors the catch-up send in reattach.
+	sess.cmds <- func() {
+		tree := sess.render(sess.state)
+		html := sess.engine.Render(tree)
+		u := wire.Update{
+			Morphs: []wire.Morph{{Key: "", HTML: html}},
+		}
+		if sess.lastURL != "" {
+			u.URL = sess.lastURL
+			u.Replace = true
+		}
+		if sess.lastTitle != "" {
+			u.Title = sess.lastTitle
+		}
+		sess.send(u)
+	}
 
 	// Mount components before events arrive.
 	if len(h.cfg.Components) > 0 {

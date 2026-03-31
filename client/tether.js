@@ -629,6 +629,14 @@ window.Tether.signals = window.Tether.signals || {};
     requestAnimationFrame(function () {
       restorePending(msg.event_id);
 
+      // Server reassigned session ID (stale client reconnection).
+      if (msg.session) {
+        sessionID = msg.session;
+        if (root) {
+          root.setAttribute("data-tether-session", sessionID);
+        }
+      }
+
       // Apply content patches first, then structural morphs.
       if (msg.patches) {
         for (var i = 0; i < msg.patches.length; i++) {

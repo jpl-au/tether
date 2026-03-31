@@ -37,6 +37,7 @@ type updateMessage struct {
 	Type     string            `json:"type"`
 	Patches  []patchEntry      `json:"patches,omitempty"`
 	Morphs   []morphEntry      `json:"morphs,omitempty"`
+	Session  string            `json:"session,omitempty"`
 	URL      string            `json:"url,omitempty"`
 	Replace  bool              `json:"replace,omitempty"`
 	Title    string            `json:"title,omitempty"`
@@ -87,6 +88,7 @@ func encodeMessage(u Update) updateMessage {
 		}
 	}
 
+	msg.Session = u.Session
 	msg.URL = u.URL
 	msg.Replace = u.Replace
 	msg.Title = u.Title

@@ -25,11 +25,17 @@ type engine interface {
 // disabled, the pre-seeded Differ from the pending session is used
 // directly. The Memoiser needs its own Render call to collect memoisation
 // keys from the tree.
-func (h *Handler[S]) engine(d *jit.Differ, state S) engine {
+//
+// When seed is false (stale client reconnecting to a fresh server),
+// the engine is left unseeded so the first Diff returns nil/nil,
+// triggering a full morph in coalescedRender.
+func (h *Handler[S]) engine(d *jit.Differ, state S, seed bool) engine {
 	if h.cfg.Memoise {
 		m := jit.NewMemoiser()
-		tree := h.cfg.Render(state)
-		m.Render(tree)
+		if seed {
+			tree := h.cfg.Render(state)
+			m.Render(tree)
+		}
 		return m
 	}
 	return d

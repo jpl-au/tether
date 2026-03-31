@@ -212,7 +212,7 @@ func (h *Handler[S]) thaw(sess *StatefulSession[S], r *http.Request, transport T
 	differ.Render(tree)
 
 	sess.state = state
-	sess.engine = h.engine(differ, state)
+	sess.engine = h.engine(differ, state, true)
 	sess.transport = transport
 	sess.transportCtx, sess.transportCancel = context.WithCancel(sess.ctx)
 	sess.events = make(chan Event)

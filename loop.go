@@ -530,6 +530,10 @@ func (s *StatefulSession[S]) sendDiff(eventID string, patches []jit.Patch, chang
 // and title are captured before the nil-transport guard so reattach
 // can replay them after a disconnect.
 func (s *StatefulSession[S]) send(u wire.Update) {
+	if s.pendingSession != "" {
+		u.Session = s.pendingSession
+		s.pendingSession = ""
+	}
 	if u.URL != "" {
 		s.lastURL = u.URL
 	}
@@ -598,6 +602,30 @@ func (s *StatefulSession[S]) coalescedRender() {
 	tree := s.render(s.state)
 	patches, change := s.engine.Diff(tree)
 	renderDuration := time.Since(renderStart)
+
+	// Unseeded engine (nil patches, nil change) means the client has
+	// stale DOM from a previous server instance. Send a full morph so
+	// the client's content is replaced with the current render. This
+	// happens when a reconnecting client's session ID was not found
+	// in any pool or store, so a fresh session was created without
+	// seeding the engine.
+	if patches == nil && change == nil {
+		html := s.engine.Render(tree)
+		dev.Debug("unseeded engine, sending full morph",
+			"session", s.id,
+			"endpoint", s.endpoint,
+			"bytes", len(html),
+		)
+		u := wire.Update{
+			Morphs: []wire.Morph{{Key: "", HTML: html}},
+		}
+		if fx != nil {
+			fx.merge(&u)
+		}
+		s.send(u)
+		return
+	}
+
 	dev.Debug("render complete",
 		"session", s.id,
 		"patches", len(patches),
