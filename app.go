@@ -3,6 +3,7 @@ package tether
 import (
 	"log/slog"
 	"net/http"
+	"time"
 )
 
 // App holds configuration shared across all handlers in an
@@ -80,4 +81,29 @@ type App struct {
 	// Events) when nil. Per-handler overrides on [StatefulConfig]
 	// take precedence.
 	Fallback func(w http.ResponseWriter, r *http.Request) (Transport, error)
+
+	// ShutdownGrace is how long [ListenAndServe] and
+	// [Handler.ListenAndServe] wait for sessions to drain during
+	// graceful shutdown. After this period, remaining sessions are
+	// force-closed. Also used as the TTL when persisting session
+	// state to the [SessionStore] during shutdown. Zero defaults to
+	// 10 seconds.
+	ShutdownGrace time.Duration
+
+	// MaxSessions limits the total number of concurrent sessions
+	// (pending + active + disconnected) across all handlers. Zero
+	// means unlimited. In production, set a limit to prevent
+	// resource exhaustion.
+	MaxSessions int
+
+	// MaxPending limits the number of pre-warmed sessions waiting
+	// for a browser to open a transport connection. Each GET request
+	// creates a pending session (state + differ), so this cap
+	// protects against GET-flooding attacks where an attacker scripts
+	// thousands of requests without ever connecting. Pending sessions
+	// are cheap but unauthenticated - capping them separately
+	// prevents an attacker from crowding out legitimate active
+	// sessions under the global MaxSessions limit. Zero defaults to
+	// 128.
+	MaxPending int
 }

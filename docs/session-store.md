@@ -117,7 +117,7 @@ rejecting the reconnect.
 Before the process exits, the framework saves all active sessions:
 
 1. For each session: encode `S`, wrap envelope, save with TTL
-2. TTL matches `Timeouts.ShutdownGrace`
+2. TTL matches `App.ShutdownGrace`
 
 On restart, reconnecting clients recover via the crash recovery path.
 

@@ -25,11 +25,12 @@ mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 on SIGINT or SIGTERM, then force-closing after the grace period:
 
 ```go
-h := tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
+app := tether.App{
+    ShutdownGrace: 15 * time.Second, // default: 10s
+}
+
+h := tether.Stateful(app, tether.StatefulConfig[State]{
     // ...
-    Timeouts: tether.Timeouts{
-        ShutdownGrace: 15 * time.Second, // default: 10s
-    },
 })
 
 h.ListenAndServe("") // PORT env var, then :8080

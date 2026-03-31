@@ -127,14 +127,14 @@ func Stateful[S any](app App, cfg StatefulConfig[S]) *Handler[S] {
 	if cfg.Limits.MaxPushSubscriptionBytes == 0 {
 		cfg.Limits.MaxPushSubscriptionBytes = defaultMaxPushSubscriptionBytes
 	}
-	if cfg.Limits.MaxPending == 0 {
-		cfg.Limits.MaxPending = defaultMaxPending
+	if app.MaxPending == 0 {
+		app.MaxPending = defaultMaxPending
 	}
 	if cfg.Timeouts.Pending == 0 {
 		cfg.Timeouts.Pending = defaultPendingTimeout
 	}
-	if cfg.Timeouts.ShutdownGrace == 0 {
-		cfg.Timeouts.ShutdownGrace = defaultShutdownGrace
+	if app.ShutdownGrace == 0 {
+		app.ShutdownGrace = defaultShutdownGrace
 	}
 	if cfg.Timeouts.Retry == 0 {
 		cfg.Timeouts.Retry = defaultRetryDelay
@@ -170,8 +170,8 @@ func Stateful[S any](app App, cfg StatefulConfig[S]) *Handler[S] {
 		panic("tether: Timeouts.BackoffMultiplier must not exceed 10")
 	}
 
-	if cfg.Limits.MaxSessions == 0 && !app.DevMode {
-		dev.Log().Warn("tether: Limits.MaxSessions is 0 (unlimited) - set a limit in production to prevent resource exhaustion")
+	if app.MaxSessions == 0 && !app.DevMode {
+		dev.Log().Warn("tether: App.MaxSessions is 0 (unlimited) - set a limit in production to prevent resource exhaustion")
 	}
 	if cfg.Freeze != 0 {
 		if cfg.SessionStore == nil {

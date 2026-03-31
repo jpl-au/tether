@@ -88,12 +88,12 @@ and returns nil on clean shutdown. A second signal forces an immediate
 exit.
 
 The grace period defaults to 10 seconds and is configurable via
-`Timeouts.ShutdownGrace`:
+`App.ShutdownGrace`:
 
 ```go
-Timeouts: tether.Timeouts{
+app := tether.App{
     ShutdownGrace: 15 * time.Second,
-},
+}
 ```
 
 To add routes or HTTP-level middleware alongside tether, pass a custom

@@ -29,11 +29,6 @@ type Timeouts struct {
 	// is discarded after this duration. Zero defaults to 30 seconds.
 	Pending time.Duration
 
-	// ShutdownGrace is how long [Handler.ListenAndServe] waits for
-	// sessions to drain during graceful shutdown. After this period,
-	// remaining sessions are force-closed. Zero defaults to 10 seconds.
-	ShutdownGrace time.Duration
-
 	// Heartbeat controls how often transports send keep-alive frames.
 	// SSE sends comment lines to prevent proxy timeouts. WebSocket
 	// sends ping frames and sets read deadlines to detect silently
@@ -95,21 +90,6 @@ type Timeouts struct {
 
 // Limits groups capacity constraints for sessions and requests.
 type Limits struct {
-	// MaxSessions limits the total number of concurrent sessions
-	// (pending + active + disconnected). Zero means unlimited.
-	MaxSessions int
-
-	// MaxPending limits the number of pre-warmed sessions waiting
-	// for a browser to open a transport connection. Each GET request
-	// creates a pending session (state + differ), so this cap
-	// protects against GET-flooding attacks where an attacker
-	// scripts thousands of requests without ever connecting.
-	// Pending sessions are cheap but unauthenticated - capping them
-	// separately prevents an attacker from crowding out legitimate
-	// active sessions under the global MaxSessions limit. Zero
-	// defaults to 128.
-	MaxPending int
-
 	// CmdBufferSize sets the capacity of each session's internal
 	// command channel. Commands include state updates, broadcasts,
 	// and side effects. When the buffer is full, a short-lived

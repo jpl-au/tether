@@ -278,7 +278,7 @@ func TestSessionStoreDisconnectTTLMatchesReconnect(t *testing.T) {
 
 // TestSessionStoreShutdownPersists verifies that Shutdown saves
 // session state after the command loop exits (no data race) and
-// uses ShutdownGrace as the TTL.
+// uses App.ShutdownGrace as the TTL.
 func TestSessionStoreShutdownPersists(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		store := newSessionFileStore(t)
@@ -293,10 +293,9 @@ func TestSessionStoreShutdownPersists(t *testing.T) {
 
 		grace := 15 * time.Second
 		h := &Handler[counterState]{
-			app: App{},
+			app: App{ShutdownGrace: grace},
 			cfg: StatefulConfig[counterState]{
 				SessionStore: store,
-				Timeouts:     Timeouts{ShutdownGrace: grace},
 			},
 			pending:      make(map[string]*pendingSession[counterState]),
 			active:       map[string]*StatefulSession[counterState]{sess.id: sess},

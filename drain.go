@@ -122,7 +122,7 @@ func (h *Handler[S]) Shutdown(ctx context.Context) error {
 	// onTransportClose and s.state has been zeroed. Saving here would
 	// overwrite the valid snapshot with empty data.
 	if h.cfg.SessionStore != nil {
-		ttl := h.cfg.Timeouts.ShutdownGrace
+		ttl := h.app.ShutdownGrace
 		if ttl == 0 {
 			ttl = defaultShutdownGrace
 		}

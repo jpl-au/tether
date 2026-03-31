@@ -102,7 +102,7 @@ func (h *Handler[S]) ListenAndServe(addr string, handler ...http.Handler) error 
 
 	return serve(srv, func() error {
 		return srv.ListenAndServe()
-	}, displayURL(addr), h.cfg.Timeouts.ShutdownGrace, []Drainable{h})
+	}, displayURL(addr), h.app.ShutdownGrace, []Drainable{h})
 }
 
 // ListenAndServeTLS starts an HTTPS server with graceful shutdown.
@@ -118,7 +118,7 @@ func (h *Handler[S]) ListenAndServeTLS(addr, certFile, keyFile string, handler .
 
 	return serve(srv, func() error {
 		return srv.ListenAndServeTLS(certFile, keyFile)
-	}, displayTLSURL(addr), h.cfg.Timeouts.ShutdownGrace, []Drainable{h})
+	}, displayTLSURL(addr), h.app.ShutdownGrace, []Drainable{h})
 }
 
 // newServer creates an [http.Server] with the resolved handler.

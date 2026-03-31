@@ -90,9 +90,20 @@ Mode constants: `mode.HTTP`, `mode.WebSocket`, `mode.ServerSentEvents`, `mode.Bo
 
 When either callback is configured, the framework's own logging for that event is suppressed - the callback controls the output. When nil and DevMode is active, a debug message is logged instead.
 
+### App capacity and shutdown
+
+These settings live on `App` because they are server-level concerns
+shared across all handlers:
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `ShutdownGrace` | `time.Duration` | 10s | Grace period for `ListenAndServe` shutdown |
+| `MaxSessions` | `int` | 0 (unlimited) | Maximum concurrent sessions (pending + active + disconnected) |
+| `MaxPending` | `int` | 128 | Maximum pre-warmed sessions awaiting transport connection |
+
 ### Timeouts
 
-`StatefulConfig.Timeouts` groups duration-based settings:
+`StatefulConfig.Timeouts` groups per-handler duration-based settings:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
@@ -103,7 +114,6 @@ When either callback is configured, the framework's own logging for that event i
 | `Pending` | `time.Duration` | 30s | Wait for browser to claim pre-warmed session |
 | `Heartbeat` | `time.Duration` | 20s | Keep-alive interval (SSE comments, WebSocket pings) |
 | `DisableHeartbeat` | `bool` | false | Stop transport keep-alive frames |
-| `ShutdownGrace` | `time.Duration` | 10s | Grace period for `ListenAndServe` shutdown |
 | `PendingCheck` | `time.Duration` | 10s | How often the background goroutine scans for expired pending sessions |
 | `SlowRender` | `time.Duration` | 0 (disabled) | Emit a `SlowRender` diagnostic when render+diff exceeds this duration |
 | `Retry` | `time.Duration` | 1s | Initial client reconnection delay |
@@ -111,12 +121,10 @@ When either callback is configured, the framework's own logging for that event i
 
 ### Limits
 
-`StatefulConfig.Limits` groups capacity constraints:
+`StatefulConfig.Limits` groups per-handler capacity constraints:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `MaxSessions` | `int` | 0 (unlimited) | Maximum concurrent sessions (pending + active + disconnected) |
-| `MaxPending` | `int` | 128 | Maximum pre-warmed sessions awaiting transport connection |
 | `CmdBufferSize` | `int` | 64 | Session command channel capacity |
 | `MaxEventBytes` | `int64` | 64 KB | Maximum POST event body size |
 | `MaxPushSubscriptionBytes` | `int64` | 4 KB | Maximum push subscription body size |
@@ -327,7 +335,7 @@ h.ListenAndServe("", existingMux)         // mount on an existing mux
 h.ListenAndServeTLS("", "cert.pem", "key.pem")  // HTTPS, defaults to :443
 ```
 
-On `SIGINT` or `SIGTERM`, sessions are drained gracefully (up to `Timeouts.ShutdownGrace`, default 10s) before the process exits.
+On `SIGINT` or `SIGTERM`, sessions are drained gracefully (up to `App.ShutdownGrace`, default 10s) before the process exits.
 
 For multi-handler apps, use the package-level `tether.ListenAndServe` which drains and shuts down all handlers concurrently:
 
