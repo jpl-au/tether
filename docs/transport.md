@@ -187,7 +187,7 @@ tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
 })
 ```
 
-The service worker caches the JS runtime (`tether.js`, `idiomorph.min.js`) using a cache-first strategy. Navigation responses are only cached when the server sends the `X-Tether-Cache: true` header - this prevents caching sensitive or session-specific pages without explicit intent. Cached pages are served as a fallback when offline.
+The service worker caches the JS runtime (`tether.js`, `idiomorph.min.js`) using a cache-first strategy. Navigation responses are only cached when the server sends the `Tether-Cache: true` header - this prevents caching sensitive or session-specific pages without explicit intent. Cached pages are served as a fallback when offline.
 
 To precache application assets (CSS, icons, fonts), use the `Precache` field on `Asset`:
 

@@ -131,8 +131,8 @@
     // After reconnection the ID may have changed.
     var sid = root ? root.getAttribute("data-tether-session") : sessionID;
     xhr.open("POST", endpoint);
-    xhr.setRequestHeader("X-Tether-Session", sid);
-    xhr.setRequestHeader("X-Tether-Upload", action);
+    xhr.setRequestHeader("Tether-Session", sid);
+    xhr.setRequestHeader("Tether-Upload", action);
     xhr.send(formData);
   }
 

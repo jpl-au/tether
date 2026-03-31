@@ -478,8 +478,8 @@ window.Tether.signals = window.Tether.signals || {};
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Tether-Session": sessionID,
-        "X-Tether-Push-Subscribe": "true"
+        "Tether-Session": sessionID,
+        "Tether-Push-Subscribe": "true"
       },
       body: JSON.stringify(sub.toJSON())
     };
@@ -602,7 +602,7 @@ window.Tether.signals = window.Tether.signals || {};
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Tether-Session": sessionID
+        "Tether-Session": sessionID
       },
       body: payload
     }).then(function (resp) {
@@ -1564,7 +1564,7 @@ window.Tether.signals = window.Tether.signals || {};
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-Tether-Session": sessionID
+          "Tether-Session": sessionID
         },
         body: payload
       }).then(function (resp) {

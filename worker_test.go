@@ -195,8 +195,8 @@ func TestHandlePushSubscribe(t *testing.T) {
 	body, _ := json.Marshal(sub)
 
 	req := httptest.NewRequest("POST", "/app", bytes.NewReader(body))
-	req.Header.Set("X-Tether-Session", "test-session")
-	req.Header.Set("X-Tether-Push-Subscribe", "true")
+	req.Header.Set("Tether-Session", "test-session")
+	req.Header.Set("Tether-Push-Subscribe", "true")
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
@@ -233,8 +233,8 @@ func TestHandlePushSubscribeNoPush(t *testing.T) {
 	})
 
 	req := httptest.NewRequest("POST", "/app", strings.NewReader("{}"))
-	req.Header.Set("X-Tether-Session", "test")
-	req.Header.Set("X-Tether-Push-Subscribe", "true")
+	req.Header.Set("Tether-Session", "test")
+	req.Header.Set("Tether-Push-Subscribe", "true")
 	w := httptest.NewRecorder()
 
 	handler.ServeHTTP(w, req)
@@ -258,8 +258,8 @@ func TestHandlePushSubscribeMissingSession(t *testing.T) {
 	})
 
 	req := httptest.NewRequest("POST", "/app", strings.NewReader("{}"))
-	req.Header.Set("X-Tether-Push-Subscribe", "true")
-	// No X-Tether-Session header
+	req.Header.Set("Tether-Push-Subscribe", "true")
+	// No Tether-Session header
 	w := httptest.NewRecorder()
 
 	handler.ServeHTTP(w, req)
@@ -283,8 +283,8 @@ func TestHandlePushSubscribeUnknownSession(t *testing.T) {
 	})
 
 	req := httptest.NewRequest("POST", "/app", strings.NewReader("{}"))
-	req.Header.Set("X-Tether-Session", "nonexistent")
-	req.Header.Set("X-Tether-Push-Subscribe", "true")
+	req.Header.Set("Tether-Session", "nonexistent")
+	req.Header.Set("Tether-Push-Subscribe", "true")
 	w := httptest.NewRecorder()
 
 	handler.ServeHTTP(w, req)

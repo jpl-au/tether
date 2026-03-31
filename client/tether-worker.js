@@ -63,13 +63,13 @@ self.addEventListener("fetch", function (e) {
 
   // Navigation requests: pass through to the network by default.
   // Only cache the response when the server opts in with the
-  // X-Tether-Cache header - this prevents caching sensitive or
+  // Tether-Cache header - this prevents caching sensitive or
   // session-specific pages without explicit intent.
   if (e.request.mode === "navigate") {
     e.respondWith(
       fetch(e.request)
         .then(function (resp) {
-          if (resp.headers.get("X-Tether-Cache") === "true") {
+          if (resp.headers.get("Tether-Cache") === "true") {
             var clone = resp.clone();
             caches.open(CACHE_VERSION).then(function (c) {
               c.put(e.request, clone);
@@ -212,7 +212,7 @@ function replayEvent(db, key, ev) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-Tether-Session": ev.sessionID
+      "Tether-Session": ev.sessionID
     },
     body: ev.payload
   }).then(function (resp) {

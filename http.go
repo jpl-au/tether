@@ -42,11 +42,11 @@ func (h *Handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// File uploads arrive as multipart POST with an X-Tether-Upload
+	// File uploads arrive as multipart POST with an Tether-Upload
 	// header. Handle them before the mode switch so they work with
 	// all transport modes.
-	if r.Method == "POST" && r.Header.Get("X-Tether-Upload") != "" {
-		dev.Debug("upload received", "session", r.Header.Get("X-Tether-Session"), "path", r.URL.Path, "remote", r.RemoteAddr)
+	if r.Method == "POST" && r.Header.Get("Tether-Upload") != "" {
+		dev.Debug("upload received", "session", r.Header.Get("Tether-Session"), "path", r.URL.Path, "remote", r.RemoteAddr)
 		h.handleUpload(w, r)
 		return
 	}
@@ -54,8 +54,8 @@ func (h *Handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Push subscription registrations arrive as POST with a special
 	// header, regardless of transport mode. Handle them before the
 	// mode switch to avoid being mistaken for an SSE event.
-	if r.Method == "POST" && r.Header.Get("X-Tether-Push-Subscribe") == "true" {
-		dev.Debug("push subscription received", "session", r.Header.Get("X-Tether-Session"))
+	if r.Method == "POST" && r.Header.Get("Tether-Push-Subscribe") == "true" {
+		dev.Debug("push subscription received", "session", r.Header.Get("Tether-Session"))
 		h.handlePushSubscribe(w, r)
 		return
 	}
@@ -172,9 +172,9 @@ func (h *Handler[S]) handlePostEvent(w http.ResponseWriter, r *http.Request) {
 
 	// The session ID is sent as a header rather than a query parameter
 	// to keep it out of server access logs and browser history.
-	id := r.Header.Get("X-Tether-Session")
+	id := r.Header.Get("Tether-Session")
 	if id == "" {
-		http.Error(w, "missing X-Tether-Session header", http.StatusBadRequest)
+		http.Error(w, "missing Tether-Session header", http.StatusBadRequest)
 		return
 	}
 
@@ -228,9 +228,9 @@ func (h *Handler[S]) handlePushSubscribe(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	id := r.Header.Get("X-Tether-Session")
+	id := r.Header.Get("Tether-Session")
 	if id == "" {
-		http.Error(w, "missing X-Tether-Session header", http.StatusBadRequest)
+		http.Error(w, "missing Tether-Session header", http.StatusBadRequest)
 		return
 	}
 

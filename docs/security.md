@@ -87,7 +87,7 @@ to any session.
 |----------|---------|
 | `data-tether-session` HTML attribute | Client reclaims session on transport connect |
 | WebSocket upgrade URL (`?session=ID`) | Server looks up the session to attach |
-| `X-Tether-Session` POST header | SSE mode event delivery |
+| `Tether-Session` POST header | SSE mode event delivery |
 | Server logs (debug level) | Correlating session activity |
 
 ### Why the session ID is in the URL
@@ -108,7 +108,7 @@ the correct User-Agent.
   default).
 - `Referrer-Policy: same-origin` prevents leakage via the Referer header on
   external navigation.
-- Custom headers (`X-Tether-Session`) on POST requests trigger CORS
+- Custom headers (`Tether-Session`) on POST requests trigger CORS
   preflight, preventing cross-origin abuse from browsers.
 - Session IDs are never included in error responses sent to clients.
 
@@ -177,8 +177,8 @@ The framework uses a layered approach that does not rely on cookies:
 
 1. **Sec-Fetch-Site + Origin validation** on state-changing requests
    (POST events, WebSocket upgrades, uploads, push subscriptions).
-2. **Custom headers** (`X-Tether-Session`, `X-Tether-Upload`,
-   `X-Tether-Push-Subscribe`) on all POST requests - these trigger
+2. **Custom headers** (`Tether-Session`, `Tether-Upload`,
+   `Tether-Push-Subscribe`) on all POST requests - these trigger
    CORS preflight, which browsers enforce.
 3. **No cookies** - the framework does not set or read cookies,
    eliminating cookie-based CSRF vectors entirely.

@@ -87,9 +87,9 @@ func (h *Handler[S]) handleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := r.Header.Get("X-Tether-Session")
+	id := r.Header.Get("Tether-Session")
 	if id == "" {
-		http.Error(w, "missing X-Tether-Session header", http.StatusBadRequest)
+		http.Error(w, "missing Tether-Session header", http.StatusBadRequest)
 		return
 	}
 
@@ -121,7 +121,7 @@ func (h *Handler[S]) handleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	action := r.Header.Get("X-Tether-Upload")
+	action := r.Header.Get("Tether-Upload")
 
 	// Validate MIME types and collect uploads before spawning the
 	// background goroutine. On validation failure, clean up

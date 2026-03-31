@@ -16,7 +16,7 @@ func TestHandleUploadNotConfigured(t *testing.T) {
 	handler := newTestHandler()
 
 	req := httptest.NewRequest("POST", "/app", nil)
-	req.Header.Set("X-Tether-Upload", "avatar")
+	req.Header.Set("Tether-Upload", "avatar")
 	w := httptest.NewRecorder()
 
 	handler.ServeHTTP(w, req)
@@ -39,7 +39,7 @@ func TestHandleUploadMissingSession(t *testing.T) {
 	})
 
 	req := httptest.NewRequest("POST", "/app", nil)
-	req.Header.Set("X-Tether-Upload", "avatar")
+	req.Header.Set("Tether-Upload", "avatar")
 	w := httptest.NewRecorder()
 
 	handler.ServeHTTP(w, req)
@@ -62,8 +62,8 @@ func TestHandleUploadUnknownSession(t *testing.T) {
 	})
 
 	req := httptest.NewRequest("POST", "/app", nil)
-	req.Header.Set("X-Tether-Upload", "avatar")
-	req.Header.Set("X-Tether-Session", "nonexistent")
+	req.Header.Set("Tether-Upload", "avatar")
+	req.Header.Set("Tether-Session", "nonexistent")
 	w := httptest.NewRecorder()
 
 	handler.ServeHTTP(w, req)
@@ -103,8 +103,8 @@ func TestHandleUploadSuccess(t *testing.T) {
 
 	req := httptest.NewRequest("POST", "/app", body)
 	req.Header.Set("Content-Type", contentType)
-	req.Header.Set("X-Tether-Upload", "avatar")
-	req.Header.Set("X-Tether-Session", "upload-session")
+	req.Header.Set("Tether-Upload", "avatar")
+	req.Header.Set("Tether-Session", "upload-session")
 	w := httptest.NewRecorder()
 
 	handler.ServeHTTP(w, req)
@@ -154,8 +154,8 @@ func TestHandleUploadMIMEReject(t *testing.T) {
 
 	req := httptest.NewRequest("POST", "/app", body)
 	req.Header.Set("Content-Type", contentType)
-	req.Header.Set("X-Tether-Upload", "avatar")
-	req.Header.Set("X-Tether-Session", "upload-session")
+	req.Header.Set("Tether-Upload", "avatar")
+	req.Header.Set("Tether-Session", "upload-session")
 	w := httptest.NewRecorder()
 
 	handler.ServeHTTP(w, req)
@@ -194,8 +194,8 @@ func TestHandleUploadMIMEAcceptWildcard(t *testing.T) {
 
 	req := httptest.NewRequest("POST", "/app", body)
 	req.Header.Set("Content-Type", contentType)
-	req.Header.Set("X-Tether-Upload", "avatar")
-	req.Header.Set("X-Tether-Session", "upload-session")
+	req.Header.Set("Tether-Upload", "avatar")
+	req.Header.Set("Tether-Session", "upload-session")
 	w := httptest.NewRecorder()
 
 	handler.ServeHTTP(w, req)
