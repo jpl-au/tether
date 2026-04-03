@@ -221,6 +221,14 @@ func ScrollTo(selector string) Option { return Option{"tether-scroll-to", select
 // on columns, chat feeds, or any scrollable region.
 func PreserveScroll() Option { return Option{"tether-preserve-scroll", ""} }
 
+// AutoScroll marks a scrollable container that should automatically
+// scroll to the bottom after each morph. Use this on log viewers,
+// streaming output, and chat feeds where new content appears at the
+// bottom and the user should follow along. Unlike [PreserveScroll]
+// which maintains the current position, AutoScroll always moves to
+// the latest content.
+func AutoScroll() Option { return Option{"tether-auto-scroll", ""} }
+
 // Cloak hides the element until the tether runtime initialises. The
 // client removes the attribute on startup, making the element visible.
 // Use this to prevent a flash of unbound content - e.g. a signal-bound

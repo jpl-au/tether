@@ -29,6 +29,30 @@ Hide an element until the tether runtime initialises (prevents flash of unstyled
 bind.Apply(div.New(children...), bind.Cloak())
 ```
 
+## Scroll management
+
+Preserve the scroll position of a container across morphs:
+
+```go
+bind.Apply(div.New(messages...).Class("chat-feed"), bind.PreserveScroll())
+```
+
+Without this, the morph engine may reset the scroll position when the container's content changes. Use this on columns, chat feeds, and any scrollable region where the user has scrolled to a specific position.
+
+Auto-scroll a container to the bottom after each morph:
+
+```go
+bind.Apply(pre.New(text.Text(logOutput)).Class("log-viewer"), bind.AutoScroll())
+```
+
+Use this on log viewers, streaming output, and terminal-style displays where new content appears at the bottom. After every morph that updates the container's content, the client scrolls to the latest entry automatically.
+
+Scroll a specific element into view on click (client-side, no server round-trip):
+
+```go
+bind.Apply(button.Text("Jump to bottom"), bind.ScrollTo("#latest"))
+```
+
 ## Transitions
 
 CSS transitions coordinated with the morph lifecycle:

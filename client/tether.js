@@ -996,6 +996,15 @@ window.Tether.signals = window.Tether.signals || {};
         delete oldNode._tetherScrollTop;
       }
 
+      // Auto-scroll containers to the bottom after content updates.
+      // Checks the morphed node and any auto-scroll descendants.
+      if (oldNode.hasAttribute("data-tether-auto-scroll")) {
+        oldNode.scrollTop = oldNode.scrollHeight;
+      }
+      oldNode.querySelectorAll("[data-tether-auto-scroll]").forEach(function (el) {
+        el.scrollTop = el.scrollHeight;
+      });
+
       callHook(oldNode, "updated");
       reapplySignals(oldNode);
       observeViewportElements(oldNode);

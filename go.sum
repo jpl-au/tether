@@ -6,10 +6,10 @@ github.com/fsnotify/fsnotify v1.9.0 h1:2Ml+OJNzbYCTzsxtv8vKSFD9PbJjmhYF14k/jKC7S
 github.com/fsnotify/fsnotify v1.9.0/go.mod h1:8jBTzvmWwFyi3Pb8djgCCO5IBqzKJ/Jwo8TRcHyHii0=
 github.com/fxamacker/cbor/v2 v2.9.0 h1:NpKPmjDBgUfBms6tr6JZkTHtfFGcMKsw3eGcmD/sapM=
 github.com/fxamacker/cbor/v2 v2.9.0/go.mod h1:vM4b+DJCtHn+zz7h3FFp/hDAI9WNWCsZj23V5ytsSxQ=
-github.com/jpl-au/fluent v0.2.3 h1:UNkvWxHizFIhdIEdYYPPF37sQit3BfKxNOi+k0ABizI=
-github.com/jpl-au/fluent v0.2.3/go.mod h1:Iptw7Q1CEBYMWKUTo5K9RpWjlpgDltRc3eHdUehPNIE=
-github.com/jpl-au/fluent-jit v0.2.4 h1:n6l3rayCnV8daSY3au/dHKBfK4SgvYVJnTsa6rZxUiE=
-github.com/jpl-au/fluent-jit v0.2.4/go.mod h1:hooLZuWBwjeKdu1NUFH4qSOBkbk81fY0aXxIsHvmygg=
+github.com/jpl-au/fluent v0.2.4 h1:u9QWLL4swy/uEx4a8iLEGOv3efEU5rCSYXqN68VlW1w=
+github.com/jpl-au/fluent v0.2.4/go.mod h1:Iptw7Q1CEBYMWKUTo5K9RpWjlpgDltRc3eHdUehPNIE=
+github.com/jpl-au/fluent-jit v0.2.5 h1:Epb9V2HK1OFgk+9iB6wFItkt6gSv65cCqdI7cS4OHGg=
+github.com/jpl-au/fluent-jit v0.2.5/go.mod h1:gdSH0rtMrLNjJypE4Q42sIHRRA3v1Wdq8AEnzbtQf4E=
 github.com/klauspost/compress v1.17.9 h1:6KIumPrER1LHsvBVuDa0r5xaG0Es51mhhB9BQB2qeMA=
 github.com/klauspost/compress v1.17.9/go.mod h1:Di0epgTjJY877eYKx5yC51cX2A2Vl2ibi7bDH9ttBbw=
 github.com/lxzan/gws v1.8.9 h1:VU3SGUeWlQrEwfUSfokcZep8mdg/BrUF+y73YYshdBM=

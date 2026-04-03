@@ -3,8 +3,8 @@ module github.com/jpl-au/tether
 go 1.25.0
 
 require (
-	github.com/jpl-au/fluent v0.2.3
-	github.com/jpl-au/fluent-jit v0.2.4
+	github.com/jpl-au/fluent v0.2.4
+	github.com/jpl-au/fluent-jit v0.2.5
 )
 
 require (
