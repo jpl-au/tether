@@ -96,6 +96,8 @@ app := tether.App{
 }
 ```
 
+Set `DevMode: true` on `App` during development - it enables debug logging, disables caching, adds visual morph flashes, and logs which configuration defaults the framework applied. See [operations](operations.md#dev-mode) for the full list.
+
 To add routes or HTTP-level middleware alongside tether, pass a custom
 mux as the second argument:
 

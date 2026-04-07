@@ -13,6 +13,22 @@
 //	        t.Errorf("got %d, want 1", h.State().Count)
 //	    }
 //	}
+//
+// # Error Injection
+//
+// Set [Config].Session to provide a custom [tether.CaptureSession] for
+// each event dispatch. This lets you test handler behaviour under error
+// conditions that the default harness cannot simulate:
+//
+//	h := tethertest.New(tethertest.Config[State]{
+//	    Handle: handle,
+//	    Session: func() *tether.CaptureSession {
+//	        return &tether.CaptureSession{
+//	            SessionID: "test",
+//	            PushErr:   errors.New("push unavailable"),
+//	        }
+//	    },
+//	})
 package tethertest
 
 import (
@@ -65,16 +81,28 @@ type Config[S any] struct {
 	// [Harness.HTML], mirroring [tether.StatefulConfig].Layout. Optional  -
 	// when absent, only the content node is rendered.
 	Layout func(S, node.Node) node.Node
+
+	// Session provides a custom [tether.CaptureSession] for each
+	// event dispatch. Use this to inject error conditions that the
+	// default harness cannot simulate:
+	//
+	//   - Set PushErr to test push notification error handling
+	//   - Set Ctx to a cancelled context to test context-aware handlers
+	//
+	// When nil, the harness creates a default CaptureSession with
+	// ID "tethertest" and no error conditions.
+	Session func() *tether.CaptureSession
 }
 
 // Harness drives a tether handler for testing. Create one with [New],
 // send events with [Harness.Send] or [Harness.SendEvent], and inspect
 // the result with the accessor methods.
 type Harness[S any] struct {
-	state  S
-	render tether.RenderFunc[S]
-	handle func(tether.Session, S, tether.Event) S
-	layout func(S, node.Node) node.Node
+	state   S
+	render  tether.RenderFunc[S]
+	handle  func(tether.Session, S, tether.Event) S
+	layout  func(S, node.Node) node.Node
+	session func() *tether.CaptureSession
 
 	// Lifecycle callbacks stored from Config.
 	onConnect    func(tether.Session)
@@ -128,6 +156,13 @@ func New[S any](cfg Config[S]) *Harness[S] {
 		handle = tether.Chain(handle, cfg.Middleware)
 	}
 
+	sessionFn := cfg.Session
+	if sessionFn == nil {
+		sessionFn = func() *tether.CaptureSession {
+			return &tether.CaptureSession{SessionID: "tethertest"}
+		}
+	}
+
 	return &Harness[S]{
 		state:        cfg.State,
 		render:       cfg.Render,
@@ -135,6 +170,7 @@ func New[S any](cfg Config[S]) *Harness[S] {
 		onConnect:    cfg.OnConnect,
 		onDisconnect: cfg.OnDisconnect,
 		layout:       cfg.Layout,
+		session:      sessionFn,
 	}
 }
 
@@ -170,7 +206,7 @@ func (h *Harness[S]) SendSubmit(action string, data map[string]string) {
 // this call, [Harness.State], [Harness.HTML], [Harness.Toast], etc.
 // reflect the result of handling this event.
 func (h *Harness[S]) SendEvent(ev tether.Event) {
-	cs := &tether.CaptureSession{SessionID: "tethertest"}
+	cs := h.session()
 	h.state = h.dispatch(cs, ev)
 	h.last = cs.Effects
 	h.morphKeys = cs.MorphKeys
@@ -318,7 +354,7 @@ func (h *Harness[S]) Connect() {
 	if h.onConnect == nil {
 		panic("tethertest: Connect called but OnConnect is not configured")
 	}
-	h.onConnect(&tether.CaptureSession{SessionID: "tethertest"})
+	h.onConnect(h.session())
 }
 
 // Disconnect triggers the OnDisconnect callback, simulating a client
@@ -327,7 +363,7 @@ func (h *Harness[S]) Disconnect() {
 	if h.onDisconnect == nil {
 		panic("tethertest: Disconnect called but OnDisconnect is not configured")
 	}
-	h.onDisconnect(&tether.CaptureSession{SessionID: "tethertest"})
+	h.onDisconnect(h.session())
 }
 
 // Replaced reports whether the most recent URL change used

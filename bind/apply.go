@@ -154,7 +154,11 @@ func FocusTrap() Option { return Option{"tether-focus-trap", ""} }
 // The default (300ms, configurable via [tether.App].Client.DefaultDebounce)
 // groups rapid keystrokes into a single event. Set a shorter duration
 // for search-as-you-type, or a longer one for expensive operations.
+// Panics if d is negative.
 func Debounce(d time.Duration) Option {
+	if d < 0 {
+		panic("bind: Debounce duration must not be negative")
+	}
 	return Option{"tether-debounce", strconv.Itoa(int(d.Milliseconds()))}
 }
 
@@ -162,8 +166,11 @@ func Debounce(d time.Duration) Option {
 // Unlike [Debounce] which waits for a pause, Throttle fires the first
 // event immediately and drops subsequent events until the interval
 // elapses. Use this for scroll or resize handlers where you want
-// regular updates without flooding the server.
+// regular updates without flooding the server. Panics if d is negative.
 func Throttle(d time.Duration) Option {
+	if d < 0 {
+		panic("bind: Throttle duration must not be negative")
+	}
 	return Option{"tether-throttle", strconv.Itoa(int(d.Milliseconds()))}
 }
 
@@ -490,13 +497,21 @@ func Required(message string) Option { return Option{"tether-required", message}
 
 // MinLength prevents form submission if the field value is shorter
 // than n characters. The message is shown as a validation tooltip.
+// Panics if n is negative.
 func MinLength(n int, message string) Option {
+	if n < 0 {
+		panic("bind: MinLength must not be negative")
+	}
 	return Option{"tether-minlength", strconv.Itoa(n) + " " + message}
 }
 
 // MaxLength prevents form submission if the field value exceeds n
 // characters. The message is shown as a validation tooltip.
+// Panics if n is negative.
 func MaxLength(n int, message string) Option {
+	if n < 0 {
+		panic("bind: MaxLength must not be negative")
+	}
 	return Option{"tether-maxlength", strconv.Itoa(n) + " " + message}
 }
 

@@ -1,6 +1,10 @@
 package tether
 
-import "time"
+import (
+	"time"
+
+	"github.com/jpl-au/tether/dev"
+)
 
 // Timeouts groups duration-based settings for session lifecycle,
 // reconnection, and transport keep-alive.
@@ -290,3 +294,68 @@ const (
 	defaultToastDuration     = 5 * time.Second
 	defaultSyncRetention     = 1 * time.Hour
 )
+
+// logAppliedDefaults logs which configuration fields were left at zero
+// and filled with framework defaults. Only fires in dev mode so
+// production remains quiet. Helps developers understand which values
+// the framework chose on their behalf when debugging timeout or
+// capacity issues.
+func logAppliedDefaults(t Timeouts, l Limits, app App) {
+	if !dev.Enabled() {
+		return
+	}
+
+	var defaults []any
+	add := func(name string, value any) {
+		defaults = append(defaults, name, value)
+	}
+
+	// Timeouts that were defaulted (already filled by caller).
+	if t.Reconnect == defaultReconnectTimeout {
+		add("Timeouts.Reconnect", t.Reconnect)
+	}
+	if t.Pending == defaultPendingTimeout {
+		add("Timeouts.Pending", t.Pending)
+	}
+	if t.Heartbeat == defaultHeartbeatInterval {
+		add("Timeouts.Heartbeat", t.Heartbeat)
+	}
+	if t.Retry == defaultRetryDelay {
+		add("Timeouts.Retry", t.Retry)
+	}
+	if t.MaxRetry == defaultMaxRetryDelay {
+		add("Timeouts.MaxRetry", t.MaxRetry)
+	}
+	if t.BackoffMultiplier == defaultBackoffMultiplier {
+		add("Timeouts.BackoffMultiplier", t.BackoffMultiplier)
+	}
+	if t.PendingCheck == defaultPendingCheckInterval {
+		add("Timeouts.PendingCheck", t.PendingCheck)
+	}
+
+	// Limits that were defaulted.
+	if l.MaxEventBytes == defaultMaxEventBytes {
+		add("Limits.MaxEventBytes", l.MaxEventBytes)
+	}
+	if l.MaxPushSubscriptionBytes == defaultMaxPushSubscriptionBytes {
+		add("Limits.MaxPushSubscriptionBytes", l.MaxPushSubscriptionBytes)
+	}
+	if l.CmdBufferSize == defaultCmdBufferSize {
+		add("Limits.CmdBufferSize", l.CmdBufferSize)
+	}
+	if l.MaxNavigateRedirects == defaultMaxNavigateRedirects {
+		add("Limits.MaxNavigateRedirects", l.MaxNavigateRedirects)
+	}
+
+	// App-level defaults.
+	if app.MaxPending == defaultMaxPending {
+		add("App.MaxPending", app.MaxPending)
+	}
+	if app.ShutdownGrace == defaultShutdownGrace {
+		add("App.ShutdownGrace", app.ShutdownGrace)
+	}
+
+	if len(defaults) > 0 {
+		dev.Debug("applied default configuration", defaults...)
+	}
+}

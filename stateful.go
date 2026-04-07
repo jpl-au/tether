@@ -162,6 +162,11 @@ func Stateful[S any](app App, cfg StatefulConfig[S]) *Handler[S] {
 		cfg.Timeouts.PendingCheck = defaultPendingCheckInterval
 	}
 
+	// Log which defaults were applied so developers can see what the
+	// framework chose on their behalf. Only fires in dev mode to avoid
+	// noise in production.
+	logAppliedDefaults(cfg.Timeouts, cfg.Limits, app)
+
 	// Validate boundaries now that defaults are applied.
 	if cfg.Timeouts.Retry > cfg.Timeouts.MaxRetry {
 		panic("tether: Timeouts.Retry must not exceed Timeouts.MaxRetry")

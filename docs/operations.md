@@ -90,13 +90,14 @@ TETHER_DEV=1 go run .
 Dev mode does the following:
 
 1. **No service worker** - unregisters the service worker scoped to this handler's endpoint and skips registration, so you always get fresh assets. Workers registered by other handlers on the same origin are left alone
-2. **Graceful reconnect** - when the server goes away, the page stays visible with a "Reconnecting…" bar. Once the server comes back, the client syncs the current URL so the server re-renders without a page reload. The page is never destroyed on disconnect or reconnect.
+2. **Graceful reconnect** - when the server goes away, the page stays visible with a "Reconnecting..." bar. Once the server comes back, the client syncs the current URL so the server re-renders without a page reload. The page is never destroyed on disconnect or reconnect.
 3. **No caching** - sets `Cache-Control: no-store` on all responses
 4. **Debug logging** - the default logger uses DEBUG level (when no Logger is provided)
 5. **Visual flash** - morphed DOM elements flash with a blue outline
 6. **Console logging** - events, patches, and morphs are logged to the browser console
 7. **Per-session diagnostics** - all session-level debug logging (events, diffs, reconnections, group membership, etc.) is gated behind dev mode via `dev.Debug`. In production with dev mode off, none of this output fires. For structured observability, use `OnStructuralChange` and `OnNoPatch` callbacks instead
 8. **Discarded effect warnings** - logs a warning when a handler panic discards buffered side effects (Toast, Signal, Navigate, etc.)
+9. **Configuration audit** - logs which Timeouts, Limits, and App fields were left at zero and filled with framework defaults. When a timeout or buffer size isn't behaving as expected, check this log to see whether the framework chose a default you didn't intend
 
 ### Filesystem asset watching
 
