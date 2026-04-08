@@ -60,7 +60,7 @@ Tether provides three primitives for cross-session reactivity. They share a comm
 `Bus[T]` is the general-purpose pub/sub mechanism. It routes typed domain events to subscribers. Any session from any handler can subscribe, because Bus is parameterised on the **event type**, not the state type:
 
 ```go
-var messages = tether.NewBus[MessageSent]()
+var messages = tether.NewBus[MessageSent]("messages")
 
 // Publish from anywhere
 messages.Publish(MessageSent{Text: "hello"})
@@ -81,7 +81,7 @@ See [broadcasting](broadcasting.md#bus---typed-cross-session-events) for the ful
 2. **Immediate sync**  - when a session subscribes, the callback fires once with the current value so the session starts in sync
 
 ```go
-var onlineCount = tether.NewValue(0)
+var onlineCount = tether.NewValue(0, "online-count")
 
 // Update from anywhere
 onlineCount.Update(func(n int) int { return n + 1 })

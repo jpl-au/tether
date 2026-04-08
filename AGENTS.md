@@ -387,6 +387,22 @@ deterministic concurrency testing.
 | **Bus[E]** | Event type | Discrete domain events across handlers (chat messages, notifications) |
 | **Value[V]** | Value type | Shared observable state all sessions should track (online count, config) |
 
+### Cluster (cross-node)
+
+Bus and Value support cross-node distribution via the `Cluster`
+interface. Set `App.Cluster` and add a topic to BusConfig or
+NewValue:
+
+```go
+app := tether.App{Cluster: tetheredis.New(rdb)}
+var messages = tether.NewBus[Message](tether.BusConfig{Topic: "messages"})
+var online   = tether.NewValue(0, "online-count")
+```
+
+Group stays local. Cross-node broadcasting flows through Bus events -
+emit the cause, let each node's WatchBus apply it. See
+[cluster](docs/cluster.md) for details.
+
 ## Diagnostics
 
 `Handler.Diagnostics` is a `Bus[Diagnostic]` that emits framework-level
@@ -456,6 +472,8 @@ Subscriptions are cleaned up automatically when the session is destroyed.
 | `bus.go` | Bus - typed pub/sub with atomic reads and copy-on-write |
 | `group.go` | Group - session pool with Broadcast/BroadcastOthers/Each |
 | `value.go` | Value - shared observable state with Bus internally |
+| `cluster.go` | Cluster interface, topic registry, CBOR envelopes, self-filtering |
+| `tetheredis/` | Redis Pub/Sub Cluster implementation (separate module) |
 | `observe.go` | Observe - atomic subscribe + initial value delivery |
 | `emit.go` | On - subscribe a session to a Bus with sender filtering |
 | `watcher.go` | Watcher interface, WatchValue, WatchBus - declarative StatefulConfig subscriptions |

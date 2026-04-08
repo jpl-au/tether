@@ -33,13 +33,13 @@ For auto-registration, pass groups via `StatefulConfig.Groups`.
 Typed pub/sub for cross-session communication. Create one per event type at program startup and share it across handlers:
 
 ```go
-var messages = tether.NewBus[MessageSent]()
+var messages = tether.NewBus[MessageSent]("messages")
 ```
 
 An optional `BusConfig` can customise async subscriber behaviour:
 
 ```go
-var events = tether.NewBus[Event](tether.BusConfig{
+var events = tether.NewBus[Event]("events", tether.BusConfig{
     AsyncWorkers:  128,           // default 64
     AsyncOverflow: tether.Drop,   // default Block
 })
@@ -122,7 +122,7 @@ Bus is parameterised on the **event type** - any session can subscribe regardles
 Shared observable state that notifies sessions when it changes. Built on top of Bus internally:
 
 ```go
-var onlineCount = tether.NewValue(0)
+var onlineCount = tether.NewValue(0, "online-count")
 ```
 
 ### Reading and writing

@@ -2,6 +2,7 @@ package tether
 
 import (
 	"context"
+	"fmt"
 	"maps"
 	"sync"
 	"sync/atomic"
@@ -36,6 +37,12 @@ const (
 // BusConfig customises the behaviour of a [Bus]. Pass to [NewBus]
 // to override defaults.
 type BusConfig struct {
+	// Topic enables cluster distribution for this bus. When set and
+	// a [Cluster] is configured on [App], events are published to
+	// the cluster topic and remote events are delivered to local
+	// subscribers. Leave empty for local-only operation.
+	Topic string
+
 	// AsyncWorkers limits the number of concurrent goroutines for
 	// async subscribers. Each publication acquires a semaphore slot
 	// before spawning a goroutine. Default 64.
@@ -62,12 +69,17 @@ type emitter interface {
 // Bus routes typed domain events to subscribers. Create one per event
 // type at program startup and share it across handlers:
 //
-//	var messages = tether.NewBus[MessageSent]()
+//	var messages = tether.NewBus[MessageSent](tether.BusConfig{Topic: "messages"})
 //
 // Bus enables cross-handler communication that [Group] cannot provide.
 // Group requires all sessions to share the same state type. Bus is
 // parameterised on the event type, so any session can subscribe
 // regardless of its state.
+//
+// When created with a [BusConfig] containing a Topic, the Bus
+// publishes events to the cluster (if configured on [App]) and
+// receives events from other nodes. Without a Topic, the Bus is
+// local-only.
 //
 // Internally the subscriber map is stored in an [atomic.Value] so
 // publish is completely lock-free. Subscribe and unsubscribe use a
@@ -87,6 +99,14 @@ type Bus[E any] struct {
 	nextID   uint64
 	sem      chan struct{} // bounds concurrent async goroutines
 	overflow AsyncOverflow
+
+	// topic is the cluster topic name. Empty means local-only.
+	topic string
+
+	// clusterOnce ensures we subscribe to the cluster topic at most
+	// once, lazily on first publish or explicit subscribe.
+	clusterOnce  sync.Once
+	clusterUnsub func()
 }
 
 type subscriber[E any] struct {
@@ -96,16 +116,21 @@ type subscriber[E any] struct {
 	async     bool            // true for SubscribeAsync subscribers
 }
 
-// NewBus creates an empty bus ready to accept subscribers. An optional
-// [BusConfig] can be provided to customise async worker limits and
-// overflow behaviour. Without config, async subscribers are bounded to
-// 64 concurrent workers and the publisher blocks when the semaphore
-// is full.
+// NewBus creates an empty bus ready to accept subscribers. The topic
+// An optional [BusConfig] can be provided to customise async worker
+// limits, overflow behaviour, and cluster topic. Without config, the
+// bus operates locally with 64 concurrent async workers and blocks
+// when the semaphore is full.
+//
+//	var messages = tether.NewBus[MessageSent](tether.BusConfig{Topic: "messages"})
+//	var local    = tether.NewBus[InternalEvent]()
 func NewBus[E any](cfg ...BusConfig) *Bus[E] {
+	var topic string
 	workers := defaultAsyncWorkers
 	overflow := Block
 	if len(cfg) > 0 {
 		c := cfg[0]
+		topic = c.Topic
 		if c.AsyncWorkers > 0 {
 			workers = c.AsyncWorkers
 		}
@@ -113,9 +138,13 @@ func NewBus[E any](cfg ...BusConfig) *Bus[E] {
 			overflow = c.AsyncOverflow
 		}
 	}
+	if topic != "" {
+		registerTopic(fmt.Sprintf("tether:bus:%s", topic))
+	}
 	b := &Bus[E]{
 		sem:      make(chan struct{}, workers),
 		overflow: overflow,
+		topic:    topic,
 	}
 	b.subs.Store(make(map[uint64]subscriber[E]))
 	return b
@@ -134,13 +163,19 @@ func NewBus[E any](cfg ...BusConfig) *Bus[E] {
 //     immediately in the caller's goroutine - deterministic in tests,
 //     harmless during pre-warm (no subscribers).
 func (b *Bus[E]) Emit(s Session, event E) {
+	b.initCluster()
 	if em, ok := s.(emitter); ok {
 		sid := em.sessionID()
-		em.enqueue(func() { b.publish(event, sid) })
+		em.enqueue(func() {
+			b.publish(event, sid)
+			b.clusterPublish(event, sid)
+		})
 		return
 	}
 	// Partial session without emitter: synchronous publish.
-	b.publish(event, s.ID())
+	sid := s.ID()
+	b.publish(event, sid)
+	b.clusterPublish(event, sid)
 }
 
 // Publish sends an event to all subscribers with no sender filter.
@@ -151,8 +186,13 @@ func (b *Bus[E]) Emit(s Session, event E) {
 // Session-bound subscribers (registered via [On]) are non-blocking
 // because they route through the session's command channel, but raw
 // [Subscribe] callbacks that block will stall the caller.
+//
+// If the bus has a cluster topic and a cluster is configured, the
+// event is also published to the cluster after local delivery.
 func (b *Bus[E]) Publish(event E) {
+	b.initCluster()
 	b.publish(event, "")
+	b.clusterPublish(event, "")
 }
 
 // Subscribe registers a callback that receives every event (no sender

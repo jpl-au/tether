@@ -101,6 +101,10 @@ func Stateful[S any](app App, cfg StatefulConfig[S]) *Handler[S] {
 		cfg.Handle = Chain(cfg.Handle, cfg.Middleware)
 	}
 
+	if app.Cluster != nil {
+		SetCluster(app.Cluster)
+	}
+
 	app.initLog()
 	if cfg.Protocol == 0 {
 		switch os.Getenv("TETHER_PROTO") {

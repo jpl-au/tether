@@ -106,4 +106,10 @@ type App struct {
 	// sessions under the global MaxSessions limit. Zero defaults to
 	// 128.
 	MaxPending int
+
+	// Cluster enables cross-node communication for [Bus] and [Value].
+	// When set, any Bus or Value created with a topic name publishes
+	// state changes to the cluster and subscribes to changes from
+	// other nodes. See [Cluster] for the interface contract.
+	Cluster Cluster
 }

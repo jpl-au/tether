@@ -161,7 +161,7 @@ session's own entry.
 `tether.Bus` routes typed domain events to subscribers. Unlike Group, Bus is parameterised on the **event type** rather than the state type, so sessions from different handlers can communicate:
 
 ```go
-var messages = tether.NewBus[MessageSent]()
+var messages = tether.NewBus[MessageSent]("messages")
 ```
 
 Subscribe a session declaratively via `StatefulConfig.Watchers`:
@@ -231,7 +231,7 @@ Register raw subscriptions via a `Setup(ctx context.Context)` function called fr
 
 ```go
 // handler/messages.go
-var messageBus = tether.NewBus[MessageSent]()
+var messageBus = tether.NewBus[MessageSent]("messages")
 
 func Setup(ctx context.Context) {
     messageBus.Subscribe(ctx, func(msg MessageSent) {
@@ -270,7 +270,7 @@ messageBus.SubscribeAsync(ctx, func(msg MessageSent) {
 `tether.Value` holds a single value that sessions can observe. When the value changes, all observers are notified automatically. Built on Bus internally:
 
 ```go
-var onlineCount = tether.NewValue(0)
+var onlineCount = tether.NewValue(0, "online-count")
 ```
 
 Observe declaratively via `StatefulConfig.Watchers` - the current value is delivered immediately on connect:

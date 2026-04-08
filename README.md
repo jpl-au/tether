@@ -129,6 +129,24 @@ reconnect window, freeing Go memory. Set `StatefulConfig.DiffStore` to enable. T
 a memory optimisation, not a recovery mechanism. See [store](docs/store.md) for
 details.
 
+## Cluster
+
+Bus and Value are in-process by default. For multi-node deployments,
+set a Cluster on App and add topic names to the primitives you want
+distributed:
+
+```go
+app := tether.App{
+    Cluster: tetheredis.New(rdb),
+}
+var messages = tether.NewBus[Message](tether.BusConfig{Topic: "messages"})
+var online   = tether.NewValue(0, "online-count")
+```
+
+Events and values are serialised with CBOR and routed through the
+broker. Groups remain local - cross-node broadcasting flows through
+Bus events. See [cluster](docs/cluster.md) for details.
+
 ## Diagnostics
 
 `Handler.Diagnostics` is a typed event bus for framework-level signals  - 
@@ -153,6 +171,7 @@ for details and examples.
 | [URL routing](docs/routing.md) | `OnNavigate`, `bind.Link`, multi-page apps with the `router` package |
 | [Client-side](docs/client-side.md) | Directives, transitions, JS hooks |
 | [Broadcasting](docs/broadcasting.md) | Groups, broadcast, presence |
+| [Cluster](docs/cluster.md) | Cross-node Bus and Value via Redis or other brokers |
 | [Extensions](docs/extensions.md) | File uploads, service worker, push notifications |
 | [SessionStore](docs/session-store.md) | Session state persistence for crash recovery and node migration |
 | [Frozen mode](docs/frozen-mode.md) | Zero-memory disconnected sessions via `Freeze` |

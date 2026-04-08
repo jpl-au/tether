@@ -32,6 +32,10 @@ func Stateless[S any](app App, cfg StatelessConfig[S]) http.Handler {
 		panic("tether: StatelessConfig.Handle is required")
 	}
 
+	if app.Cluster != nil {
+		SetCluster(app.Cluster)
+	}
+
 	app.initLog()
 
 	// Compose component routing into Handle so that mounted component

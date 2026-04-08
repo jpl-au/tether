@@ -143,7 +143,7 @@ OnConnect: func(sess *tether.StatefulSession[State]) {
 Use `Value` for shared state that sessions observe, `Bus` for discrete events, and `Group` for broadcasting state mutations:
 
 ```go
-var onlineCount = tether.NewValue(0)
+var onlineCount = tether.NewValue(0, "online-count")
 
 OnConnect: func(sess *tether.StatefulSession[State]) {
     onlineCount.Update(func(n int) int { return n + 1 })
