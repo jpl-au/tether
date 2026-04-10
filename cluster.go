@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"sync"
+	"sync/atomic"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/jpl-au/tether/dev"
@@ -33,9 +34,10 @@ type Cluster interface {
 	Subscribe(topic string, fn func(data []byte)) func()
 }
 
-// cluster is the package-level cluster instance, set by SetCluster
+// clusterVal is the package-level cluster instance, set by SetCluster
 // during App initialisation. Buses and Values discover it here.
-var cluster Cluster
+// Uses atomic.Value for safe concurrent read/write.
+var clusterVal atomic.Value
 
 // nodeID uniquely identifies this process. Used for self-filtering
 // so a node does not process its own cluster messages.
@@ -57,7 +59,16 @@ func init() {
 // Safe to call multiple times with the same value (idempotent for
 // the common case of multiple handlers sharing one App).
 func SetCluster(c Cluster) {
-	cluster = c
+	clusterVal.Store(c)
+}
+
+// getCluster returns the current cluster instance, or nil if none is set.
+func getCluster() Cluster {
+	v := clusterVal.Load()
+	if v == nil {
+		return nil
+	}
+	return v.(Cluster)
 }
 
 // registerTopic records a topic name in the global registry. Panics
@@ -84,7 +95,7 @@ func unregisterTopic(topic string) {
 // resetCluster clears the package-level cluster and topic registry.
 // Only for use in tests.
 func resetCluster() {
-	cluster = nil
+	clusterVal = atomic.Value{}
 	topicRegistry.mu.Lock()
 	topicRegistry.topics = make(map[string]bool)
 	topicRegistry.mu.Unlock()
@@ -134,7 +145,11 @@ func unmarshalValueEnvelope(data []byte) (valueEnvelope, error) {
 // clusterPublish sends data to the cluster, logging any error at Warn
 // level. Local operations always succeed regardless of cluster health.
 func clusterPublish(topic string, data []byte) {
-	if err := cluster.Publish(context.Background(), topic, data); err != nil {
+	c := getCluster()
+	if c == nil {
+		return
+	}
+	if err := c.Publish(context.Background(), topic, data); err != nil {
 		dev.Log().Warn("cluster publish failed", "topic", topic, "error", err)
 	}
 }

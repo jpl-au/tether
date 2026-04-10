@@ -18,9 +18,10 @@ self.addEventListener("install", function (e) {
   e.waitUntil(
     caches.open(CACHE_VERSION).then(function (cache) {
       return cache.addAll(PRECACHE_URLS.concat(PRECACHE_EXTRA));
+    }).then(function () {
+      return self.skipWaiting();
     })
   );
-  self.skipWaiting();
 });
 
 // --- Activate: clean old caches ---
@@ -33,9 +34,10 @@ self.addEventListener("activate", function (e) {
           .filter(function (k) { return k !== CACHE_VERSION; })
           .map(function (k) { return caches.delete(k); })
       );
+    }).then(function () {
+      return self.clients.claim();
     })
   );
-  self.clients.claim();
 });
 
 // --- Fetch: serve cached assets and page shells ---
@@ -78,7 +80,13 @@ self.addEventListener("fetch", function (e) {
           return resp;
         })
         .catch(function () {
-          return caches.match(e.request);
+          return caches.match(e.request).then(function (cached) {
+            return cached || new Response("Offline", {
+              status: 503,
+              statusText: "Service Unavailable",
+              headers: { "Content-Type": "text/plain" }
+            });
+          });
         })
     );
     return;
@@ -91,7 +99,10 @@ self.addEventListener("fetch", function (e) {
 // --- Push notifications ---
 
 self.addEventListener("push", function (e) {
-  var data = e.data ? e.data.json() : {};
+  var data = {};
+  if (e.data) {
+    try { data = e.data.json(); } catch (_) {}
+  }
   var title = data.title || "Notification";
   var opts = {
     body: data.body || "",

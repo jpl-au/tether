@@ -39,11 +39,25 @@
     root.addEventListener("touchmove", onTouchMove, { passive: true });
     root.addEventListener("touchend", onTouchEnd);
 
+    // Suppress the browser context menu on long-press targets so the
+    // tether long-press action fires without the native menu appearing.
+    root.addEventListener("contextmenu", function (e) {
+      var target = e.target.nodeType === 1 ? e.target : e.target.parentElement;
+      if (target && target.closest("[data-tether-longpress]")) {
+        e.preventDefault();
+      }
+    });
+
     log("init");
   }
 
   function onTouchStart(e) {
     if (!e.touches.length) return;
+    // Ignore multi-touch -- only track single-finger gestures.
+    if (e.touches.length > 1) {
+      cancelLongPress();
+      return;
+    }
     var touch = e.touches[0];
     touchStartX = touch.clientX;
     touchStartY = touch.clientY;
@@ -51,10 +65,12 @@
 
     // Start long-press timer if the target is inside a longpress element.
     cancelLongPress();
-    var el = e.target.closest("[data-tether-longpress]");
+    var target = e.target.nodeType === 1 ? e.target : e.target.parentElement;
+    var el = target ? target.closest("[data-tether-longpress]") : null;
     if (el) {
       longPressTarget = el;
       longPressTimer = setTimeout(function () {
+        if (!document.contains(el)) return;
         fireLongPress(el);
         longPressTarget = null;
       }, holdTime);
@@ -89,7 +105,8 @@
 
     if (absDx < minDistance && absDy < minDistance) return;
 
-    var el = e.target.closest("[data-tether-swipe]");
+    var target = e.target.nodeType === 1 ? e.target : e.target.parentElement;
+    var el = target ? target.closest("[data-tether-swipe]") : null;
     if (!el) return;
 
     var direction;

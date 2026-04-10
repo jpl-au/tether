@@ -281,15 +281,27 @@ func TestCopyToClipboard(t *testing.T) {
 
 func TestHotkey(t *testing.T) {
 	html := string(bind.Apply(div.New(), bind.Hotkey("ctrl+k", "search.open")).Render())
-	if !strings.Contains(html, `data-tether-hotkey-ctrl-k="search.open"`) {
+	if !strings.Contains(html, `data-tether-hotkey="ctrl-k search.open"`) {
 		t.Errorf("missing hotkey attribute in:\n%s", html)
 	}
 }
 
 func TestHotkeyNormalisesPlus(t *testing.T) {
 	html := string(bind.Apply(div.New(), bind.Hotkey("ctrl+shift+p", "palette")).Render())
-	if !strings.Contains(html, `data-tether-hotkey-ctrl-shift-p="palette"`) {
+	if !strings.Contains(html, `data-tether-hotkey="ctrl-shift-p palette"`) {
 		t.Errorf("missing normalised hotkey in:\n%s", html)
+	}
+}
+
+func TestHotkeySpecialCharacters(t *testing.T) {
+	html := string(bind.Apply(div.New(), bind.Hotkey("ctrl+/", "help")).Render())
+	if !strings.Contains(html, `data-tether-hotkey="ctrl-/ help"`) {
+		t.Errorf("missing hotkey with slash in:\n%s", html)
+	}
+
+	html = string(bind.Apply(div.New(), bind.Hotkey("shift+?", "search")).Render())
+	if !strings.Contains(html, `data-tether-hotkey="shift-? search"`) {
+		t.Errorf("missing hotkey with question mark in:\n%s", html)
 	}
 }
 

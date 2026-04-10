@@ -311,23 +311,31 @@ func (b *Bus[E]) publish(event E, senderID string) {
 // fast path acquires a slot without blocking. When the semaphore is
 // full, the configured overflow strategy applies.
 func (b *Bus[E]) dispatchAsync(fn func(E), event E) {
+	wrapped := func() {
+		defer func() {
+			if r := recover(); r != nil {
+				dev.Log().Error("panic in bus subscriber", "panic", r)
+			}
+		}()
+		fn(event)
+	}
 	select {
 	case b.sem <- struct{}{}:
 		go func() {
 			defer func() { <-b.sem }()
-			fn(event)
+			wrapped()
 		}()
 	default:
 		switch b.overflow {
 		case Drop:
 			dev.Log().Warn("tether: async event dropped, semaphore full")
 		case Inline:
-			fn(event)
+			wrapped()
 		default: // Block
 			b.sem <- struct{}{}
 			go func() {
 				defer func() { <-b.sem }()
-				fn(event)
+				wrapped()
 			}()
 		}
 	}

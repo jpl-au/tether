@@ -5,7 +5,10 @@
 // caching navigation responses, or running background sync.
 
 self.addEventListener("push", function (e) {
-  var data = e.data ? e.data.json() : {};
+  var data = {};
+  if (e.data) {
+    try { data = e.data.json(); } catch (_) {}
+  }
   var title = data.title || "Notification";
   var opts = {
     body: data.body || "",

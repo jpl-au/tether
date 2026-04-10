@@ -42,6 +42,11 @@
     var isFileInput = el.tagName === "INPUT" && el.type === "file";
 
     if (isFileInput) {
+      // Clear the value on click (before the file picker opens) so
+      // the browser always sees a change, even if the user picks the
+      // same file again. Clearing on change (after) is too late -
+      // the browser already skipped the event.
+      el.addEventListener("click", function () { el.value = ""; });
       el.addEventListener("change", function () {
         if (el.files && el.files.length > 0) {
           uploadFiles(action, el.files, el);
@@ -89,15 +94,26 @@
     return files;
   }
 
+  // Active uploads keyed by action name. When a new upload starts for
+  // the same action, the previous XHR is aborted so progress signals
+  // don't flicker between competing requests.
+  var activeUploads = {};
+
   // uploadFiles sends files to the server via multipart POST and
   // tracks progress through tether signals.
   function uploadFiles(action, files, triggerEl) {
+    // Abort any in-progress upload for this action.
+    if (activeUploads[action]) {
+      activeUploads[action].abort();
+    }
+
     var formData = new FormData();
     for (var i = 0; i < files.length; i++) {
       formData.append("file", files[i]);
     }
 
     var xhr = new XMLHttpRequest();
+    activeUploads[action] = xhr;
 
     // Progress signal: 0–100.
     Tether.setSignal("upload:" + action + ":progress", "0");
@@ -111,6 +127,7 @@
     });
 
     xhr.addEventListener("load", function () {
+      delete activeUploads[action];
       if (xhr.status >= 200 && xhr.status < 300) {
         Tether.setSignal("upload:" + action + ":progress", "100");
         Tether.setSignal("upload:" + action + ":state", "done");
@@ -120,10 +137,12 @@
     });
 
     xhr.addEventListener("error", function () {
+      delete activeUploads[action];
       Tether.setSignal("upload:" + action + ":state", "error");
     });
 
     xhr.addEventListener("abort", function () {
+      delete activeUploads[action];
       Tether.setSignal("upload:" + action + ":state", "idle");
     });
 

@@ -10,7 +10,7 @@ import (
 // clusterPublish encodes the value and sends it to the cluster. No-op
 // when the Value has no topic or no cluster is configured.
 func (v *Value[V]) clusterPublish(val V) {
-	if v.topic == "" || cluster == nil {
+	if v.topic == "" || getCluster() == nil {
 		return
 	}
 	data, err := cbor.Marshal(val)
@@ -36,12 +36,12 @@ func (v *Value[V]) clusterPublish(val V) {
 // The subscription calls storeLocal to update the value from remote
 // changes without re-publishing to the cluster.
 func (v *Value[V]) initCluster() {
-	if v.topic == "" || cluster == nil {
+	if v.topic == "" || getCluster() == nil {
 		return
 	}
 	v.clusterOnce.Do(func() {
 		topic := fmt.Sprintf("tether:value:%s", v.topic)
-		v.clusterUnsub = cluster.Subscribe(topic, func(data []byte) {
+		v.clusterUnsub = getCluster().Subscribe(topic, func(data []byte) {
 			env, err := unmarshalValueEnvelope(data)
 			if err != nil {
 				dev.Log().Warn("cluster value: failed to decode envelope",

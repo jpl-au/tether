@@ -34,7 +34,8 @@
     // listeners when idiomorph reuses DOM nodes during morphs.
 
     root.addEventListener("dragstart", function (e) {
-      var el = e.target.closest("[data-tether-draggable]");
+      var t = e.target.nodeType === 1 ? e.target : e.target.parentElement;
+      var el = t ? t.closest("[data-tether-draggable]") : null;
       if (!el) return;
       el.classList.add(dragClass);
       var data = collectData(el);
@@ -44,7 +45,8 @@
     });
 
     root.addEventListener("dragend", function (e) {
-      var el = e.target.closest("[data-tether-draggable]");
+      var t = e.target.nodeType === 1 ? e.target : e.target.parentElement;
+      var el = t ? t.closest("[data-tether-draggable]") : null;
       if (el) el.classList.remove(dragClass);
       clearOverStates();
     });

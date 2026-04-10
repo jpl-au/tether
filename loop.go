@@ -138,6 +138,17 @@ func (s *StatefulSession[S]) readTransport(out chan<- Event) {
 			}
 			return
 		}
-		out <- ev
+		// Select on both the send and the transport context so the
+		// goroutine exits promptly when the session is destroyed,
+		// instead of blocking forever on a full channel.
+		ctx := s.transportCtx
+		if ctx == nil {
+			ctx = s.ctx
+		}
+		select {
+		case out <- ev:
+		case <-ctx.Done():
+			return
+		}
 	}
 }

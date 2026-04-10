@@ -3,6 +3,7 @@ package tether
 import (
 	"context"
 	"net/http"
+	"sync"
 
 	jit "github.com/jpl-au/fluent-jit"
 	"github.com/jpl-au/tether/dev"
@@ -221,6 +222,7 @@ func (h *Handler[S]) thaw(sess *StatefulSession[S], r *http.Request, transport T
 	sess.overflowSem = make(chan struct{}, h.cfg.Limits.CmdBufferSize)
 	sess.loopDone = make(chan struct{})
 	sess.destroyed = make(chan struct{})
+	sess.destroyedOnce = sync.Once{}
 	sess.lastURL = env.URL
 	sess.lastTitle = env.Title
 

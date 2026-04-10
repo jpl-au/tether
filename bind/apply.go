@@ -429,16 +429,18 @@ func FlashClass(class string) Option { return Option{"tether-flash-class", class
 // event. The combo format is modifier keys joined with + followed by
 // the key name: "ctrl+k", "escape", "shift+?", "ctrl+shift+p".
 //
-// Multiple hotkeys can be applied to the same element - each creates
-// a unique data attribute:
+// One hotkey per element. For multiple hotkeys, apply each to its
+// own element:
 //
-//	bind.Apply(container,
-//	    bind.Hotkey("ctrl+k", "search.open"),
-//	    bind.Hotkey("escape", "modal.close"),
-//	)
+//	bind.Apply(div.New(), bind.Hotkey("ctrl+k", "search.open"))
+//	bind.Apply(div.New(), bind.Hotkey("escape", "modal.close"))
+//
+// The client runtime builds a registry from [data-tether-hotkey]
+// elements on init and after each morph. Lookups are O(1) per
+// keypress with no CSS selector queries.
 func Hotkey(combo, action string) Option {
-	norm := strings.ReplaceAll(combo, "+", "-")
-	return Option{"tether-hotkey-" + norm, action}
+	norm := strings.ToLower(strings.ReplaceAll(combo, "+", "-"))
+	return Option{"tether-hotkey", norm + " " + action}
 }
 
 // Drag and drop options - mark elements as draggable or as drop

@@ -67,6 +67,38 @@ window.Tether.signals = window.Tether.signals || {};
     }
   }
 
+  // Safe querySelector wrappers. Dynamic values interpolated into CSS
+  // selectors can contain special characters (periods, colons, brackets,
+  // quotes) that cause SyntaxError. These helpers catch the error and
+  // report it via the standard error channel instead of crashing the
+  // caller. Use these for any selector built from server data, user
+  // input, or DOM attribute values.
+
+  function safeQuery(parent, selector) {
+    try {
+      return parent.querySelector(selector);
+    } catch (e) {
+      reportError("render", "invalid selector: " + selector);
+      return null;
+    }
+  }
+
+  function safeQueryAll(parent, selector) {
+    try {
+      return parent.querySelectorAll(selector);
+    } catch (e) {
+      reportError("render", "invalid selector: " + selector);
+      return [];
+    }
+  }
+
+  // Build an attribute selector with the value properly escaped.
+  // Example: attrSelector("data-tether-key", key) returns
+  // '[data-tether-key="<escaped>"]'
+  function attrSelector(attr, value) {
+    return "[" + attr + '="' + CSS.escape(value) + '"]';
+  }
+
   // --- Initialisation ---
 
   document.addEventListener("DOMContentLoaded", function () {
@@ -648,6 +680,13 @@ window.Tether.signals = window.Tether.signals || {};
           applyMorph(msg.morphs[i]);
         }
       }
+
+      // Rebuild the hotkey registry after DOM changes so newly added
+      // or removed hotkey elements are reflected.
+      if (msg.patches || msg.morphs) {
+        buildHotkeyRegistry();
+      }
+
       if (msg.url) {
         if (msg.replace) {
           history.replaceState({}, "", msg.url);
@@ -665,7 +704,7 @@ window.Tether.signals = window.Tether.signals || {};
       }
       if (msg.flash) {
         for (var selector in msg.flash) {
-          var el = document.querySelector(selector);
+          var el = safeQuery(document, selector);
           if (el) {
             el.textContent = msg.flash[selector];
             (function (target) {
@@ -681,7 +720,7 @@ window.Tether.signals = window.Tether.signals || {};
         toast(msg.toast);
       }
       if (msg.scroll_to) {
-        var scrollTarget = document.querySelector(msg.scroll_to);
+        var scrollTarget = safeQuery(document, msg.scroll_to);
         if (scrollTarget) scrollTarget.scrollIntoView({ behavior: "smooth", block: "nearest" });
       }
       if (msg.download) {
@@ -805,13 +844,20 @@ window.Tether.signals = window.Tether.signals || {};
       el.style.transform = "translateY(0)";
     });
 
-    // Animate out and remove
+    // Animate out and remove. The fallback timeout ensures the element
+    // is removed even when CSS transitions are disabled (e.g.
+    // prefers-reduced-motion) and transitionend never fires.
     setTimeout(function () {
       el.style.opacity = "0";
       el.style.transform = "translateY(20px)";
-      el.addEventListener("transitionend", function () {
+      var removed = false;
+      function remove() {
+        if (removed) return;
+        removed = true;
         if (el.parentNode) el.parentNode.removeChild(el);
-      });
+      }
+      el.addEventListener("transitionend", remove);
+      setTimeout(remove, 1000);
     }, toastDuration);
   }
 
@@ -872,7 +918,7 @@ window.Tether.signals = window.Tether.signals || {};
 
     var indicatorSelector = el.getAttribute("data-tether-indicator");
     if (indicatorSelector) {
-      entry.indicator = document.querySelector(indicatorSelector);
+      entry.indicator = safeQuery(document, indicatorSelector);
       if (entry.indicator) entry.indicator.classList.add("tether-pending");
     }
 
@@ -1098,7 +1144,7 @@ window.Tether.signals = window.Tether.signals || {};
   // --- Patching and morphing ---
 
   function applyPatch(patch) {
-    var el = document.querySelector('[data-tether-key="' + patch.key + '"]');
+    var el = safeQuery(document, attrSelector("data-tether-key", patch.key));
     if (!el) return;
 
     if (devMode) {
@@ -1142,7 +1188,7 @@ window.Tether.signals = window.Tether.signals || {};
       }
       var newEl = template.content.firstElementChild;
       if (!newEl) return;
-      var el = document.querySelector('[data-tether-key="' + morph.key + '"]');
+      var el = safeQuery(document, attrSelector("data-tether-key", morph.key));
       if (el) {
         Idiomorph.morph(el, newEl, {callbacks: morphCallbacks});
       }
@@ -1169,19 +1215,19 @@ window.Tether.signals = window.Tether.signals || {};
   // classes, status indicators) that sit outside the morphed content area.
   function updateSignalBindings(key, value) {
     // Text bindings: data-tether-bind-text="signalName"
-    var els = document.querySelectorAll('[data-tether-bind-text="' + key + '"]');
+    var els = safeQueryAll(document, attrSelector("data-tether-bind-text", key));
     for (var i = 0; i < els.length; i++) {
       els[i].textContent = value == null ? "" : String(value);
     }
 
     // Show bindings: data-tether-bind-show="signalName"
-    els = document.querySelectorAll('[data-tether-bind-show="' + key + '"]');
+    els = safeQueryAll(document, attrSelector("data-tether-bind-show", key));
     for (var i = 0; i < els.length; i++) {
       els[i].style.display = isTruthy(value) ? "" : "none";
     }
 
     // Hide bindings: data-tether-bind-hide="signalName"
-    els = document.querySelectorAll('[data-tether-bind-hide="' + key + '"]');
+    els = safeQueryAll(document, attrSelector("data-tether-bind-hide", key));
     for (var i = 0; i < els.length; i++) {
       els[i].style.display = isTruthy(value) ? "none" : "";
     }
@@ -1209,7 +1255,7 @@ window.Tether.signals = window.Tether.signals || {};
     }
 
     // Value bindings: data-tether-bind-value="signalName"
-    els = document.querySelectorAll('[data-tether-bind-value="' + key + '"]');
+    els = safeQueryAll(document, attrSelector("data-tether-bind-value", key));
     for (var i = 0; i < els.length; i++) {
       els[i].value = value == null ? "" : String(value);
     }
@@ -1322,6 +1368,7 @@ window.Tether.signals = window.Tether.signals || {};
     root.addEventListener("click", handleSelectable);
     window.addEventListener("keydown", handleFocusTrap);
     window.addEventListener("keydown", handleHotkeys);
+    buildHotkeyRegistry();
 
     window.addEventListener("popstate", function () {
       sendNavigate(location.pathname + location.search);
@@ -1443,7 +1490,7 @@ window.Tether.signals = window.Tether.signals || {};
       // by field name without the caller needing a form wrapper.
       var collectSelector = target.getAttribute("data-tether-collect");
       if (collectSelector) {
-        document.querySelectorAll(collectSelector).forEach(function (el) {
+        safeQueryAll(document, collectSelector).forEach(function (el) {
           var key = el.name || el.id;
           if (!key) return;
           if (el.type === "checkbox" || el.type === "radio") {
@@ -1458,7 +1505,7 @@ window.Tether.signals = window.Tether.signals || {};
       var collectSelected = target.getAttribute("data-tether-collect-selected");
       if (collectSelected) {
         var ids = [];
-        document.querySelectorAll(collectSelected + " .tether-selected").forEach(function (el) {
+        safeQueryAll(document, collectSelected + " .tether-selected").forEach(function (el) {
           var id = el.getAttribute("data-tether-data-id");
           if (id) ids.push(id);
         });
@@ -1741,7 +1788,7 @@ window.Tether.signals = window.Tether.signals || {};
     if (!trigger) return;
 
     var targetSelector = trigger.getAttribute("data-tether-toggle-target");
-    var target = targetSelector ? document.querySelector(targetSelector) : trigger;
+    var target = targetSelector ? safeQuery(document, targetSelector) : trigger;
     if (!target) return;
 
     var toggleClass = trigger.getAttribute("data-tether-toggle-class");
@@ -1857,7 +1904,7 @@ window.Tether.signals = window.Tether.signals || {};
     if (!trigger) return;
 
     var selector = trigger.getAttribute("data-tether-copy");
-    var source = document.querySelector(selector);
+    var source = safeQuery(document, selector);
     if (!source) return;
 
     var text = source.value !== undefined && source.value !== "" ? source.value : source.textContent;
@@ -1878,29 +1925,44 @@ window.Tether.signals = window.Tether.signals || {};
     if (!trigger) return;
 
     var selector = trigger.getAttribute("data-tether-scroll-to");
-    var target = document.querySelector(selector);
+    var target = safeQuery(document, selector);
     if (target) target.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 
   // --- Global hotkeys ---
   //
-  // Elements with data-tether-hotkey-<combo>="<action>" register
-  // global keyboard shortcuts. The combo is in the attribute name
-  // (e.g. data-tether-hotkey-ctrl-k) and the action is the value.
-  // On keydown, all hotkey attributes in the DOM are checked against
-  // the pressed key combo.
+  // Elements with data-tether-hotkey="<combo> <action>" register
+  // global keyboard shortcuts. The combo and action are space-
+  // separated in the attribute value. One hotkey per element.
+  //
+  // The runtime builds a registry (combo → {action, element}) on
+  // init and rebuilds it after each morph. Keydown lookups are O(1)
+  // with no CSS selector queries, avoiding the selector-injection
+  // issues that arise from putting key names in attribute names.
 
-  var hotkeyPrefix = "data-tether-hotkey-";
+  var hotkeyRegistry = {};
+
+  function buildHotkeyRegistry() {
+    hotkeyRegistry = {};
+    if (!root) return;
+    var els = root.querySelectorAll("[data-tether-hotkey]");
+    for (var i = 0; i < els.length; i++) {
+      var val = els[i].getAttribute("data-tether-hotkey");
+      var spaceIdx = val.indexOf(" ");
+      if (spaceIdx === -1) continue;
+      var combo = val.substring(0, spaceIdx);
+      var action = val.substring(spaceIdx + 1);
+      hotkeyRegistry[combo] = { action: action, el: els[i] };
+    }
+  }
 
   function handleHotkeys(e) {
-    // Build the combo string from the pressed key and modifiers.
     var parts = [];
     if (e.ctrlKey || e.metaKey) parts.push("ctrl");
     if (e.shiftKey) parts.push("shift");
     if (e.altKey) parts.push("alt");
 
     var key = e.key.toLowerCase();
-    // Normalise special keys.
     if (key === " ") key = "space";
     if (key !== "control" && key !== "shift" && key !== "alt" && key !== "meta") {
       parts.push(key);
@@ -1908,18 +1970,13 @@ window.Tether.signals = window.Tether.signals || {};
     if (parts.length === 0) return;
 
     var combo = parts.join("-");
-
-    // Find any element with a matching hotkey attribute.
-    var attr = hotkeyPrefix + combo;
-    var el = root ? root.querySelector("[" + attr + "]") : null;
-    if (!el) return;
-
-    var action = el.getAttribute(attr);
-    if (!action) return;
+    var entry = hotkeyRegistry[combo];
+    if (!entry) return;
 
     e.preventDefault();
 
-    var prefix = findPrefix(el);
+    var action = entry.action;
+    var prefix = findPrefix(entry.el);
     if (prefix && action.indexOf(prefix + ".") !== 0) {
       action = prefix + "." + action;
     }

@@ -568,6 +568,28 @@ func (h *Handler[S]) restoreSession(id string, r *http.Request, transport Transp
 
 	go sess.run()
 
+	// Recover from panics during session restoration (OnRestore,
+	// OnConnect, component mounts, watcher subscriptions). Without
+	// this, a panic kills the HTTP goroutine silently, leaving a
+	// zombie session in the run loop.
+	defer func() {
+		if r := recover(); r != nil {
+			err := panicErr(r)
+			dev.Log().Error("panic during session restoration",
+				"session", sess.id,
+				"endpoint", sess.endpoint,
+				"panic", r,
+			)
+			sess.emitDiagnostic(Diagnostic{
+				Kind:      HandlerPanic,
+				SessionID: sess.id,
+				Err:       err,
+				Detail:    "session restoration",
+			})
+			sess.stop()
+		}
+	}()
+
 	// Send the restored content to the client. The differ is seeded
 	// with the current state, so Diff returns empty patches (nothing
 	// changed). Render the tree as a full morph and include the saved

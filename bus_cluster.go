@@ -11,7 +11,7 @@ import (
 // the bus has no topic or no cluster is configured. Errors are logged
 // at Warn level - local delivery always succeeds regardless.
 func (b *Bus[E]) clusterPublish(event E, senderID string) {
-	if b.topic == "" || cluster == nil {
+	if b.topic == "" || getCluster() == nil {
 		return
 	}
 	data, err := cbor.Marshal(event)
@@ -38,12 +38,12 @@ func (b *Bus[E]) clusterPublish(event E, senderID string) {
 // The subscription delivers remote events to local subscribers with
 // self-filtering by node ID.
 func (b *Bus[E]) initCluster() {
-	if b.topic == "" || cluster == nil {
+	if b.topic == "" || getCluster() == nil {
 		return
 	}
 	b.clusterOnce.Do(func() {
 		topic := fmt.Sprintf("tether:bus:%s", b.topic)
-		b.clusterUnsub = cluster.Subscribe(topic, func(data []byte) {
+		b.clusterUnsub = getCluster().Subscribe(topic, func(data []byte) {
 			env, err := unmarshalBusEnvelope(data)
 			if err != nil {
 				dev.Log().Warn("cluster bus: failed to decode envelope",
