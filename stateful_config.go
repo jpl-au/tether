@@ -257,8 +257,8 @@ type StatefulConfig[S any] struct {
 	Limits Limits
 
 	// WireFormat selects the encoding for server-to-client updates.
-	// Defaults to [wire.JSON]. Currently the only supported format;
-	// additional formats (e.g. HTML fragments) will be added in future.
+	// Defaults to [wire.JSON]. Set to [wire.CBOR] for compact binary
+	// encoding that reduces payload size on the wire.
 	WireFormat wire.Format
 
 	// DiffStore provides external persistence for disconnected session

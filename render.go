@@ -11,6 +11,7 @@ import (
 	"github.com/jpl-au/fluent/node"
 	"github.com/jpl-au/tether/dev"
 	"github.com/jpl-au/tether/mode"
+	"github.com/jpl-au/tether/wire"
 )
 
 // extension maps a data attribute marker to the JS file that handles it.
@@ -48,10 +49,12 @@ type tetherBody struct {
 	transitionTimeout time.Duration
 	flashDuration     time.Duration
 	toastDuration     time.Duration
+	wireFormat        wire.Format
 	worker            bool
 	pushKey           string
 	backgroundSync    bool
 	syncRetention     time.Duration
+	runtime           ClientRuntime
 }
 
 func (p *tetherBody) Render(w ...io.Writer) []byte {
@@ -138,29 +141,31 @@ func (p *tetherBody) RenderBuilder(buf *bytes.Buffer) {
 	if dev.Enabled() {
 		buf.WriteString(` data-tether-dev`)
 	}
+	// Only emit wire format for non-default encodings. JSON is the
+	// default, so absence means JSON.
+	if p.wireFormat != wire.JSON {
+		buf.WriteString(` data-tether-wire-format="`)
+		buf.WriteString(p.wireFormat.String())
+		buf.WriteString(`"`)
+	}
+	rt := p.runtime
+	if rt == nil {
+		rt = Runtime.Default()
+	}
+	rt.writeAttributes(buf)
 	buf.WriteString(`>`)
 	buf.Write(p.html)
+	rt.writeScripts(buf, p.html)
 
-	// Append a content hash to all script URLs so browsers fetch fresh
-	// copies after a library upgrade, even without a service worker.
-	v := clientVersion()
-	buf.WriteString("</div>\n<script src=\"/_tether/idiomorph.min.js?v=")
-	buf.WriteString(v)
-	buf.WriteString("\"></script>\n<script src=\"/_tether/tether.js?v=")
-	buf.WriteString(v)
-	buf.WriteString("\"></script>\n")
-
-	// Extension scripts are included only when the rendered HTML uses
-	// the corresponding data attributes. This keeps the client payload
-	// small for apps that don't need optional features.
-	for _, ext := range extensions {
-		if bytes.Contains(p.html, ext.marker) {
-			buf.WriteString("<script src=\"/_tether/")
-			buf.WriteString(ext.script)
-			buf.WriteString("?v=")
-			buf.WriteString(v)
-			buf.WriteString("\"></script>\n")
-		}
+	// Wire format extensions are injected after the runtime scripts.
+	// The extension overrides the default JSON decoder in tether.js
+	// with a format-specific decoder (e.g. CBOR). Only relevant for
+	// the JS runtime; WASM handles decoding in Go.
+	if _, isJS := rt.(jsRuntime); isJS && p.wireFormat == wire.CBOR {
+		v := clientVersion()
+		buf.WriteString("<script src=\"/_tether/tether-wire-cbor.js?v=")
+		buf.WriteString(v)
+		buf.WriteString("\"></script>\n")
 	}
 }
 

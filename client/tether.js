@@ -26,6 +26,11 @@ window.Tether = window.Tether || {};
 window.Tether.hooks = window.Tether.hooks || {};
 window.Tether.signals = window.Tether.signals || {};
 
+// Tether.decode parses a server message from its wire representation.
+// The default is JSON.parse. Wire format extensions (e.g. tether-wire-cbor.js)
+// override this to decode CBOR or other binary formats.
+window.Tether.decode = window.Tether.decode || JSON.parse;
+
 (function () {
   "use strict";
 
@@ -286,7 +291,7 @@ window.Tether.signals = window.Tether.signals || {};
     ws.onmessage = function (e) {
       var msg;
       try {
-        msg = JSON.parse(e.data);
+        msg = window.Tether.decode(e.data);
       } catch (err) {
         reportError("parse", "failed to parse WebSocket message: " + err, true);
         return;
@@ -344,7 +349,7 @@ window.Tether.signals = window.Tether.signals || {};
     eventSource.onmessage = function (e) {
       var msg;
       try {
-        msg = JSON.parse(e.data);
+        msg = window.Tether.decode(e.data);
       } catch (err) {
         reportError("parse", "failed to parse SSE message: " + err, true);
         return;

@@ -74,6 +74,7 @@ func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 		endpoint:          r.URL.Path,
 		session:           id,
 		transport:         h.cfg.Mode,
+		wireFormat:        h.wireFormat,
 		retryDelay:        h.cfg.Timeouts.Retry,
 		maxRetryDelay:     h.cfg.Timeouts.MaxRetry,
 		backoffMultiplier: h.cfg.Timeouts.BackoffMultiplier,
@@ -86,6 +87,7 @@ func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 		pushKey:           pushKey,
 		backgroundSync:    h.app.Client.BackgroundSync,
 		syncRetention:     h.app.Client.SyncRetention,
+		runtime:           h.app.Client.Runtime,
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -280,6 +282,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		handle:               h.cfg.Handle,
 		engine:               h.engine(differ, state, !stale),
 		encoder:              h.encoder,
+		wireFormat:           h.wireFormat,
 		transport:            transport,
 		transportCtx:         tctx,
 		transportCancel:      tcancel,
@@ -502,6 +505,7 @@ func (h *Handler[S]) restoreSession(id string, r *http.Request, transport Transp
 		handle:               h.cfg.Handle,
 		engine:               h.engine(differ, state, true),
 		encoder:              h.encoder,
+		wireFormat:           h.wireFormat,
 		transport:            transport,
 		transportCtx:         tctx,
 		transportCancel:      tcancel,

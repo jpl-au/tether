@@ -193,6 +193,13 @@ func Stateful[S any](app App, cfg StatefulConfig[S]) *Handler[S] {
 	mounts := app.mountAssets()
 	csrf := app.Security.csrf()
 
+	// Resolve the effective wire format: per-handler config takes
+	// precedence, then the app-level default, then JSON.
+	wf := cfg.WireFormat
+	if wf == 0 && app.WireFormat != 0 {
+		wf = app.WireFormat
+	}
+
 	h := &Handler[S]{
 		app:           app,
 		cfg:           cfg,
@@ -201,7 +208,8 @@ func Stateful[S any](app App, cfg StatefulConfig[S]) *Handler[S] {
 		disconnected:  make(map[string]*StatefulSession[S]),
 		done:          make(chan struct{}),
 		drainNotify:   make(chan struct{}, 1),
-		encoder:       resolveEncoder(cfg.WireFormat),
+		wireFormat:    wf,
+		encoder:       resolveEncoder(wf),
 		clientHandler: app.jsHandler(),
 		assetMounts:   mounts,
 		csrf:          csrf,
@@ -210,25 +218,28 @@ func Stateful[S any](app App, cfg StatefulConfig[S]) *Handler[S] {
 
 	go h.reapPending()
 
-	dev.Log().Info("tether: ready", handlerAttrs(app, cfg)...)
+	dev.Log().Info("tether: ready", handlerAttrs(app, cfg, wf)...)
 
 	return h
 }
 
 // resolveEncoder returns an Encoder for the given wire format. JSON is
-// the default and currently the only supported format.
+// the default; CBOR is available for compact binary encoding.
 func resolveEncoder(f wire.Format) wire.Encoder {
 	switch f {
+	case wire.CBOR:
+		return wire.CBOREncoder{}
 	default:
 		return wire.JSONEncoder{}
 	}
 }
 
 // handlerAttrs builds the slog attribute list for the "tether: ready"
-// startup log. Transport is always present; name, worker, middleware,
-// and dev are included only when set, to keep the line uncluttered.
-func handlerAttrs[S any](app App, cfg StatefulConfig[S]) []any {
-	args := []any{"transport", transportLabel(cfg.Mode), "protocol", cfg.Protocol.String()}
+// startup log. Transport and wire format are always present; name,
+// worker, middleware, and dev are included only when set, to keep the
+// line uncluttered.
+func handlerAttrs[S any](app App, cfg StatefulConfig[S], wf wire.Format) []any {
+	args := []any{"transport", transportLabel(cfg.Mode), "protocol", cfg.Protocol.String(), "wire", wf.String()}
 	if cfg.Name != "" {
 		args = append(args, "name", cfg.Name)
 	}

@@ -38,8 +38,7 @@ tether.Stateful(app, tether.StatefulConfig[State]{
 })
 ```
 
-Same wire format, same API regardless of transport. The encoding is
-selected via `StatefulConfig.WireFormat` (default `wire.JSON`).
+Same wire format, same API regardless of transport.
 
 ## Protocol awareness
 
@@ -212,23 +211,38 @@ A reconnecting indicator bar appears automatically when the connection drops and
 
 ## Wire format
 
-Server-to-client updates are encoded by a `wire.Encoder`. The encoder
-is selected at handler construction time via `StatefulConfig.WireFormat`:
+The wire format controls how server-to-client updates are encoded. Set
+it on `App.WireFormat` for all handlers, or on `StatefulConfig.WireFormat`
+for a specific handler. Per-handler settings override the app default.
 
 ```go
-import "github.com/jpl-au/tether/wire"
+// CBOR for all handlers.
+app := tether.App{
+    WireFormat: wire.CBOR,
+}
 
-tether.Stateful(tether.App{}, tether.StatefulConfig[State]{
-    WireFormat: wire.JSON, // default - currently the only format
-    // ...
+// JSON globally, CBOR for one handler.
+app := tether.App{}
+tether.Stateful(app, tether.StatefulConfig[State]{
+    WireFormat: wire.CBOR,
 })
 ```
 
-`wire.JSON` encodes updates as JSON objects. Additional formats (e.g.
-HTML fragments) will be added in future. The wire format is an internal
-concern - transports receive pre-encoded bytes and the client JS
-handles decoding, so changing the format requires no application code
-changes.
+| Format | Constant | Description |
+|--------|----------|-------------|
+| JSON | `wire.JSON` | Default. Human-readable. Works with any client |
+| CBOR | `wire.CBOR` | Compact binary (RFC 8949). Smaller payloads, faster encoding. The JS client auto-loads a CBOR decoder extension; the WASM client decodes natively |
+
+For SSE transport, CBOR payloads are base64-encoded because SSE is
+text-only. The client handles this transparently. For WebSocket
+transport, CBOR bytes are sent as binary frames with no encoding
+overhead.
+
+The `tether.js` client uses a pluggable `Tether.decode` function.
+JSON is the default (`JSON.parse`). When CBOR is active, the framework
+injects `tether-wire-cbor.js` which overrides `Tether.decode` with a
+lightweight inline CBOR decoder. Custom wire formats can follow the
+same pattern.
 
 The `wire.Encoder` interface:
 

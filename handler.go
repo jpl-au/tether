@@ -54,8 +54,12 @@ type Handler[S any] struct {
 	// clientHandler serves the embedded JS runtime at /_tether/*.
 	clientHandler http.Handler
 
-	// encoder serialises updates for the wire format selected by
-	// StatefulConfig.WireFormat. All sessions inherit this encoder.
+	// wireFormat is the resolved wire format for this handler,
+	// combining App.WireFormat and StatefulConfig.WireFormat.
+	wireFormat wire.Format
+
+	// encoder serialises updates using wireFormat. All sessions
+	// inherit this encoder.
 	encoder wire.Encoder
 
 	// assetMounts serves embedded application assets at their

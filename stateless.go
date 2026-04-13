@@ -161,6 +161,7 @@ func (p *statelessHandler[S]) serveGET(w http.ResponseWriter, r *http.Request) {
 		transitionTimeout: p.app.Client.TransitionTimeout,
 		flashDuration:     p.app.Client.FlashDuration,
 		toastDuration:     p.app.Client.ToastDuration,
+		runtime:           p.app.Client.Runtime,
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

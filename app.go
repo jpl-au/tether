@@ -4,6 +4,8 @@ import (
 	"log/slog"
 	"net/http"
 	"time"
+
+	"github.com/jpl-au/tether/wire"
 )
 
 // App holds configuration shared across all handlers in an
@@ -106,6 +108,11 @@ type App struct {
 	// sessions under the global MaxSessions limit. Zero defaults to
 	// 128.
 	MaxPending int
+
+	// WireFormat selects the default encoding for server-to-client
+	// updates across all handlers. Individual handlers can override
+	// this via [StatefulConfig].WireFormat. The zero value is [wire.JSON].
+	WireFormat wire.Format
 
 	// Cluster enables cross-node communication for [Bus] and [Value].
 	// When set, any Bus or Value created with a topic name publishes

@@ -11,6 +11,7 @@ max pending sessions. Override fields as needed:
 ```go
 app := tether.App{
     DevMode:       true,
+    WireFormat:    wire.CBOR,    // compact binary encoding (default: wire.JSON)
     MaxSessions:   500,
     ShutdownGrace: 15 * time.Second,
     Assets:        []*tether.Asset{assets},
@@ -29,6 +30,7 @@ app := tether.App{
 | `Logger` | `*slog.Logger` | auto | When nil, creates a text handler at INFO (DEBUG in DevMode). The dev package logger is scoped to the framework and never touches the process-wide slog default |
 | `Assets` | `[]*Asset` | nil | Asset collections (embedded or filesystem) - auto-served with content-hashed URLs |
 | `Client` | `Client` | | Browser-side settings (debounce, transitions, flash duration, etc.) |
+| `WireFormat` | `wire.Format` | `wire.JSON` | Default wire encoding for all handlers. Per-handler override via `StatefulConfig.WireFormat` takes precedence |
 | `Security` | `Security` | | CSRF protection and session binding settings |
 
 ---
@@ -139,6 +141,7 @@ When either callback is configured, the framework's own logging for that event i
 | `ToastDuration` | `time.Duration` | 5s | Toast notification auto-dismiss duration |
 | `BackgroundSync` | `bool` | false | Queue failed SSE events in IndexedDB for replay |
 | `SyncRetention` | `time.Duration` | 1h | How long queued events survive before expiry |
+| `Runtime` | `ClientRuntime` | `Runtime.Default()` | Browser-side client implementation. Use `Runtime.WASM("/static/client.wasm")` for a Go WASM client |
 
 ### Extensions
 
@@ -156,7 +159,7 @@ When either callback is configured, the framework's own logging for that event i
 | `Freeze` | `FreezeMode` | Frozen mode for disconnected sessions. `FreezeWithRestore` requires OnRestore; `FreezeWithConnect` falls back to OnConnect. Zero disables. See [frozen mode](frozen-mode.md) |
 | `Protocol` | `protocol.Protocol` | HTTP protocol (default `protocol.Auto` - detects per request). See [transport](transport.md#protocol-awareness) |
 | `Memoise` | `bool` | Use the Memoiser engine instead of the Differ. Render functions must use `node.Memoise` for each Dynamic region. See [engine guide](engine.md#memoiser-opt-in) |
-| `WireFormat` | `wire.Format` | Encoding for server-to-client updates (default `wire.JSON`) |
+| `WireFormat` | `wire.Format` | Encoding for server-to-client updates (default `wire.JSON`). Overrides `App.WireFormat` for this handler |
 
 ### Security
 

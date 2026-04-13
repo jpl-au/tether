@@ -54,4 +54,20 @@
 // JS knows which DOM events to forward. Signal bindings and client-side
 // directives handle interactions that stay in the browser. See the bind
 // sub-package for the full set.
+//
+// # Wire format
+//
+// Server-to-client updates are encoded as JSON by default. Set
+// [App].WireFormat or [StatefulConfig].WireFormat to [wire.CBOR] for
+// smaller, faster binary payloads. The client detects the format
+// automatically - no additional configuration is needed on the browser
+// side.
+//
+// # Client runtime
+//
+// The default client runtime is tether.js, a JavaScript implementation
+// that handles transport, morphing, signals, and event binding. For
+// applications that benefit from shared Go types on both sides of the
+// wire, set [App].Client.Runtime to [Runtime.WASM] to use a Go WASM
+// client instead. See the tether-wasm module for details.
 package tether

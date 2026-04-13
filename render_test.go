@@ -7,6 +7,7 @@ import (
 
 	"github.com/jpl-au/tether/dev"
 	"github.com/jpl-au/tether/mode"
+	"github.com/jpl-au/tether/wire"
 )
 
 func TestTetherBodyScriptHashes(t *testing.T) {
@@ -234,6 +235,171 @@ func TestTetherBodyBackoffAttributes(t *testing.T) {
 		}
 		if strings.Contains(html, "data-tether-jitter") {
 			t.Error("fetch mode should not have jitter attribute")
+		}
+	})
+}
+
+func TestTetherBodyWireFormatAttribute(t *testing.T) {
+	t.Run("CBOR emits data-tether-wire-format", func(t *testing.T) {
+		body := &tetherBody{
+			html:       []byte("<p>hello</p>"),
+			endpoint:   "/app",
+			session:    "abc",
+			wireFormat: wire.CBOR,
+		}
+		var buf bytes.Buffer
+		body.RenderBuilder(&buf)
+		html := buf.String()
+
+		if !strings.Contains(html, `data-tether-wire-format="cbor"`) {
+			t.Error("expected data-tether-wire-format attribute for CBOR")
+		}
+	})
+
+	t.Run("JSON omits data-tether-wire-format", func(t *testing.T) {
+		body := &tetherBody{
+			html:       []byte("<p>hello</p>"),
+			endpoint:   "/app",
+			session:    "abc",
+			wireFormat: wire.JSON,
+		}
+		var buf bytes.Buffer
+		body.RenderBuilder(&buf)
+		html := buf.String()
+
+		if strings.Contains(html, "data-tether-wire-format") {
+			t.Error("JSON should not emit data-tether-wire-format attribute")
+		}
+	})
+}
+
+func TestTetherBodyCBORWireExtension(t *testing.T) {
+	t.Run("JS runtime with CBOR injects tether-wire-cbor.js", func(t *testing.T) {
+		body := &tetherBody{
+			html:       []byte("<p>hello</p>"),
+			endpoint:   "/app",
+			session:    "abc",
+			wireFormat: wire.CBOR,
+			// nil runtime defaults to JS
+		}
+		var buf bytes.Buffer
+		body.RenderBuilder(&buf)
+		html := buf.String()
+
+		if !strings.Contains(html, "tether-wire-cbor.js") {
+			t.Error("expected tether-wire-cbor.js script for CBOR wire format")
+		}
+		// Should also have tether.js
+		if !strings.Contains(html, "tether.js") {
+			t.Error("expected tether.js script")
+		}
+	})
+
+	t.Run("JS runtime with JSON omits tether-wire-cbor.js", func(t *testing.T) {
+		body := &tetherBody{
+			html:       []byte("<p>hello</p>"),
+			endpoint:   "/app",
+			session:    "abc",
+			wireFormat: wire.JSON,
+		}
+		var buf bytes.Buffer
+		body.RenderBuilder(&buf)
+		html := buf.String()
+
+		if strings.Contains(html, "tether-wire-cbor.js") {
+			t.Error("tether-wire-cbor.js should not appear for JSON wire format")
+		}
+	})
+}
+
+func TestTetherBodyWASMRuntime(t *testing.T) {
+	t.Run("WASM runtime emits wasm-src attribute", func(t *testing.T) {
+		body := &tetherBody{
+			html:     []byte("<p>hello</p>"),
+			endpoint: "/app",
+			session:  "abc",
+			runtime:  Runtime.WASM("/static/client.wasm"),
+		}
+		var buf bytes.Buffer
+		body.RenderBuilder(&buf)
+		html := buf.String()
+
+		if !strings.Contains(html, `data-tether-wasm-src="/static/client.wasm"`) {
+			t.Error("expected data-tether-wasm-src attribute")
+		}
+	})
+
+	t.Run("WASM runtime injects tether-wasm.js", func(t *testing.T) {
+		body := &tetherBody{
+			html:     []byte("<p>hello</p>"),
+			endpoint: "/app",
+			session:  "abc",
+			runtime:  Runtime.WASM("/static/client.wasm"),
+		}
+		var buf bytes.Buffer
+		body.RenderBuilder(&buf)
+		html := buf.String()
+
+		if !strings.Contains(html, "tether-wasm.js") {
+			t.Error("expected tether-wasm.js script")
+		}
+	})
+
+	t.Run("WASM runtime does not inject tether.js", func(t *testing.T) {
+		body := &tetherBody{
+			html:     []byte("<p>hello</p>"),
+			endpoint: "/app",
+			session:  "abc",
+			runtime:  Runtime.WASM("/static/client.wasm"),
+		}
+		var buf bytes.Buffer
+		body.RenderBuilder(&buf)
+		html := buf.String()
+
+		if strings.Contains(html, "/_tether/tether.js") {
+			t.Error("WASM runtime should not inject tether.js")
+		}
+		if strings.Contains(html, "/_tether/idiomorph") {
+			t.Error("WASM runtime should not inject idiomorph")
+		}
+	})
+
+	t.Run("WASM runtime with CBOR does not inject tether-wire-cbor.js", func(t *testing.T) {
+		body := &tetherBody{
+			html:       []byte("<p>hello</p>"),
+			endpoint:   "/app",
+			session:    "abc",
+			runtime:    Runtime.WASM("/static/client.wasm"),
+			wireFormat: wire.CBOR,
+		}
+		var buf bytes.Buffer
+		body.RenderBuilder(&buf)
+		html := buf.String()
+
+		// WASM handles CBOR in Go, no JS extension needed.
+		if strings.Contains(html, "tether-wire-cbor.js") {
+			t.Error("WASM runtime should not inject tether-wire-cbor.js")
+		}
+	})
+}
+
+func TestTetherBodyDefaultRuntime(t *testing.T) {
+	t.Run("nil runtime defaults to JS", func(t *testing.T) {
+		body := &tetherBody{
+			html:     []byte("<p>hello</p>"),
+			endpoint: "/app",
+			session:  "abc",
+			// runtime is nil
+		}
+		var buf bytes.Buffer
+		body.RenderBuilder(&buf)
+		html := buf.String()
+
+		if !strings.Contains(html, "tether.js") {
+			t.Error("nil runtime should default to tether.js")
+		}
+		if !strings.Contains(html, "idiomorph") {
+			t.Error("nil runtime should include idiomorph")
 		}
 	})
 }

@@ -1,9 +1,3 @@
-// Package wire defines the encoding abstraction for server-to-client
-// updates. The [Format] type selects which [Encoder] implementation
-// serialises updates into bytes for the transport layer.
-//
-// Currently the only supported format is [JSON]. Additional formats
-// (e.g. HTML fragments) will be added in future.
 package wire
 
 // Format selects the encoding used for updates sent from server to
@@ -15,4 +9,20 @@ const (
 	// patches, morphs, signals, and side effects. This is the
 	// default format.
 	JSON Format = iota
+
+	// CBOR encodes updates as a binary CBOR map (RFC 8949) using
+	// the same field names as the JSON encoder. CBOR produces
+	// smaller payloads and faster encoding at the cost of
+	// human-readability.
+	CBOR
 )
+
+// String returns the lowercase name of the wire format.
+func (f Format) String() string {
+	switch f {
+	case CBOR:
+		return "cbor"
+	default:
+		return "json"
+	}
+}

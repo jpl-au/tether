@@ -56,11 +56,12 @@ type StatefulSession[S any] struct {
 	id    string
 	state S
 
-	render    RenderFunc[S]
-	handle    HandleFunc[S]
-	engine    engine
-	encoder   wire.Encoder
-	transport Transport
+	render     RenderFunc[S]
+	handle     HandleFunc[S]
+	engine     engine
+	encoder    wire.Encoder
+	wireFormat wire.Format
+	transport  Transport
 
 	// Channel pair: events from transport, commands from everything else.
 	events chan Event

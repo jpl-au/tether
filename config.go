@@ -169,6 +169,16 @@ type Client struct {
 	// Zero defaults to 1 hour. Only relevant when BackgroundSync is
 	// enabled.
 	SyncRetention time.Duration
+
+	// Runtime selects the browser-side client implementation injected
+	// after the tether root element. When nil, the framework uses the
+	// default JS runtime (idiomorph and tether.js). Set to
+	// Runtime.WASM() to use a Go WASM client instead.
+	//
+	//     tether.Client{
+	//         Runtime: tether.Runtime.WASM("/static/client.go.wasm"),
+	//     }
+	Runtime ClientRuntime
 }
 
 // defaults fills zero-valued fields with sensible defaults.

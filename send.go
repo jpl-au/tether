@@ -1,6 +1,7 @@
 package tether
 
 import (
+	"encoding/base64"
 	"fmt"
 	"time"
 
@@ -91,6 +92,12 @@ func (s *StatefulSession[S]) send(u wire.Update) {
 			Detail:    s.endpoint,
 		})
 		return
+	}
+	// Binary wire formats (CBOR) must be base64-encoded for
+	// text-only transports like SSE, where raw bytes would
+	// corrupt the event stream framing.
+	if s.wireFormat == wire.CBOR {
+		data = []byte(base64.StdEncoding.EncodeToString(data))
 	}
 	if err := s.transport.Send(data); err != nil {
 		s.emitDiagnostic(Diagnostic{
