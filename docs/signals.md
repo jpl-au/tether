@@ -79,6 +79,20 @@ bind.Apply(button.Text("Like"),
 )
 ```
 
+## Client-side timers - autonomous ticking
+
+Timers tick entirely in the browser. The server controls them by pushing signals - no background goroutines and no per-tick WebSocket messages:
+
+```go
+// Render: attach a timer to an element
+bind.Apply(span.New(), bind.Timer("elapsed"))
+
+// Handle or OnConnect: start the timer
+sess.Signal("elapsed.running", true)
+```
+
+The timer increments (or decrements) a signal locally on each tick and updates the element's text content with the formatted value. See [client-side timers](client-side.md#timers) for the full API including countdown, precision, and completion events.
+
 ## Client-side directives - ephemeral state
 
 For toggle-only UI (drawers, menus, modals) where the server doesn't need to know, use client-side directives. These are covered in [client-side features](client-side.md).
@@ -137,6 +151,7 @@ Pick one update path per element. Use signals for high-frequency updates that by
 | **Signal directives** | None | Tab selection, menu state with server override |
 | **Optimistic updates** | Yes (with instant preview) | Like buttons, checkboxes, toggles |
 | **Client directives** | None | Drawer open/close, modal visibility |
+| **Client-side timers** | Start/stop only | Elapsed time, countdowns, stopwatches |
 
 ---
 

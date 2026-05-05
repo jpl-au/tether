@@ -132,6 +132,7 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
     for (var i = 0; i < cloaked.length; i++) cloaked[i].removeAttribute("data-tether-cloak");
 
     initViewportObserver();
+    scanTimers();
 
     if (transportMode === "fetch") {
       connectionMode = "fetch";
@@ -751,6 +752,7 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
       // appear in the DOM after a morph. This eliminates the need for
       // hidden marker elements on the initial page.
       loadExtensions();
+      scanTimers();
       applyValidation(root);
       bindEditables(root);
 
@@ -1211,6 +1213,7 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
     for (var key in updates) {
       window.Tether.signals[key] = updates[key];
       updateSignalBindings(key, updates[key]);
+      handleTimerSignal(key, updates[key]);
     }
   }
 
@@ -2015,6 +2018,190 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
       Tether.signals[key] = value;
       updateSignalBindings(key, value);
     }
+  }
+
+  // --- Client-side timers ---
+  //
+  // Timers tick entirely in the browser. The server controls them by
+  // pushing signals: "name.running" (boolean) starts/pauses, and
+  // setting "name" to a number resets the value. The element's text
+  // content is automatically updated with the formatted time on each
+  // tick - no BindText needed.
+
+  var timers = {}; // keyed by timer name
+
+  // scanTimers finds all data-tether-timer elements and registers them.
+  // Called on init and after each morph so dynamically added timers are
+  // picked up.
+  function scanTimers() {
+    var els = document.querySelectorAll("[data-tether-timer]");
+    for (var i = 0; i < els.length; i++) {
+      var el = els[i];
+      var name = el.getAttribute("data-tether-timer");
+      if (!name) continue;
+      if (timers[name] && timers[name].el === el) continue;
+
+      // Stop any existing timer with this name before re-registering
+      // (element may have been replaced by a morph).
+      if (timers[name] && timers[name].interval) {
+        clearInterval(timers[name].interval);
+      }
+
+      var countdown = parseFloat(el.getAttribute("data-tether-timer-countdown"));
+      var precision = parseInt(el.getAttribute("data-tether-timer-precision")) || 1000;
+      var format = el.getAttribute("data-tether-timer-format") || "auto";
+      var complete = el.getAttribute("data-tether-timer-complete") || "";
+
+      var t = {
+        el: el,
+        name: name,
+        down: countdown > 0,
+        start: countdown > 0 ? countdown : 0,
+        precision: precision,
+        format: format,
+        complete: complete,
+        interval: null
+      };
+
+      timers[name] = t;
+
+      // Initialise the signal value if not already set by the server.
+      if (Tether.signals[name] === undefined || Tether.signals[name] === null) {
+        Tether.signals[name] = t.start;
+      }
+
+      // Display the initial formatted value.
+      el.textContent = formatTimer(Tether.signals[name], t);
+
+      // If the running signal is already truthy (e.g. server pushed
+      // it before the element appeared), start ticking immediately.
+      if (isTruthy(Tether.signals[name + ".running"])) {
+        startTimer(t);
+      }
+    }
+  }
+
+  // startTimer begins ticking. Each tick updates the signal value in
+  // the local store and refreshes the element text. For count-down
+  // timers reaching zero, the interval is cleared and an optional
+  // completion event is sent back to the server.
+  function startTimer(t) {
+    if (t.interval) return; // already running
+    t.interval = setInterval(function () {
+      var step = t.precision / 1000;
+      var current = typeof Tether.signals[t.name] === "number" ? Tether.signals[t.name] : 0;
+
+      if (t.down) {
+        current -= step;
+        if (current <= 0) {
+          current = 0;
+          Tether.signals[t.name] = current;
+          updateSignalBindings(t.name, current);
+          t.el.textContent = formatTimer(current, t);
+          stopTimer(t);
+          // Fire completion event to the server.
+          if (t.complete) {
+            sendEvent("click", t.complete, {});
+          }
+          return;
+        }
+      } else {
+        current += step;
+      }
+
+      Tether.signals[t.name] = current;
+      updateSignalBindings(t.name, current);
+      t.el.textContent = formatTimer(current, t);
+    }, t.precision);
+  }
+
+  // stopTimer clears the interval and marks the running signal as
+  // false locally so BindShow/BindHide elements react immediately.
+  function stopTimer(t) {
+    if (t.interval) {
+      clearInterval(t.interval);
+      t.interval = null;
+    }
+    // Clear the running signal locally so the client state stays
+    // consistent even if the server does not explicitly push false.
+    Tether.signals[t.name + ".running"] = false;
+    updateSignalBindings(t.name + ".running", false);
+  }
+
+  // handleTimerSignal is called from applySignals when a signal key
+  // matches a registered timer's control or value signal.
+  function handleTimerSignal(key, value) {
+    // Check for "name.running" pattern.
+    if (key.endsWith(".running")) {
+      var name = key.substring(0, key.length - 8);
+      var t = timers[name];
+      if (!t) return;
+      if (isTruthy(value)) {
+        startTimer(t);
+      } else {
+        if (t.interval) {
+          clearInterval(t.interval);
+          t.interval = null;
+        }
+      }
+      return;
+    }
+
+    // Direct value set (e.g. reset to 0, or server sets a specific value).
+    var t = timers[key];
+    if (t && typeof value === "number") {
+      t.el.textContent = formatTimer(value, t);
+    }
+  }
+
+  // formatTimer renders a seconds value using the timer's format.
+  function formatTimer(totalSeconds, t) {
+    var neg = totalSeconds < 0;
+    var s = Math.abs(totalSeconds);
+    var fmt = t.format;
+
+    if (fmt === "auto") {
+      if (s < 60) fmt = "ss";
+      else if (s < 3600) fmt = "mm:ss";
+      else fmt = "hh:mm:ss";
+    }
+
+    var hours = Math.floor(s / 3600);
+    var minutes = Math.floor((s % 3600) / 60);
+    var seconds = Math.floor(s % 60);
+    var frac = s - Math.floor(s);
+
+    var result = "";
+
+    switch (fmt) {
+      case "hh:mm:ss":
+        result = pad(hours) + ":" + pad(minutes) + ":" + pad(seconds);
+        break;
+      case "mm:ss":
+        // Roll hours into minutes for mm:ss format.
+        result = pad(hours * 60 + minutes) + ":" + pad(seconds);
+        break;
+      case "ss":
+        result = String(Math.floor(s));
+        break;
+      case "mm:ss.S":
+        result = pad(hours * 60 + minutes) + ":" + pad(seconds) + "." + Math.floor(frac * 10);
+        break;
+      case "mm:ss.SS":
+        result = pad(hours * 60 + minutes) + ":" + pad(seconds) + "." + pad(Math.floor(frac * 100));
+        break;
+      default:
+        // Unknown format - fall back to auto.
+        if (s < 60) result = String(Math.floor(s));
+        else if (s < 3600) result = pad(minutes) + ":" + pad(seconds);
+        else result = pad(hours) + ":" + pad(minutes) + ":" + pad(seconds);
+    }
+
+    return neg ? "-" + result : result;
+  }
+
+  function pad(n) {
+    return n < 10 ? "0" + n : String(n);
   }
 
   // --- PWA lifecycle events ---

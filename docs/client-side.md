@@ -69,6 +69,96 @@ bind.Apply(div.New(children...), bind.Transition("fade"))
 
 Enter: `tether-{name}-enter` is added before insertion and removed next frame. Leave: `tether-{name}-leave` is added and the node waits for `transitionend` before removal (`TransitionTimeout` fallback, default 5s).
 
+## Timers
+
+Client-side timers tick entirely in the browser. The server controls them by pushing signals - no background goroutines and no per-tick WebSocket messages required.
+
+### Basic elapsed timer
+
+```go
+// Attach a timer to an element. The element's text content is
+// automatically bound to the formatted timer value.
+bind.Apply(span.New(), bind.Timer("elapsed"))
+```
+
+Control the timer from the server by pushing signals:
+
+```go
+sess.Signal("elapsed.running", true)   // start
+sess.Signal("elapsed.running", false)  // pause
+sess.Signal("elapsed", 0)             // reset
+```
+
+The timer counts up from zero at one-second precision with an auto-detected display format (`ss` under a minute, `mm:ss` under an hour, `hh:mm:ss` beyond that).
+
+### Countdown with completion event
+
+```go
+bind.Apply(span.New(),
+    bind.Timer("quiz"),
+    bind.Countdown(30*time.Second),
+    bind.TimerOnComplete("quiz.expired"),
+)
+```
+
+When the countdown reaches zero, it stops automatically and fires `quiz.expired` back to the server as a standard event:
+
+```go
+case "quiz.expired":
+    sess.Toast("Time's up!")
+```
+
+### Sub-second precision
+
+```go
+bind.Apply(span.New(),
+    bind.Timer("stopwatch"),
+    bind.TimerPrecision(100*time.Millisecond),
+    bind.TimerFormat("mm:ss.S"),
+)
+```
+
+### Configuration
+
+All options have sensible defaults. Stack them with `bind.Apply` like any other binding:
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `bind.Timer(name)` | (required) | Attaches a timer and binds the element's text |
+| `bind.Countdown(d)` | Count up | Count down from `d` instead of counting up |
+| `bind.TimerPrecision(d)` | 1 second | Tick interval |
+| `bind.TimerFormat(pattern)` | Auto | Display format (see below) |
+| `bind.TimerOnComplete(action)` | None | Event fired when a countdown reaches zero |
+
+### Signal convention
+
+For a timer named `foo`:
+
+- `foo` - the current value in seconds (number)
+- `foo.running` - boolean controlling start/pause
+
+These are standard signals. You can bind other elements to them with `BindShow`, `BindClass`, etc.:
+
+```go
+// Show a warning when the countdown drops below 10 seconds
+bind.Apply(span.Text("Hurry!"), bind.BindShow("quiz.warning"))
+
+// In Handle, push the warning signal based on the timer value
+sess.Signal("quiz.warning", remaining < 10)
+```
+
+### Display formats
+
+The `auto` format (the default) picks the shortest readable representation based on the current value. For explicit control:
+
+| Format | Example output |
+|--------|---------------|
+| `ss` | `42` |
+| `mm:ss` | `01:42` |
+| `hh:mm:ss` | `01:01:42` |
+| `mm:ss.S` | `01:42.3` |
+| `mm:ss.SS` | `01:42.30` |
+
 ## JS hooks
 
 Integrate third-party JavaScript libraries (charts, maps, rich text editors) via lifecycle hooks:

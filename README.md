@@ -177,6 +177,7 @@ for details and examples.
 | [Frozen mode](docs/frozen-mode.md) | Zero-memory disconnected sessions via `Freeze` |
 | [DiffStore](docs/store.md) | External snapshot persistence for disconnected sessions |
 | [Transport](docs/transport.md) | WebSocket, SSE, resilience |
+| [WASM runtime](docs/wasm.md) | Experimental Go WASM client as an alternative to `tether.js` |
 | [Push notifications](docs/push-notifications.md) | Web Push with VAPID |
 | [Operations](docs/operations.md) | Health check, drain, dev mode, diagnostics, error reporting |
 | [Scaling](docs/scaling.md) | Per-session overhead, horizontal scaling, capacity planning |

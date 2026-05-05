@@ -191,6 +191,21 @@ also calculates the drop index for within-container reordering.
 The `tether-drag-and-drop.js` extension is auto-included when any element
 renders `data-tether-draggable` or `data-tether-sortable`.
 
+### Client-side timers
+
+```go
+bind.Timer("elapsed")                       // count-up timer, 1s precision, auto format
+bind.Countdown(30*time.Second)              // count down from duration
+bind.TimerPrecision(100*time.Millisecond)   // tick interval
+bind.TimerFormat("mm:ss.S")                 // explicit display format
+bind.TimerOnComplete("quiz.expired")        // event on countdown completion
+```
+
+Server controls via signals: `sess.Signal("name.running", true/false)` to
+start/pause, `sess.Signal("name", 0)` to reset. The element's text content
+is automatically bound to the formatted value. See
+[client-side timers](client-side.md#timers) for details.
+
 ### Lifecycle
 
 ```go
