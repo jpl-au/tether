@@ -62,6 +62,36 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
   var pendingCount = 0;
   var eventDataPrefix = "data-tether-data-";
 
+  // --- Extension listener registries ---
+  //
+  // Extensions (tether-hotkey.js, tether-timer.js, ...) and app code
+  // register callbacks for runtime lifecycle moments. Each listener
+  // is guarded: a throwing extension must not break the core or the
+  // other listeners.
+
+  var signalListeners = [];  // fn(key, value) after a signal changes
+  var updateListeners = [];  // fn(root) after a server update applies
+  var addedListeners = [];   // fn(el) after a morph adds an element
+  var removedListeners = []; // fn(el) before a morph removes an element
+
+  function addListener(list, fn) {
+    list.push(fn);
+    return function () {
+      var i = list.indexOf(fn);
+      if (i !== -1) list.splice(i, 1);
+    };
+  }
+
+  function notify(list, a, b) {
+    for (var i = 0; i < list.length; i++) {
+      try {
+        list[i](a, b);
+      } catch (e) {
+        reportError("extension", "listener threw: " + e);
+      }
+    }
+  }
+
   // Report an error or warning to the Tether.onError callback if set.
   // Falls back to console.warn for non-silent errors. The callback is
   // guarded - a throwing error reporter must not abort the runtime
@@ -138,7 +168,6 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
     for (var i = 0; i < cloaked.length; i++) cloaked[i].removeAttribute("data-tether-cloak");
 
     initViewportObserver();
-    scanTimers();
 
     if (transportMode === "fetch") {
       connectionMode = "fetch";
@@ -739,12 +768,6 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
         }
       }
 
-      // Rebuild the hotkey registry after DOM changes so newly added
-      // or removed hotkey elements are reflected.
-      if (msg.patches || msg.morphs) {
-        buildHotkeyRegistry();
-      }
-
       if (msg.url) {
         if (msg.replace) {
           history.replaceState({}, "", msg.url);
@@ -810,12 +833,14 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
       // appear in the DOM after a morph. This eliminates the need for
       // hidden marker elements on the initial page.
       loadExtensions();
-      scanTimers();
       applyValidation(root);
       bindEditables(root);
 
       // Notify extensions that the DOM has been updated so they can
-      // re-scan for new elements (e.g. upload triggers added by a morph).
+      // re-scan for new elements (e.g. hotkeys or timers added by a
+      // morph). Both channels fire: registered onUpdate listeners and
+      // the tether:update DOM event.
+      notify(updateListeners, root);
       document.dispatchEvent(new CustomEvent("tether:update", { detail: { root: root } }));
     });
   }
@@ -1069,6 +1094,7 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
 
     afterNodeAdded: function (newNode) {
       if (newNode.nodeType !== 1) return;
+      notify(addedListeners, newNode);
       callHookDeep(newNode, "mounted");
       reapplySignals(newNode);
       observeViewportElements(newNode);
@@ -1133,6 +1159,7 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
 
     beforeNodeRemoved: function (oldNode) {
       if (oldNode.nodeType !== 1) return true;
+      notify(removedListeners, oldNode);
       callHookDeep(oldNode, "destroyed");
       var name = oldNode.getAttribute("data-tether-transition");
       if (!name) return true;
@@ -1299,11 +1326,18 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
   // changes, all bound elements update instantly - no render, no diff.
   // Signal values are stored in Tether.signals so JS hooks can read them.
 
+  // setSignal is the single write path for signal values - server
+  // pushes, client-side signal actions, and extension writes all land
+  // here, so bindings and onSignalChange listeners always agree.
+  function setSignal(key, value) {
+    window.Tether.signals[key] = value;
+    updateSignalBindings(key, value);
+    notify(signalListeners, key, value);
+  }
+
   function applySignals(updates) {
     for (var key in updates) {
-      window.Tether.signals[key] = updates[key];
-      updateSignalBindings(key, updates[key]);
-      handleTimerSignal(key, updates[key]);
+      setSignal(key, updates[key]);
     }
   }
 
@@ -1463,10 +1497,7 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
     root.addEventListener("click", handleLinks);
     root.addEventListener("click", handleClipboard);
     root.addEventListener("click", handleScrollTo);
-    root.addEventListener("click", handleSelectable);
     window.addEventListener("keydown", handleFocusTrap);
-    window.addEventListener("keydown", handleHotkeys);
-    buildHotkeyRegistry();
 
     window.addEventListener("popstate", function () {
       sendNavigate(location.pathname + location.search);
@@ -1776,55 +1807,6 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
     return id;
   }
 
-  // --- Multi-select ---
-  //
-  // Containers with data-tether-selectable enable click, ctrl+click,
-  // and shift+click selection on children that have data-tether-data-id.
-  // Selection is purely client-side via the tether-selected CSS class.
-  // Use data-tether-collect-selected on an action button to gather IDs.
-
-  var lastSelected = null;
-
-  function handleSelectable(e) {
-    var container = e.target.closest("[data-tether-selectable]");
-    if (!container) return;
-
-    var item = e.target.closest("[data-tether-data-id]");
-    if (!item || !container.contains(item)) return;
-
-    var items = container.querySelectorAll("[data-tether-data-id]");
-
-    if (e.shiftKey && lastSelected) {
-      // Range select: from lastSelected to this item.
-      var start = -1, end = -1;
-      for (var i = 0; i < items.length; i++) {
-        if (items[i] === lastSelected) start = i;
-        if (items[i] === item) end = i;
-      }
-      if (start > -1 && end > -1) {
-        var lo = Math.min(start, end);
-        var hi = Math.max(start, end);
-        for (var i = 0; i < items.length; i++) {
-          items[i].classList.toggle("tether-selected", i >= lo && i <= hi);
-        }
-        trackClientClasses(item, ["tether-selected"]);
-      }
-    } else if (e.ctrlKey || e.metaKey) {
-      // Toggle this item.
-      item.classList.toggle("tether-selected");
-      trackClientClasses(item, ["tether-selected"]);
-    } else {
-      // Single select: deselect all, select this one.
-      for (var i = 0; i < items.length; i++) {
-        items[i].classList.remove("tether-selected");
-      }
-      item.classList.add("tether-selected");
-      trackClientClasses(item, ["tether-selected"]);
-    }
-
-    lastSelected = item;
-  }
-
   // --- Client-side validation ---
   //
   // Fields with data-tether-required, data-tether-minlength,
@@ -2070,88 +2052,6 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
     if (target) target.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 
-  // --- Global hotkeys ---
-  //
-  // Elements with data-tether-hotkey="<combo> <action>" register
-  // global keyboard shortcuts. The combo and action are space-
-  // separated in the attribute value. One hotkey per element.
-  //
-  // The runtime builds a registry (combo → {action, element}) on
-  // init and rebuilds it after each morph. Keydown lookups are O(1)
-  // with no CSS selector queries, avoiding the selector-injection
-  // issues that arise from putting key names in attribute names.
-
-  var hotkeyRegistry = {};
-
-  function buildHotkeyRegistry() {
-    hotkeyRegistry = {};
-    if (!root) return;
-    var els = root.querySelectorAll("[data-tether-hotkey]");
-    for (var i = 0; i < els.length; i++) {
-      var val = els[i].getAttribute("data-tether-hotkey");
-      var spaceIdx = val.indexOf(" ");
-      if (spaceIdx === -1) continue;
-      var combo = val.substring(0, spaceIdx);
-      var action = val.substring(spaceIdx + 1);
-      hotkeyRegistry[combo] = { action: action, el: els[i] };
-    }
-  }
-
-  var isMacPlatform = /Mac|iPhone|iPad|iPod/.test(navigator.platform || "");
-
-  // isEditableTarget reports whether the element accepts typed text.
-  // Hotkeys without a command modifier must not fire from these -
-  // pressing "/" inside a search box is typing, not a shortcut.
-  function isEditableTarget(el) {
-    if (!el || el.nodeType !== 1) return false;
-    var tag = el.tagName;
-    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
-    return !!el.isContentEditable;
-  }
-
-  function handleHotkeys(e) {
-    var key = e.key.toLowerCase();
-    if (key === " ") key = "space";
-    if (key === "control" || key === "shift" || key === "alt" || key === "meta") return;
-
-    // Unmodified keys (and shift, which produces capitals and
-    // punctuation) belong to the focused field. Ctrl/meta/alt combos
-    // are commands and still fire from inputs.
-    if (!e.ctrlKey && !e.metaKey && !e.altKey && isEditableTarget(e.target)) return;
-
-    var mods = [];
-    if (e.ctrlKey) mods.push("ctrl");
-    if (e.metaKey) mods.push("meta");
-    if (e.shiftKey) mods.push("shift");
-    if (e.altKey) mods.push("alt");
-
-    // Ctrl and meta are distinct - folding Cmd into ctrl would make a
-    // "ctrl-c" hotkey swallow Cmd+C on macOS. The "mod" alias matches
-    // the platform's primary command modifier (meta on macOS, ctrl
-    // elsewhere) so one registration works everywhere.
-    var combo = mods.concat([key]).join("-");
-    var entry = hotkeyRegistry[combo];
-    if (!entry) {
-      var primary = isMacPlatform ? "meta" : "ctrl";
-      if (mods.indexOf(primary) !== -1) {
-        var modCombo = mods.map(function (m) { return m === primary ? "mod" : m; }).concat([key]).join("-");
-        entry = hotkeyRegistry[modCombo];
-        if (entry) combo = modCombo;
-      }
-    }
-    if (!entry) return;
-
-    e.preventDefault();
-
-    var action = entry.action;
-    var prefix = findPrefix(entry.el);
-    if (prefix && action.indexOf(prefix + ".") !== 0) {
-      action = prefix + "." + action;
-    }
-
-    sendEvent("hotkey", action, { combo: combo });
-  }
-
   // --- Client-side signal actions ---
   //
   // Signal actions let developers toggle or set signal values without
@@ -2163,9 +2063,7 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
     var toggle = e.target.closest("[data-tether-toggle-signal]");
     if (toggle) {
       var key = toggle.getAttribute("data-tether-toggle-signal");
-      var next = !isTruthy(Tether.signals[key]);
-      Tether.signals[key] = next;
-      updateSignalBindings(key, next);
+      setSignal(key, !isTruthy(Tether.signals[key]));
       return;
     }
 
@@ -2175,202 +2073,8 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
       var idx = raw.indexOf(" ");
       var key = idx === -1 ? raw : raw.substring(0, idx);
       var value = parseSignalValue(idx === -1 ? "" : raw.substring(idx + 1));
-      Tether.signals[key] = value;
-      updateSignalBindings(key, value);
+      setSignal(key, value);
     }
-  }
-
-  // --- Client-side timers ---
-  //
-  // Timers tick entirely in the browser. The server controls them by
-  // pushing signals: "name.running" (boolean) starts/pauses, and
-  // setting "name" to a number resets the value. The element's text
-  // content is automatically updated with the formatted time on each
-  // tick - no BindText needed.
-
-  var timers = {}; // keyed by timer name
-
-  // scanTimers finds all data-tether-timer elements and registers them.
-  // Called on init and after each morph so dynamically added timers are
-  // picked up.
-  function scanTimers() {
-    var els = document.querySelectorAll("[data-tether-timer]");
-    for (var i = 0; i < els.length; i++) {
-      var el = els[i];
-      var name = el.getAttribute("data-tether-timer");
-      if (!name) continue;
-      if (timers[name] && timers[name].el === el) continue;
-
-      // Stop any existing timer with this name before re-registering
-      // (element may have been replaced by a morph).
-      if (timers[name] && timers[name].interval) {
-        clearInterval(timers[name].interval);
-      }
-
-      var countdown = parseFloat(el.getAttribute("data-tether-timer-countdown"));
-      var precision = parseInt(el.getAttribute("data-tether-timer-precision")) || 1000;
-      var format = el.getAttribute("data-tether-timer-format") || "auto";
-      var complete = el.getAttribute("data-tether-timer-complete") || "";
-
-      var t = {
-        el: el,
-        name: name,
-        down: countdown > 0,
-        start: countdown > 0 ? countdown : 0,
-        precision: precision,
-        format: format,
-        complete: complete,
-        interval: null
-      };
-
-      timers[name] = t;
-
-      // Initialise the signal value if not already set by the server.
-      if (Tether.signals[name] === undefined || Tether.signals[name] === null) {
-        Tether.signals[name] = t.start;
-      }
-
-      // Display the initial formatted value.
-      el.textContent = formatTimer(Tether.signals[name], t);
-
-      // If the running signal is already truthy (e.g. server pushed
-      // it before the element appeared), start ticking immediately.
-      if (isTruthy(Tether.signals[name + ".running"])) {
-        startTimer(t);
-      }
-    }
-  }
-
-  // startTimer begins ticking. Each tick updates the signal value in
-  // the local store and refreshes the element text. For count-down
-  // timers reaching zero, the interval is cleared and an optional
-  // completion event is sent back to the server.
-  function startTimer(t) {
-    if (t.interval) return; // already running
-    t.interval = setInterval(function () {
-      // The element may have been morphed away since the last tick.
-      // Stop ticking (and never fire "complete" on a dead element);
-      // if a timer with this name reappears, scanTimers re-registers
-      // it and the running signal restarts it.
-      if (!t.el.isConnected) {
-        clearInterval(t.interval);
-        t.interval = null;
-        return;
-      }
-      var step = t.precision / 1000;
-      var current = typeof Tether.signals[t.name] === "number" ? Tether.signals[t.name] : 0;
-
-      if (t.down) {
-        current -= step;
-        if (current <= 0) {
-          current = 0;
-          Tether.signals[t.name] = current;
-          updateSignalBindings(t.name, current);
-          t.el.textContent = formatTimer(current, t);
-          stopTimer(t);
-          // Fire completion event to the server.
-          if (t.complete) {
-            sendEvent("click", t.complete, {});
-          }
-          return;
-        }
-      } else {
-        current += step;
-      }
-
-      Tether.signals[t.name] = current;
-      updateSignalBindings(t.name, current);
-      t.el.textContent = formatTimer(current, t);
-    }, t.precision);
-  }
-
-  // stopTimer clears the interval and marks the running signal as
-  // false locally so BindShow/BindHide elements react immediately.
-  function stopTimer(t) {
-    if (t.interval) {
-      clearInterval(t.interval);
-      t.interval = null;
-    }
-    // Clear the running signal locally so the client state stays
-    // consistent even if the server does not explicitly push false.
-    Tether.signals[t.name + ".running"] = false;
-    updateSignalBindings(t.name + ".running", false);
-  }
-
-  // handleTimerSignal is called from applySignals when a signal key
-  // matches a registered timer's control or value signal.
-  function handleTimerSignal(key, value) {
-    // Check for "name.running" pattern.
-    if (key.endsWith(".running")) {
-      var name = key.substring(0, key.length - 8);
-      var t = timers[name];
-      if (!t) return;
-      if (isTruthy(value)) {
-        startTimer(t);
-      } else {
-        if (t.interval) {
-          clearInterval(t.interval);
-          t.interval = null;
-        }
-      }
-      return;
-    }
-
-    // Direct value set (e.g. reset to 0, or server sets a specific value).
-    var t = timers[key];
-    if (t && typeof value === "number") {
-      t.el.textContent = formatTimer(value, t);
-    }
-  }
-
-  // formatTimer renders a seconds value using the timer's format.
-  function formatTimer(totalSeconds, t) {
-    var neg = totalSeconds < 0;
-    var s = Math.abs(totalSeconds);
-    var fmt = t.format;
-
-    if (fmt === "auto") {
-      if (s < 60) fmt = "ss";
-      else if (s < 3600) fmt = "mm:ss";
-      else fmt = "hh:mm:ss";
-    }
-
-    var hours = Math.floor(s / 3600);
-    var minutes = Math.floor((s % 3600) / 60);
-    var seconds = Math.floor(s % 60);
-    var frac = s - Math.floor(s);
-
-    var result = "";
-
-    switch (fmt) {
-      case "hh:mm:ss":
-        result = pad(hours) + ":" + pad(minutes) + ":" + pad(seconds);
-        break;
-      case "mm:ss":
-        // Roll hours into minutes for mm:ss format.
-        result = pad(hours * 60 + minutes) + ":" + pad(seconds);
-        break;
-      case "ss":
-        result = String(Math.floor(s));
-        break;
-      case "mm:ss.S":
-        result = pad(hours * 60 + minutes) + ":" + pad(seconds) + "." + Math.floor(frac * 10);
-        break;
-      case "mm:ss.SS":
-        result = pad(hours * 60 + minutes) + ":" + pad(seconds) + "." + pad(Math.floor(frac * 100));
-        break;
-      default:
-        // Unknown format - fall back to auto.
-        if (s < 60) result = String(Math.floor(s));
-        else if (s < 3600) result = pad(minutes) + ":" + pad(seconds);
-        else result = pad(hours) + ":" + pad(minutes) + ":" + pad(seconds);
-    }
-
-    return neg ? "-" + result : result;
-  }
-
-  function pad(n) {
-    return n < 10 ? "0" + n : String(n);
   }
 
   // --- PWA lifecycle events ---
@@ -2400,6 +2104,9 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
 
   var extensionMarkers = [
     { attr: "data-tether-upload", script: "tether-upload.js" },
+    { attr: "data-tether-hotkey", script: "tether-hotkey.js" },
+    { attr: "data-tether-timer", script: "tether-timer.js" },
+    { attr: "data-tether-selectable", script: "tether-select.js" },
     { attr: "data-tether-draggable", script: "tether-drag-and-drop.js" },
     { attr: "data-tether-sortable", script: "tether-drag-and-drop.js" },
     { attr: "data-tether-swipe", script: "tether-touch.js" },
@@ -2448,8 +2155,40 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
   // the server and update client-side state.
 
   window.Tether.sendEvent = sendEvent;
-  window.Tether.setSignal = function (key, value) {
-    Tether.signals[key] = value;
-    updateSignalBindings(key, value);
+  window.Tether.setSignal = setSignal;
+
+  // getSignal reads a signal value. Prefer this over touching
+  // Tether.signals directly - the storage may change shape.
+  window.Tether.getSignal = function (key) {
+    return window.Tether.signals[key];
   };
+
+  // isTruthy is the truthiness rule the core uses for BindShow,
+  // BindHide, BindClass, and BindAttr. Exposed so extensions treat
+  // signal values identically.
+  window.Tether.isTruthy = isTruthy;
+
+  // findPrefix resolves the data-tether-prefix chain above an element
+  // so extensions can namespace actions exactly like core events do.
+  window.Tether.findPrefix = findPrefix;
+
+  // trackClientClasses / trackClientAttrs register client-managed DOM
+  // state so it survives server morphs (see preserveClientState).
+  window.Tether.trackClientClasses = trackClientClasses;
+  window.Tether.trackClientAttrs = trackClientAttrs;
+
+  // Lifecycle subscriptions. Each returns an unsubscribe function.
+  //
+  //   Tether.onSignalChange(function (key, value) { ... })
+  //   Tether.onUpdate(function (root) { ... })       // after each server update
+  //   Tether.onElementAdded(function (el) { ... })   // morph added an element
+  //   Tether.onElementRemoved(function (el) { ... }) // morph is removing one
+  //
+  // onElementAdded/Removed fire for the top-level node idiomorph
+  // touched; scan el.querySelectorAll for descendants. Listeners are
+  // guarded - a throwing callback is reported and skipped.
+  window.Tether.onSignalChange = function (fn) { return addListener(signalListeners, fn); };
+  window.Tether.onUpdate = function (fn) { return addListener(updateListeners, fn); };
+  window.Tether.onElementAdded = function (fn) { return addListener(addedListeners, fn); };
+  window.Tether.onElementRemoved = function (fn) { return addListener(removedListeners, fn); };
 })();

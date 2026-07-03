@@ -22,13 +22,18 @@ type extension struct {
 }
 
 // extensions is the registry of optional JS files. Add entries here
-// when new extension scripts are created in client/.
+// when new extension scripts are created in client/. Keep the list in
+// sync with extensionMarkers in client/tether.js, which handles the
+// lazy-load case where a marker first appears after a morph.
 var extensions = []extension{
 	{marker: []byte("data-tether-upload"), script: "tether-upload.js"},
 	{marker: []byte("data-tether-draggable"), script: "tether-drag-and-drop.js"},
 	{marker: []byte("data-tether-sortable"), script: "tether-drag-and-drop.js"},
 	{marker: []byte("data-tether-swipe"), script: "tether-touch.js"},
 	{marker: []byte("data-tether-longpress"), script: "tether-touch.js"},
+	{marker: []byte("data-tether-hotkey"), script: "tether-hotkey.js"},
+	{marker: []byte("data-tether-timer"), script: "tether-timer.js"},
+	{marker: []byte("data-tether-selectable"), script: "tether-select.js"},
 }
 
 // tetherBody implements node.Node for the tether root div and client

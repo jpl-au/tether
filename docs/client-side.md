@@ -71,7 +71,7 @@ Enter: `tether-{name}-enter` is added before insertion and removed next frame. L
 
 ## Timers
 
-Client-side timers tick entirely in the browser. The server controls them by pushing signals - no background goroutines and no per-tick WebSocket messages required.
+Client-side timers tick entirely in the browser. The server controls them by pushing signals - no background goroutines and no per-tick WebSocket messages required. The timer runtime ships as an extension script (`tether-timer.js`) that the framework includes automatically whenever a rendered page uses `bind.Timer`.
 
 ### Basic elapsed timer
 
@@ -176,6 +176,66 @@ Tether.hooks.chart = {
 ```
 
 The JS runtime calls `mounted` when the element is added to the DOM, `updated` when it is morphed in place, and `destroyed` when it is about to be removed.
+
+## Client extension API
+
+For behaviour that spans the whole page rather than a single hooked element - keyboard layers, analytics, custom widgets - the runtime exposes a small extension API on `window.Tether`. The built-in extensions (`tether-hotkey.js`, `tether-timer.js`, `tether-select.js`, `tether-upload.js`) are written against this same surface.
+
+### Data access
+
+```js
+Tether.getSignal("count");          // read a signal value
+Tether.setSignal("count", 42);      // write it - bindings update instantly
+Tether.isTruthy(value);             // the truthiness rule BindShow/BindClass use
+Tether.sendEvent("click", "save", {id: "7"}); // send an event to Handle
+Tether.findPrefix(el);              // resolve the data-tether-prefix chain
+```
+
+### Lifecycle subscriptions
+
+Each subscription returns an unsubscribe function. Callbacks are guarded - a throwing listener is reported via `Tether.onError` and skipped, never breaking the core or other listeners.
+
+```js
+// After every signal change, from any source (server push, client
+// signal action, another extension).
+var off = Tether.onSignalChange(function (key, value) { ... });
+
+// After each applied server update (patches, morphs, effects).
+// Re-scan the DOM here for elements your extension manages.
+Tether.onUpdate(function (root) { ... });
+
+// Around morphs: an element was added / is about to be removed.
+// Fires for the top-level node idiomorph touched - scan
+// el.querySelectorAll for descendants.
+Tether.onElementAdded(function (el) { ... });
+Tether.onElementRemoved(function (el) { ... });
+```
+
+### Preserving client-managed DOM state
+
+Server morphs rebuild elements from server HTML, which knows nothing about state your extension wrote into the DOM. Register client-managed classes and attributes so the morph carries them over:
+
+```js
+el.classList.add("my-ext-active");
+Tether.trackClientClasses(el, ["my-ext-active"]);
+Tether.trackClientAttrs(el, "data-my-ext-open");
+```
+
+### Binding to elements
+
+Track per-element listener state in a `WeakSet`, not a DOM attribute - morphs sync attributes from server HTML and would strip a marker attribute while the reused node keeps its listener:
+
+```js
+var bound = new WeakSet();
+function bind(el) {
+    if (bound.has(el)) return;
+    bound.add(el);
+    el.addEventListener("click", ...);
+}
+Tether.onUpdate(function (root) {
+    root.querySelectorAll("[data-my-ext]").forEach(bind);
+});
+```
 
 ---
 

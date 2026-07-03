@@ -42,6 +42,46 @@ func TestTetherBodyScriptHashes(t *testing.T) {
 	}
 }
 
+// TestExtensionScriptsInjectedByMarker verifies that each extracted
+// extension script is included exactly when its marker attribute
+// appears in the rendered HTML - the developer never wires scripts by
+// hand; bind.Hotkey/bind.Timer/bind.Selectable are enough.
+func TestExtensionScriptsInjectedByMarker(t *testing.T) {
+	cases := []struct {
+		marker string
+		script string
+	}{
+		{`data-tether-hotkey="mod-k search"`, "tether-hotkey.js"},
+		{`data-tether-timer="clock"`, "tether-timer.js"},
+		{`data-tether-selectable=""`, "tether-select.js"},
+	}
+	for _, tc := range cases {
+		body := &tetherBody{
+			html:     []byte(`<div ` + tc.marker + `></div>`),
+			endpoint: "/app",
+			session:  "abc",
+		}
+		var buf bytes.Buffer
+		body.RenderBuilder(&buf)
+		html := buf.String()
+
+		if !strings.Contains(html, "/_tether/"+tc.script) {
+			t.Errorf("marker %s: expected %s to be injected", tc.marker, tc.script)
+		}
+	}
+
+	// And none of them appear when no marker is present.
+	body := &tetherBody{html: []byte("<p>plain</p>"), endpoint: "/app", session: "abc"}
+	var buf bytes.Buffer
+	body.RenderBuilder(&buf)
+	html := buf.String()
+	for _, tc := range cases {
+		if strings.Contains(html, tc.script) {
+			t.Errorf("%s injected without its marker", tc.script)
+		}
+	}
+}
+
 func TestClientVersionDeterministic(t *testing.T) {
 	a := clientVersion()
 	b := clientVersion()

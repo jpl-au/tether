@@ -56,13 +56,15 @@ bind.Apply(el,
 `bind.Hotkey` registers keyboard shortcuts that fire regardless of which element has focus:
 
 ```go
-bind.Apply(container,
-    bind.Hotkey("ctrl+k", "search.open"),
-    bind.Hotkey("escape", "modal.close"),
-)
+bind.Apply(searchBox, bind.Hotkey("mod+k", "search.open"))
+bind.Apply(modal, bind.Hotkey("escape", "modal.close"))
 ```
 
-Multiple hotkeys can be applied to the same element. The combo format uses `+` between modifiers and the key: `"ctrl+k"`, `"ctrl+shift+p"`, `"escape"`. The event arrives in Handle with `ev.Data["combo"]` set to the normalised combo string.
+One hotkey per element - for several shortcuts, apply each to its own element. The combo format uses `+` between modifiers and the key: `"mod+k"`, `"ctrl+shift+p"`, `"escape"`. The event arrives in Handle with `ev.Data["combo"]` set to the normalised combo string.
+
+Modifiers are `ctrl`, `meta` (Cmd on macOS, Win key on Windows), `shift`, and `alt` - ctrl and meta are distinct, so a ctrl combo never swallows Cmd+C on macOS. Use `mod` for the platform's primary command modifier (meta on macOS, ctrl elsewhere) when one shortcut should feel native everywhere. Hotkeys without ctrl/meta/alt do not fire while an input, textarea, select, or contenteditable element has focus - typing `/` into a search box is text, not a shortcut.
+
+The hotkey runtime ships as an extension script (`tether-hotkey.js`) that the framework includes automatically whenever a rendered page uses `bind.Hotkey` - there is nothing to wire up.
 
 ### Client-side validation
 

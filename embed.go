@@ -17,7 +17,7 @@ import (
 // clientFS embeds the client-side JS runtime and the idiomorph library.
 // These files are served at the /_tether/ path by the Handler.
 //
-//go:embed client/tether.js client/idiomorph.min.js client/tether-worker.js client/tether-push-worker.js client/tether-upload.js client/tether-drag-and-drop.js client/tether-touch.js client/tether-wasm.js client/tether-wire-cbor.js
+//go:embed client/tether.js client/idiomorph.min.js client/tether-worker.js client/tether-push-worker.js client/tether-upload.js client/tether-drag-and-drop.js client/tether-touch.js client/tether-hotkey.js client/tether-timer.js client/tether-select.js client/tether-wasm.js client/tether-wire-cbor.js
 var clientFS embed.FS
 
 // clientFiles returns an fs.FS rooted at the client/ directory so that

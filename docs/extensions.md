@@ -219,6 +219,21 @@ sess.Push(push.Notification{
 })
 ```
 
+## Client extension scripts
+
+Browser-side features that go beyond the core runtime ship as separate extension scripts, loaded only when used. The framework scans the rendered HTML for each extension's marker attribute and injects its script automatically - on the initial page render and, for markers that first appear after a morph, lazily at runtime. There is nothing to wire up.
+
+| Extension | Marker (set by) | Provides |
+|-----------|-----------------|----------|
+| `tether-upload.js` | `bind.Upload` | File uploads with progress signals |
+| `tether-drag-and-drop.js` | `bind.Draggable`, `bind.Sortable` | Drag and drop, sortable lists |
+| `tether-touch.js` | `bind.Swipe`, `bind.LongPress` | Touch gestures |
+| `tether-hotkey.js` | `bind.Hotkey` | Global keyboard shortcuts |
+| `tether-timer.js` | `bind.Timer` | Client-side timers |
+| `tether-select.js` | `bind.Selectable` | Click/ctrl/shift multi-select |
+
+All of them are written against the public client extension API (`Tether.onUpdate`, `Tether.onSignalChange`, `Tether.getSignal`, ...), which is also available to application code and third-party extensions - see [client-side.md](client-side.md#client-extension-api).
+
 ---
 
 [← Back to documentation](../README.md#documentation)
