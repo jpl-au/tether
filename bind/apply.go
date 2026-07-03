@@ -184,12 +184,31 @@ func FilterKey(key string) Option { return Option{"tether-key", key} }
 // the escape hatch for attributes not covered by the built-in options.
 func Data(key, value string) Option { return Option{key, value} }
 
-// EventData attaches a static key-value pair to every event from this
-// element. The pair appears in [tether.Event].Data alongside any
-// values the client collects automatically (input value, form fields).
-// Use this to carry context - like an item ID - with each click so the
-// handler knows which item was acted on without maintaining server-side
-// selection state.
+// EventData attaches a key-value pair to every event from this element.
+// The pair appears in [tether.Event].Data alongside any values the
+// client collects automatically (input value, form fields). Use this to
+// carry context - like an item ID - with each click so the handler knows
+// which item was acted on without maintaining server-side selection
+// state.
+//
+// The value is rendered into a data attribute and only refreshes when
+// the element itself is re-rendered. The diff engine re-renders a region
+// only when it carries a [node.Dynamic] key (this is true in every mode,
+// including the plain differ), so a value that CHANGES between renders
+// must live inside the Dynamic region that updates - otherwise it is
+// frozen at its first-render value while the visible content around it
+// updates, a silent mismatch. A value that never changes for a given
+// element (the intended use - a stable item ID) can sit anywhere.
+//
+//	// Wrong: count changes but the button is outside any Dynamic key,
+//	// so data-tether-data-n stays "0" forever.
+//	bind.Apply(button.Text("+"), bind.OnClick("inc"), bind.EventData("n", n))
+//
+//	// Right: the button lives in the region keyed to the count, so its
+//	// event data refreshes with each update.
+//	div.New(
+//	    bind.Apply(button.Text("+"), bind.OnClick("inc"), bind.EventData("n", n)),
+//	).Dynamic("counter")
 func EventData(key, value string) Option { return Option{"tether-data-" + key, value} }
 
 // Directive options - client-side behaviour that runs entirely in the

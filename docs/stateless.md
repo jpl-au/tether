@@ -198,6 +198,8 @@ The mechanics: a stateless server holds no previous render to diff against, so t
 
 An explicit `sess.Morph` call still takes precedence for that response. Clients that never echo hashes (curl, older pages) get plain full morphs. The cost is one extra render walk per request and a small hash map on each event - worth it on pages with large static regions, unnecessary on small pages.
 
+**Watch for changing data outside a fragment.** Because only changed fragments travel, an element *outside* every Dynamic region never refreshes - including its `bind.EventData`. A button carrying `bind.EventData("n", count)` that sits next to the fragment, not inside it, will keep sending its first-render value while the visible count updates. Put changing event data inside the Dynamic region that updates (or use `bind.Collect` / a signal). Static event data - a stable item ID - is fine anywhere. This is the same rule the diff engine follows everywhere: only keyed regions re-render.
+
 ### Targeted morphs vs stateful patches
 
 In stateful mode, the differ automatically detects which Dynamic keys changed and sends targeted patches. There is no need to call `Morph` - the differ handles it. Calling `Morph` on a stateful session is a no-op with a dev warning.
