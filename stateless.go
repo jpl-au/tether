@@ -92,16 +92,25 @@ func Stateless[S any](app App, cfg StatelessConfig[S]) http.Handler {
 
 	csrf := app.Security.csrf()
 
-	// Stateless responses are always JSON: the fetch-mode client
-	// decodes with resp.json() and no CBOR extension is injected for
-	// HTTP transport. Say so rather than silently ignoring the config.
-	if app.WireFormat == wire.CBOR {
-		dev.Log().Warn("tether: Stateless always uses JSON on the wire - App.WireFormat CBOR applies to stateful handlers only")
+	// Resolve the wire format: per-handler config takes precedence,
+	// then the app-level default. Stateless supports JSON (the
+	// default envelope, shared with stateful mode) and HTML (plain
+	// fragments). CBOR is stateful-only - the fetch client decodes
+	// text - so it falls back to JSON with a warning rather than
+	// being silently honoured.
+	wf := cfg.WireFormat
+	if wf == 0 && app.WireFormat != 0 {
+		wf = app.WireFormat
+	}
+	if wf == wire.CBOR {
+		dev.Log().Warn("tether: Stateless does not support wire.CBOR - using JSON; CBOR applies to stateful handlers only")
+		wf = wire.JSON
 	}
 
 	return &statelessHandler[S]{
 		app:           app,
 		cfg:           cfg,
+		wireFormat:    wf,
 		encoder:       resolveEncoder(wire.JSON),
 		clientHandler: app.jsHandler(),
 		assetMounts:   app.mountAssets(),
@@ -113,6 +122,7 @@ func Stateless[S any](app App, cfg StatelessConfig[S]) http.Handler {
 type statelessHandler[S any] struct {
 	app           App
 	cfg           StatelessConfig[S]
+	wireFormat    wire.Format
 	encoder       wire.Encoder
 	clientHandler http.Handler
 	assetMounts   []assetMount
@@ -182,8 +192,14 @@ func (p *statelessHandler[S]) serveGET(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("X-Frame-Options", "DENY")
 	w.Header().Set("Referrer-Policy", "same-origin")
-	if dev.Enabled() {
+	// Stateless pages embed no session token, so caching is the
+	// developer's call via CacheControl. Dev mode always disables
+	// caching so edits show immediately.
+	switch {
+	case dev.Enabled():
 		w.Header().Set("Cache-Control", "no-store")
+	case p.cfg.CacheControl != "":
+		w.Header().Set("Cache-Control", p.cfg.CacheControl)
 	}
 	if p.cfg.Layout != nil {
 		p.cfg.Layout(state, content).Render(w)
@@ -295,6 +311,26 @@ func (p *statelessHandler[S]) servePOST(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 	cs.Effects.merge(&u)
+
+	if p.wireFormat == wire.HTML {
+		body, keyed, err := wire.HTMLBody(u)
+		if err != nil {
+			dev.Log().Error("encode response error", "err", err, "path", r.URL.Path, "remote", r.RemoteAddr)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		// Keyed fragments need an explicit signal: a root render whose
+		// top-level elements all carry keys would otherwise look
+		// identical to a fragment response on the client.
+		if keyed {
+			w.Header().Set("Tether-Morph", "keyed")
+		}
+		if _, err := w.Write(body); err != nil {
+			dev.Log().Warn("failed to write page response", "path", r.URL.Path, "err", err)
+		}
+		return
+	}
 
 	data, err := p.encoder.Encode(u)
 	if err != nil {

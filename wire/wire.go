@@ -15,6 +15,15 @@ const (
 	// smaller payloads and faster encoding at the cost of
 	// human-readability.
 	CBOR
+
+	// HTML sends updates as plain HTML: the morph fragments are the
+	// response body and side effects ride in a small JSON island
+	// appended to it. Responses are curl-inspectable and carry no
+	// envelope overhead. Only supported by stateless handlers, whose
+	// one-request-one-response shape fits an HTML body - stateful
+	// transports multiplex many update kinds over one connection and
+	// need the structured formats.
+	HTML
 )
 
 // String returns the lowercase name of the wire format.
@@ -22,6 +31,8 @@ func (f Format) String() string {
 	switch f {
 	case CBOR:
 		return "cbor"
+	case HTML:
+		return "html"
 	default:
 		return "json"
 	}

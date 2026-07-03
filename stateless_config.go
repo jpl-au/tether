@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/jpl-au/fluent/node"
+	"github.com/jpl-au/tether/wire"
 )
 
 // StatelessConfig wires together a stateless page: how to reconstruct
@@ -17,8 +18,9 @@ import (
 // state, use [StatefulConfig] with [Stateful] instead.
 //
 // GET requests render the full page. POST requests handle a client
-// event, render the new state, and return a JSON update (the same wire
-// format as stateful mode) with a root morph and any side effects.
+// event, render the new state, and return an update with a root morph
+// (or targeted fragments via [Session.Morph]) and any side effects -
+// as a JSON envelope by default, or plain HTML with [wire.HTML].
 //
 // At minimum, set InitialState, Render, and Handle. Everything else
 // is optional and has sensible defaults. Shared settings (DevMode,
@@ -39,7 +41,7 @@ type StatelessConfig[S any] struct {
 	// Handle processes a client event and returns the new state. Side
 	// effects (toast, navigate, title, etc.) are expressed as calls on
 	// the [Session] parameter - the same interface used by
-	// [StatefulConfig].OnNavigate. The effects are included in the JSON
+	// [StatefulConfig].OnNavigate. The effects are included in the
 	// response so the client can apply them atomically.
 	Handle func(session Session, state S, event Event) S
 
@@ -73,4 +75,23 @@ type StatelessConfig[S any] struct {
 	// Name identifies this page handler in log output. Appears in the
 	// "tether: ready" startup line. Optional.
 	Name string
+
+	// WireFormat selects the encoding for POST event responses.
+	// Defaults to [wire.JSON] (the same envelope stateful mode uses).
+	// Set to [wire.HTML] for plain-HTML responses: the morph
+	// fragments are the response body and side effects ride in a
+	// small JSON island - curl-inspectable, no envelope overhead.
+	// [wire.CBOR] is not supported in stateless mode.
+	WireFormat wire.Format
+
+	// CacheControl sets the Cache-Control header on GET responses.
+	// Stateless pages embed no session token, so they are safe to
+	// cache when the content permits it:
+	//
+	//	CacheControl: "public, max-age=60",
+	//
+	// Empty (the default) sends no Cache-Control header in
+	// production; dev mode always sends no-store so edits show
+	// immediately.
+	CacheControl string
 }

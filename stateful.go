@@ -206,6 +206,9 @@ func Stateful[S any](app App, cfg StatefulConfig[S]) *Handler[S] {
 	if wf == 0 && app.WireFormat != 0 {
 		wf = app.WireFormat
 	}
+	if wf == wire.HTML {
+		panic("tether: wire.HTML is stateless-only - stateful transports multiplex updates over one connection and need a structured format; use wire.JSON or wire.CBOR")
+	}
 
 	h := &Handler[S]{
 		app:           app,

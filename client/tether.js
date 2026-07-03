@@ -1741,6 +1741,50 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
   // response is applied so an older render can't overwrite a newer one.
   var fetchSeq = 0;
 
+  // parseHTMLUpdate converts an HTML wire-format response into the
+  // standard update message shape so applyMessage handles both
+  // formats identically. The body is morph fragments, optionally
+  // followed by a <template data-tether-effects> JSON island. When
+  // keyed is true each top-level element is a targeted fragment
+  // addressed by its data-tether-key; otherwise the whole body is a
+  // root morph.
+  function parseHTMLUpdate(text, keyed, eventID) {
+    var msg = { type: "update", event_id: eventID };
+
+    var template = document.createElement("template");
+    template.innerHTML = text;
+
+    var fxEl = template.content.querySelector("template[data-tether-effects]");
+    if (fxEl) {
+      var raw = fxEl.content ? fxEl.content.textContent : fxEl.textContent;
+      try {
+        var fx = JSON.parse(raw);
+        for (var k in fx) msg[k] = fx[k];
+      } catch (err) {
+        reportError("parse", "failed to parse effects island: " + err);
+      }
+      fxEl.parentNode.removeChild(fxEl);
+    }
+
+    msg.morphs = [];
+    if (keyed) {
+      var children = template.content.children;
+      for (var i = 0; i < children.length; i++) {
+        var key = children[i].getAttribute("data-tether-key");
+        if (key) msg.morphs.push({ key: key, html: children[i].outerHTML });
+      }
+    } else {
+      // Re-serialise the remaining content (the island is gone) so
+      // applyMorph's innerHTML-mode root morph gets a plain string.
+      var holder = document.createElement("div");
+      holder.appendChild(template.content);
+      if (holder.innerHTML) {
+        msg.morphs.push({ key: "", html: holder.innerHTML });
+      }
+    }
+    return msg;
+  }
+
   function sendEvent(type, action, data) {
     if (devMode) {
       console.log("tether: event", {type: type, action: action, data: data});
@@ -1756,7 +1800,17 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
         headers: { "Content-Type": "application/json" },
         body: payload
       }).then(function (resp) {
-        if (!resp.ok) { restorePending(id); return; }
+        if (!resp.ok) { restorePending(id); return null; }
+        // The response format is sniffed from Content-Type: JSON is
+        // the default envelope; text/html is the HTML wire format
+        // (fragments as the body, effects in a JSON island).
+        var ct = resp.headers.get("Content-Type") || "";
+        if (ct.indexOf("text/html") === 0) {
+          var keyed = resp.headers.get("Tether-Morph") === "keyed";
+          return resp.text().then(function (text) {
+            return parseHTMLUpdate(text, keyed, id);
+          });
+        }
         return resp.json();
       }).then(function (msg) {
         if (!msg) return;

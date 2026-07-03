@@ -12,6 +12,8 @@ import (
 	"github.com/jpl-au/fluent/node"
 	"github.com/jpl-au/tether/dev"
 	"github.com/jpl-au/tether/event"
+	"github.com/jpl-au/tether/mode"
+	"github.com/jpl-au/tether/wire"
 )
 
 // statelessHandleCounter is a stateless handle function for testing.
@@ -663,3 +665,136 @@ func TestStatelessPOSTMorphWithEffects(t *testing.T) {
 // Verify the event.Type import compiles (used for event constants in
 // tests above via string literals, but callers use event.Click etc.).
 var _ event.Type = event.Click
+
+// --- HTML wire format ---
+
+func newHTMLWireHandler(morphKeys ...string) http.Handler {
+	return Stateless(App{}, StatelessConfig[counterState]{
+		WireFormat:   wire.HTML,
+		InitialState: func(r *http.Request) counterState { return counterState{} },
+		Render:       renderCounter,
+		Handle: func(sess Session, state counterState, ev Event) counterState {
+			if len(morphKeys) > 0 {
+				sess.Morph(morphKeys...)
+			}
+			return statelessHandleCounter(sess, state, ev)
+		},
+	})
+}
+
+func postEvent(t *testing.T, h http.Handler, body string) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest("POST", "/app", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	return w
+}
+
+// TestStatelessHTMLWireRootMorph verifies that wire.HTML answers a
+// POST event with plain HTML - the rendered tree as the body, no
+// JSON envelope - so responses are curl-inspectable.
+func TestStatelessHTMLWireRootMorph(t *testing.T) {
+	h := newHTMLWireHandler()
+	w := postEvent(t, h, `{"type":"click","action":"increment","data":{},"event_id":"1"}`)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusOK)
+	}
+	if ct := w.Header().Get("Content-Type"); !strings.HasPrefix(ct, "text/html") {
+		t.Fatalf("Content-Type = %q, want text/html", ct)
+	}
+	if w.Header().Get("Tether-Morph") != "" {
+		t.Error("root morph response must not carry the keyed header")
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "Count: 1") {
+		t.Errorf("body should contain the rendered tree, got %s", body)
+	}
+	if strings.Contains(body, `"type":"update"`) {
+		t.Error("body should be plain HTML, not a JSON envelope")
+	}
+	if strings.Contains(body, "data-tether-effects") {
+		t.Error("no effects were raised - the island should be omitted")
+	}
+}
+
+// TestStatelessHTMLWireKeyedFragments verifies that sess.Morph
+// produces targeted keyed fragments flagged by the Tether-Morph
+// header.
+func TestStatelessHTMLWireKeyedFragments(t *testing.T) {
+	h := newHTMLWireHandler("count")
+	w := postEvent(t, h, `{"type":"click","action":"increment","data":{},"event_id":"1"}`)
+
+	if w.Header().Get("Tether-Morph") != "keyed" {
+		t.Fatalf("Tether-Morph = %q, want keyed", w.Header().Get("Tether-Morph"))
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, `data-tether-key="count"`) {
+		t.Errorf("fragment should carry its key attribute, got %s", body)
+	}
+	if strings.Contains(body, "<div") {
+		t.Error("keyed response should contain only the fragment, not the full tree")
+	}
+}
+
+// TestStatelessHTMLWireEffectsIsland verifies that side effects ride
+// in the JSON template island using the standard wire field names.
+func TestStatelessHTMLWireEffectsIsland(t *testing.T) {
+	h := newHTMLWireHandler()
+	w := postEvent(t, h, `{"type":"click","action":"toast","data":{},"event_id":"1"}`)
+
+	body := w.Body.String()
+	idx := strings.Index(body, `<template data-tether-effects>`)
+	if idx == -1 {
+		t.Fatalf("expected effects island, got %s", body)
+	}
+	end := strings.Index(body, "</template>")
+	raw := body[idx+len(`<template data-tether-effects>`) : end]
+
+	var fx map[string]any
+	if err := json.Unmarshal([]byte(raw), &fx); err != nil {
+		t.Fatalf("island is not valid JSON: %v (%s)", err, raw)
+	}
+	if fx["toast"] != "hello" {
+		t.Errorf("toast = %v, want hello", fx["toast"])
+	}
+}
+
+// TestStatelessCacheControl verifies the configurable GET cache
+// header: stateless pages carry no session token, so caching is the
+// developer's call.
+func TestStatelessCacheControl(t *testing.T) {
+	h := Stateless(App{}, StatelessConfig[counterState]{
+		CacheControl: "public, max-age=60",
+		InitialState: func(r *http.Request) counterState { return counterState{} },
+		Render:       renderCounter,
+		Handle:       statelessHandleCounter,
+	})
+
+	req := httptest.NewRequest("GET", "/app", nil)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+
+	if cc := w.Header().Get("Cache-Control"); cc != "public, max-age=60" {
+		t.Errorf("Cache-Control = %q, want the configured value", cc)
+	}
+}
+
+// TestStatefulRejectsHTMLWireFormat verifies the loud failure: the
+// HTML wire format cannot ride a stateful transport.
+func TestStatefulRejectsHTMLWireFormat(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("Stateful should panic on wire.HTML")
+		}
+	}()
+	Stateful(App{}, StatefulConfig[counterState]{
+		WireFormat:   wire.HTML,
+		Mode:         mode.WebSocket,
+		Upgrade:      stubUpgrade,
+		InitialState: func(r *http.Request) counterState { return counterState{} },
+		Render:       renderCounter,
+		Handle:       handleCounter,
+	})
+}

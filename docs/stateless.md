@@ -26,7 +26,7 @@ GET requests render the full page. POST requests handle a client event, render t
 
 1. **GET** - `InitialState(r)` creates state from the request, `OnNavigate` (if set) processes URL parameters, `Render` builds the node tree, `Layout` (if set) wraps it in a document shell, and the HTML is written to the response.
 
-2. **POST** - `InitialState(r)` reconstructs state from scratch (stateless - no memory of previous requests), `Handle` processes the event, `Render` builds the new tree, and the framework returns a JSON update with a root morph and any side effects. The client morphs the page in place.
+2. **POST** - `InitialState(r)` reconstructs state from scratch (stateless - no memory of previous requests), `Handle` processes the event, `Render` builds the new tree, and the framework returns an update with a root morph and any side effects - a JSON envelope by default, or plain HTML with `WireFormat: wire.HTML`. The client morphs the page in place.
 
 The POST response uses the same wire format as stateful mode, so the client JS handles both identically. The key difference: stateful mode sends targeted patches to keyed elements, while stateless mode always sends a full root morph (since there is no previous tree to diff against).
 
@@ -65,6 +65,16 @@ tether.Stateless(app, tether.StatelessConfig[State]{
     Components: []tether.ComponentMount[State]{
         tether.Mount("widget", getWidget, setWidget),
     },
+
+    // Optional: response encoding for POST events. wire.JSON (the
+    // default) shares the stateful envelope; wire.HTML answers with
+    // plain HTML fragments - curl-inspectable, no envelope.
+    WireFormat: wire.HTML,
+
+    // Optional: Cache-Control for GET responses. Stateless pages
+    // embed no session token, so they are safe to cache when the
+    // content permits it.
+    CacheControl: "public, max-age=60",
 
     // Optional configuration.
     Limits: tether.Limits{MaxEventBytes: 128 << 10},
@@ -225,6 +235,40 @@ func handle(sess tether.Session, s State, ev tether.Event) State {
 Available methods on `Session`: `Toast`, `Navigate`, `ReplaceURL`, `SetTitle`, `Announce`, `Flash`, `Signal`, `Signals`, `Push`.
 
 Note: `Session.ID()` returns an empty string in stateless mode - there is no persistent session. `Push` returns `ErrPushPreWarm`.
+
+## The HTML wire format
+
+Set `WireFormat: wire.HTML` and POST responses become plain HTML instead of a JSON envelope. The rendered content is the response body; side effects ride in a small JSON island appended to it:
+
+```
+$ curl -s -X POST localhost:8080/settings \
+    -H 'Content-Type: application/json' \
+    -d '{"type":"click","action":"save","data":{}}'
+<div class="settings">...</div>
+<template data-tether-effects>{"toast":"Settings saved"}</template>
+```
+
+With `sess.Morph("key")`, the body contains only the keyed fragments and the response carries a `Tether-Morph: keyed` header so the client applies them as targeted morphs:
+
+```
+$ curl -si ... | grep Tether-Morph
+Tether-Morph: keyed
+<span data-tether-key="count">Count: 5</span>
+```
+
+The client runtime detects the format from the response `Content-Type` - nothing to configure on the browser side, and the same page works with either format. Use `wire.HTML` when you want responses that are easy to inspect, test with curl, or serve through HTML-aware middleware; use the default `wire.JSON` when you prefer one envelope across stateless and stateful handlers.
+
+`wire.HTML` is stateless-only: stateful transports multiplex many update kinds over one connection and need a structured format ([Stateful] fails at startup if asked for it).
+
+## Caching stateless pages
+
+Stateless GET responses embed no session token, so they are safe for browsers and CDNs to cache when the content permits it. Set `CacheControl` to opt in:
+
+```go
+CacheControl: "public, max-age=60, stale-while-revalidate=300",
+```
+
+The default sends no `Cache-Control` header in production; dev mode always sends `no-store` so edits show immediately.
 
 ## When to upgrade to stateful mode
 
