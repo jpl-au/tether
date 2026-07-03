@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jpl-au/tether/dev"
 	"github.com/jpl-au/tether/mode"
 	"github.com/jpl-au/tether/wire"
 )
@@ -392,4 +393,44 @@ func TestCBORUsesBinaryFramesWhenSupported(t *testing.T) {
 	if _, err := base64.StdEncoding.DecodeString(string(mt.sent[0])); err != nil {
 		t.Errorf("text fallback is not valid base64: %v", err)
 	}
+}
+
+// TestDebugDashboard covers the dev-only observability page: it must
+// show the pool counts and recent diagnostics in dev mode and be
+// absent in production, where Health() is the monitoring surface.
+func TestDebugDashboard(t *testing.T) {
+	t.Run("dev mode serves the dashboard", func(t *testing.T) {
+		t.Cleanup(dev.Reset)
+		h := Stateful(App{DevMode: true}, StatefulConfig[counterState]{
+			Mode:         mode.WebSocket,
+			Upgrade:      stubUpgrade,
+			InitialState: func(r *http.Request) counterState { return counterState{} },
+			Render:       renderCounter,
+			Handle:       handleCounter,
+		})
+
+		h.Diagnostics.Publish(Diagnostic{Kind: TransportError, SessionID: "DASHTESTSESSION", Detail: "/app"})
+
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, httptest.NewRequest("GET", "/_tether/debug", nil))
+		if w.Code != http.StatusOK {
+			t.Fatalf("status = %d, want 200", w.Code)
+		}
+		body := w.Body.String()
+		if !strings.Contains(body, "Sessions") || !strings.Contains(body, "Diagnostics") {
+			t.Errorf("dashboard missing sections: %s", body)
+		}
+		if !strings.Contains(body, string(TransportError)) {
+			t.Error("published diagnostic not shown on dashboard")
+		}
+	})
+
+	t.Run("production does not expose it", func(t *testing.T) {
+		h := newTestHandler()
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, httptest.NewRequest("GET", "/_tether/debug", nil))
+		if strings.Contains(w.Body.String(), "tether debug") {
+			t.Error("debug dashboard reachable outside dev mode")
+		}
+	})
 }

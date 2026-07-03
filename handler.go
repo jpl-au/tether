@@ -55,6 +55,10 @@ type Handler[S any] struct {
 	ticketMu sync.Mutex
 	tickets  map[string]connectTicket
 
+	// debugLog records recent diagnostics for the dev dashboard at
+	// /_tether/debug. Nil outside dev mode.
+	debugLog *diagnosticLog
+
 	// csrf checks cross-origin requests using Go 1.25's standard
 	// library CrossOriginProtection. Safe methods (GET, HEAD) are
 	// always allowed; non-safe methods are checked against

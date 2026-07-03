@@ -98,6 +98,7 @@ Dev mode does the following:
 7. **Per-session diagnostics** - all session-level debug logging (events, diffs, reconnections, group membership, etc.) is gated behind dev mode via `dev.Debug`. In production with dev mode off, none of this output fires. For structured observability, use `OnStructuralChange` and `OnNoPatch` callbacks instead
 8. **Discarded effect warnings** - logs a warning when a handler panic discards buffered side effects (Toast, Signal, Navigate, etc.)
 9. **Configuration audit** - logs which Timeouts, Limits, and App fields were left at zero and filled with framework defaults. When a timeout or buffer size isn't behaving as expected, check this log to see whether the framework chose a default you didn't intend
+10. **Debug dashboard** - `/_tether/debug` serves an auto-refreshing page showing the session pool counts (pending / active / disconnected), outstanding connect tickets, and the most recent diagnostics. A session-accounting leak or a stream of transport errors is visible at a glance. Dev mode only; use `Handler.Health()` and the `Diagnostics` bus for production monitoring
 
 ### Filesystem asset watching
 

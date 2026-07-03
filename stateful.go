@@ -226,6 +226,12 @@ func Stateful[S any](app App, cfg StatefulConfig[S]) *Handler[S] {
 		Diagnostics:   NewBus[Diagnostic](),
 	}
 
+	// The dev dashboard records recent diagnostics; production pays
+	// nothing for it (nil log, route not registered).
+	if dev.Enabled() {
+		h.debugLog = newDiagnosticLog(h.Diagnostics)
+	}
+
 	go h.reapPending()
 
 	dev.Log().Info("tether: ready", handlerAttrs(app, cfg, wf)...)
