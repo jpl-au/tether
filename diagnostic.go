@@ -105,6 +105,16 @@ const (
 	// keys. The Detail field contains the miss ratio. Configure the
 	// threshold via [Timeouts].MemoiseMissThreshold; zero disables.
 	HighMemoiseMissRate DiagnosticKind = "high_memoise_miss_rate"
+
+	// SharedCacheReuse signals that a render cycle used the process-
+	// global shared-fragment cache (see [node.Shared]). The Detail
+	// field reports hits and misses for the cycle: a hit reused another
+	// session's rendered bytes, a miss rendered fresh and populated the
+	// cache. All-miss cycles across sessions usually mean the shared
+	// keys are not aligned - e.g. a key derived from per-session state
+	// instead of shared content. Fires only when the cycle touched the
+	// shared cache at all.
+	SharedCacheReuse DiagnosticKind = "shared_cache_reuse"
 )
 
 // Diagnostic carries a framework-level event from the session lifecycle,

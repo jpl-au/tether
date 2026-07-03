@@ -259,4 +259,20 @@ func (s *StatefulSession[S]) checkMemoiseStats() {
 			})
 		}
 	}
+
+	// Shared-fragment cache activity, if this render used any
+	// node.Shared regions. A hit reused another session's bytes; a
+	// miss rendered fresh for the whole process.
+	if sharedHits, sharedMisses := ms.SharedStats(); sharedHits+sharedMisses > 0 {
+		dev.Debug("shared cache stats",
+			"session", s.id,
+			"hits", sharedHits,
+			"misses", sharedMisses,
+		)
+		s.emitDiagnostic(Diagnostic{
+			Kind:      SharedCacheReuse,
+			SessionID: s.id,
+			Detail:    fmt.Sprintf("%d hits, %d misses", sharedHits, sharedMisses),
+		})
+	}
 }

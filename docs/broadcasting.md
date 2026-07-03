@@ -58,6 +58,27 @@ group.Each(func(sess *tether.StatefulSession[State]) {
 Use `Broadcast` when the state struct changes (triggers render).
 Use `Each` when only signal-bound values change (skips render).
 
+### Sharing rendered fragments across the room
+
+`Broadcast` fans the update out to every session, and each one renders
+independently in its own loop. When part of that render is identical for
+everyone - a room header, a shared leaderboard, a live scoreboard -
+wrap it in `node.Shared` so it renders once for the whole room instead
+of once per member:
+
+```go
+// With StatefulConfig.Memoise: true
+node.Shared("board:"+s.BoardVersion, func() node.Node {
+    return renderBoard(s.Board)
+})
+```
+
+The first session to render a given key populates a process-global
+cache; the rest reuse its bytes. The larger the room, the bigger the
+saving. See [shared fragments](performance.md#shared-fragments-across-sessions)
+for the full contract - the key must be globally unique and derived
+from the content, never from per-session state.
+
 ## Broadcasting from Handle
 
 When broadcasting from inside `Handle`, use `BroadcastOthers` to exclude the sender. Handle already updates the sender's state via the return value - broadcasting to everyone would double-apply the change on the sender:

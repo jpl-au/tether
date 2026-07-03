@@ -366,6 +366,13 @@ type StatefulConfig[S any] struct {
 	// a [node.Memoise] child with a cache key. Dynamic regions without
 	// a memoised child are always re-rendered (treated as a miss).
 	//
+	// Memoisation also unlocks [node.Shared], which reuses a region's
+	// rendered bytes across sessions via a process-global cache - the
+	// closure runs at most once per key for the whole process, not once
+	// per session. Use it for regions broadcast identically to many
+	// sessions (a shared header, a live leaderboard). The
+	// [SharedCacheReuse] diagnostic reports how often it saves a render.
+	//
 	// When false (the default), the session uses the standard Differ
 	// which renders and compares every Dynamic region on each cycle.
 	// This is correct for all render functions and requires no
