@@ -229,6 +229,20 @@ func (b *Bus[E]) Len() int {
 	return len(b.loadSubs())
 }
 
+// Close releases the bus's cluster subscription, if any. Package-level
+// buses live for the whole process and never need this; call it when
+// a Bus with a cluster topic is created per-request or per-entity,
+// which would otherwise leak its broker subscription and goroutine.
+func (b *Bus[E]) Close() {
+	// The no-op Do synchronises with a concurrent lazy cluster
+	// subscribe - it blocks until any in-flight first Do completes,
+	// making the clusterUnsub read safe.
+	b.clusterOnce.Do(func() {})
+	if b.clusterUnsub != nil {
+		b.clusterUnsub()
+	}
+}
+
 // subscribe is the internal registration method. sessionID is non-empty
 // for subscriptions created via tether.On (sender-filtered) and empty for
 // raw Subscribe calls. Copy-on-write: a new map is built under the
@@ -247,6 +261,11 @@ func (b *Bus[E]) subscribeAsync(ctx context.Context, fn func(E), sessionID strin
 // (sync, async, session-bound, raw) funnel through here. Copy-on-write:
 // a new map is built under the write lock and stored atomically.
 func (b *Bus[E]) add(ctx context.Context, fn func(E), sessionID string, async bool) func() {
+	// A nil context would panic in context.AfterFunc below and again
+	// in the lock-free publish path. Treat nil as "never cancelled".
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	b.wmu.Lock()
 	id := b.nextID
 	b.nextID++

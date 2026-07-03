@@ -323,7 +323,7 @@ func TestStateCalledDuringHandleWarns(t *testing.T) {
 		// The warning is emitted via dev.Warn - we verify it
 		// doesn't panic and the handling flag is correctly
 		// managed (cleared after Handle returns).
-		if sess.handling {
+		if sess.handling.Load() {
 			t.Error("handling flag should be false after Handle returns")
 		}
 	})

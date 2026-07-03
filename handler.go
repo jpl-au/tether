@@ -14,12 +14,16 @@ import (
 
 // pendingSession holds a pre-warmed session created during the initial GET
 // request. The state and differ are seeded so that the WebSocket can attach
-// without repeating the initial render.
+// without repeating the initial render. Effects captured while running
+// OnNavigate during the GET (SetTitle, Toast, Announce - a Navigate
+// redirect is answered with a real 302 instead) are carried here and
+// delivered in the first update after the transport connects.
 type pendingSession[S any] struct {
 	state     S
 	differ    *jit.Differ
 	createdAt time.Time
 	userAgent string
+	effects   Effects
 }
 
 // defaultPendingTimeout is used when PendingTimeout is zero.
@@ -44,6 +48,12 @@ type Handler[S any] struct {
 	draining     atomic.Bool
 	drainNotify  chan struct{} // buffered(1), signalled when pools empty during drain
 	uploadWG     sync.WaitGroup
+
+	// tickets holds outstanding one-time connect tickets, keyed by
+	// token. See ticket.go for why transports connect with a ticket
+	// instead of the session ID.
+	ticketMu sync.Mutex
+	tickets  map[string]connectTicket
 
 	// csrf checks cross-origin requests using Go 1.25's standard
 	// library CrossOriginProtection. Safe methods (GET, HEAD) are
@@ -104,12 +114,11 @@ func (h *Handler[S]) destroySession(s *StatefulSession[S]) {
 	}
 
 	// For frozen sessions the loop already exited and cleanup()
-	// skipped closing destroyed. Close it now so Shutdown waiters
-	// are unblocked. destroyedOnce ensures this is safe even if
-	// cleanup() and destroySession() race during thaw.
-	if Status(s.status.Load()) == Frozen {
-		s.transition(Destroyed)
-	}
+	// skipped closing destroyed. Move them straight to Destroyed and
+	// close the channel so Shutdown waiters are unblocked. The CAS
+	// loses harmlessly if a concurrent thaw claimed the stub first;
+	// destroyedOnce ensures a single close either way.
+	s.status.CompareAndSwap(int32(Frozen), int32(Destroyed))
 	s.destroyedOnce.Do(func() { close(s.destroyed) })
 
 	// Remove stored data for sessions that were offloaded during
@@ -142,15 +151,22 @@ func (h *Handler[S]) destroySession(s *StatefulSession[S]) {
 	}
 }
 
-// destroyByID looks up a session by ID in the disconnected pool and
-// destroys it immediately. Used by the session handoff (replaces
-// param) and the beforeunload beacon (destroy param) to skip the
-// disconnect timer when the client knows the session is abandoned.
+// destroyByID looks up a session by ID and destroys it immediately.
+// Used by the session handoff (replaces) and the beforeunload beacon
+// (destroy) to skip the disconnect timer when the client knows the
+// session is abandoned. Checks the active pool as well as the
+// disconnected pool - on a fast page refresh the new connection can
+// arrive before the old transport has finished closing, leaving the
+// replaced session still in h.active.
 func (h *Handler[S]) destroyByID(id string) {
 	h.mu.Lock()
 	sess, ok := h.disconnected[id]
 	if ok {
 		delete(h.disconnected, id)
+	} else if sess, ok = h.active[id]; ok {
+		delete(h.active, id)
+	}
+	if ok {
 		h.notifyDrain()
 	}
 	h.mu.Unlock()
@@ -160,5 +176,34 @@ func (h *Handler[S]) destroyByID(id string) {
 		if h.cfg.OnDisconnect != nil {
 			h.cfg.OnDisconnect(sess)
 		}
+	}
+}
+
+// sessionDestroyed is the convergence point for teardown initiated
+// inside the session (panic, idle timeout, MaxLifetime, explicit
+// stop). Called from cleanup on the loop goroutine, it removes the
+// session from whichever pool still holds it and runs the permanent
+// cleanup. Idempotent: teardown that came through the transport side
+// (disconnect timer, destroy beacon, shutdown) already removed the
+// session from the pools and ran destroySession, so this becomes a
+// no-op.
+func (h *Handler[S]) sessionDestroyed(s *StatefulSession[S]) {
+	h.mu.Lock()
+	_, inActive := h.active[s.id]
+	_, inDisconnected := h.disconnected[s.id]
+	tracked := inActive || inDisconnected
+	if tracked {
+		delete(h.active, s.id)
+		delete(h.disconnected, s.id)
+		h.notifyDrain()
+	}
+	h.mu.Unlock()
+	if !tracked {
+		return
+	}
+
+	h.destroySession(s)
+	if h.cfg.OnDisconnect != nil {
+		h.cfg.OnDisconnect(s)
 	}
 }

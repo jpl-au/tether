@@ -47,3 +47,15 @@ type Transport interface {
 type Heartbeater interface {
 	StartHeartbeat(interval time.Duration)
 }
+
+// BinarySender is an optional interface for transports that can carry
+// raw binary payloads. WebSocket implements it (binary frames); SSE
+// cannot - its event stream is text-only, so binary wire formats are
+// base64-encoded for it instead.
+//
+// When a session's wire format is binary (CBOR) and its transport
+// implements BinarySender, updates are sent via SendBinary with no
+// base64 inflation.
+type BinarySender interface {
+	SendBinary(data []byte) error
+}

@@ -79,8 +79,11 @@ func NewValue[V any](initial V, topic ...string) *Value[V] {
 }
 
 // Load returns the current value. Lock-free. Returns the zero value
-// of V if the Value was not created via [NewValue].
+// of V if the Value was not created via [NewValue]. Loading also
+// (lazily, once) subscribes a clustered Value to its topic, so a node
+// that only reads a topic Value still receives remote updates.
 func (v *Value[V]) Load() V {
+	v.initCluster()
 	raw := v.val.Load()
 	if raw == nil {
 		var zero V
@@ -94,8 +97,17 @@ func (v *Value[V]) Load() V {
 // is also published to other nodes.
 func (v *Value[V]) Store(val V) {
 	v.initCluster()
-	v.storeLocal(val)
+	v.wmu.Lock()
+	v.val.Store(valueBox[V]{val})
+	// The cluster publish happens under the write lock so concurrent
+	// writers reach the wire in the same order they reached the
+	// value. Publishing after unlock let two writes swap on the wire,
+	// leaving remote nodes converged on the older value.
 	v.clusterPublish(val)
+	v.wmu.Unlock()
+	// Local observers are notified outside the lock - a subscriber
+	// callback may itself call Store/Update without deadlocking.
+	v.bus.Publish(val)
 }
 
 // Update performs an atomic read-modify-write. It reads the current
@@ -106,11 +118,17 @@ func (v *Value[V]) Store(val V) {
 func (v *Value[V]) Update(fn func(V) V) {
 	v.initCluster()
 	v.wmu.Lock()
-	current := fn(v.Load())
+	raw := v.val.Load()
+	var current V
+	if raw != nil {
+		current = raw.(valueBox[V]).v
+	}
+	current = fn(current)
 	v.val.Store(valueBox[V]{current})
+	// Under the lock for cross-node ordering - see Store.
+	v.clusterPublish(current)
 	v.wmu.Unlock()
 	v.bus.Publish(current)
-	v.clusterPublish(current)
 }
 
 // storeLocal writes a new value and publishes to local observers
@@ -126,6 +144,19 @@ func (v *Value[V]) storeLocal(val V) {
 // Len returns the number of active observers.
 func (v *Value[V]) Len() int {
 	return v.bus.Len()
+}
+
+// Close releases the value's cluster subscription, if any. Package-
+// level values live for the whole process and never need this; call
+// it when a Value with a cluster topic is created per-request or
+// per-entity, which would otherwise leak its broker subscription.
+func (v *Value[V]) Close() {
+	// The no-op Do synchronises with a concurrent lazy cluster
+	// subscribe - see Bus.Close.
+	v.clusterOnce.Do(func() {})
+	if v.clusterUnsub != nil {
+		v.clusterUnsub()
+	}
 }
 
 // observe registers a subscriber and returns the current value

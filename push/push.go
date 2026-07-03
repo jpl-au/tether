@@ -121,8 +121,12 @@ func (s Subscription) Validate() error {
 	if err != nil {
 		return fmt.Errorf("push: invalid endpoint: %w", err)
 	}
-	if u.Scheme != "https" && u.Scheme != "http" {
-		return fmt.Errorf("push: endpoint scheme must be https or http, got %q", u.Scheme)
+	// RFC 8030 requires push resources to be HTTPS. An http endpoint
+	// can only come from a tampered or hand-crafted subscription, and
+	// accepting it would send (encrypted) user payloads in cleartext
+	// transport to an attacker-chosen host.
+	if u.Scheme != "https" {
+		return fmt.Errorf("push: endpoint scheme must be https, got %q", u.Scheme)
 	}
 
 	pub, err := decodeBase64URL(s.Keys.P256dh)
@@ -326,8 +330,11 @@ func encryptPayload(key, nonce, plaintext []byte) ([]byte, error) {
 	}
 
 	// Append the delimiter byte (0x02 = final record) so the receiver
-	// can distinguish content from padding.
-	padded := append(plaintext, 0x02)
+	// can distinguish content from padding. Copy first - appending to
+	// the caller's slice could write into its backing array.
+	padded := make([]byte, len(plaintext)+1)
+	copy(padded, plaintext)
+	padded[len(plaintext)] = 0x02
 
 	return gcm.Seal(nil, nonce, padded, nil), nil
 }

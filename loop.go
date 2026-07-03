@@ -20,7 +20,14 @@ import (
 func (s *StatefulSession[S]) run() {
 	dev.Debug("run loop started", "session", s.id, "endpoint", s.endpoint)
 	s.stateSnap.Store(s.state)
-	s.transition(Active)
+	// Fresh sessions activate here. Thawed sessions were already
+	// moved Frozen → Active by thaw (atomically, so a concurrent
+	// Shutdown cannot destroy the frozen stub mid-thaw), and a
+	// session that lost that race to Shutdown is Destroyed - the
+	// loop starts, sees the cancelled context, and exits cleanly.
+	if Status(s.status.Load()) == Pending {
+		s.transition(Active)
+	}
 	defer close(s.loopDone)
 	defer s.cleanup()
 
@@ -43,6 +50,13 @@ func (s *StatefulSession[S]) run() {
 			s.exec(ev)
 
 		case cmd := <-s.cmds:
+			// Snapshot the pre-batch state so the optional Equal
+			// check can skip the render when the whole batch left
+			// state unchanged - matching the event path in exec.
+			var prev S
+			if s.equal != nil {
+				prev = s.state
+			}
 			s.runCmd(cmd)
 			// Drain additional pending commands to coalesce Updates.
 			// Multiple rapid Updates (broadcasts, watchers) execute
@@ -64,7 +78,15 @@ func (s *StatefulSession[S]) run() {
 			if s.needsRender && s.ctx.Err() == nil {
 				s.needsRender = false
 				s.coalescedCount = batched
-				s.coalescedRender()
+				if s.equal != nil && s.equal(prev, s.state) {
+					// State unchanged across the batch - skip the
+					// render but still deliver buffered effects.
+					fx := &Effects{}
+					s.drainFx(fx)
+					s.sendFx(fx)
+				} else {
+					s.coalescedRender()
+				}
 			}
 
 		case fn := <-s.fxCh:
@@ -141,9 +163,9 @@ func (s *StatefulSession[S]) readTransport(out chan<- Event) {
 		// Select on both the send and the transport context so the
 		// goroutine exits promptly when the session is destroyed,
 		// instead of blocking forever on a full channel.
-		ctx := s.transportCtx
-		if ctx == nil {
-			ctx = s.ctx
+		ctx := s.ctx
+		if p := s.transportCtx.Load(); p != nil && *p != nil {
+			ctx = *p
 		}
 		select {
 		case out <- ev:

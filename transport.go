@@ -26,3 +26,9 @@ type Transport = xport.Transport
 // it calls StartHeartbeat with the configured interval after the
 // session is established.
 type Heartbeater = xport.Heartbeater
+
+// BinarySender is an optional interface for transports that can carry
+// raw binary payloads (WebSocket binary frames). When a session's
+// wire format is binary (CBOR) and its transport implements
+// BinarySender, updates are sent as-is instead of base64-encoded.
+type BinarySender = xport.BinarySender

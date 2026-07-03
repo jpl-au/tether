@@ -86,21 +86,29 @@ to any session.
 | Location | Purpose |
 |----------|---------|
 | `data-tether-session` HTML attribute | Client reclaims session on transport connect |
-| WebSocket upgrade URL (`?session=ID`) | Server looks up the session to attach |
-| `Tether-Session` POST header | SSE mode event delivery |
+| `Tether-Session` POST header | Events, uploads, push subscriptions, connect tickets |
+| Destroy beacon POST body | Immediate teardown on page unload |
 | Server logs (debug level) | Correlating session activity |
 
-### Why the session ID is in the URL
+### Why the session ID is never in a URL
 
-Browsers do not allow custom headers on `new WebSocket()` calls. The only
-alternatives are cookies (which the framework deliberately avoids to
-eliminate cookie-based CSRF) or the WebSocket sub-protocol field (a misuse
-of the spec). A query parameter is the standard approach used by Phoenix
-LiveView, Laravel Livewire, and similar frameworks.
+URLs are captured by web-server access logs, reverse proxies, and APM
+traces, so a bearer token in a query string leaks into infrastructure
+the application does not control. Browsers do not allow custom headers
+on `new WebSocket()` or `new EventSource()` calls, so the transport
+connect cannot carry the ID in a header directly. Instead the client
+first POSTs to the endpoint with `?tether=ticket`, sending the session
+ID in the `Tether-Session` header (and any replaced session in
+`Tether-Replaces`). The server answers with an opaque, single-use
+connect ticket that expires in seconds, and the transport connects
+with `?ticket=<token>`. A logged copy of the ticket is worthless: it
+dies on first use, expires almost immediately, and is bound to the
+issuing client's User-Agent.
 
-Session binding mitigates the risk of URL exposure - knowing the session ID
-alone is not sufficient to hijack a session; the attacker must also present
-the correct User-Agent.
+Session binding adds a second layer - even a live session ID is not
+sufficient to reconnect; the client must also present the original
+User-Agent (a tripwire against casual replay, not real protection
+against a capable attacker).
 
 ### Mitigations
 

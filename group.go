@@ -87,13 +87,26 @@ func (g *Group[S]) Add(s *StatefulSession[S]) {
 	g.wmu.Unlock()
 
 	if !exists {
-		n := len(g.loadSessions())
-		g.count.Store(n)
+		n := g.syncCount()
 		dev.Debug("group.Add", "session", s.id, "endpoint", s.endpoint, "members", n)
 		if onJoin != nil {
 			onJoin(s)
 		}
 	}
+}
+
+// syncCount refreshes the reactive count from the live session map.
+// The map is re-read inside the count Value's own write lock, so two
+// racing Add/Remove calls cannot publish their counts out of order
+// and strand the Value on a stale number - whichever update runs last
+// reads the newest map.
+func (g *Group[S]) syncCount() int {
+	n := 0
+	g.count.Update(func(int) int {
+		n = len(g.loadSessions())
+		return n
+	})
+	return n
 }
 
 // Remove unregisters a session from the group. If the session was
@@ -117,8 +130,7 @@ func (g *Group[S]) Remove(s *StatefulSession[S]) {
 	g.wmu.Unlock()
 
 	if exists {
-		n := len(g.loadSessions())
-		g.count.Store(n)
+		n := g.syncCount()
 		dev.Debug("group.Remove", "session", s.id, "endpoint", s.endpoint, "members", n)
 		if onLeave != nil {
 			onLeave(s)

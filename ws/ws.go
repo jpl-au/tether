@@ -204,11 +204,13 @@ func isNormalClose(err error) bool {
 	return strings.Contains(s, "code=1000") || strings.Contains(s, "code=1001")
 }
 
-// Compile-time checks: *transport must satisfy xport.Transport
-// and xport.Heartbeater (WebSocket ping/pong keep-alive).
+// Compile-time checks: *transport must satisfy xport.Transport,
+// xport.Heartbeater (WebSocket ping/pong keep-alive), and
+// xport.BinarySender (binary frames for binary wire formats).
 var (
-	_ xport.Transport   = (*transport)(nil)
-	_ xport.Heartbeater = (*transport)(nil)
+	_ xport.Transport    = (*transport)(nil)
+	_ xport.Heartbeater  = (*transport)(nil)
+	_ xport.BinarySender = (*transport)(nil)
 )
 
 // transport implements [xport.Transport] over a single WebSocket
@@ -239,6 +241,13 @@ func (t *transport) closeWithErr(err error) {
 // [Session.Update] goroutines.
 func (t *transport) Send(data []byte) error {
 	return t.conn.WriteMessage(gws.OpcodeText, data)
+}
+
+// SendBinary writes raw bytes as a WebSocket binary frame. Used for
+// binary wire formats (CBOR) so payloads travel without the +33%
+// base64 inflation that text-only transports require.
+func (t *transport) SendBinary(data []byte) error {
+	return t.conn.WriteMessage(gws.OpcodeBinary, data)
 }
 
 // ReceiveEvent blocks until the client sends a JSON event message.

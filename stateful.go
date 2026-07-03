@@ -49,19 +49,15 @@ func Stateful[S any](app App, cfg StatefulConfig[S]) *Handler[S] {
 	}
 	// Inherit transport functions from App when the handler does not
 	// set its own. Per-handler values always take precedence. When
-	// neither App nor StatefulConfig provides a value, apply the
-	// built-in default (WebSocket for Upgrade, SSE for Fallback).
+	// neither App nor StatefulConfig provides a value, the built-in
+	// default (WebSocket for Upgrade, SSE for Fallback) is applied
+	// below, after Limits are resolved, so the default upgrader can
+	// enforce MaxEventBytes.
 	if cfg.Upgrade == nil {
 		cfg.Upgrade = app.Upgrade
 	}
-	if cfg.Upgrade == nil {
-		cfg.Upgrade = ws.Upgrade()
-	}
 	if cfg.Fallback == nil {
 		cfg.Fallback = app.Fallback
-	}
-	if cfg.Fallback == nil {
-		cfg.Fallback = sse.Upgrade()
 	}
 	// Default to mode.Both when Mode is not set.
 	if cfg.Mode == 0 {
@@ -164,6 +160,17 @@ func Stateful[S any](app App, cfg StatefulConfig[S]) *Handler[S] {
 	}
 	if cfg.Timeouts.PendingCheck == 0 {
 		cfg.Timeouts.PendingCheck = defaultPendingCheckInterval
+	}
+
+	// Built-in transport defaults. The default WebSocket upgrader
+	// inherits MaxEventBytes so the configured event-size limit
+	// applies to both transports - a custom Upgrade takes over that
+	// responsibility (set ws.Options.ReadLimit to match).
+	if cfg.Upgrade == nil {
+		cfg.Upgrade = ws.Upgrade(ws.Options{ReadLimit: cfg.Limits.MaxEventBytes})
+	}
+	if cfg.Fallback == nil {
+		cfg.Fallback = sse.Upgrade()
 	}
 
 	// Log which defaults were applied so developers can see what the

@@ -122,6 +122,12 @@ func TestRestoreSessionLoadsState(t *testing.T) {
 				t.Errorf("re-persisted Count = %d, want 8", state.Count)
 			}
 		}
+
+		// restoreSession returns at disconnect; the loop keeps
+		// running through the reconnect window. Destroy it so the
+		// bubble can finish.
+		sess.stop()
+		synctest.Wait()
 	})
 }
 
@@ -145,7 +151,7 @@ func TestRestoreSessionFiresOnRestore(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/?session="+id, nil)
 		req.Header.Set("User-Agent", "TestAgent/1.0")
 
-		_, ok := h.restoreSession(id, req, mt)
+		sess, ok := h.restoreSession(id, req, mt)
 		synctest.Wait()
 
 		if !ok {
@@ -154,6 +160,9 @@ func TestRestoreSessionFiresOnRestore(t *testing.T) {
 		if !called {
 			t.Error("OnRestore was not called during crash recovery")
 		}
+
+		sess.stop()
+		synctest.Wait()
 	})
 }
 
@@ -177,7 +186,7 @@ func TestRestoreSessionFallsBackToOnConnect(t *testing.T) {
 		req, _ := http.NewRequest("GET", "/?session="+id, nil)
 		req.Header.Set("User-Agent", "TestAgent/1.0")
 
-		_, ok := h.restoreSession(id, req, mt)
+		sess, ok := h.restoreSession(id, req, mt)
 		synctest.Wait()
 
 		if !ok {
@@ -186,6 +195,9 @@ func TestRestoreSessionFallsBackToOnConnect(t *testing.T) {
 		if !called {
 			t.Error("OnConnect was not called as fallback during crash recovery")
 		}
+
+		sess.stop()
+		synctest.Wait()
 	})
 }
 
@@ -261,5 +273,8 @@ func TestRestoreSessionMetadata(t *testing.T) {
 		if sess.lastTitle != "Test Page" {
 			t.Errorf("lastTitle = %q, want Test Page", sess.lastTitle)
 		}
+
+		sess.stop()
+		synctest.Wait()
 	})
 }

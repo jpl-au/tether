@@ -78,8 +78,12 @@ type StatefulSession[S any] struct {
 	// Transport lifetime - cancelled when the transport drops
 	// (disconnect or freeze). Recreated on reattach and thaw.
 	// Go() passes this context so background goroutines stop
-	// when the client is no longer connected.
-	transportCtx    context.Context
+	// when the client is no longer connected. The context is an
+	// atomic pointer because Go() and readTransport read it from
+	// arbitrary goroutines while reattach swaps it on the loop.
+	// The cancel func is only touched on the loop goroutine (or
+	// before the loop starts), so it stays a plain field.
+	transportCtx    atomic.Pointer[context.Context]
 	transportCancel context.CancelFunc
 	// loopDone is closed each time run() exits. The HTTP handler
 	// goroutine blocks on this so it can return when the transport
@@ -109,11 +113,12 @@ type StatefulSession[S any] struct {
 	// round-trip, no blocking.
 	stateSnap atomic.Value
 
-	// handling is true while Handle or Update is executing on the
-	// loop goroutine. Used by State() to emit a dev-mode warning
-	// when called during Handle - the snapshot is stale and the
-	// developer should use the state parameter instead.
-	handling bool
+	// handling is true while Handle is executing on the loop
+	// goroutine. Used by State() to emit a dev-mode warning when
+	// called during Handle - the snapshot is stale and the
+	// developer should use the state parameter instead. Atomic
+	// because State() is documented as safe from any goroutine.
+	handling atomic.Bool
 
 	// overflows counts how many times the command or effect buffer
 	// was full and a goroutine was spawned to deliver the item.
@@ -469,13 +474,29 @@ func (s *StatefulSession[S]) Context() context.Context {
 // The goroutine must respect context cancellation. A goroutine
 // that ignores the context will leak.
 func (s *StatefulSession[S]) Go(fn func(ctx context.Context)) {
-	go fn(s.transportCtx)
+	ctx := s.Context()
+	if p := s.transportCtx.Load(); p != nil && *p != nil {
+		ctx = *p
+	}
+	go fn(ctx)
 }
 
 // sessionID returns the session's unique identifier. Used by
 // Bus.Emit to record the sender for subscriber filtering.
 func (s *StatefulSession[S]) sessionID() string {
 	return s.id
+}
+
+// attachTransportCtx derives a fresh transport-lifetime context from
+// the session context and installs it. Returns the new context so the
+// HTTP handler goroutine can wait on this specific attachment and
+// return as soon as the transport is gone, rather than holding the
+// request alive for the whole session.
+func (s *StatefulSession[S]) attachTransportCtx() context.Context {
+	ctx, cancel := context.WithCancel(s.ctx)
+	s.transportCtx.Store(&ctx)
+	s.transportCancel = cancel
+	return ctx
 }
 
 // enqueueFx sends an effect closure to the effects channel. Under

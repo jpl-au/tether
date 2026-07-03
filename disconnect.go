@@ -77,10 +77,12 @@ func (s *StatefulSession[S]) onTransportClose() {
 
 	// Freeze: release state and differ to reclaim memory. The store
 	// holds everything needed to restore. The loop exits after this
-	// returns (checked by the caller in run).
+	// returns (checked by the caller in run). The snapshot is zeroed
+	// too so State() reflects the released state.
 	if s.freeze {
 		var zero S
 		s.state = zero
+		s.stateSnap.Store(zero)
 		s.engine = nil
 		s.transition(Frozen)
 		dev.Debug("session frozen", "session", s.id, "endpoint", s.endpoint)
@@ -171,8 +173,26 @@ func (s *StatefulSession[S]) cleanup() {
 	if s.transport != nil {
 		s.transport.Close()
 	}
-	s.transition(Destroyed)
+	if s.transportCancel != nil {
+		s.transportCancel()
+	}
+	// Another path may already have moved the session to Destroyed
+	// (destroySession racing a freeze, Shutdown racing a thaw) - the
+	// CAS simply loses and the transition is skipped.
+	s.status.CompareAndSwap(int32(Active), int32(Destroyed))
 	s.destroyedOnce.Do(func() { close(s.destroyed) })
+
+	// Destruction that starts inside the session (handler panic with
+	// no OnPanic, idle timeout, MaxLifetime, dropped command) exits
+	// through this path without ever passing through the transport
+	// disconnect flow, so the handler bookkeeping - pool removal,
+	// group membership, store entries, drain notification - happens
+	// here. sessionDestroyed is a no-op for sessions that were
+	// already removed from the pools (disconnect timer, destroy
+	// beacon, shutdown), making the two destruction paths converge.
+	if s.handler != nil {
+		s.handler.sessionDestroyed(s)
+	}
 }
 
 // startTimers sets up per-session lifecycle timers. Called once during

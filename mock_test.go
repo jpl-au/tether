@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"sync"
+	"time"
 
 	jit "github.com/jpl-au/fluent-jit"
 	"github.com/jpl-au/fluent/html5/div"
@@ -179,6 +180,18 @@ func stubUpgrade(w http.ResponseWriter, r *http.Request) (Transport, error) {
 	return &mockTransport{}, nil
 }
 
+// connectPath builds the transport-connect URL the way the client JS
+// does: issue a one-time ticket carrying the session ID, then connect
+// with ?ticket=. The ua must match the User-Agent header set on the
+// connect request - redemption verifies it.
+func connectPath[S any](h *Handler[S], id, ua string) string {
+	tok, ok := h.issueTicket(id, "", ua, time.Now())
+	if !ok {
+		panic("connectPath: issueTicket refused")
+	}
+	return "/?ticket=" + tok
+}
+
 type counterState struct {
 	Count int
 }
@@ -208,26 +221,24 @@ func handleCounter(_ Session, state counterState, ev Event) counterState {
 func newTestSession(state counterState, mt Transport) *StatefulSession[counterState] {
 	differ := jit.NewDiffer()
 	ctx, cancel := context.WithCancel(context.Background())
-	tctx, tcancel := context.WithCancel(ctx)
 	sess := &StatefulSession[counterState]{
-		id:              "test",
-		state:           state,
-		render:          renderCounter,
-		handle:          handleCounter,
-		engine:          differ,
-		encoder:         wire.JSONEncoder{},
-		transport:       mt,
-		transportCtx:    tctx,
-		transportCancel: tcancel,
-		events:          make(chan Event),
-		cmds:            make(chan func(), defaultCmdBufferSize),
-		fxCh:            make(chan func(*Effects), defaultCmdBufferSize),
-		overflowSem:     make(chan struct{}, defaultCmdBufferSize),
-		loopDone:        make(chan struct{}),
-		destroyed:       make(chan struct{}),
-		ctx:             ctx,
-		stop:            cancel,
+		id:          "test",
+		state:       state,
+		render:      renderCounter,
+		handle:      handleCounter,
+		engine:      differ,
+		encoder:     wire.JSONEncoder{},
+		transport:   mt,
+		events:      make(chan Event),
+		cmds:        make(chan func(), defaultCmdBufferSize),
+		fxCh:        make(chan func(*Effects), defaultCmdBufferSize),
+		overflowSem: make(chan struct{}, defaultCmdBufferSize),
+		loopDone:    make(chan struct{}),
+		destroyed:   make(chan struct{}),
+		ctx:         ctx,
+		stop:        cancel,
 	}
+	sess.attachTransportCtx()
 	// Initial status is set directly, not via transition(), because
 	// there is no prior state to validate against. All subsequent
 	// changes must use transition().

@@ -9,6 +9,16 @@ import (
 	"github.com/jpl-au/tether/wire"
 )
 
+// runHandle invokes the composed Handle function with the handling
+// flag raised so State() can warn about stale reads. The flag is
+// lowered via defer so a panic recovered by OnPanic cannot leave it
+// stuck and turn every later State() call into a bogus warning.
+func (s *StatefulSession[S]) runHandle(state S, ev Event) S {
+	s.handling.Store(true)
+	defer s.handling.Store(false)
+	return s.handle(s, state, ev)
+}
+
 // exec processes a single client event: handle it, re-render, diff,
 // and send patches to the transport.
 func (s *StatefulSession[S]) exec(ev Event) {
@@ -52,9 +62,7 @@ func (s *StatefulSession[S]) exec(ev Event) {
 
 	// All events flow through the composed Handle function, which
 	// includes middleware, OnNavigate, and component routing.
-	s.handling = true
-	newState := s.handle(s, s.state, ev)
-	s.handling = false
+	newState := s.runHandle(s.state, ev)
 
 	s.drainFx(fx)
 
@@ -78,7 +86,7 @@ func (s *StatefulSession[S]) exec(ev Event) {
 				Type: "navigate",
 				Data: map[string]string{"path": u.Path, "search": u.RawQuery},
 			}
-			newState = s.handle(s, newState, redirectEv)
+			newState = s.runHandle(newState, redirectEv)
 			s.drainFx(fx)
 
 			if fx.URL == "" {
@@ -136,7 +144,10 @@ func (s *StatefulSession[S]) exec(ev Event) {
 		})
 	}
 	s.checkMemoiseStats()
-	if len(patches) == 0 && change == nil {
+	// Nil patches with no structural change means the engine is
+	// unseeded (stale client) - sendDiff answers with a full morph,
+	// so it is not a "no patch" outcome and is excluded here.
+	if patches != nil && len(patches) == 0 && change == nil {
 		source := string(ev.Type)
 		switch {
 		case s.onNoPatch != nil:

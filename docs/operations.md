@@ -91,7 +91,7 @@ Dev mode does the following:
 
 1. **No service worker** - unregisters the service worker scoped to this handler's endpoint and skips registration, so you always get fresh assets. Workers registered by other handlers on the same origin are left alone
 2. **Graceful reconnect** - when the server goes away, the page stays visible with a "Reconnecting..." bar. Once the server comes back, the client syncs the current URL so the server re-renders without a page reload. The page is never destroyed on disconnect or reconnect.
-3. **No caching** - sets `Cache-Control: no-store` on all responses
+3. **No caching** - the initial page always carries `Cache-Control: private, no-store` (it embeds the session token), in dev mode and production alike
 4. **Debug logging** - the default logger uses DEBUG level (when no Logger is provided)
 5. **Visual flash** - morphed DOM elements flash with a blue outline
 6. **Console logging** - events, patches, and morphs are logged to the browser console

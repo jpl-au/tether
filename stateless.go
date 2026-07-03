@@ -92,10 +92,17 @@ func Stateless[S any](app App, cfg StatelessConfig[S]) http.Handler {
 
 	csrf := app.Security.csrf()
 
+	// Stateless responses are always JSON: the fetch-mode client
+	// decodes with resp.json() and no CBOR extension is injected for
+	// HTTP transport. Say so rather than silently ignoring the config.
+	if app.WireFormat == wire.CBOR {
+		dev.Log().Warn("tether: Stateless always uses JSON on the wire - App.WireFormat CBOR applies to stateful handlers only")
+	}
+
 	return &statelessHandler[S]{
 		app:           app,
 		cfg:           cfg,
-		encoder:       resolveEncoder(0),
+		encoder:       resolveEncoder(wire.JSON),
 		clientHandler: app.jsHandler(),
 		assetMounts:   app.mountAssets(),
 		csrf:          csrf,
@@ -148,6 +155,13 @@ func (p *statelessHandler[S]) serveGET(w http.ResponseWriter, r *http.Request) {
 		cs := &CaptureSession{Ctx: r.Context(), PushErr: ErrPushPreWarm}
 		params := Params{Path: r.URL.Path, Query: r.URL.Query()}
 		state = p.cfg.OnNavigate(cs, state, params)
+		// A Navigate call during a GET is an auth-guard style
+		// redirect - answer with a real HTTP redirect instead of
+		// rendering the guarded page.
+		if cs.Effects.URL != "" {
+			http.Redirect(w, r, cs.Effects.URL, http.StatusFound)
+			return
+		}
 	}
 
 	tree := p.cfg.Render(state)

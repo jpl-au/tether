@@ -88,8 +88,8 @@ func (h *Handler[S]) handleUpload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	id := r.Header.Get("Tether-Session")
-	if id == "" {
-		http.Error(w, "missing Tether-Session header", http.StatusBadRequest)
+	if !validSessionID(id) {
+		http.Error(w, "missing or invalid Tether-Session header", http.StatusBadRequest)
 		return
 	}
 

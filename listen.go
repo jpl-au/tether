@@ -182,14 +182,22 @@ func serve(srv *http.Server, start func() error, url string, grace time.Duration
 	}
 	wg.Wait()
 
+	// Force-close any sessions that didn't drain in time. This runs
+	// before the HTTP listener shutdown: SSE session handlers are
+	// ordinary HTTP requests that only return once their transport
+	// dies, so stopping the listener first would burn the whole grace
+	// period waiting for them and leave no time for the handlers'
+	// final SessionStore save. Draining is already active, so no new
+	// sessions can start while the listener is still accepting.
+	for _, d := range drainers {
+		if err := d.Shutdown(ctx); err != nil {
+			dev.Log().Warn("tether: handler shutdown error", "error", err)
+		}
+	}
+
 	// Stop accepting new HTTP requests.
 	if err := srv.Shutdown(ctx); err != nil {
 		dev.Log().Warn("tether: HTTP server shutdown error", "error", err)
-	}
-
-	// Force-close any sessions that didn't drain in time.
-	for _, d := range drainers {
-		d.Shutdown(ctx)
 	}
 
 	dev.Log().Info("shutdown complete")

@@ -34,7 +34,7 @@ func TestSessionBindingRejectsReattachWithMismatchedUA(t *testing.T) {
 	h.Diagnostics.Subscribe(ctx, func(d Diagnostic) { got = d })
 
 	// Attempt to reconnect with a different User-Agent.
-	req := httptest.NewRequest("GET", "/?session="+sess.id, nil)
+	req := httptest.NewRequest("GET", connectPath(h, sess.id, "curl/7.68"), nil)
 	req.Header.Set("Upgrade", "websocket")
 	req.Header.Set("User-Agent", "curl/7.68")
 	w := httptest.NewRecorder()
@@ -82,7 +82,7 @@ func TestSessionBindingRejectsPendingClaimWithMismatchedUA(t *testing.T) {
 	h.Diagnostics.Subscribe(ctx, func(d Diagnostic) { got = d })
 
 	// Attempt to claim with a different User-Agent.
-	req := httptest.NewRequest("GET", "/?session=test-pending", nil)
+	req := httptest.NewRequest("GET", connectPath(h, "test-pending", "curl/7.68"), nil)
 	req.Header.Set("Upgrade", "websocket")
 	req.Header.Set("User-Agent", "curl/7.68")
 	w := httptest.NewRecorder()
@@ -128,7 +128,7 @@ func TestSessionBindingDisabledAllowsMismatchedUA(t *testing.T) {
 
 	// Claim with a different User-Agent - should succeed because
 	// binding is disabled.
-	req := httptest.NewRequest("GET", "/?session=test-disabled", nil)
+	req := httptest.NewRequest("GET", connectPath(h, "test-disabled", "curl/7.68"), nil)
 	req.Header.Set("Upgrade", "websocket")
 	req.Header.Set("User-Agent", "curl/7.68")
 	w := httptest.NewRecorder()
@@ -177,7 +177,7 @@ func TestSessionMatchCustomMatcher(t *testing.T) {
 	h.mu.Unlock()
 
 	// Claim with a different Mozilla version - should match.
-	req := httptest.NewRequest("GET", "/?session=test-match", nil)
+	req := httptest.NewRequest("GET", connectPath(h, "test-match", "Mozilla/5.0 (X11; Linux) Chrome/121"), nil)
 	req.Header.Set("Upgrade", "websocket")
 	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux) Chrome/121")
 	w := httptest.NewRecorder()
@@ -220,7 +220,7 @@ func TestSessionMatchRejectsNonMatchingUA(t *testing.T) {
 	h.Diagnostics.Subscribe(ctx, func(d Diagnostic) { got = d })
 
 	// Attempt reconnect with a completely different UA family.
-	req := httptest.NewRequest("GET", "/?session="+sess.id, nil)
+	req := httptest.NewRequest("GET", connectPath(h, sess.id, "curl/7.68"), nil)
 	req.Header.Set("Upgrade", "websocket")
 	req.Header.Set("User-Agent", "curl/7.68")
 	w := httptest.NewRecorder()

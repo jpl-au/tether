@@ -23,16 +23,15 @@ import (
 // emitted if State() is called during Handle to help catch this
 // mistake early.
 //
-// When the loop is not active (before startup, after destruction, or
-// while frozen), the state field is returned directly - no concurrent
-// mutations are possible.
+// The snapshot is stored at session construction and after every
+// mutation, so it is always available while the loop runs and remains
+// readable (without racing the loop) after destruction or freeze. The
+// direct field read only happens for sessions constructed without a
+// handler (tests), where no loop exists.
 func (s *StatefulSession[S]) State() S {
-	if s.handling {
+	if s.handling.Load() {
 		dev.Warn("State() called during Handle - the returned value is stale; use the state parameter instead",
 			"session", s.id, "endpoint", s.endpoint)
-	}
-	if Status(s.status.Load()) != Active {
-		return s.state
 	}
 	if v := s.stateSnap.Load(); v != nil {
 		return v.(S)
@@ -81,11 +80,16 @@ func (s *StatefulSession[S]) Update(fn func(S) S) {
 					Err:       err,
 					Detail:    s.endpoint,
 				})
-				s.needsRender = false
-				s.drainFx(nil)
+				// needsRender is left alone: in a coalesced batch an
+				// earlier Update may have applied a mutation that
+				// still needs rendering. When OnPanic keeps the
+				// session alive, clearing the flag would leave the
+				// client showing stale state; effects buffered by
+				// sibling Updates are kept for the same reason.
 				if s.onPanic != nil {
 					s.onPanic(s, err)
 				} else {
+					s.drainFx(nil)
 					s.stop()
 				}
 			}

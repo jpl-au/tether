@@ -59,12 +59,15 @@ func TestStatefulDevModeCacheControl(t *testing.T) {
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 
-	if w.Header().Get("Cache-Control") != "no-store" {
-		t.Errorf("Cache-Control = %q, want %q", w.Header().Get("Cache-Control"), "no-store")
+	if w.Header().Get("Cache-Control") != "private, no-store" {
+		t.Errorf("Cache-Control = %q, want %q", w.Header().Get("Cache-Control"), "private, no-store")
 	}
 }
 
-func TestStatefulNoCacheControlInProduction(t *testing.T) {
+// The initial page embeds the session ID (a bearer token), so it must
+// carry no-store in production too - a shared cache serving one
+// user's page to another would hand over the session.
+func TestStatefulCacheControlInProduction(t *testing.T) {
 	handler := Stateful(App{}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
@@ -77,8 +80,8 @@ func TestStatefulNoCacheControlInProduction(t *testing.T) {
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 
-	if w.Header().Get("Cache-Control") != "" {
-		t.Errorf("Cache-Control = %q, want empty when DevMode is false", w.Header().Get("Cache-Control"))
+	if w.Header().Get("Cache-Control") != "private, no-store" {
+		t.Errorf("Cache-Control = %q, want %q", w.Header().Get("Cache-Control"), "private, no-store")
 	}
 }
 

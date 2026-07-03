@@ -429,10 +429,21 @@ func FlashClass(class string) Option { return Option{"tether-flash-class", class
 // event. The combo format is modifier keys joined with + followed by
 // the key name: "ctrl+k", "escape", "shift+?", "ctrl+shift+p".
 //
+// Modifiers are ctrl, meta, shift, and alt - ctrl and meta (Cmd on
+// macOS, Win key on Windows) are distinct, so a ctrl combo never
+// swallows Cmd+C. Use the "mod" alias for the platform's primary
+// command modifier (meta on macOS, ctrl elsewhere) when one shortcut
+// should feel native everywhere: "mod+k". Modifiers must appear in
+// the order ctrl, meta, shift, alt (or mod, shift, alt).
+//
+// Hotkeys without ctrl/meta/alt do not fire while an input, textarea,
+// select, or contenteditable element has focus - typing "/" into a
+// search box is text, not a shortcut.
+//
 // One hotkey per element. For multiple hotkeys, apply each to its
 // own element:
 //
-//	bind.Apply(div.New(), bind.Hotkey("ctrl+k", "search.open"))
+//	bind.Apply(div.New(), bind.Hotkey("mod+k", "search.open"))
 //	bind.Apply(div.New(), bind.Hotkey("escape", "modal.close"))
 //
 // The client runtime builds a registry from [data-tether-hotkey]

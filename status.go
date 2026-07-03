@@ -48,14 +48,19 @@ var validTransitions = map[Status][]Status{
 // if the transition is not valid according to the state machine.
 // This makes invalid transitions impossible - bugs surface
 // immediately during development rather than causing silent state
-// corruption.
+// corruption. A compare-and-swap loop (rather than load-then-store)
+// keeps the check and the write atomic when two goroutines race,
+// e.g. the loop freezing while Shutdown destroys.
 func (s *StatefulSession[S]) transition(to Status) {
-	from := Status(s.status.Load())
-	if slices.Contains(validTransitions[from], to) {
-		s.status.Store(int32(to))
-		return
+	for {
+		from := Status(s.status.Load())
+		if !slices.Contains(validTransitions[from], to) {
+			panic("tether: invalid status transition " + from.String() + " -> " + to.String())
+		}
+		if s.status.CompareAndSwap(int32(from), int32(to)) {
+			return
+		}
 	}
-	panic("tether: invalid status transition " + from.String() + " -> " + to.String())
 }
 
 // String returns a human-readable name for the status.

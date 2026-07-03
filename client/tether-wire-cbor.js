@@ -1,9 +1,10 @@
 // tether-wire-cbor.js overrides Tether.decode to handle CBOR payloads.
 //
-// When the server sends CBOR over SSE, the binary bytes are base64-encoded
-// (SSE is text-only). This extension base64-decodes the data, then decodes
-// the CBOR into a plain JS object. The resulting object has the same shape
-// as the JSON equivalent, so the rest of tether.js works unchanged.
+// Over WebSocket, CBOR arrives as native binary frames. Over SSE (a
+// text-only stream) the bytes arrive base64-encoded and are decoded
+// first. Either way the CBOR decodes into a plain JS object with the
+// same shape as the JSON equivalent, so the rest of tether.js works
+// unchanged.
 //
 // Loaded automatically by the framework when WireFormat is wire.CBOR.
 
@@ -74,7 +75,9 @@
     }
 
     function readMap(len) {
-      var obj = {};
+      // Null-prototype object: a "__proto__" key arriving on the wire
+      // must become a plain own property, not a prototype write.
+      var obj = Object.create(null);
       for (var i = 0; i < len; i++) {
         var key = read();
         obj[key] = read();
@@ -123,10 +126,18 @@
     return bytes;
   }
 
-  // Override Tether.decode: base64-decode the SSE data string, then
-  // CBOR-decode the binary payload.
+  // Override Tether.decode. WebSocket delivers CBOR as native binary
+  // frames (ArrayBuffer); SSE is text-only, so its payloads arrive
+  // base64-encoded and are decoded to bytes first.
   window.Tether.decode = function (data) {
-    var bytes = base64ToBytes(data);
+    var bytes;
+    if (typeof data === "string") {
+      bytes = base64ToBytes(data);
+    } else if (data instanceof Uint8Array) {
+      bytes = data;
+    } else {
+      bytes = new Uint8Array(data);
+    }
     return decodeCBOR(bytes);
   };
 })();

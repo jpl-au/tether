@@ -67,17 +67,24 @@ func (h *Handler[S]) Shutdown(ctx context.Context) error {
 	for _, sess := range h.disconnected {
 		sessions = append(sessions, sess)
 	}
-	// Clear pending and disconnected maps to release memory.
+	// Clear all pools. Shutdown owns the destruction of every session
+	// collected above; clearing active as well makes the loop-side
+	// cleanup (sessionDestroyed) a no-op so bookkeeping is not run
+	// twice and OnDisconnect does not fire during shutdown.
 	clear(h.pending)
+	clear(h.active)
 	clear(h.disconnected)
 	h.mu.Unlock()
 
 	// Destroy all sessions. Frozen sessions keep their store
 	// entries so a restarting server can restore them - only the
-	// destroyed channel is closed to unblock waiters below.
+	// destroyed channel is closed to unblock waiters below. The
+	// compare-and-swap is the serialisation point against a
+	// concurrent thaw: if the thaw wins, the session is Active and
+	// falls through to the normal destroy path, which cancels its
+	// context and stops the freshly started loop.
 	for _, sess := range sessions {
-		if sess.freeze && Status(sess.status.Load()) == Frozen {
-			sess.transition(Destroyed)
+		if sess.freeze && sess.status.CompareAndSwap(int32(Frozen), int32(Destroyed)) {
 			sess.destroyedOnce.Do(func() { close(sess.destroyed) })
 			continue
 		}

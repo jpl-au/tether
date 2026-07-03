@@ -30,13 +30,20 @@
     }
   }
 
+  // Boundness lives in a WeakSet keyed by the DOM node rather than a
+  // DOM attribute: morphs sync attributes from server HTML (which
+  // never carries a bound marker), so an attribute guard is stripped
+  // on every morph while the reused node keeps its listener - the
+  // rebind then stacks a second listener and one file selection
+  // starts N competing uploads.
+  var boundUploads = new WeakSet();
+
   // setupUpload wires a single upload element. File inputs trigger on
   // change; buttons and other elements trigger on click and look for a
   // file input in the closest form or parent.
   function setupUpload(el) {
-    // Guard against double-binding after morphs.
-    if (el.hasAttribute("data-tether-upload-bound")) return;
-    el.setAttribute("data-tether-upload-bound", "");
+    if (boundUploads.has(el)) return;
+    boundUploads.add(el);
 
     var action = el.getAttribute("data-tether-upload");
     var isFileInput = el.tagName === "INPUT" && el.type === "file";

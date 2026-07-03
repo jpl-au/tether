@@ -2,10 +2,12 @@ package tether
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/url"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/jpl-au/tether/dev"
 	"github.com/jpl-au/tether/mode"
@@ -33,12 +35,16 @@ func (h *Handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Beacon destroy signal: the client sends a POST with ?destroy=ID
-	// via navigator.sendBeacon on page unload. Destroy the session
-	// immediately so it doesn't sit in the disconnect timer.
-	if destroy := r.URL.Query().Get("destroy"); destroy != "" {
-		h.destroyByID(destroy)
-		w.WriteHeader(http.StatusNoContent)
+	// Framework verbs share the page endpoint, selected by ?tether=.
+	// Both are POST-only and CSRF-checked - they act on session state,
+	// so a cross-site GET (e.g. <img src="...?tether=destroy">) must
+	// not be able to trigger them.
+	switch r.URL.Query().Get("tether") {
+	case "ticket":
+		h.handleConnectTicket(w, r)
+		return
+	case "destroy":
+		h.handleDestroyBeacon(w, r)
 		return
 	}
 
@@ -155,6 +161,72 @@ func (h *Handler[S]) wsOriginAllowed(r *http.Request) bool {
 	return u.Host == r.Host
 }
 
+// handleConnectTicket issues a one-time connect ticket. The client
+// POSTs here immediately before opening a transport, carrying its
+// session ID (and any session it replaces after a page refresh) in
+// headers so neither appears in a URL. The response body is the
+// opaque ticket the transport connects with. See ticket.go.
+func (h *Handler[S]) handleConnectTicket(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if err := h.csrf.Check(r); err != nil {
+		http.Error(w, "origin not allowed", http.StatusForbidden)
+		return
+	}
+
+	// Both IDs are optional - a first connect has no session yet -
+	// but when present they must look like IDs this framework issued.
+	id := r.Header.Get("Tether-Session")
+	if id != "" && !validSessionID(id) {
+		http.Error(w, "invalid session ID", http.StatusBadRequest)
+		return
+	}
+	replaces := r.Header.Get("Tether-Replaces")
+	if replaces != "" && !validSessionID(replaces) {
+		http.Error(w, "invalid session ID", http.StatusBadRequest)
+		return
+	}
+
+	tok, ok := h.issueTicket(id, replaces, r.UserAgent(), time.Now())
+	if !ok {
+		http.Error(w, "too many pending connections", http.StatusServiceUnavailable)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	io.WriteString(w, tok)
+}
+
+// handleDestroyBeacon destroys a session the client knows is
+// abandoned - navigator.sendBeacon fires it on page unload so the
+// session doesn't sit out its disconnect timer. sendBeacon always
+// POSTs; the session ID travels in the body, keeping it out of URLs.
+func (h *Handler[S]) handleDestroyBeacon(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if err := h.csrf.Check(r); err != nil {
+		http.Error(w, "origin not allowed", http.StatusForbidden)
+		return
+	}
+
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 256))
+	if err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	id := strings.TrimSpace(string(body))
+	if !validSessionID(id) {
+		http.Error(w, "invalid session ID", http.StatusBadRequest)
+		return
+	}
+	h.destroyByID(id)
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // handlePostEvent receives a client event via HTTP POST. This is the
 // client→server path for SSE mode, where the EventSource connection
 // is unidirectional. WebSocket transports receive events on the
@@ -173,8 +245,8 @@ func (h *Handler[S]) handlePostEvent(w http.ResponseWriter, r *http.Request) {
 	// The session ID is sent as a header rather than a query parameter
 	// to keep it out of server access logs and browser history.
 	id := r.Header.Get("Tether-Session")
-	if id == "" {
-		http.Error(w, "missing Tether-Session header", http.StatusBadRequest)
+	if !validSessionID(id) {
+		http.Error(w, "missing or invalid Tether-Session header", http.StatusBadRequest)
 		return
 	}
 
@@ -229,8 +301,8 @@ func (h *Handler[S]) handlePushSubscribe(w http.ResponseWriter, r *http.Request)
 	}
 
 	id := r.Header.Get("Tether-Session")
-	if id == "" {
-		http.Error(w, "missing Tether-Session header", http.StatusBadRequest)
+	if !validSessionID(id) {
+		http.Error(w, "missing or invalid Tether-Session header", http.StatusBadRequest)
 		return
 	}
 

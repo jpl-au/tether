@@ -220,9 +220,15 @@ type Security struct {
 
 	// DisableSessionBinding turns off User-Agent verification on
 	// session reconnect entirely. When true, [SessionMatch] is
-	// ignored and any client can reconnect to any session. Use
-	// only in trusted environments where session theft is not a
-	// concern.
+	// ignored and possession of the session ID alone is enough to
+	// reconnect.
+	//
+	// Note that the User-Agent check is a tripwire, not real theft
+	// protection - an attacker who has stolen a session ID can
+	// usually spoof the UA too. The real protections are keeping the
+	// ID out of URLs and logs (the framework carries it in headers
+	// and one-time connect tickets) and TLS. The UA check merely
+	// stops casual replay of a leaked ID from a different device.
 	DisableSessionBinding bool
 
 	// SessionMatch customises how the framework compares

@@ -45,6 +45,7 @@ func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 	h.mu.RUnlock()
 
 	state := h.cfg.InitialState(r)
+	var effects Effects
 	if h.cfg.OnNavigate != nil {
 		params := Params{
 			Path:  r.URL.Path,
@@ -52,6 +53,17 @@ func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 		}
 		cs := &CaptureSession{SessionID: "pre-warm", Ctx: r.Context(), PushErr: ErrPushPreWarm}
 		state = h.cfg.OnNavigate(cs, state, params)
+		// A Navigate call during the initial GET is an auth-guard
+		// style redirect. Answer with a real HTTP redirect instead of
+		// rendering the guarded page and hoping the client bounces.
+		if cs.Effects.URL != "" {
+			http.Redirect(w, r, cs.Effects.URL, http.StatusFound)
+			return
+		}
+		// Remaining effects (title, toast, announce, signals) are
+		// carried on the pending session and delivered in the first
+		// update after the transport connects.
+		effects = cs.Effects
 	}
 	tree := h.cfg.Render(state)
 
@@ -61,7 +73,7 @@ func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 	id := newID()
 	now := time.Now()
 	h.mu.Lock()
-	h.pending[id] = &pendingSession[S]{state: state, differ: differ, createdAt: now, userAgent: r.UserAgent()}
+	h.pending[id] = &pendingSession[S]{state: state, differ: differ, createdAt: now, userAgent: r.UserAgent(), effects: effects}
 	h.mu.Unlock()
 
 	var pushKey string
@@ -95,9 +107,10 @@ func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Frame-Options", "DENY")
 	// Prevent session ID leakage via Referer header on external links.
 	w.Header().Set("Referrer-Policy", "same-origin")
-	if dev.Enabled() {
-		w.Header().Set("Cache-Control", "no-store")
-	}
+	// The page embeds the session ID (a bearer token), so it must
+	// never be stored by a shared cache or CDN - one cached response
+	// would hand one user's session to every subsequent visitor.
+	w.Header().Set("Cache-Control", "private, no-store")
 	if h.cfg.Layout != nil {
 		h.cfg.Layout(state, content).Render(w)
 	} else {
@@ -117,6 +130,25 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 	proto := resolveProtocol(h.cfg.Protocol, r, h.app.Logger)
 	dev.Debug("session transport", "protocol", proto.String(), "remote", r.RemoteAddr)
 
+	// The connect URL carries a one-time ticket rather than the
+	// session ID itself. The ID is a bearer token - putting it in a
+	// URL would leak it into access logs, proxy logs, and APM traces.
+	// The ticket was issued moments ago by handleConnectTicket with
+	// the ID (and any replaced session) carried in request headers.
+	var id, replaces string
+	invalidTicket := false
+	if tok := r.URL.Query().Get("ticket"); tok != "" {
+		if t, ok := h.redeemTicket(tok, r.UserAgent()); ok {
+			id = t.session
+			replaces = t.replaces
+		} else {
+			// Expired, replayed, or forged. The client evidently ran
+			// the connect flow, so it is showing some page - treat it
+			// as a stale client below: fresh session, full morph.
+			invalidTicket = true
+		}
+	}
+
 	transport, err := upgrade(w, r)
 	if err != nil {
 		http.Error(w, "connection upgrade failed", http.StatusInternalServerError)
@@ -132,13 +164,11 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		}
 	}()
 
-	id := r.URL.Query().Get("session")
-
 	// If the client is replacing a previous session (page refresh),
 	// destroy the old session immediately instead of waiting for the
 	// 30s disconnect timer. sessionStorage on the client tracks which
 	// session was active in this tab before the refresh.
-	if replaces := r.URL.Query().Get("replaces"); replaces != "" {
+	if replaces != "" {
 		h.destroyByID(replaces)
 	}
 
@@ -175,10 +205,12 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 				}
 			}
 			dev.Debug("session reattached", "session", id, "endpoint", sess.endpoint, "remote", r.RemoteAddr)
-			h.reattach(sess, transport)
-			// Block so the HTTP goroutine stays alive - SSE
-			// transports need r.Context() to remain valid.
-			<-sess.loopDone
+			// Block only for this attachment's lifetime - the HTTP
+			// goroutine must stay alive while the transport is in use
+			// (SSE needs r.Context() valid), but holding it until the
+			// session is destroyed would pin one goroutine plus its
+			// request per reconnect.
+			<-h.reattach(sess, transport)
 		}
 		return
 	}
@@ -188,7 +220,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 	// migration). The client has an ID that isn't in any in-memory
 	// pool, but the store may have persisted state from a previous
 	// server instance.
-	if h.cfg.SessionStore != nil {
+	if h.cfg.SessionStore != nil && id != "" {
 		if restored, ok := h.restoreSession(id, r, transport); ok {
 			started = true
 			_ = restored // restoreSession blocked until the loop exited
@@ -199,6 +231,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 	// Try to claim a pending (pre-warmed) session.
 	var state S
 	var differ *jit.Differ
+	var effects Effects
 
 	h.mu.Lock()
 	if ps, ok := h.pending[id]; ok {
@@ -214,16 +247,18 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		}
 		state = ps.state
 		differ = ps.differ
+		effects = ps.effects
 		delete(h.pending, id)
 	}
 	h.mu.Unlock()
 
-	// When the client sent a session ID that wasn't found in any
-	// pool or store, the client has stale DOM from a previous server
-	// instance. The engine is left unseeded so the first render
-	// produces a full morph, replacing whatever stale content the
-	// client is showing. False for the pending-session path where
-	// the differ was already seeded during GET.
+	// When the client presented a session ID that wasn't found in any
+	// pool or store (or an unusable ticket), the client has stale DOM
+	// from a previous server instance. The engine is left unseeded and
+	// a full morph is sent as soon as the loop starts, replacing
+	// whatever stale content the client is showing. False for the
+	// pending-session path where the differ was already seeded during
+	// the GET.
 	var stale bool
 
 	if differ == nil {
@@ -243,7 +278,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 			}
 		}
 
-		stale = id != ""
+		stale = id != "" || invalidTicket
 
 		id = newID()
 		state = h.cfg.InitialState(r)
@@ -254,6 +289,10 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 			}
 			cs := &CaptureSession{SessionID: "pre-warm", Ctx: r.Context(), PushErr: ErrPushPreWarm}
 			state = h.cfg.OnNavigate(cs, state, params)
+			// Effects raised while pre-warming (a Navigate redirect
+			// from an auth guard, a title, a toast) are delivered in
+			// the first update after the loop starts.
+			effects = cs.Effects
 		}
 		differ = jit.NewDiffer()
 
@@ -266,15 +305,10 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 			tree := h.cfg.Render(state)
 			differ.Render(tree)
 		}
-		// When stale is true, the differ stays unseeded. The
-		// session's first render will produce a full morph via the
-		// coalescedRender nil-patches path, replacing whatever stale
-		// content the client is showing.
 	}
 
 	now := time.Now()
 	ctx, cancel := context.WithCancel(context.Background())
-	tctx, tcancel := context.WithCancel(ctx)
 	sess := &StatefulSession[S]{
 		id:                   id,
 		state:                state,
@@ -284,8 +318,6 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		encoder:              h.encoder,
 		wireFormat:           h.wireFormat,
 		transport:            transport,
-		transportCtx:         tctx,
-		transportCancel:      tcancel,
 		events:               make(chan Event),
 		cmds:                 make(chan func(), h.cfg.Limits.CmdBufferSize),
 		fxCh:                 make(chan func(*Effects), h.cfg.Limits.CmdBufferSize),
@@ -309,6 +341,8 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		slowRender:           h.cfg.Timeouts.SlowRender,
 		memoiseMissThreshold: h.cfg.Timeouts.MemoiseMissThreshold,
 	}
+	tctx := sess.attachTransportCtx()
+	sess.stateSnap.Store(state)
 	sess.lastActivity.Store(now.UnixNano())
 	// Initial status is set directly, not via transition(), because
 	// there is no prior state to validate against at construction.
@@ -380,6 +414,30 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		}
 	}()
 
+	// A stale client is showing DOM from a previous server instance.
+	// Proactively replace it rather than waiting for the first event -
+	// a page with no watchers, components, or connect-time Updates
+	// would otherwise keep showing stale content indefinitely.
+	// Rendering through the engine also seeds it, so later diffs
+	// produce targeted patches.
+	if stale {
+		sess.cmds <- func() {
+			tree := sess.render(sess.state)
+			html := sess.engine.Render(tree)
+			sess.send(wire.Update{Morphs: []wire.Morph{{Key: "", HTML: html}}})
+		}
+	}
+
+	// Deliver effects captured during pre-warming (OnNavigate on the
+	// initial GET or on this direct connect) as the first update.
+	// Navigate redirects on the GET were already answered with a real
+	// 302; anything else (title, toast, announce, signals) replays
+	// here, honouring the documented CaptureSession contract.
+	if effects.Any() {
+		fx := effects
+		sess.enqueueFx(func(dst *Effects) { fx.copyInto(dst) })
+	}
+
 	// Mount components that implement Mounter before any events arrive.
 	// Uses Update so side effects (Toast, Signal) are rendered and sent.
 	if len(h.cfg.Components) > 0 {
@@ -416,12 +474,14 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 	go sess.readTransport(sess.events)
 	dev.Debug("session ready", "session", sess.id, "endpoint", sess.endpoint)
 
-	// Block until the session loop exits. The HTTP handler goroutine
-	// must stay alive to keep r.Context() valid - both the WebSocket
-	// and SSE transports use it for reads and writes. If we returned
-	// here, net/http would cancel the context and kill the connection
-	// immediately.
-	<-sess.loopDone
+	// Block until this attachment's transport lifetime ends. The HTTP
+	// handler goroutine must stay alive while the transport is in use
+	// to keep r.Context() valid - both the WebSocket and SSE
+	// transports use it for reads and writes. Once the transport
+	// drops (disconnect, freeze, or destroy) the request can return;
+	// a reconnect arrives on a fresh request and blocks on its own
+	// attachment context.
+	<-tctx.Done()
 }
 
 // sessionCodec returns the codec for serialising state S. Uses the
@@ -440,6 +500,23 @@ func (h *Handler[S]) sessionCodec() SessionCodec[S] {
 // caller should treat a false return as "no session to restore" and
 // continue with normal session creation.
 func (h *Handler[S]) restoreSession(id string, r *http.Request, transport Transport) (*StatefulSession[S], bool) {
+	// Restores build a full session, so they respect the same gates
+	// as direct connects. Without this, the reconnect storm after a
+	// node restart - exactly when thousands of clients hold
+	// restorable IDs - could blow past MaxSessions, and a draining
+	// node would keep accepting work it is trying to shed.
+	if h.draining.Load() {
+		return nil, false
+	}
+	if h.app.MaxSessions > 0 {
+		h.mu.RLock()
+		full := len(h.pending)+len(h.active)+len(h.disconnected) >= h.app.MaxSessions
+		h.mu.RUnlock()
+		if full {
+			return nil, false
+		}
+	}
+
 	data, err := h.cfg.SessionStore.Load(r.Context(), id)
 	if err != nil {
 		dev.Warn("session store load failed", "session", id, "error", err)
@@ -497,7 +574,6 @@ func (h *Handler[S]) restoreSession(id string, r *http.Request, transport Transp
 
 	now := time.Now()
 	ctx, cancel := context.WithCancel(context.Background())
-	tctx, tcancel := context.WithCancel(ctx)
 	sess := &StatefulSession[S]{
 		id:                   id,
 		state:                state,
@@ -507,8 +583,6 @@ func (h *Handler[S]) restoreSession(id string, r *http.Request, transport Transp
 		encoder:              h.encoder,
 		wireFormat:           h.wireFormat,
 		transport:            transport,
-		transportCtx:         tctx,
-		transportCancel:      tcancel,
 		events:               make(chan Event),
 		cmds:                 make(chan func(), h.cfg.Limits.CmdBufferSize),
 		fxCh:                 make(chan func(*Effects), h.cfg.Limits.CmdBufferSize),
@@ -532,6 +606,8 @@ func (h *Handler[S]) restoreSession(id string, r *http.Request, transport Transp
 		slowRender:           h.cfg.Timeouts.SlowRender,
 		memoiseMissThreshold: h.cfg.Timeouts.MemoiseMissThreshold,
 	}
+	tctx := sess.attachTransportCtx()
+	sess.stateSnap.Store(state)
 	// Initial status is set directly, not via transition(), because
 	// there is no prior state to validate against at construction.
 	sess.status.Store(int32(Pending))
@@ -657,6 +733,7 @@ func (h *Handler[S]) restoreSession(id string, r *http.Request, transport Transp
 	go sess.readTransport(sess.events)
 	dev.Debug("session restored", "session", sess.id, "endpoint", sess.endpoint)
 
-	<-sess.loopDone
+	// Hold the HTTP goroutine only for this attachment's lifetime.
+	<-tctx.Done()
 	return sess, true
 }

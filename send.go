@@ -12,10 +12,35 @@ import (
 )
 
 // sendDiff is the render-diff-send pipeline extracted from exec and
-// Update. It handles patches, structural changes, and the no-diff
-// case where only the eventID needs echoing. fx carries any buffered
-// effects to merge into the update message.
+// Update. It handles patches, structural changes, the unseeded-engine
+// case, and the no-diff case where only the eventID needs echoing.
+// fx carries any buffered effects to merge into the update message.
 func (s *StatefulSession[S]) sendDiff(eventID string, patches []jit.Patch, change *jit.StructuralChange, tree node.Node, fx *Effects) {
+	// Unseeded engine (nil patches, nil change) means the client has
+	// stale DOM from a previous server instance. Send a full morph so
+	// the client's content is replaced with the current render. This
+	// happens when a reconnecting client's session ID was not found
+	// in any pool or store, so a fresh session was created without
+	// seeding the engine. Handled here so the event path (exec) and
+	// the update path (coalescedRender) recover identically.
+	if patches == nil && change == nil {
+		html := s.engine.Render(tree)
+		dev.Debug("unseeded engine, sending full morph",
+			"session", s.id,
+			"endpoint", s.endpoint,
+			"bytes", len(html),
+		)
+		u := wire.Update{
+			Morphs:  []wire.Morph{{Key: "", HTML: html}},
+			EventID: eventID,
+		}
+		if fx != nil {
+			fx.merge(&u)
+		}
+		s.send(u)
+		return
+	}
+
 	if change != nil {
 		html := s.engine.Render(tree)
 		sc := StructuralChange{
@@ -91,12 +116,36 @@ func (s *StatefulSession[S]) send(u wire.Update) {
 			Err:       err,
 			Detail:    s.endpoint,
 		})
-		return
+		// Signals carry arbitrary developer values (the usual encode
+		// failure: a chan, func, or NaN slipped into a Signal). One
+		// bad signal must not cost the client its patches - retry
+		// without the signals and only drop the update if it still
+		// will not encode.
+		if u.Signals == nil {
+			return
+		}
+		u.Signals = nil
+		data, err = s.encoder.Encode(u)
+		if err != nil {
+			return
+		}
 	}
-	// Binary wire formats (CBOR) must be base64-encoded for
-	// text-only transports like SSE, where raw bytes would
-	// corrupt the event stream framing.
+	// Binary wire formats (CBOR) travel as native binary frames when
+	// the transport supports them (WebSocket). Text-only transports
+	// (SSE) get base64 instead, where raw bytes would corrupt the
+	// event stream framing - at a +33% size cost.
 	if s.wireFormat == wire.CBOR {
+		if bs, ok := s.transport.(BinarySender); ok {
+			if err := bs.SendBinary(data); err != nil {
+				s.emitDiagnostic(Diagnostic{
+					Kind:      TransportError,
+					SessionID: s.id,
+					Err:       err,
+					Detail:    s.endpoint,
+				})
+			}
+			return
+		}
 		data = []byte(base64.StdEncoding.EncodeToString(data))
 	}
 	if err := s.transport.Send(data); err != nil {
@@ -149,29 +198,6 @@ func (s *StatefulSession[S]) coalescedRender() {
 	patches, change := s.engine.Diff(tree)
 	renderDuration := time.Since(renderStart)
 
-	// Unseeded engine (nil patches, nil change) means the client has
-	// stale DOM from a previous server instance. Send a full morph so
-	// the client's content is replaced with the current render. This
-	// happens when a reconnecting client's session ID was not found
-	// in any pool or store, so a fresh session was created without
-	// seeding the engine.
-	if patches == nil && change == nil {
-		html := s.engine.Render(tree)
-		dev.Debug("unseeded engine, sending full morph",
-			"session", s.id,
-			"endpoint", s.endpoint,
-			"bytes", len(html),
-		)
-		u := wire.Update{
-			Morphs: []wire.Morph{{Key: "", HTML: html}},
-		}
-		if fx != nil {
-			fx.merge(&u)
-		}
-		s.send(u)
-		return
-	}
-
 	dev.Debug("render complete",
 		"session", s.id,
 		"patches", len(patches),
@@ -187,7 +213,9 @@ func (s *StatefulSession[S]) coalescedRender() {
 		})
 	}
 	s.checkMemoiseStats()
-	if len(patches) == 0 && change == nil {
+	// Nil patches (unseeded engine) is answered with a full morph by
+	// sendDiff, so only a seeded-but-unchanged diff counts as no-patch.
+	if patches != nil && len(patches) == 0 && change == nil {
 		if s.onNoPatch != nil {
 			s.onNoPatch(s, NoPatch{Source: "update"})
 		} else {

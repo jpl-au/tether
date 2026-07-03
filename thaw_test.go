@@ -373,7 +373,7 @@ func TestThawRecreatesTransportContext(t *testing.T) {
 
 		// Capture the pre-freeze transport context. It was set
 		// during newTestSession and cancelled in onTransportClose.
-		preFreezeCtx := sess.transportCtx
+		preFreezeCtx := *sess.transportCtx.Load()
 		select {
 		case <-preFreezeCtx.Done():
 			// expected - cancelled on disconnect/freeze
@@ -394,7 +394,7 @@ func TestThawRecreatesTransportContext(t *testing.T) {
 
 		// After thaw, the session should have a new, live
 		// transport context (created inside thaw).
-		if sess.transportCtx == preFreezeCtx {
+		if *sess.transportCtx.Load() == preFreezeCtx {
 			t.Error("thaw should create a new transport context")
 		}
 

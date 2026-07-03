@@ -5,6 +5,10 @@
 // sync for SSE event resilience. Registered by tether.js when
 // the server enables Worker mode.
 
+// The version literal below is a placeholder - the server rewrites it
+// at serve time with a content hash of the embedded client files and
+// precached assets (see buildWorkerJS), so each deploy activates a
+// fresh cache and the activate handler evicts the old one.
 var CACHE_VERSION = "tether-v1";
 var PRECACHE_URLS = [
   "/_tether/tether.js",
@@ -17,7 +21,14 @@ var PRECACHE_EXTRA = [];
 self.addEventListener("install", function (e) {
   e.waitUntil(
     caches.open(CACHE_VERSION).then(function (cache) {
-      return cache.addAll(PRECACHE_URLS.concat(PRECACHE_EXTRA));
+      // Best-effort, one URL at a time: under a non-root mount the
+      // absolute /_tether/ paths may not resolve, and one failed
+      // asset must not silently abort the whole install.
+      return Promise.all(
+        PRECACHE_URLS.concat(PRECACHE_EXTRA).map(function (u) {
+          return cache.add(u).catch(function () {});
+        })
+      );
     }).then(function () {
       return self.skipWaiting();
     })
@@ -52,10 +63,15 @@ self.addEventListener("fetch", function (e) {
       caches.match(e.request).then(function (cached) {
         if (cached) return cached;
         return fetch(e.request).then(function (resp) {
-          var clone = resp.clone();
-          caches.open(CACHE_VERSION).then(function (c) {
-            c.put(e.request, clone);
-          });
+          // Never cache error responses - a 502 during a deploy
+          // cached here would pin the app broken until the user
+          // manually clears storage.
+          if (resp.ok) {
+            var clone = resp.clone();
+            caches.open(CACHE_VERSION).then(function (c) {
+              c.put(e.request, clone);
+            });
+          }
           return resp;
         });
       })
@@ -71,7 +87,7 @@ self.addEventListener("fetch", function (e) {
     e.respondWith(
       fetch(e.request)
         .then(function (resp) {
-          if (resp.headers.get("Tether-Cache") === "true") {
+          if (resp.ok && resp.headers.get("Tether-Cache") === "true") {
             var clone = resp.clone();
             caches.open(CACHE_VERSION).then(function (c) {
               c.put(e.request, clone);

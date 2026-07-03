@@ -3,7 +3,6 @@ package tether
 import (
 	"context"
 	"net/http"
-	"sync"
 
 	jit "github.com/jpl-au/fluent-jit"
 	"github.com/jpl-au/tether/dev"
@@ -13,15 +12,11 @@ import (
 // reattach reconnects a disconnected session with a new transport.
 // A command is sent to the session's loop to swap in the new transport
 // and re-render. This avoids any locking - only the loop touches
-// session state.
-func (h *Handler[S]) reattach(sess *StatefulSession[S], transport Transport) {
-	// Stop the disconnect timer so the session isn't destroyed
-	// while we're reattaching. Timer.Stop is goroutine-safe.
-	if sess.disconnectTimer != nil {
-		sess.disconnectTimer.Stop()
-		sess.disconnectTimer = nil
-	}
-
+// session state. Returns a channel that closes when this attachment's
+// transport lifetime ends, so the HTTP handler goroutine can return
+// as soon as the transport is gone instead of blocking until the
+// session is destroyed.
+func (h *Handler[S]) reattach(sess *StatefulSession[S], transport Transport) <-chan struct{} {
 	if hb, ok := transport.(Heartbeater); ok && !h.cfg.Timeouts.DisableHeartbeat {
 		hb.StartHeartbeat(h.cfg.Timeouts.Heartbeat)
 	}
@@ -55,11 +50,26 @@ func (h *Handler[S]) reattach(sess *StatefulSession[S], transport Transport) {
 		}
 	}
 
+	// The attachment context is created here (context creation is
+	// goroutine-safe) but installed on the loop so only the loop
+	// mutates session fields.
+	tctx, tcancel := context.WithCancel(sess.ctx)
+
 	select {
 	case sess.cmds <- func() {
+		// Stop the disconnect timer on the loop goroutine - the
+		// timer fields are loop-owned (cleanup reads them there).
+		// If the timer fires before this command runs, the caller
+		// has already moved the session back to the active pool, so
+		// sessionTimedOut's membership recheck makes it a no-op.
+		if sess.disconnectTimer != nil {
+			sess.disconnectTimer.Stop()
+			sess.disconnectTimer = nil
+		}
 
 		sess.transport = transport
-		sess.transportCtx, sess.transportCancel = context.WithCancel(sess.ctx)
+		sess.transportCtx.Store(&tctx)
+		sess.transportCancel = tcancel
 		sess.events = make(chan Event)
 		go sess.readTransport(sess.events)
 
@@ -111,6 +121,7 @@ func (h *Handler[S]) reattach(sess *StatefulSession[S], transport Transport) {
 	case <-sess.ctx.Done():
 		transport.Close()
 	}
+	return tctx.Done()
 }
 
 // thaw restores a frozen session from the SessionStore and starts a
@@ -207,22 +218,42 @@ func (h *Handler[S]) thaw(sess *StatefulSession[S], r *http.Request, transport T
 		return
 	}
 
-	// Rebuild the session's runtime state.
+	// Claim the frozen stub before touching its fields. The CAS is
+	// the serialisation point against a concurrent Shutdown: whichever
+	// side moves the status first owns the session. Losing means
+	// Shutdown already transitioned Frozen → Destroyed - back out and
+	// let Shutdown's cleanup stand rather than reviving a session the
+	// process is tearing down (previously this race could panic with
+	// an invalid destroyed → active transition).
+	if !sess.status.CompareAndSwap(int32(Frozen), int32(Active)) {
+		h.mu.Lock()
+		delete(h.active, sess.id)
+		h.notifyDrain()
+		h.mu.Unlock()
+		if err := transport.Close(); err != nil {
+			dev.Warn("transport close failed on thaw", "session", sess.id, "error", err)
+		}
+		return
+	}
+
+	// Rebuild the session's runtime state. The destroyed channel and
+	// its once are deliberately not recreated - they are still armed
+	// from the session's creation (freeze skips them) and destroy is
+	// a one-shot event for the session's whole lifetime.
 	differ := jit.NewDiffer()
 	tree := h.cfg.Render(state)
 	differ.Render(tree)
 
 	sess.state = state
+	sess.stateSnap.Store(state)
 	sess.engine = h.engine(differ, state, true)
 	sess.transport = transport
-	sess.transportCtx, sess.transportCancel = context.WithCancel(sess.ctx)
+	tctx := sess.attachTransportCtx()
 	sess.events = make(chan Event)
 	sess.cmds = make(chan func(), h.cfg.Limits.CmdBufferSize)
 	sess.fxCh = make(chan func(*Effects), h.cfg.Limits.CmdBufferSize)
 	sess.overflowSem = make(chan struct{}, h.cfg.Limits.CmdBufferSize)
 	sess.loopDone = make(chan struct{})
-	sess.destroyed = make(chan struct{})
-	sess.destroyedOnce = sync.Once{}
 	sess.lastURL = env.URL
 	sess.lastTitle = env.Title
 
@@ -270,7 +301,9 @@ func (h *Handler[S]) thaw(sess *StatefulSession[S], r *http.Request, transport T
 	go sess.readTransport(sess.events)
 	dev.Debug("session thawed", "session", sess.id, "endpoint", sess.endpoint)
 
-	<-sess.loopDone
+	// Hold the HTTP goroutine only for this attachment's lifetime -
+	// the transport context ends on disconnect, freeze, or destroy.
+	<-tctx.Done()
 }
 
 // sessionDisconnected moves a session from the active pool to the
@@ -299,9 +332,18 @@ func (h *Handler[S]) sessionDisconnected(sess *StatefulSession[S]) {
 }
 
 // sessionTimedOut removes a disconnected session whose reconnect
-// timer has fired. Called from the timer goroutine.
+// timer has fired. Called from the timer goroutine. Membership in
+// the disconnected pool is rechecked under the lock: if the timer
+// fired at the same moment a client reconnected, reattach's
+// Timer.Stop came too late to prevent this callback, but the session
+// has already moved back to the active pool and must not be
+// destroyed out from under the client.
 func (h *Handler[S]) sessionTimedOut(sess *StatefulSession[S]) {
 	h.mu.Lock()
+	if _, ok := h.disconnected[sess.id]; !ok {
+		h.mu.Unlock()
+		return
+	}
 	delete(h.disconnected, sess.id)
 	h.notifyDrain()
 	h.mu.Unlock()

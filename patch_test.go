@@ -199,27 +199,25 @@ func TestPatchThroughDynamicParent(t *testing.T) {
 
 		differ := jit.NewDiffer()
 		ctx, cancel := context.WithCancel(context.Background())
-		tctx, tcancel := context.WithCancel(ctx)
 		ct := newConnectedTransport()
 		sess := &StatefulSession[manyState]{
-			id:              "test",
-			state:           manyState{},
-			render:          renderAll,
-			handle:          handleReset,
-			engine:          differ,
-			encoder:         wire.JSONEncoder{},
-			transport:       ct,
-			transportCtx:    tctx,
-			transportCancel: tcancel,
-			events:          make(chan Event),
-			cmds:            make(chan func(), defaultCmdBufferSize),
-			fxCh:            make(chan func(*Effects), defaultCmdBufferSize),
-			overflowSem:     make(chan struct{}, defaultCmdBufferSize),
-			loopDone:        make(chan struct{}),
-			destroyed:       make(chan struct{}),
-			ctx:             ctx,
-			stop:            cancel,
+			id:          "test",
+			state:       manyState{},
+			render:      renderAll,
+			handle:      handleReset,
+			engine:      differ,
+			encoder:     wire.JSONEncoder{},
+			transport:   ct,
+			events:      make(chan Event),
+			cmds:        make(chan func(), defaultCmdBufferSize),
+			fxCh:        make(chan func(*Effects), defaultCmdBufferSize),
+			overflowSem: make(chan struct{}, defaultCmdBufferSize),
+			loopDone:    make(chan struct{}),
+			destroyed:   make(chan struct{}),
+			ctx:         ctx,
+			stop:        cancel,
 		}
+		sess.attachTransportCtx()
 		sess.status.Store(int32(Pending))
 		differ.Render(renderAll(sess.state))
 
@@ -314,27 +312,25 @@ func TestPatchResetWithManyKeys(t *testing.T) {
 
 		differ := jit.NewDiffer()
 		ctx, cancel := context.WithCancel(context.Background())
-		tctx, tcancel := context.WithCancel(ctx)
 		ct := newConnectedTransport()
 		sess := &StatefulSession[manyState]{
-			id:              "test",
-			state:           manyState{},
-			render:          renderAll,
-			handle:          handleReset,
-			engine:          differ,
-			encoder:         wire.JSONEncoder{},
-			transport:       ct,
-			transportCtx:    tctx,
-			transportCancel: tcancel,
-			events:          make(chan Event),
-			cmds:            make(chan func(), defaultCmdBufferSize),
-			fxCh:            make(chan func(*Effects), defaultCmdBufferSize),
-			overflowSem:     make(chan struct{}, defaultCmdBufferSize),
-			loopDone:        make(chan struct{}),
-			destroyed:       make(chan struct{}),
-			ctx:             ctx,
-			stop:            cancel,
+			id:          "test",
+			state:       manyState{},
+			render:      renderAll,
+			handle:      handleReset,
+			engine:      differ,
+			encoder:     wire.JSONEncoder{},
+			transport:   ct,
+			events:      make(chan Event),
+			cmds:        make(chan func(), defaultCmdBufferSize),
+			fxCh:        make(chan func(*Effects), defaultCmdBufferSize),
+			overflowSem: make(chan struct{}, defaultCmdBufferSize),
+			loopDone:    make(chan struct{}),
+			destroyed:   make(chan struct{}),
+			ctx:         ctx,
+			stop:        cancel,
 		}
+		sess.attachTransportCtx()
 		sess.status.Store(int32(Pending))
 		differ.Render(renderAll(sess.state))
 
