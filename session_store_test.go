@@ -5,6 +5,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -12,10 +13,13 @@ import (
 
 // sessionFileStore is a filesystem-backed SessionStore for testing.
 // TTL is recorded but not enforced - the tests verify it is passed
-// correctly without relying on real expiry.
+// correctly without relying on real expiry. The mutex makes the
+// helper safe for the stress harness, where many sessions save
+// concurrently.
 type sessionFileStore struct {
-	dir     string
-	lastTTL time.Duration
+	dir string
+	mu  sync.Mutex
+	ttl time.Duration
 }
 
 func newSessionFileStore(t *testing.T) *sessionFileStore {
@@ -26,8 +30,16 @@ func (fs *sessionFileStore) path(id string) string {
 	return filepath.Join(fs.dir, id+".session")
 }
 
+func (fs *sessionFileStore) lastTTL() time.Duration {
+	fs.mu.Lock()
+	defer fs.mu.Unlock()
+	return fs.ttl
+}
+
 func (fs *sessionFileStore) Save(_ context.Context, id string, data []byte, ttl time.Duration) error {
-	fs.lastTTL = ttl
+	fs.mu.Lock()
+	fs.ttl = ttl
+	fs.mu.Unlock()
 	return os.WriteFile(fs.path(id), data, 0o600)
 }
 
@@ -115,8 +127,8 @@ func TestSessionStoreTTLPassedThrough(t *testing.T) {
 	if err := store.Save(ctx, "sess-3", []byte("data"), ttl); err != nil {
 		t.Fatalf("Save: %v", err)
 	}
-	if store.lastTTL != ttl {
-		t.Errorf("TTL = %v, want %v", store.lastTTL, ttl)
+	if store.lastTTL() != ttl {
+		t.Errorf("TTL = %v, want %v", store.lastTTL(), ttl)
 	}
 }
 
@@ -267,8 +279,8 @@ func TestSessionStoreDisconnectTTLMatchesReconnect(t *testing.T) {
 		go sess.run()
 		synctest.Wait()
 
-		if store.lastTTL != 45*time.Second {
-			t.Errorf("TTL = %v, want 45s", store.lastTTL)
+		if store.lastTTL() != 45*time.Second {
+			t.Errorf("TTL = %v, want 45s", store.lastTTL())
 		}
 
 		sess.stop()
@@ -336,8 +348,8 @@ func TestSessionStoreShutdownPersists(t *testing.T) {
 		}
 
 		// Verify TTL matches ShutdownGrace.
-		if store.lastTTL != grace {
-			t.Errorf("TTL = %v, want %v", store.lastTTL, grace)
+		if store.lastTTL() != grace {
+			t.Errorf("TTL = %v, want %v", store.lastTTL(), grace)
 		}
 	})
 }
