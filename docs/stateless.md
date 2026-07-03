@@ -20,7 +20,7 @@ mux.Handle("/", tether.Stateless(tether.App{}, tether.StatelessConfig[State]{
 }))
 ```
 
-GET requests render the full page. POST requests handle a client event, render the new state, and return a JSON update that the client applies via the morph engine.
+GET requests render the full page. POST requests handle a client event, render the new state, and return an update that the client applies via the morph engine - a JSON envelope by default, or plain HTML with `WireFormat: wire.HTML`.
 
 ## How it works
 

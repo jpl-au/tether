@@ -49,8 +49,8 @@ The session ID is embedded as a data attribute on the root element. The rendered
 The client JS (`tether.js`) runs on `DOMContentLoaded`:
 
 1. Reads configuration from data attributes on the tether root element
-2. Opens a transport connection - WebSocket by default, SSE as fallback
-3. Passes the session ID as a query parameter so the server can reclaim the pre-warmed state
+2. Requests a one-time connect ticket via POST, carrying the session ID in a header (the ID is a bearer token and never appears in a URL - see [security.md](security.md))
+3. Opens a transport connection - WebSocket by default, SSE as fallback - with the single-use ticket in the query string, so the server can reclaim the pre-warmed state
 
 ### 3. Transport upgrade
 

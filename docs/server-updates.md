@@ -30,6 +30,10 @@ Available side effects:
 
 When no side effects are needed, just return the new state.
 
+### Effect coalescing
+
+Rapid `Update` calls (broadcast storms, watcher bursts) coalesce into one render cycle, and their effects merge: scalar effects (`Toast`, `Announce`, `ScrollTo`, `Download`, `SetTitle`, `Navigate`) are last-write-wins - only the final value in the batch reaches the client - while map effects (`Flash`, `Signals`) merge key by key. When every occurrence matters (a stream of notifications, say), model them as state and render them, or give each its own signal key, rather than relying on one scalar effect per update.
+
 ### Selector helpers vs signals
 
 `Flash` and `Indicator` target DOM elements by CSS selector. This is productive - a single line shows a message or a spinner - but it couples the server to the DOM's ID structure. For simple apps and quick iterations this is the right trade-off.

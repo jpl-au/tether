@@ -84,7 +84,7 @@ ws.Upgrade(ws.Options{
 })
 ```
 
-Set `ReadLimit` to match `StatefulConfig.Limits.MaxEventBytes` for consistent limits across transport modes. Messages exceeding the limit cause the connection to be closed with a protocol error.
+The built-in default upgrader already sets `ReadLimit` to `StatefulConfig.Limits.MaxEventBytes`, so the configured event-size limit applies to both transports out of the box. When you construct a custom `ws.Upgrade`, set `ReadLimit` to match `MaxEventBytes` yourself. Messages exceeding the limit cause the connection to be closed with a protocol error.
 
 ### SSE options
 
@@ -232,6 +232,7 @@ tether.Stateful(app, tether.StatefulConfig[State]{
 |--------|----------|-------------|
 | JSON | `wire.JSON` | Default. Human-readable. Works with any client |
 | CBOR | `wire.CBOR` | Compact binary (RFC 8949). Smaller payloads, faster encoding. The JS client auto-loads a CBOR decoder extension; the WASM client decodes natively |
+| HTML | `wire.HTML` | Stateless-only: fragments as the response body, effects in a JSON island. See [stateless.md](stateless.md#the-html-wire-format) |
 
 For SSE transport, CBOR payloads are base64-encoded because SSE is
 text-only. The client handles this transparently. For WebSocket
