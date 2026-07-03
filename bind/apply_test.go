@@ -402,3 +402,88 @@ func TestOnLongPress(t *testing.T) {
 		t.Errorf("missing longpress attribute in:\n%s", html)
 	}
 }
+
+func TestConditionalBindings(t *testing.T) {
+	tests := []struct {
+		name string
+		opt  bind.Option
+		attr string
+	}{
+		{"BindShowWhen int", bind.BindShowWhen("count", ">", 5), `data-tether-bind-show-when="count > 5"`},
+		{"BindHideWhen str", bind.BindHideWhen("status", "==", "done"), `data-tether-bind-hide-when="status == done"`},
+		{"BindClassWhen", bind.BindClassWhen("danger", "seconds", "<", 10), `data-tether-bind-class-when="danger seconds < 10"`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			html := string(bind.Apply(div.New(), tt.opt).Render())
+			if !strings.Contains(html, tt.attr) {
+				t.Errorf("missing %s in:\n%s", tt.attr, html)
+			}
+		})
+	}
+}
+
+func TestConditionalBindingUnknownOpPanics(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Error("expected panic on unknown operator")
+		}
+	}()
+	bind.BindShowWhen("count", "=<", 5)
+}
+
+func TestEmit(t *testing.T) {
+	html := string(bind.Apply(button.Text("Clear"), bind.Emit("clear", "#search")).Render())
+	if !strings.Contains(html, `data-tether-emit="clear #search"`) {
+		t.Errorf("missing emit attribute in:\n%s", html)
+	}
+}
+
+func TestOnClientEvent(t *testing.T) {
+	tests := []struct {
+		name string
+		opt  bind.Option
+		attr string
+	}{
+		{"set", bind.OnClientEvent("clear", bind.SetSignal("query", "")), `data-tether-on-clear="set-signal query "`},
+		{"toggle", bind.OnClientEvent("flip", bind.ToggleSignal("open")), `data-tether-on-flip="toggle-signal open"`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			html := string(bind.Apply(input.Text("q", ""), tt.opt).Render())
+			if !strings.Contains(html, tt.attr) {
+				t.Errorf("missing %s in:\n%s", tt.attr, html)
+			}
+		})
+	}
+}
+
+func TestOnClientEventRejectsNonSignalAction(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Error("expected panic on non-signal action")
+		}
+	}()
+	bind.OnClientEvent("clear", bind.OnClick("send"))
+}
+
+func TestFilter(t *testing.T) {
+	html := string(bind.Apply(input.Text("q", ""), bind.Filter("#item-list")).Render())
+	if !strings.Contains(html, `data-tether-filter="#item-list"`) {
+		t.Errorf("missing filter attribute in:\n%s", html)
+	}
+}
+
+func TestFilterItem(t *testing.T) {
+	html := string(bind.Apply(div.New(), bind.FilterItem()).Render())
+	if !strings.Contains(html, `data-tether-filter-item`) {
+		t.Errorf("missing filter-item attribute in:\n%s", html)
+	}
+}
+
+func TestTemplate(t *testing.T) {
+	html := string(bind.Apply(div.New(), bind.Template("people", "#people-list")).Render())
+	if !strings.Contains(html, `data-tether-template="people #people-list"`) {
+		t.Errorf("missing template attribute in:\n%s", html)
+	}
+}

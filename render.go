@@ -34,6 +34,7 @@ var extensions = []extension{
 	{marker: []byte("data-tether-hotkey"), script: "tether-hotkey.js"},
 	{marker: []byte("data-tether-timer"), script: "tether-timer.js"},
 	{marker: []byte("data-tether-selectable"), script: "tether-select.js"},
+	{marker: []byte("data-tether-template"), script: "tether-template.js"},
 }
 
 // tetherBody implements node.Node for the tether root div and client

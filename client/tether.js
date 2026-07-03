@@ -287,6 +287,12 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
     // actions on elements in the Layout shell (outside the morphed root)
     // work the same as those inside it.
     document.addEventListener("click", handleSignalActions);
+
+    // Client events and filtering also bind on document so triggers and
+    // controls in the Layout shell behave the same as those inside root.
+    document.addEventListener("click", handleEmit);
+    document.addEventListener("input", handleFilter);
+    document.addEventListener(CLIENT_EVENT, receiveClientEvent);
   });
 
   // --- Connection ---
@@ -1414,6 +1420,75 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
     for (var i = 0; i < els.length; i++) {
       els[i].value = value == null ? "" : String(value);
     }
+
+    // Conditional show bindings: data-tether-bind-show-when="signal op value"
+    els = document.querySelectorAll("[data-tether-bind-show-when]");
+    for (var i = 0; i < els.length; i++) {
+      applyConditionalShow(els[i], "data-tether-bind-show-when", key, value, false);
+    }
+
+    // Conditional hide bindings: data-tether-bind-hide-when="signal op value"
+    els = document.querySelectorAll("[data-tether-bind-hide-when]");
+    for (var i = 0; i < els.length; i++) {
+      applyConditionalShow(els[i], "data-tether-bind-hide-when", key, value, true);
+    }
+
+    // Conditional class bindings: data-tether-bind-class-when="class signal op value"
+    els = document.querySelectorAll("[data-tether-bind-class-when]");
+    for (var i = 0; i < els.length; i++) {
+      applyConditionalClass(els[i], key, value);
+    }
+  }
+
+  // parseCondition splits a "signal op value" (or "class signal op value")
+  // binding attribute into its parts. lead is how many leading tokens
+  // precede the signal name (0 for show/hide, 1 for class). Returns null
+  // when the attribute is malformed so callers skip it safely.
+  function parseCondition(raw, lead) {
+    var parts = raw.split(/\s+/);
+    if (parts.length < lead + 3) return null;
+    return {
+      prefix: parts.slice(0, lead),
+      signal: parts[lead],
+      op: parts[lead + 1],
+      // The operand is the remainder, rejoined so string values with
+      // spaces survive the split.
+      operand: parts.slice(lead + 2).join(" ")
+    };
+  }
+
+  // evalCondition compares a signal value against an operand using op.
+  // Numeric operands compare numerically; ==/!= fall back to string
+  // comparison so status strings and booleans work too.
+  function evalCondition(value, op, operandStr) {
+    var operand = parseSignalValue(operandStr);
+    if (op === "==") return value == operand;
+    if (op === "!=") return value != operand;
+    var a = Number(value), b = Number(operand);
+    if (isNaN(a) || isNaN(b)) return false;
+    if (op === ">") return a > b;
+    if (op === ">=") return a >= b;
+    if (op === "<") return a < b;
+    if (op === "<=") return a <= b;
+    return false;
+  }
+
+  // applyConditionalShow toggles display for a show-when/hide-when
+  // binding. invert is true for hide-when. Only acts when the binding's
+  // signal matches the one that changed (key).
+  function applyConditionalShow(el, attr, key, value, invert) {
+    var c = parseCondition(el.getAttribute(attr) || "", 0);
+    if (!c || c.signal !== key) return;
+    var on = evalCondition(value, c.op, c.operand);
+    if (invert) on = !on;
+    el.style.display = on ? "" : "none";
+  }
+
+  // applyConditionalClass toggles a CSS class for a class-when binding.
+  function applyConditionalClass(el, key, value) {
+    var c = parseCondition(el.getAttribute("data-tether-bind-class-when") || "", 1);
+    if (!c || c.signal !== key) return;
+    el.classList.toggle(c.prefix[0], evalCondition(value, c.op, c.operand));
   }
 
   // parseSignalValue converts a string from an HTML data attribute into
@@ -1445,7 +1520,8 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
     applySignalsToElement(el);
     var bound = el.querySelectorAll(
       "[data-tether-bind-text],[data-tether-bind-show],[data-tether-bind-hide]," +
-      "[data-tether-bind-class],[data-tether-bind-attr],[data-tether-bind-value]"
+      "[data-tether-bind-class],[data-tether-bind-attr],[data-tether-bind-value]," +
+      "[data-tether-bind-show-when],[data-tether-bind-hide-when],[data-tether-bind-class-when]"
     );
     for (var i = 0; i < bound.length; i++) {
       applySignalsToElement(bound[i]);
@@ -1495,6 +1571,23 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
     var valueSignal = el.getAttribute("data-tether-bind-value");
     if (valueSignal && signals.hasOwnProperty(valueSignal)) {
       el.value = signals[valueSignal] == null ? "" : String(signals[valueSignal]);
+    }
+
+    // Conditional bindings: re-evaluate against the current signal value
+    // after a morph so a freshly added element reflects the latest state.
+    var showWhen = parseCondition(el.getAttribute("data-tether-bind-show-when") || "", 0);
+    if (showWhen && signals.hasOwnProperty(showWhen.signal)) {
+      el.style.display = evalCondition(signals[showWhen.signal], showWhen.op, showWhen.operand) ? "" : "none";
+    }
+
+    var hideWhen = parseCondition(el.getAttribute("data-tether-bind-hide-when") || "", 0);
+    if (hideWhen && signals.hasOwnProperty(hideWhen.signal)) {
+      el.style.display = evalCondition(signals[hideWhen.signal], hideWhen.op, hideWhen.operand) ? "none" : "";
+    }
+
+    var classWhen = parseCondition(el.getAttribute("data-tether-bind-class-when") || "", 1);
+    if (classWhen && signals.hasOwnProperty(classWhen.signal)) {
+      el.classList.toggle(classWhen.prefix[0], evalCondition(signals[classWhen.signal], classWhen.op, classWhen.operand));
     }
   }
 
@@ -2160,6 +2253,88 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
     }
   }
 
+  // --- Client-side events ---
+  //
+  // data-tether-emit="name selector" dispatches a client event to the
+  // elements matching selector on click. Receivers carry
+  // data-tether-on-<name>="verb args" (see bind.OnClientEvent) and run a
+  // signal action in response. This keeps sibling coordination - clearing
+  // a search box, closing another dropdown - entirely on the client.
+
+  var CLIENT_EVENT = "tether:client";
+
+  function handleEmit(e) {
+    var trigger = e.target.closest("[data-tether-emit]");
+    if (!trigger) return;
+
+    var raw = trigger.getAttribute("data-tether-emit");
+    var idx = raw.indexOf(" ");
+    if (idx === -1) return;
+    var name = raw.substring(0, idx);
+    var selector = raw.substring(idx + 1);
+
+    var targets = safeQueryAll(document, selector);
+    for (var i = 0; i < targets.length; i++) {
+      targets[i].dispatchEvent(new CustomEvent(CLIENT_EVENT, {
+        detail: { name: name },
+        bubbles: true
+      }));
+    }
+  }
+
+  function receiveClientEvent(e) {
+    var el = e.target;
+    if (!el || el.nodeType !== 1) return;
+    var spec = el.getAttribute("data-tether-on-" + e.detail.name);
+    if (!spec) return;
+
+    var idx = spec.indexOf(" ");
+    var verb = idx === -1 ? spec : spec.substring(0, idx);
+    var args = idx === -1 ? "" : spec.substring(idx + 1);
+
+    if (verb === "toggle-signal") {
+      setSignal(args, !isTruthy(window.Tether.signals[args]));
+      return;
+    }
+    if (verb === "set-signal") {
+      var sp = args.indexOf(" ");
+      var key = sp === -1 ? args : args.substring(0, sp);
+      var value = parseSignalValue(sp === -1 ? "" : args.substring(sp + 1));
+      setSignal(key, value);
+    }
+
+    // If the receiver is a filter input, its value may have just
+    // changed (e.g. a Clear button set it empty). Re-run the filter so
+    // the hidden items reappear without waiting for a keystroke.
+    if (el.hasAttribute("data-tether-filter")) applyFilter(el);
+  }
+
+  // --- Client-side filtering ---
+  //
+  // data-tether-filter="selector" on a text input hides items in the
+  // matched container whose text does not contain the query. Items are
+  // the elements marked data-tether-filter-item, or the container's
+  // direct children when none are marked. No server round-trip.
+
+  function handleFilter(e) {
+    var input = e.target.closest("[data-tether-filter]");
+    if (input) applyFilter(input);
+  }
+
+  function applyFilter(input) {
+    var container = safeQuery(document, input.getAttribute("data-tether-filter"));
+    if (!container) return;
+
+    var query = String(input.value || "").toLowerCase();
+    var items = container.querySelectorAll("[data-tether-filter-item]");
+    if (items.length === 0) items = container.children;
+
+    for (var i = 0; i < items.length; i++) {
+      var match = items[i].textContent.toLowerCase().indexOf(query) !== -1;
+      items[i].style.display = match ? "" : "none";
+    }
+  }
+
   // --- PWA lifecycle events ---
   //
   // Propagate standard PWA/network events to the server so handlers can
@@ -2193,7 +2368,8 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
     { attr: "data-tether-draggable", script: "tether-drag-and-drop.js" },
     { attr: "data-tether-sortable", script: "tether-drag-and-drop.js" },
     { attr: "data-tether-swipe", script: "tether-touch.js" },
-    { attr: "data-tether-longpress", script: "tether-touch.js" }
+    { attr: "data-tether-longpress", script: "tether-touch.js" },
+    { attr: "data-tether-template", script: "tether-template.js" }
   ];
   var loadedExtensions = {};
 

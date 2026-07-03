@@ -61,6 +61,48 @@ bind.Apply(button.Text("Settings"), bind.SetSignal("tab", "settings"))
 
 The server can override any client-set signal at any time by calling `sess.Signal(key, correctValue)`.
 
+## Conditional bindings - derive booleans on the client
+
+`BindShow` and `BindClass` test a signal for truthiness. When the condition is a comparison against a value the client already holds - a count, a countdown, a status string - you don't need the server to push a separate boolean. The conditional bindings evaluate the comparison in the browser and react the instant the underlying signal changes:
+
+```go
+// Show a warning only once the count passes five.
+bind.Apply(warning, bind.BindShowWhen("count", ">", 5))
+
+// Hide the "all done" banner while any items remain.
+bind.Apply(banner, bind.BindHideWhen("remaining", ">", 0))
+
+// Turn the countdown red in the final ten seconds.
+bind.Apply(timer, bind.BindClassWhen("danger", "seconds", "<", 10))
+```
+
+The operator is one of `>`, `>=`, `<`, `<=`, `==`, `!=`. Numeric operands compare numerically; `==` and `!=` also compare strings and booleans, so `BindShowWhen("status", "==", "error")` works too. An unknown operator panics at construction, so a typo fails fast rather than silently never matching.
+
+The server pushes one value; the client derives however many booleans it needs:
+
+```go
+sess.Signal("count", s.Count)   // one push drives every count-based condition
+```
+
+## Client events - coordinate elements without the server
+
+The event model everywhere else is client → server → client. For the cases where the server genuinely doesn't need to know - clearing a search box, closing a sibling dropdown, resetting a filter - client events let one element trigger a signal action on another with no round-trip.
+
+`Emit` dispatches a named event to the elements matching a selector on click; `OnClientEvent` runs a `SetSignal` or `ToggleSignal` on the receivers when that event arrives, so they react through the ordinary signal bindings:
+
+```go
+// A search input bound to the "query" signal...
+bind.Apply(input.New(),
+    bind.BindValue("query"),
+    bind.OnClientEvent("clear", bind.SetSignal("query", "")),
+)
+
+// ...cleared by a button that emits "clear" to it.
+bind.Apply(clearButton, bind.Emit("clear", "#search"))
+```
+
+Only `SetSignal` and `ToggleSignal` are valid actions - anything else panics - because the receiver reacts through signals, which are the client's single source of truth. That keeps client events composable with `BindShow`, `BindValue`, `BindClass`, and the conditional bindings above, rather than introducing a second, parallel way to change the DOM.
+
 ## Optimistic updates - predict and correct
 
 For predictable actions where the round-trip delay would feel sluggish, update a signal immediately before the event reaches the server. When the server responds, its signals overwrite the optimistic value - if the prediction was wrong, the DOM corrects itself.

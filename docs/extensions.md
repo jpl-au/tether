@@ -231,6 +231,7 @@ Browser-side features that go beyond the core runtime ship as separate extension
 | `tether-hotkey.js` | `bind.Hotkey` | Global keyboard shortcuts |
 | `tether-timer.js` | `bind.Timer` | Client-side timers |
 | `tether-select.js` | `bind.Selectable` | Click/ctrl/shift multi-select |
+| `tether-template.js` | `bind.Template` | Signal-driven client-side lists |
 
 All of them are written against the public client extension API (`Tether.onUpdate`, `Tether.onSignalChange`, `Tether.getSignal`, ...), which is also available to application code and third-party extensions - see [client-side.md](client-side.md#client-extension-api).
 

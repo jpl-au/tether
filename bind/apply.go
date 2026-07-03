@@ -1,6 +1,7 @@
 package bind
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -585,3 +586,132 @@ func OnSwipe(action string) Option { return Option{"tether-swipe", action} }
 // Cancelled if the finger moves before the timeout. Common mobile
 // alternative to right-click. Only fires on touch devices.
 func OnLongPress(action string) Option { return Option{"tether-longpress", action} }
+
+// Conditional signal bindings - like [BindShow] and [BindClass], but
+// driven by a comparison against the signal value rather than plain
+// truthiness. The server pushes one value (a count, a status string)
+// and the client derives several booleans from it, so no extra boolean
+// signals need to be pushed for conditions the client can compute
+// itself. Handled entirely on the client, reacting the instant the
+// signal changes.
+
+// validConditionOps lists the comparison operators accepted by the
+// conditional bindings. Kept here so every helper validates identically.
+var validConditionOps = map[string]bool{
+	">": true, ">=": true, "<": true, "<=": true, "==": true, "!=": true,
+}
+
+// checkOp panics on an unknown operator so a typo fails at construction
+// rather than silently never matching on the client.
+func checkOp(op string) {
+	if !validConditionOps[op] {
+		panic("bind: unknown comparison operator " + strconv.Quote(op) +
+			` (want one of >, >=, <, <=, ==, !=)`)
+	}
+}
+
+// BindShowWhen shows the element when the named signal compares true
+// against value using op, and hides it otherwise. op is one of ">",
+// ">=", "<", "<=", "==", "!=". Numeric operands compare numerically;
+// "==" and "!=" also compare strings and booleans. Panics on an unknown
+// operator.
+//
+//	// Visible only once the count passes five.
+//	bind.Apply(warning, bind.BindShowWhen("count", ">", 5))
+func BindShowWhen(signal, op string, value any) Option {
+	checkOp(op)
+	return Option{"tether-bind-show-when", signal + " " + op + " " + fmt.Sprint(value)}
+}
+
+// BindHideWhen is the inverse of [BindShowWhen]: the element is hidden
+// when the comparison is true and visible otherwise. Panics on an
+// unknown operator.
+func BindHideWhen(signal, op string, value any) Option {
+	checkOp(op)
+	return Option{"tether-bind-hide-when", signal + " " + op + " " + fmt.Sprint(value)}
+}
+
+// BindClassWhen adds the CSS class while the named signal compares true
+// against value using op, and removes it otherwise. Panics on an unknown
+// operator.
+//
+//	// Turn the countdown red in the final ten seconds.
+//	bind.Apply(timer, bind.BindClassWhen("danger", "seconds", "<", 10))
+func BindClassWhen(class, signal, op string, value any) Option {
+	checkOp(op)
+	return Option{"tether-bind-class-when", class + " " + signal + " " + op + " " + fmt.Sprint(value)}
+}
+
+// Client-side events - let one element trigger a client-side action on
+// another without a server round-trip. The event model everywhere else
+// is client to server to client; this is the escape hatch for the cases
+// where the server does not need to know: clearing a search box, closing
+// a sibling dropdown, resetting a filter.
+
+// Emit dispatches a named client event to every element matching
+// selector when this element is clicked. Pair with [OnClientEvent] on
+// the receiving elements. No server round-trip.
+//
+//	bind.Apply(clearBtn, bind.OnClick("noop"), bind.Emit("clear", "#search"))
+func Emit(event, selector string) Option {
+	return Option{"tether-emit", event + " " + selector}
+}
+
+// OnClientEvent runs a client-side signal action when this element
+// receives the named client event from an [Emit]. The action is a
+// [SetSignal] or [ToggleSignal] option - the same helpers used for
+// click-driven signal actions - so the receiver reacts through the
+// ordinary signal bindings ([BindShow], [BindValue], [BindClass]).
+// No server round-trip. Panics if action is not a signal action.
+//
+//	// An input bound to the "query" signal clears when "clear" fires.
+//	bind.Apply(input.New(),
+//	    bind.BindValue("query"),
+//	    bind.OnClientEvent("clear", bind.SetSignal("query", "")),
+//	)
+func OnClientEvent(event string, action Option) Option {
+	verb, ok := strings.CutPrefix(action.key, "tether-")
+	if !ok || (verb != "set-signal" && verb != "toggle-signal") {
+		panic("bind: OnClientEvent action must be SetSignal or ToggleSignal")
+	}
+	return Option{"tether-on-" + event, verb + " " + action.value}
+}
+
+// Client-side filtering - connect a text input to a container of items
+// and show or hide the items as the user types, matching against their
+// text content. Entirely client-side: the server sends the full list
+// once, the client narrows it with no round-trip per keystroke.
+
+// Filter marks a text input as the filter control for the container
+// matched by selector. As the user types, items in the container whose
+// text does not contain the query (case-insensitive) are hidden. By
+// default every direct child of the container is an item; mark a subset
+// with [FilterItem] to filter only those.
+//
+//	bind.Apply(input.New(), bind.Filter("#item-list"))
+func Filter(selector string) Option { return Option{"tether-filter", selector} }
+
+// FilterItem marks an element as a filterable item within a [Filter]
+// container. Use it when the items are not the container's direct
+// children (e.g. each row wraps its content) so matching targets the
+// right elements.
+func FilterItem() Option { return Option{"tether-filter-item", ""} }
+
+// Client-side templates - render a list on the client from a signal
+// holding a JSON array, with no server round-trip per change. Handled by
+// the tether-template.js extension, auto-included when any element
+// renders data-tether-template.
+
+// Template renders a client-side list into the container matched by
+// target whenever the named signal changes. Apply it to a <template>
+// element whose content is the markup for one item, using {{field}}
+// placeholders for object fields (or {{.}} for a scalar array element).
+// The server pushes the data as a JSON array via [tether.Session.Signal];
+// the client stamps one clone per element. Interpolated values are
+// HTML-escaped.
+//
+//	// <template> content: <li>{{name}} - {{email}}</li>
+//	bind.Apply(itemTemplate, bind.Template("people", "#people-list"))
+func Template(signal, target string) Option {
+	return Option{"tether-template", signal + " " + target}
+}

@@ -29,6 +29,36 @@ Hide an element until the tether runtime initialises (prevents flash of unstyled
 bind.Apply(div.New(children...), bind.Cloak())
 ```
 
+## Client-side filtering
+
+Connect a text input to a container of items and narrow the list as the user types - no server round-trip per keystroke. The server sends the full list once; the client hides the items whose text doesn't match:
+
+```go
+bind.Apply(input.New(), bind.Filter("#item-list"))
+
+ul.New(
+    bind.Apply(li.Text("Apple"), bind.FilterItem()),
+    bind.Apply(li.Text("Banana"), bind.FilterItem()),
+    bind.Apply(li.Text("Cherry"), bind.FilterItem()),
+).ID("item-list")
+```
+
+Matching is case-insensitive against each item's text content. Mark items with `FilterItem` to filter a specific subset; when no items are marked, every direct child of the container is treated as an item. Pair it with a [client event](signals.md#client-events---coordinate-elements-without-the-server) to add a Clear button - clearing a filter input that is bound to a signal re-runs the filter, so every item reappears.
+
+## Signal-driven templates
+
+Render a list on the client from a signal holding a JSON array, with no server round-trip per change. Apply `Template` to a `<template>` element whose content is the markup for one item, using `{{field}}` placeholders (or `{{.}}` for a scalar array element). The server pushes the data as a JSON array; the client stamps one clone per element into the target container:
+
+```go
+// <template> content: <li>{{name}} — {{email}}</li>
+bind.Apply(itemTemplate, bind.Template("people", "#people-list"))
+
+// Server pushes the data - the client re-renders the list locally.
+sess.Signal("people", people)
+```
+
+Interpolated values are HTML-escaped. This suits client-side sorting, optimistic list additions, and filtering a list the server already sent - reactive lists on stateless pages without upgrading to a WebSocket. The `tether-template.js` extension is auto-included when any element renders `data-tether-template`. For anything richer than field interpolation, keep rendering on the server.
+
 ## Scroll management
 
 Preserve the scroll position of a container across morphs:
