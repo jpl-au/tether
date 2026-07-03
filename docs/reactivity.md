@@ -32,8 +32,8 @@ Reactivity in tether flows in three directions. Each direction has its own set o
                     └──────┬──────────┬─────────┘
             events ▲       │          │
           (OnClick,│       │ render   │ signals
-           OnSubmit│       │ + diff   │ (Signal, BindText,
-           etc.)   │       ▼          ▼  BindShow, etc.)
+           OnSubmit│       │ + diff   │ (Signal, Text,
+           etc.)   │       ▼          ▼  Show, etc.)
                     ┌──────────────────────────┐
                     │         Browser DOM        │
                     └───────────────────────────┘

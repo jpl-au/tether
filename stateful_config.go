@@ -188,7 +188,7 @@ type StatefulConfig[S any] struct {
 	// tether root div is morphed - the outer shell is not re-rendered.
 	// To update shell elements during navigation or event handling, use
 	// [Session.SetTitle] for the page title, and signal bindings
-	// ([bind.BindText], [bind.BindClass], [bind.BindShow], etc.) for
+	// ([bind.Text], [bind.Class], [bind.Show], etc.) for
 	// everything else. Signal bindings work document-wide, so elements
 	// in the Layout shell react to [Session.Signal] calls just like
 	// elements inside the tether root.

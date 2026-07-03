@@ -14,7 +14,7 @@ import (
 //   - sess.Signal("name", 0)             resets the value
 //
 // The element's text content is automatically bound to the formatted
-// timer value - no separate [BindText] call is needed.
+// timer value - no separate [Text] call is needed.
 //
 // By default the timer counts up from zero at one-second precision
 // with an auto-detected display format (ss, mm:ss, or hh:mm:ss).

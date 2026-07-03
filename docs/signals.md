@@ -33,12 +33,12 @@ sess.Signals(map[string]any{
 Bind elements to signals in your render function:
 
 ```go
-bind.Apply(span.New(), bind.BindText("count"))                    // sets textContent
-bind.Apply(div.New(children...), bind.BindShow("isOpen"))          // shows when truthy
-bind.Apply(div.New(children...), bind.BindHide("isOpen"))          // inverse of BindShow
-bind.Apply(span.New(), bind.BindClass("active", "isSelected"))     // toggles CSS class
-bind.Apply(button.New(), bind.BindAttr("disabled", "isLoading"))   // sets/removes attribute
-bind.Apply(input.Text("email", ""), bind.BindValue("email"))       // sets form field value
+bind.Apply(span.New(), bind.Text("count"))                    // sets textContent
+bind.Apply(div.New(children...), bind.Show("isOpen"))          // shows when truthy
+bind.Apply(div.New(children...), bind.Hide("isOpen"))          // inverse of Show
+bind.Apply(span.New(), bind.Class("active", "isSelected"))     // toggles CSS class
+bind.Apply(button.New(), bind.Attr("disabled", "isLoading"))   // sets/removes attribute
+bind.Apply(input.Text("email", ""), bind.Value("email"))       // sets form field value
 ```
 
 Signal bindings work **document-wide**, not just inside the tether root. This means navigation highlights, status indicators, and layout shell elements react instantly to signal pushes without triggering a full render.
@@ -63,20 +63,20 @@ The server can override any client-set signal at any time by calling `sess.Signa
 
 ## Conditional bindings - derive booleans on the client
 
-`BindShow` and `BindClass` test a signal for truthiness. When the condition is a comparison against a value the client already holds - a count, a countdown, a status string - you don't need the server to push a separate boolean. The conditional bindings evaluate the comparison in the browser and react the instant the underlying signal changes:
+`Show` and `Class` test a signal for truthiness. When the condition is a comparison against a value the client already holds - a count, a countdown, a status string - you don't need the server to push a separate boolean. The conditional bindings evaluate the comparison in the browser and react the instant the underlying signal changes:
 
 ```go
 // Show a warning only once the count passes five.
-bind.Apply(warning, bind.BindShowWhen("count", ">", 5))
+bind.Apply(warning, bind.ShowWhen("count", ">", 5))
 
 // Hide the "all done" banner while any items remain.
-bind.Apply(banner, bind.BindHideWhen("remaining", ">", 0))
+bind.Apply(banner, bind.HideWhen("remaining", ">", 0))
 
 // Turn the countdown red in the final ten seconds.
-bind.Apply(timer, bind.BindClassWhen("danger", "seconds", "<", 10))
+bind.Apply(timer, bind.ClassWhen("danger", "seconds", "<", 10))
 ```
 
-The operator is one of `>`, `>=`, `<`, `<=`, `==`, `!=`. Numeric operands compare numerically; `==` and `!=` also compare strings and booleans, so `BindShowWhen("status", "==", "error")` works too. An unknown operator panics at construction, so a typo fails fast rather than silently never matching.
+The operator is one of `>`, `>=`, `<`, `<=`, `==`, `!=`. Numeric operands compare numerically; `==` and `!=` also compare strings and booleans, so `ShowWhen("status", "==", "error")` works too. An unknown operator panics at construction, so a typo fails fast rather than silently never matching.
 
 The server pushes one value; the client derives however many booleans it needs:
 
@@ -93,7 +93,7 @@ The event model everywhere else is client → server → client. For the cases w
 ```go
 // A search input bound to the "query" signal...
 bind.Apply(input.New(),
-    bind.BindValue("query"),
+    bind.Value("query"),
     bind.OnClientEvent("clear", bind.SetSignal("query", "")),
 )
 
@@ -101,7 +101,7 @@ bind.Apply(input.New(),
 bind.Apply(clearButton, bind.Emit("clear", "#search"))
 ```
 
-Only `SetSignal` and `ToggleSignal` are valid actions - anything else panics - because the receiver reacts through signals, which are the client's single source of truth. That keeps client events composable with `BindShow`, `BindValue`, `BindClass`, and the conditional bindings above, rather than introducing a second, parallel way to change the DOM.
+Only `SetSignal` and `ToggleSignal` are valid actions - anything else panics - because the receiver reacts through signals, which are the client's single source of truth. That keeps client events composable with `Show`, `Value`, `Class`, and the conditional bindings above, rather than introducing a second, parallel way to change the DOM.
 
 ## Optimistic updates - predict and correct
 
@@ -141,7 +141,7 @@ For toggle-only UI (drawers, menus, modals) where the server doesn't need to kno
 
 ## Signal truthiness
 
-`BindShow`, `BindHide`, `BindClass`, and `BindAttr` evaluate signal values
+`Show`, `Hide`, `Class`, and `Attr` evaluate signal values
 for truthiness. The signal store always holds properly typed values:
 
 - **Server → client**: `Signal("flag", false)` serialises to JSON `false`
@@ -173,10 +173,10 @@ An element should be driven by **either** signals **or** state rendering - never
 
 ```go
 // Wrong - the render and signal fight over the same element
-bind.Apply(span.Textf("Count: %d", s.Count).Dynamic("count"), bind.BindText("count"))
+bind.Apply(span.Textf("Count: %d", s.Count).Dynamic("count"), bind.Text("count"))
 
 // Right - signal-only element, no Dynamic key needed
-bind.Apply(span.New(), bind.BindText("count"))
+bind.Apply(span.New(), bind.Text("count"))
 
 // Right - state-rendered element, no signal binding
 span.Textf("Count: %d", s.Count).Dynamic("count")

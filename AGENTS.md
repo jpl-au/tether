@@ -23,7 +23,7 @@ lifecycle.
 
 ```
 tether/              Root package - StatefulConfig, Handler, Session, Bus, Group, Value, Observe, On
-├── bind/            Event binding and signal binding via Apply + composable Options (OnClick, BindText, Confirm, etc.)
+├── bind/            Event binding and signal binding via Apply + composable Options (OnClick, Text, Confirm, etc.)
 ├── client/          Embedded JS runtime (tether.js, idiomorph, service worker, upload, push worker)
 ├── dev/             Debug logging - dev.Enable() activates, dev.Debug() is a no-op when disabled
 ├── docs/            Markdown guides (architecture, API, events, signals, broadcasting, etc.)

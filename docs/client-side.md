@@ -167,11 +167,11 @@ For a timer named `foo`:
 - `foo` - the current value in seconds (number)
 - `foo.running` - boolean controlling start/pause
 
-These are standard signals. You can bind other elements to them with `BindShow`, `BindClass`, etc.:
+These are standard signals. You can bind other elements to them with `Show`, `Class`, etc.:
 
 ```go
 // Show a warning when the countdown drops below 10 seconds
-bind.Apply(span.Text("Hurry!"), bind.BindShow("quiz.warning"))
+bind.Apply(span.Text("Hurry!"), bind.Show("quiz.warning"))
 
 // In Handle, push the warning signal based on the timer value
 sess.Signal("quiz.warning", remaining < 10)
@@ -216,7 +216,7 @@ For behaviour that spans the whole page rather than a single hooked element - ke
 ```js
 Tether.getSignal("count");          // read a signal value
 Tether.setSignal("count", 42);      // write it - bindings update instantly
-Tether.isTruthy(value);             // the truthiness rule BindShow/BindClass use
+Tether.isTruthy(value);             // the truthiness rule Show/Class use
 Tether.sendEvent("click", "save", {id: "7"}); // send an event to Handle
 Tether.findPrefix(el);              // resolve the data-tether-prefix chain
 ```

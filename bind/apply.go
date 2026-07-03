@@ -258,38 +258,38 @@ func Permanent() Option { return Option{"tether-permanent", ""} }
 // instantly. Elements with signal bindings do not need Dynamic keys
 // because they bypass the diff engine entirely.
 
-// BindText replaces the element's text content with the signal's current
+// Text replaces the element's text content with the signal's current
 // value whenever the server pushes an update via [tether.Session.Signal].
 // The signal name must match the key passed to Signal().
-func BindText(signal string) Option { return Option{"tether-bind-text", signal} }
+func Text(signal string) Option { return Option{"tether-bind-text", signal} }
 
-// BindShow makes the element visible when the named signal is truthy
+// Show makes the element visible when the named signal is truthy
 // and hidden when falsy. Visibility is toggled via CSS display - the
 // element remains in the DOM either way.
-func BindShow(signal string) Option { return Option{"tether-bind-show", signal} }
+func Show(signal string) Option { return Option{"tether-bind-show", signal} }
 
-// BindHide is the inverse of [BindShow]: the element is hidden when the
+// Hide is the inverse of [Show]: the element is hidden when the
 // signal is truthy and visible when falsy.
-func BindHide(signal string) Option { return Option{"tether-bind-hide", signal} }
+func Hide(signal string) Option { return Option{"tether-bind-hide", signal} }
 
-// BindClass adds the CSS class when the named signal is truthy and
+// Class adds the CSS class when the named signal is truthy and
 // removes it when falsy. Use this for conditional styling that reacts
 // to server-pushed state without a full render cycle.
-func BindClass(class, signal string) Option {
+func Class(class, signal string) Option {
 	return Option{"tether-bind-class", class + " " + signal}
 }
 
-// BindAttr sets an HTML attribute to the signal's value. When the
+// Attr sets an HTML attribute to the signal's value. When the
 // signal is falsy the attribute is removed entirely. Use this for
 // dynamic attributes like "disabled", "aria-expanded", or "href".
-func BindAttr(attr, signal string) Option {
+func Attr(attr, signal string) Option {
 	return Option{"tether-bind-attr", attr + " " + signal}
 }
 
-// BindValue binds a form element's value property (input, select,
+// Value binds a form element's value property (input, select,
 // textarea) to a named signal. When the server pushes a new signal
 // value, the form element's displayed value updates instantly.
-func BindValue(signal string) Option { return Option{"tether-bind-value", signal} }
+func Value(signal string) Option { return Option{"tether-bind-value", signal} }
 
 // Signal directive options - modify signal values on the client without
 // waiting for a server response. These are purely client-side operations
@@ -297,7 +297,7 @@ func BindValue(signal string) Option { return Option{"tether-bind-value", signal
 
 // ToggleSignal flips a boolean signal between true and false on click.
 // No server round-trip - the signal updates instantly on the client.
-// Combine with [BindShow] or [BindClass] for UI that toggles without
+// Combine with [Show] or [Class] for UI that toggles without
 // network latency (dropdowns, accordions, dark mode).
 func ToggleSignal(signal string) Option { return Option{"tether-toggle-signal", signal} }
 
@@ -587,7 +587,7 @@ func OnSwipe(action string) Option { return Option{"tether-swipe", action} }
 // alternative to right-click. Only fires on touch devices.
 func OnLongPress(action string) Option { return Option{"tether-longpress", action} }
 
-// Conditional signal bindings - like [BindShow] and [BindClass], but
+// Conditional signal bindings - like [Show] and [Class], but
 // driven by a comparison against the signal value rather than plain
 // truthiness. The server pushes one value (a count, a status string)
 // and the client derives several booleans from it, so no extra boolean
@@ -610,34 +610,34 @@ func checkOp(op string) {
 	}
 }
 
-// BindShowWhen shows the element when the named signal compares true
+// ShowWhen shows the element when the named signal compares true
 // against value using op, and hides it otherwise. op is one of ">",
 // ">=", "<", "<=", "==", "!=". Numeric operands compare numerically;
 // "==" and "!=" also compare strings and booleans. Panics on an unknown
 // operator.
 //
 //	// Visible only once the count passes five.
-//	bind.Apply(warning, bind.BindShowWhen("count", ">", 5))
-func BindShowWhen(signal, op string, value any) Option {
+//	bind.Apply(warning, bind.ShowWhen("count", ">", 5))
+func ShowWhen(signal, op string, value any) Option {
 	checkOp(op)
 	return Option{"tether-bind-show-when", signal + " " + op + " " + fmt.Sprint(value)}
 }
 
-// BindHideWhen is the inverse of [BindShowWhen]: the element is hidden
+// HideWhen is the inverse of [ShowWhen]: the element is hidden
 // when the comparison is true and visible otherwise. Panics on an
 // unknown operator.
-func BindHideWhen(signal, op string, value any) Option {
+func HideWhen(signal, op string, value any) Option {
 	checkOp(op)
 	return Option{"tether-bind-hide-when", signal + " " + op + " " + fmt.Sprint(value)}
 }
 
-// BindClassWhen adds the CSS class while the named signal compares true
+// ClassWhen adds the CSS class while the named signal compares true
 // against value using op, and removes it otherwise. Panics on an unknown
 // operator.
 //
 //	// Turn the countdown red in the final ten seconds.
-//	bind.Apply(timer, bind.BindClassWhen("danger", "seconds", "<", 10))
-func BindClassWhen(class, signal, op string, value any) Option {
+//	bind.Apply(timer, bind.ClassWhen("danger", "seconds", "<", 10))
+func ClassWhen(class, signal, op string, value any) Option {
 	checkOp(op)
 	return Option{"tether-bind-class-when", class + " " + signal + " " + op + " " + fmt.Sprint(value)}
 }
@@ -661,12 +661,12 @@ func Emit(event, selector string) Option {
 // receives the named client event from an [Emit]. The action is a
 // [SetSignal] or [ToggleSignal] option - the same helpers used for
 // click-driven signal actions - so the receiver reacts through the
-// ordinary signal bindings ([BindShow], [BindValue], [BindClass]).
+// ordinary signal bindings ([Show], [Value], [Class]).
 // No server round-trip. Panics if action is not a signal action.
 //
 //	// An input bound to the "query" signal clears when "clear" fires.
 //	bind.Apply(input.New(),
-//	    bind.BindValue("query"),
+//	    bind.Value("query"),
 //	    bind.OnClientEvent("clear", bind.SetSignal("query", "")),
 //	)
 func OnClientEvent(event string, action Option) Option {

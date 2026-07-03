@@ -124,9 +124,9 @@ bind.MaxLength(140, "msg") bind.Pattern("regex", "msg")
 ### Signal bindings
 
 ```go
-bind.BindText("count")           bind.BindShow("isOpen")
-bind.BindHide("isOpen")          bind.BindClass("active", "sel")
-bind.BindAttr("disabled", "busy") bind.BindValue("email")
+bind.Text("count")           bind.Show("isOpen")
+bind.Hide("isOpen")          bind.Class("active", "sel")
+bind.Attr("disabled", "busy") bind.Value("email")
 ```
 
 ### Client directives

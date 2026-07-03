@@ -71,7 +71,7 @@ bind.Apply(
     progress.New().Attr("max", "100"),
     bind.UploadProgress("avatar"),
 )
-// Shorthand for: bind.Apply(el, bind.BindAttr("value", "upload:avatar:progress"))
+// Shorthand for: bind.Apply(el, bind.Attr("value", "upload:avatar:progress"))
 ```
 
 ## Drag and drop

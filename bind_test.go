@@ -263,7 +263,7 @@ func TestFocusTrapRendersDataAttribute(t *testing.T) {
 }
 
 func TestBindTextRendersDataAttribute(t *testing.T) {
-	el := bind.Apply(button.Text("0"), bind.BindText("count"))
+	el := bind.Apply(button.Text("0"), bind.Text("count"))
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-tether-bind-text="count"`) {
@@ -272,7 +272,7 @@ func TestBindTextRendersDataAttribute(t *testing.T) {
 }
 
 func TestBindShowRendersDataAttribute(t *testing.T) {
-	el := bind.Apply(button.Text("Panel"), bind.BindShow("isOpen"))
+	el := bind.Apply(button.Text("Panel"), bind.Show("isOpen"))
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-tether-bind-show="isOpen"`) {
@@ -281,7 +281,7 @@ func TestBindShowRendersDataAttribute(t *testing.T) {
 }
 
 func TestBindHideRendersDataAttribute(t *testing.T) {
-	el := bind.Apply(button.Text("Spinner"), bind.BindHide("isLoaded"))
+	el := bind.Apply(button.Text("Spinner"), bind.Hide("isLoaded"))
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-tether-bind-hide="isLoaded"`) {
@@ -290,7 +290,7 @@ func TestBindHideRendersDataAttribute(t *testing.T) {
 }
 
 func TestBindClassRendersDataAttribute(t *testing.T) {
-	el := bind.Apply(button.Text("Tab"), bind.BindClass("active", "isSelected"))
+	el := bind.Apply(button.Text("Tab"), bind.Class("active", "isSelected"))
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-tether-bind-class="active isSelected"`) {
@@ -299,7 +299,7 @@ func TestBindClassRendersDataAttribute(t *testing.T) {
 }
 
 func TestBindAttrRendersDataAttribute(t *testing.T) {
-	el := bind.Apply(button.Text("Save"), bind.BindAttr("disabled", "isSaving"))
+	el := bind.Apply(button.Text("Save"), bind.Attr("disabled", "isSaving"))
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-tether-bind-attr="disabled isSaving"`) {
@@ -308,7 +308,7 @@ func TestBindAttrRendersDataAttribute(t *testing.T) {
 }
 
 func TestBindValueRendersDataAttribute(t *testing.T) {
-	el := bind.Apply(input.Text("email", ""), bind.BindValue("email"))
+	el := bind.Apply(input.Text("email", ""), bind.Value("email"))
 	html := string(el.Render())
 
 	if !strings.Contains(html, `data-tether-bind-value="email"`) {

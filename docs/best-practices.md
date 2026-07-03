@@ -105,7 +105,7 @@ A full render-diff-send cycle for a single counter increment is wasteful. Signal
 
 ```go
 // In Render - bind the element once
-bind.Apply(span.New(), bind.BindText("count"))
+bind.Apply(span.New(), bind.Text("count"))
 
 // From anywhere - push the value
 sess.Signal("count", 42)

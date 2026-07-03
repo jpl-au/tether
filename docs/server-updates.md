@@ -47,7 +47,7 @@ sess.Flash("#notice", "Saved")
 // Signal approach - decoupled, no selector needed
 sess.Signal("saved", true)
 // In Render:
-bind.Apply(span.Text("Saved"), bind.BindShow("saved"))
+bind.Apply(span.Text("Saved"), bind.Show("saved"))
 ```
 
 ```go
@@ -62,7 +62,7 @@ bind.Apply(button.Text("Load"),
     bind.OnClick("load"),
     bind.Optimistic("loading", "true"),
 )
-bind.Apply(span.Text("Loading..."), bind.BindShow("loading"))
+bind.Apply(span.Text("Loading..."), bind.Show("loading"))
 ```
 
 Both are valid. Use selector helpers when speed matters and the DOM structure is straightforward. Use signals when the element lives in a different component or when the same indicator pattern is reused across pages.
@@ -234,7 +234,7 @@ These warnings are centralised in the `dev` package - call sites use `dev.Warn()
 
 ### Signals bypass the diff engine
 
-Signals (`sess.Signal`, `bind.BindText`, `bind.BindShow`, etc.) update bound elements directly on the client without rendering or diffing. Elements that are updated exclusively via signals do not need Dynamic keys.
+Signals (`sess.Signal`, `bind.Text`, `bind.Show`, etc.) update bound elements directly on the client without rendering or diffing. Elements that are updated exclusively via signals do not need Dynamic keys.
 
 ## Background goroutines
 

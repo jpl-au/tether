@@ -38,8 +38,8 @@
 //     changed fragments back as targeted patches or structural morphs.
 //  4. For lightweight updates that don't need a full render cycle, the
 //     server pushes signals via [Session.Signal]. Bound elements
-//     ([bind.BindText], [bind.BindShow], [bind.BindClass],
-//     [bind.BindAttr]) update instantly on the client - no diff, no
+//     ([bind.Text], [bind.Show], [bind.Class],
+//     [bind.Attr]) update instantly on the client - no diff, no
 //     HTML.
 //
 // # Stateless mode

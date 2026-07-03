@@ -131,12 +131,12 @@ func TestApplySignalBindingOptions(t *testing.T) {
 		opt  bind.Option
 		attr string
 	}{
-		{"BindText", bind.BindText("count"), `data-tether-bind-text="count"`},
-		{"BindShow", bind.BindShow("isOpen"), `data-tether-bind-show="isOpen"`},
-		{"BindHide", bind.BindHide("isHidden"), `data-tether-bind-hide="isHidden"`},
-		{"BindClass", bind.BindClass("active", "isSelected"), `data-tether-bind-class="active isSelected"`},
-		{"BindAttr", bind.BindAttr("disabled", "isLoading"), `data-tether-bind-attr="disabled isLoading"`},
-		{"BindValue", bind.BindValue("email"), `data-tether-bind-value="email"`},
+		{"Text", bind.Text("count"), `data-tether-bind-text="count"`},
+		{"Show", bind.Show("isOpen"), `data-tether-bind-show="isOpen"`},
+		{"Hide", bind.Hide("isHidden"), `data-tether-bind-hide="isHidden"`},
+		{"Class", bind.Class("active", "isSelected"), `data-tether-bind-class="active isSelected"`},
+		{"Attr", bind.Attr("disabled", "isLoading"), `data-tether-bind-attr="disabled isLoading"`},
+		{"Value", bind.Value("email"), `data-tether-bind-value="email"`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -193,7 +193,7 @@ func TestApplyCompositionWithSignalBindings(t *testing.T) {
 	el := bind.Apply(button.Text("Like"),
 		bind.OnClick("like"),
 		bind.Disable("Liking..."),
-		bind.BindShow("isLiked"),
+		bind.Show("isLiked"),
 		bind.OptimisticToggle("liked"),
 	)
 	html := string(el.Render())
@@ -409,9 +409,9 @@ func TestConditionalBindings(t *testing.T) {
 		opt  bind.Option
 		attr string
 	}{
-		{"BindShowWhen int", bind.BindShowWhen("count", ">", 5), `data-tether-bind-show-when="count > 5"`},
-		{"BindHideWhen str", bind.BindHideWhen("status", "==", "done"), `data-tether-bind-hide-when="status == done"`},
-		{"BindClassWhen", bind.BindClassWhen("danger", "seconds", "<", 10), `data-tether-bind-class-when="danger seconds < 10"`},
+		{"ShowWhen int", bind.ShowWhen("count", ">", 5), `data-tether-bind-show-when="count > 5"`},
+		{"HideWhen str", bind.HideWhen("status", "==", "done"), `data-tether-bind-hide-when="status == done"`},
+		{"ClassWhen", bind.ClassWhen("danger", "seconds", "<", 10), `data-tether-bind-class-when="danger seconds < 10"`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -429,7 +429,7 @@ func TestConditionalBindingUnknownOpPanics(t *testing.T) {
 			t.Error("expected panic on unknown operator")
 		}
 	}()
-	bind.BindShowWhen("count", "=<", 5)
+	bind.ShowWhen("count", "=<", 5)
 }
 
 func TestEmit(t *testing.T) {
