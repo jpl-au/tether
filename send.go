@@ -3,6 +3,7 @@ package tether
 import (
 	"encoding/base64"
 	"fmt"
+	"sync"
 	"time"
 
 	jit "github.com/jpl-au/fluent-jit"
@@ -10,6 +11,10 @@ import (
 	"github.com/jpl-au/tether/dev"
 	"github.com/jpl-au/tether/wire"
 )
+
+// memoiseNoopWarnOnce guards the one-time warning for a Memoise-enabled
+// handler whose render carries no node.Memoise regions.
+var memoiseNoopWarnOnce sync.Once
 
 // sendDiff is the render-diff-send pipeline extracted from exec and
 // Update. It handles patches, structural changes, the unseeded-engine
@@ -249,6 +254,16 @@ func (s *StatefulSession[S]) checkMemoiseStats() {
 		"hits", hits,
 		"misses", misses,
 	)
+
+	// Memoise is enabled but the render carried no node.Memoise regions,
+	// so the Memoiser has nothing to skip and behaves like the plain
+	// differ - the flag is a silent no-op. Warn once per process so the
+	// misconfiguration surfaces without spamming every render.
+	if ms.Memoised() == 0 {
+		memoiseNoopWarnOnce.Do(func() {
+			dev.Log().Warn("tether: Memoise is enabled but no node.Memoise regions were found in the render - the flag has no effect; wrap the expensive Dynamic regions in node.Memoise or disable Memoise")
+		})
+	}
 	if s.memoiseMissThreshold > 0 {
 		ratio := float64(misses) / float64(total)
 		if ratio > s.memoiseMissThreshold {
