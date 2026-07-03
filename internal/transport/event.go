@@ -26,6 +26,13 @@ type Event struct {
 	Target  string            `json:"target,omitempty"`
 	Data    map[string]string `json:"data,omitempty"`
 	EventID string            `json:"event_id,omitempty"`
+
+	// Hashes carries the client's current content hash for each
+	// Dynamic fragment, keyed by Dynamic key. Sent only by stateless
+	// pages with AutoFragments enabled; the server compares them
+	// against the fresh render and returns only the fragments whose
+	// content changed.
+	Hashes map[string]string `json:"hashes,omitempty"`
 }
 
 // Value returns the input element's value from the event data. This is

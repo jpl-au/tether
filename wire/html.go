@@ -43,6 +43,7 @@ func HTMLBody(u Update) (body []byte, keyed bool, err error) {
 // names as [updateMessage] so the client merges it straight into the
 // message it builds from the HTML body.
 type effectsMessage struct {
+	Hashes   map[string]string `json:"hashes,omitempty"`
 	URL      string            `json:"url,omitempty"`
 	Replace  bool              `json:"replace,omitempty"`
 	Title    string            `json:"title,omitempty"`
@@ -60,10 +61,12 @@ type effectsMessage struct {
 // the JSON is embedded inside an HTML template element.
 func encodeEffects(u Update) (data []byte, ok bool, err error) {
 	if u.URL == "" && u.Title == "" && len(u.Flash) == 0 && len(u.Signals) == 0 &&
-		u.Announce == "" && u.Toast == "" && u.ScrollTo == "" && u.Download == "" {
+		u.Announce == "" && u.Toast == "" && u.ScrollTo == "" && u.Download == "" &&
+		u.Hashes == nil {
 		return nil, false, nil
 	}
 	data, err = json.Marshal(effectsMessage{
+		Hashes:   u.Hashes,
 		URL:      u.URL,
 		Replace:  u.Replace,
 		Title:    u.Title,

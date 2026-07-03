@@ -48,6 +48,7 @@ type updateMessage struct {
 	ScrollTo string            `json:"scroll_to,omitempty"`
 	Download string            `json:"download,omitempty"`
 	EventID  string            `json:"event_id,omitempty"`
+	Hashes   map[string]string `json:"hashes,omitempty"`
 }
 
 // patchEntry is a single key+html pair within an [updateMessage].
@@ -89,6 +90,7 @@ func encodeMessage(u Update) updateMessage {
 	}
 
 	msg.Session = u.Session
+	msg.Hashes = u.Hashes
 	msg.URL = u.URL
 	msg.Replace = u.Replace
 	msg.Title = u.Title

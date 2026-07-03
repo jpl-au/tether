@@ -798,3 +798,187 @@ func TestStatefulRejectsHTMLWireFormat(t *testing.T) {
 		Handle:       handleCounter,
 	})
 }
+
+// --- Auto-fragments ---
+
+// twoRegionState renders two independently keyed regions so tests can
+// change one and assert the other stays off the wire.
+type twoRegionState struct {
+	A, B int
+}
+
+func renderTwoRegions(s twoRegionState) node.Node {
+	return div.New(
+		span.Textf("A: %d", s.A).Dynamic("region-a"),
+		span.Textf("B: %d", s.B).Dynamic("region-b"),
+	)
+}
+
+func newAutoFragmentsHandler() http.Handler {
+	return Stateless(App{}, StatelessConfig[twoRegionState]{
+		AutoFragments: true,
+		InitialState: func(r *http.Request) twoRegionState {
+			return twoRegionState{A: 1, B: 2}
+		},
+		Render: renderTwoRegions,
+		Handle: func(_ Session, s twoRegionState, ev Event) twoRegionState {
+			if ev.Action == "bump-a" {
+				s.A++
+			}
+			return s
+		},
+	})
+}
+
+// TestAutoFragmentsSeedsHashesOnGET verifies the initial page carries
+// the hash island the client echoes with events.
+func TestAutoFragmentsSeedsHashesOnGET(t *testing.T) {
+	h := newAutoFragmentsHandler()
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, httptest.NewRequest("GET", "/app", nil))
+
+	body := w.Body.String()
+	idx := strings.Index(body, `<template data-tether-hashes>`)
+	if idx == -1 {
+		t.Fatalf("expected hash island in initial page, got %s", body)
+	}
+	end := strings.Index(body[idx:], "</template>")
+	raw := body[idx+len(`<template data-tether-hashes>`) : idx+end]
+
+	var hashes map[string]string
+	if err := json.Unmarshal([]byte(raw), &hashes); err != nil {
+		t.Fatalf("hash island is not valid JSON: %v (%s)", err, raw)
+	}
+	if len(hashes) != 2 || hashes["region-a"] == "" || hashes["region-b"] == "" {
+		t.Errorf("hashes = %v, want entries for region-a and region-b", hashes)
+	}
+}
+
+// getSeedHashes extracts the hash map from the initial GET, the way
+// the client runtime does.
+func getSeedHashes(t *testing.T, h http.Handler) map[string]string {
+	t.Helper()
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, httptest.NewRequest("GET", "/app", nil))
+	body := w.Body.String()
+	idx := strings.Index(body, `<template data-tether-hashes>`)
+	if idx == -1 {
+		t.Fatalf("no hash island in initial page")
+	}
+	end := strings.Index(body[idx:], "</template>")
+	raw := body[idx+len(`<template data-tether-hashes>`) : idx+end]
+	var hashes map[string]string
+	if err := json.Unmarshal([]byte(raw), &hashes); err != nil {
+		t.Fatalf("seed hashes: %v", err)
+	}
+	return hashes
+}
+
+// TestAutoFragmentsSendsOnlyChangedFragment covers the core promise:
+// an event that changes one region sends only that region back, plus
+// the refreshed hash map.
+func TestAutoFragmentsSendsOnlyChangedFragment(t *testing.T) {
+	h := newAutoFragmentsHandler()
+	seed := getSeedHashes(t, h)
+
+	ev, _ := json.Marshal(map[string]any{
+		"type": "click", "action": "bump-a", "data": map[string]string{},
+		"event_id": "1", "hashes": seed,
+	})
+	w := postEvent(t, h, string(ev))
+
+	var msg struct {
+		Morphs  []testMorph       `json:"morphs"`
+		Hashes  map[string]string `json:"hashes"`
+		EventID string            `json:"event_id"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &msg); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(msg.Morphs) != 1 {
+		t.Fatalf("morphs = %d, want exactly the changed fragment (%v)", len(msg.Morphs), msg.Morphs)
+	}
+	if msg.Morphs[0].Key != "region-a" || !strings.Contains(msg.Morphs[0].HTML, "A: 2") {
+		t.Errorf("unexpected fragment: %+v", msg.Morphs[0])
+	}
+	if msg.Hashes["region-a"] == seed["region-a"] {
+		t.Error("region-a hash should have changed")
+	}
+	if msg.Hashes["region-b"] != seed["region-b"] {
+		t.Error("region-b hash should be unchanged")
+	}
+	if msg.EventID != "1" {
+		t.Errorf("event_id = %q, want 1", msg.EventID)
+	}
+}
+
+// TestAutoFragmentsNoChangeSendsNoMorphs verifies a no-op event still
+// echoes the event ID (loading state must clear) with zero fragments.
+func TestAutoFragmentsNoChangeSendsNoMorphs(t *testing.T) {
+	h := newAutoFragmentsHandler()
+	seed := getSeedHashes(t, h)
+
+	ev, _ := json.Marshal(map[string]any{
+		"type": "click", "action": "noop", "data": map[string]string{},
+		"event_id": "7", "hashes": seed,
+	})
+	w := postEvent(t, h, string(ev))
+
+	var msg struct {
+		Morphs  []testMorph `json:"morphs"`
+		EventID string      `json:"event_id"`
+	}
+	json.Unmarshal(w.Body.Bytes(), &msg)
+	if len(msg.Morphs) != 0 {
+		t.Errorf("morphs = %v, want none for an unchanged render", msg.Morphs)
+	}
+	if msg.EventID != "7" {
+		t.Errorf("event_id = %q, want 7", msg.EventID)
+	}
+}
+
+// TestAutoFragmentsStructuralChangeFallsBack verifies that a key-set
+// mismatch (client and server disagree on which fragments exist)
+// produces a full root morph plus the complete fresh map.
+func TestAutoFragmentsStructuralChangeFallsBack(t *testing.T) {
+	h := newAutoFragmentsHandler()
+
+	ev, _ := json.Marshal(map[string]any{
+		"type": "click", "action": "bump-a", "data": map[string]string{},
+		"event_id": "1",
+		"hashes":   map[string]string{"region-a": "x", "gone-key": "y"},
+	})
+	w := postEvent(t, h, string(ev))
+
+	var msg struct {
+		Morphs []testMorph       `json:"morphs"`
+		Hashes map[string]string `json:"hashes"`
+	}
+	json.Unmarshal(w.Body.Bytes(), &msg)
+	if len(msg.Morphs) != 1 || msg.Morphs[0].Key != "" {
+		t.Fatalf("expected a single root morph fallback, got %v", msg.Morphs)
+	}
+	if len(msg.Hashes) != 2 {
+		t.Errorf("fallback should carry the complete fresh map, got %v", msg.Hashes)
+	}
+}
+
+// TestAutoFragmentsWithoutClientHashesSendsFullMorph verifies a
+// client that never echoes hashes (older page, curl) gets the plain
+// full-morph behaviour plus a map to bootstrap from.
+func TestAutoFragmentsWithoutClientHashesSendsFullMorph(t *testing.T) {
+	h := newAutoFragmentsHandler()
+	w := postEvent(t, h, `{"type":"click","action":"bump-a","data":{},"event_id":"1"}`)
+
+	var msg struct {
+		Morphs []testMorph       `json:"morphs"`
+		Hashes map[string]string `json:"hashes"`
+	}
+	json.Unmarshal(w.Body.Bytes(), &msg)
+	if len(msg.Morphs) != 1 || msg.Morphs[0].Key != "" {
+		t.Fatalf("expected root morph, got %v", msg.Morphs)
+	}
+	if len(msg.Hashes) != 2 {
+		t.Errorf("response should bootstrap the client's hash map, got %v", msg.Hashes)
+	}
+}

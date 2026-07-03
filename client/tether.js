@@ -61,6 +61,11 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
   var toastDuration = 5000;
   var pendingCount = 0;
   var eventDataPrefix = "data-tether-data-";
+  // Fragment content hashes for stateless auto-fragments: seeded by
+  // the initial GET's island, echoed with each event, and replaced
+  // wholesale from every response's hashes field. Null when the page
+  // does not use auto-fragments.
+  var fragmentHashes = null;
 
   // --- Extension listener registries ---
   //
@@ -168,6 +173,18 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
     for (var i = 0; i < cloaked.length; i++) cloaked[i].removeAttribute("data-tether-cloak");
 
     initViewportObserver();
+
+    // Stateless auto-fragments: the server seeds the hash map in a
+    // template island inside the root.
+    var hashSeed = root.querySelector("template[data-tether-hashes]");
+    if (hashSeed) {
+      try {
+        var seedRaw = hashSeed.content ? hashSeed.content.textContent : hashSeed.textContent;
+        fragmentHashes = JSON.parse(seedRaw);
+      } catch (err) {
+        reportError("parse", "failed to parse fragment hash seed: " + err);
+      }
+    }
 
     if (transportMode === "fetch") {
       connectionMode = "fetch";
@@ -747,6 +764,12 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
     // it correlates with.
     requestAnimationFrame(function () {
       restorePending(msg.event_id);
+
+      // Stateless auto-fragments: every response carries the complete
+      // fresh hash map - replace, never merge.
+      if (msg.hashes) {
+        fragmentHashes = msg.hashes;
+      }
 
       // Server reassigned session ID (stale client reconnection).
       if (msg.session) {
@@ -1790,7 +1813,13 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
       console.log("tether: event", {type: type, action: action, data: data});
     }
     var id = String(++eventCounter);
-    var payload = JSON.stringify({type: type, action: action, data: data, event_id: id});
+    var envelope = {type: type, action: action, data: data, event_id: id};
+    // Stateless auto-fragments: echo the current hash map so the
+    // server can send back only the fragments that changed.
+    if (connectionMode === "fetch" && fragmentHashes) {
+      envelope.hashes = fragmentHashes;
+    }
+    var payload = JSON.stringify(envelope);
 
     if (connectionMode === "fetch") {
       var url = location.protocol + "//" + location.host + endpoint;

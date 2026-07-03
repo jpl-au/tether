@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/jpl-au/fluent/node"
 	"github.com/jpl-au/tether/dev"
 	"github.com/jpl-au/tether/event"
 	"github.com/jpl-au/tether/mode"
@@ -177,6 +178,19 @@ func (p *statelessHandler[S]) serveGET(w http.ResponseWriter, r *http.Request) {
 	tree := p.cfg.Render(state)
 	html := tree.Render()
 
+	// Seed the client's fragment-hash map. The island rides inside
+	// the tether root so the runtime finds it on init; standard JSON
+	// escaping keeps "</template>" out of the payload.
+	if p.cfg.AutoFragments {
+		if hashes := fragmentHashes(collectFragments(tree)); len(hashes) > 0 {
+			if data, err := json.Marshal(hashes); err == nil {
+				html = append(html, []byte(`<template data-tether-hashes>`)...)
+				html = append(html, data...)
+				html = append(html, []byte(`</template>`)...)
+			}
+		}
+	}
+
 	content := &tetherBody{
 		html:              html,
 		endpoint:          r.URL.Path,
@@ -285,7 +299,9 @@ func (p *statelessHandler[S]) servePOST(w http.ResponseWriter, r *http.Request) 
 	tree := p.cfg.Render(state)
 
 	var u wire.Update
-	if len(cs.MorphKeys) > 0 {
+	switch {
+	case len(cs.MorphKeys) > 0:
+		// Explicit Morph always wins for this response.
 		morphs := extractMorphs(tree, cs.MorphKeys)
 		if dev.Enabled() {
 			found := make(map[string]bool, len(morphs))
@@ -303,12 +319,24 @@ func (p *statelessHandler[S]) servePOST(w http.ResponseWriter, r *http.Request) 
 			Morphs:  morphs,
 			EventID: ev.EventID,
 		}
-	} else {
+
+	case p.cfg.AutoFragments && ev.Hashes != nil:
+		u = p.autoFragmentUpdate(tree, ev)
+
+	default:
 		html := tree.Render()
 		u = wire.Update{
 			Morphs:  []wire.Morph{{Key: "", HTML: html}},
 			EventID: ev.EventID,
 		}
+	}
+
+	// With auto-fragments on, every response carries the complete
+	// fresh hash map so the client can echo it with the next event -
+	// including on the explicit-Morph and fallback paths, which would
+	// otherwise leave the client's map stale.
+	if p.cfg.AutoFragments && u.Hashes == nil {
+		u.Hashes = fragmentHashes(collectFragments(tree))
 	}
 	cs.Effects.merge(&u)
 
@@ -342,5 +370,37 @@ func (p *statelessHandler[S]) servePOST(w http.ResponseWriter, r *http.Request) 
 	w.Header().Set("Content-Type", "application/json")
 	if _, err := w.Write(data); err != nil {
 		dev.Log().Warn("failed to write page response", "path", r.URL.Path, "err", err)
+	}
+}
+
+// autoFragmentUpdate builds a targeted update by comparing the fresh
+// render's fragment hashes against the map the client echoed. Only
+// changed fragments travel; the complete refreshed map rides along so
+// the client stays current. Structural changes (Dynamic keys added or
+// removed) and pages without keys fall back to a full root morph.
+func (p *statelessHandler[S]) autoFragmentUpdate(tree node.Node, ev Event) wire.Update {
+	frags := collectFragments(tree)
+	fresh := fragmentHashes(frags)
+
+	if len(frags) == 0 || !sameKeys(ev.Hashes, fresh) {
+		return wire.Update{
+			Morphs:  []wire.Morph{{Key: "", HTML: tree.Render()}},
+			EventID: ev.EventID,
+			Hashes:  fresh,
+		}
+	}
+
+	var morphs []wire.Morph
+	for key, hash := range fresh {
+		if ev.Hashes[key] != hash {
+			morphs = append(morphs, wire.Morph{Key: key, HTML: frags[key]})
+		}
+	}
+	// morphs may be empty - nothing changed - and that is a valid
+	// update: the event ID still echoes so loading state clears.
+	return wire.Update{
+		Morphs:  morphs,
+		EventID: ev.EventID,
+		Hashes:  fresh,
 	}
 }

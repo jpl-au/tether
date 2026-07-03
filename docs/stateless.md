@@ -183,18 +183,33 @@ Use `Morph` when the page has large static sections that the event does not affe
 
 The full tree is always rendered - `Render(state)` runs in full so the tree is correct. The handler then walks the tree, finds nodes whose Dynamic key matches a requested key, renders each subtree individually, and returns them as keyed morphs. Keys not found in the tree are silently skipped (with a dev-mode warning).
 
+### Automatic fragments (AutoFragments)
+
+`sess.Morph` requires knowing which keys an event affected. When you would rather not track that, set `AutoFragments: true` and the framework works it out by content hash:
+
+```go
+tether.Stateless(app, tether.StatelessConfig[State]{
+    AutoFragments: true,
+    // ...
+})
+```
+
+The mechanics: a stateless server holds no previous render to diff against, so the *client* keeps the state. The initial GET seeds the page with a content hash per Dynamic fragment; the client echoes the map with every event; the server hashes its fresh render and responds with only the fragments whose bytes changed, plus the refreshed map. An unchanged render sends no fragments at all (the event ID still echoes so loading state clears). If the fragment structure changes - Dynamic keys added or removed - the response falls back to a full root morph, and the protocol is self-healing: every response carries the complete map, so a missed update can only cost one redundant fragment, never a stale page.
+
+An explicit `sess.Morph` call still takes precedence for that response. Clients that never echo hashes (curl, older pages) get plain full morphs. The cost is one extra render walk per request and a small hash map on each event - worth it on pages with large static regions, unnecessary on small pages.
+
 ### Targeted morphs vs stateful patches
 
 In stateful mode, the differ automatically detects which Dynamic keys changed and sends targeted patches. There is no need to call `Morph` - the differ handles it. Calling `Morph` on a stateful session is a no-op with a dev warning.
 
-In stateless mode, there is no previous tree to diff against, so the developer explicitly declares which keys to morph. This is the trade-off: stateless mode avoids the memory cost of storing a previous tree, but requires the developer to know which keys their event affected.
+In stateless mode, there is no previous tree to diff against, so targeting is either declared per-event (`sess.Morph`) or computed by content hash (`AutoFragments`), with the client carrying the hash state between requests.
 
 | Concern | Stateful | Stateless |
 |---------|----------|-----------|
-| Targeting | Automatic (differ) | Explicit (`sess.Morph`) |
-| Memory | Stores previous tree snapshots | No stored state |
+| Targeting | Automatic (differ) | Explicit (`sess.Morph`) or automatic (`AutoFragments`) |
+| Memory | Stores previous tree snapshots | No stored state (hashes live on the client) |
 | Default | Targeted patches | Root morph |
-| Developer action | Add `.Dynamic("key")` to elements | Add `.Dynamic("key")` and call `sess.Morph("key")` |
+| Developer action | Add `.Dynamic("key")` to elements | Add `.Dynamic("key")`, then `sess.Morph("key")` or `AutoFragments: true` |
 
 ## Multi-page routing
 

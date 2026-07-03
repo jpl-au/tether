@@ -28,6 +28,14 @@ type Update struct {
 	ScrollTo string            // if non-empty, scroll element into view
 	Download string            // if non-empty, trigger a file download from this URL
 	EventID  string            // echoed from the triggering Event for correlation
+
+	// Hashes carries the complete current content-hash map for the
+	// page's Dynamic fragments, keyed by Dynamic key. Sent by
+	// stateless handlers with AutoFragments enabled; the client
+	// replaces its stored map wholesale and echoes it with the next
+	// event, so the protocol is self-healing - a missed update can
+	// only cost one redundant fragment send, never a stale page.
+	Hashes map[string]string
 }
 
 // Patch is a targeted content replacement. Key identifies a

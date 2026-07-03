@@ -84,6 +84,20 @@ type StatelessConfig[S any] struct {
 	// [wire.CBOR] is not supported in stateless mode.
 	WireFormat wire.Format
 
+	// AutoFragments enables automatic targeted updates by content
+	// hash. The initial GET seeds the client with a hash per Dynamic
+	// fragment; each event echoes the map, and the response carries
+	// only the fragments whose content changed (plus the refreshed
+	// map). No Session.Morph calls needed - though an explicit Morph
+	// still takes precedence for that response. When the page's
+	// fragment structure changes (Dynamic keys added or removed),
+	// the response falls back to a full root morph.
+	//
+	// Requires Dynamic keys on the regions that change; a page with
+	// no keys always sends full morphs, exactly as without this
+	// flag.
+	AutoFragments bool
+
 	// CacheControl sets the Cache-Control header on GET responses.
 	// Stateless pages embed no session token, so they are safe to
 	// cache when the content permits it:
