@@ -112,10 +112,22 @@ func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 	// never be stored by a shared cache or CDN - one cached response
 	// would hand one user's session to every subsequent visitor.
 	w.Header().Set("Cache-Control", "private, no-store")
+	var writeErr error
 	if h.cfg.Layout != nil {
-		h.cfg.Layout(state, content).Render(w)
+		_, writeErr = h.cfg.Layout(state, content).WriteTo(w)
 	} else {
-		content.Render(w)
+		_, writeErr = content.WriteTo(w)
+	}
+	if writeErr != nil {
+		// The client vanished mid-response, so it can never connect a
+		// transport for this session. Free the pending slot immediately
+		// instead of leaving it to the reaper - pending slots are what
+		// MaxPending rations, and under churn they are scarce.
+		h.mu.Lock()
+		delete(h.pending, id)
+		h.mu.Unlock()
+		dev.Debug("initial page write failed, pending session discarded",
+			"session", id, "error", writeErr)
 	}
 }
 

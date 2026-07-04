@@ -1,6 +1,7 @@
 package tether
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -124,5 +125,59 @@ func TestStatefulInitialPageHasReconnectionAttributes(t *testing.T) {
 	}
 	if !strings.Contains(body, "data-tether-jitter") {
 		t.Error("expected data-tether-jitter attribute (default enabled)")
+	}
+}
+
+// failingWriter satisfies http.ResponseWriter but rejects every body
+// write, simulating a client that vanished mid-response.
+type failingWriter struct {
+	header http.Header
+}
+
+func (f *failingWriter) Header() http.Header {
+	if f.header == nil {
+		f.header = http.Header{}
+	}
+	return f.header
+}
+func (f *failingWriter) Write([]byte) (int, error) { return 0, errors.New("client gone") }
+func (f *failingWriter) WriteHeader(int)           {}
+
+// TestStatefulFailedPageWriteFreesPendingSlot verifies that when the
+// initial page write fails, the pending session is discarded
+// immediately rather than occupying a MaxPending slot until the reaper
+// collects it. A client that never received the page can never connect
+// a transport for that session.
+func TestStatefulFailedPageWriteFreesPendingSlot(t *testing.T) {
+	t.Cleanup(dev.Reset)
+
+	handler := Stateful(App{}, StatefulConfig[counterState]{
+		Mode:         mode.WebSocket,
+		Upgrade:      stubUpgrade,
+		InitialState: func(r *http.Request) counterState { return counterState{} },
+		Render:       renderCounter,
+		Handle:       handleCounter,
+	})
+
+	req := httptest.NewRequest("GET", "/app", nil)
+	handler.ServeHTTP(&failingWriter{}, req)
+
+	handler.mu.Lock()
+	pending := len(handler.pending)
+	handler.mu.Unlock()
+	if pending != 0 {
+		t.Errorf("failed page write should discard the pending session, %d still pending", pending)
+	}
+
+	// A successful write must keep its pending session for the
+	// transport connect.
+	req = httptest.NewRequest("GET", "/app", nil)
+	handler.ServeHTTP(httptest.NewRecorder(), req)
+
+	handler.mu.Lock()
+	pending = len(handler.pending)
+	handler.mu.Unlock()
+	if pending != 1 {
+		t.Errorf("successful page write should keep its pending session, got %d", pending)
 	}
 }
