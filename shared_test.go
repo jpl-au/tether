@@ -19,7 +19,7 @@ import (
 func sharedRegion(version int) node.Node {
 	return div.New(
 		div.New(
-			node.Shared("nav:v"+strconv.Itoa(version), func() node.Node {
+			jit.Shared("nav:v"+strconv.Itoa(version), func() node.Node {
 				return span.Text("nav")
 			}),
 		).Dynamic("nav"),
@@ -100,7 +100,7 @@ func TestSharedCacheReuseDiagnosticSilentWithoutShared(t *testing.T) {
 	plain := func(v int) node.Node {
 		return div.New(
 			div.New(
-				node.Memoise("v"+strconv.Itoa(v), func() node.Node { return span.Text("x") }),
+				jit.Memoise("v"+strconv.Itoa(v), func() node.Node { return span.Text("x") }),
 			).Dynamic("region"),
 		)
 	}

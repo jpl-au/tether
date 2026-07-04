@@ -730,7 +730,7 @@ func TestStatelessHTMLWireKeyedFragments(t *testing.T) {
 		t.Fatalf("Tether-Morph = %q, want keyed", w.Header().Get("Tether-Morph"))
 	}
 	body := w.Body.String()
-	if !strings.Contains(body, `data-tether-key="count"`) {
+	if !strings.Contains(body, `data-fluent-key="count"`) {
 		t.Errorf("fragment should carry its key attribute, got %s", body)
 	}
 	if strings.Contains(body, "<div") {

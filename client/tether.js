@@ -139,8 +139,8 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
   }
 
   // Build an attribute selector with the value properly escaped.
-  // Example: attrSelector("data-tether-key", key) returns
-  // '[data-tether-key="<escaped>"]'
+  // Example: attrSelector("data-fluent-key", key) returns
+  // '[data-fluent-key="<escaped>"]'
   function attrSelector(attr, value) {
     return "[" + attr + '="' + CSS.escape(value) + '"]';
   }
@@ -1297,7 +1297,7 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
   // --- Patching and morphing ---
 
   function applyPatch(patch) {
-    var el = safeQuery(document, attrSelector("data-tether-key", patch.key));
+    var el = safeQuery(document, attrSelector("data-fluent-key", patch.key));
     if (!el) return;
 
     if (devMode) {
@@ -1341,7 +1341,7 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
       }
       var newEl = template.content.firstElementChild;
       if (!newEl) return;
-      var el = safeQuery(document, attrSelector("data-tether-key", morph.key));
+      var el = safeQuery(document, attrSelector("data-fluent-key", morph.key));
       if (el) {
         Idiomorph.morph(el, newEl, {callbacks: morphCallbacks});
       }
@@ -1775,7 +1775,9 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
           break;
 
         case "keydown":
-          // If data-tether-key is set, only send the event if it matches.
+          // If data-tether-key is set (bind.FilterKey), only send the
+          // event when the pressed key matches. Distinct from
+          // data-fluent-key, the diff engine's element identity.
           var filter = target.getAttribute("data-tether-key");
           if (filter && filter !== e.key) return;
 
@@ -1862,7 +1864,7 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
   // formats identically. The body is morph fragments, optionally
   // followed by a <template data-tether-effects> JSON island. When
   // keyed is true each top-level element is a targeted fragment
-  // addressed by its data-tether-key; otherwise the whole body is a
+  // addressed by its data-fluent-key; otherwise the whole body is a
   // root morph.
   function parseHTMLUpdate(text, keyed, eventID) {
     var msg = { type: "update", event_id: eventID };
@@ -1886,7 +1888,7 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
     if (keyed) {
       var children = template.content.children;
       for (var i = 0; i < children.length; i++) {
-        var key = children[i].getAttribute("data-tether-key");
+        var key = children[i].getAttribute("data-fluent-key");
         if (key) msg.morphs.push({ key: key, html: children[i].outerHTML });
       }
     } else {

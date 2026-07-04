@@ -1,7 +1,7 @@
 package tether
 
 // Versioned wraps a value with an automatic version counter for use
-// with [node.Memoise]. The version increments on every call to [With],
+// with [jit.Memoise]. The version increments on every call to [With],
 // ensuring the memoisation key changes when the data changes.
 //
 // Use Versioned for state fields that back memoised Dynamic regions.
@@ -23,7 +23,7 @@ package tether
 //
 // Use the version as the memoisation key in Render:
 //
-//	node.Memoise(s.Items.Version(), func() node.Node {
+//	jit.Memoise(s.Items.Version(), func() node.Node {
 //	    return renderTable(s.Items.Val)
 //	})
 //
@@ -56,9 +56,9 @@ func (v Versioned[T]) With(data T) Versioned[T] {
 }
 
 // Version returns the current version counter. Use this as the
-// key for [node.Memoise]:
+// key for [jit.Memoise]:
 //
-//	node.Memoise(s.Items.Version(), func() node.Node { ... })
+//	jit.Memoise(s.Items.Version(), func() node.Node { ... })
 func (v Versioned[T]) Version() int {
 	return v.version
 }

@@ -8,8 +8,8 @@ import (
 func TestEncodeWithPatches(t *testing.T) {
 	u := Update{
 		Patches: []Patch{
-			{Key: "count", HTML: []byte(`<span data-tether-key="count">42</span>`)},
-			{Key: "name", HTML: []byte(`<span data-tether-key="name">Alice</span>`)},
+			{Key: "count", HTML: []byte(`<span data-fluent-key="count">42</span>`)},
+			{Key: "name", HTML: []byte(`<span data-fluent-key="name">Alice</span>`)},
 		},
 	}
 

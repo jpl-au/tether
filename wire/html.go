@@ -9,7 +9,7 @@ import (
 // format: the morph fragments concatenated in order, followed by a
 // JSON effects island when the update carries side effects:
 //
-//	<div data-tether-key="list">...</div>
+//	<div data-fluent-key="list">...</div>
 //	<template data-tether-effects>{"toast":"Saved"}</template>
 //
 // The island uses the same field names as the JSON wire format, and

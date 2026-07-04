@@ -78,7 +78,7 @@ func benchEncodeUpdatePatches(b *testing.B, n int) {
 		key := fmt.Sprintf("key-%d", i)
 		patches[i] = wire.Patch{
 			Key:  key,
-			HTML: fmt.Appendf(nil, `<span data-tether-key="%s">value %d</span>`, key, i),
+			HTML: fmt.Appendf(nil, `<span data-fluent-key="%s">value %d</span>`, key, i),
 		}
 	}
 	u := wire.Update{Patches: patches}
@@ -91,7 +91,7 @@ func benchEncodeUpdatePatches(b *testing.B, n int) {
 }
 
 func BenchmarkEncodeUpdateMorph(b *testing.B) {
-	html := []byte(`<div data-tether-root><span data-tether-key="count">42</span><span data-tether-key="name">Alice</span></div>`)
+	html := []byte(`<div data-tether-root><span data-fluent-key="count">42</span><span data-fluent-key="name">Alice</span></div>`)
 	u := wire.Update{
 		Morphs: []wire.Morph{{Key: "", HTML: html}},
 	}

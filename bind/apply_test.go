@@ -90,6 +90,8 @@ func TestApplyTimingOptions(t *testing.T) {
 
 func TestFilterKey(t *testing.T) {
 	html := string(bind.Apply(input.Text("q", ""), bind.FilterKey("Enter")).RenderBytes())
+	// FilterKey is tether's keyboard filter - deliberately NOT
+	// data-fluent-key, which is the diff engine's element identity.
 	want := `data-tether-key="Enter"`
 	if !strings.Contains(html, want) {
 		t.Errorf("FilterKey missing %s in:\n%s", want, html)
