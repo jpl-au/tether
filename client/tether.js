@@ -1775,10 +1775,10 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
           break;
 
         case "keydown":
-          // If data-tether-key is set (bind.FilterKey), only send the
-          // event when the pressed key matches. Distinct from
+          // If data-tether-filterkey is set (bind.FilterKey), only send
+          // the event when the pressed key matches. Unrelated to
           // data-fluent-key, the diff engine's element identity.
-          var filter = target.getAttribute("data-tether-key");
+          var filter = target.getAttribute("data-tether-filterkey");
           if (filter && filter !== e.key) return;
 
           data.key = e.key || "";

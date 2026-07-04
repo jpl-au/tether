@@ -245,8 +245,8 @@ func TestFilterKeyRendersDataAttribute(t *testing.T) {
 	)
 	html := string(el.RenderBytes())
 
-	if !strings.Contains(html, `data-tether-key="Enter"`) {
-		t.Errorf("expected data-tether-key attribute in HTML:\n%s", html)
+	if !strings.Contains(html, `data-tether-filterkey="Enter"`) {
+		t.Errorf("expected data-tether-filterkey attribute in HTML:\n%s", html)
 	}
 	if !strings.Contains(html, `data-tether-keydown="exec"`) {
 		t.Errorf("expected data-tether-keydown attribute in HTML:\n%s", html)
