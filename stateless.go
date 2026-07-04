@@ -176,7 +176,7 @@ func (p *statelessHandler[S]) serveGET(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tree := p.cfg.Render(state)
-	html := tree.Render()
+	html := tree.RenderBytes()
 
 	// Seed the client's fragment-hash map. The island rides inside
 	// the tether root so the runtime finds it on init; standard JSON
@@ -324,7 +324,7 @@ func (p *statelessHandler[S]) servePOST(w http.ResponseWriter, r *http.Request) 
 		u = p.autoFragmentUpdate(tree, ev)
 
 	default:
-		html := tree.Render()
+		html := tree.RenderBytes()
 		u = wire.Update{
 			Morphs:  []wire.Morph{{Key: "", HTML: html}},
 			EventID: ev.EventID,
@@ -384,7 +384,7 @@ func (p *statelessHandler[S]) autoFragmentUpdate(tree node.Node, ev Event) wire.
 
 	if len(frags) == 0 || !sameKeys(ev.Hashes, fresh) {
 		return wire.Update{
-			Morphs:  []wire.Morph{{Key: "", HTML: tree.Render()}},
+			Morphs:  []wire.Morph{{Key: "", HTML: tree.RenderBytes()}},
 			EventID: ev.EventID,
 			Hashes:  fresh,
 		}

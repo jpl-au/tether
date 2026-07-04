@@ -227,9 +227,9 @@ func (h *Harness[S]) dispatch(cs *tether.CaptureSession, ev tether.Event) S {
 func (h *Harness[S]) renderHTML(s S) []byte {
 	content := h.render(s)
 	if h.layout != nil {
-		return h.layout(s, content).Render()
+		return h.layout(s, content).RenderBytes()
 	}
-	return content.Render()
+	return content.RenderBytes()
 }
 
 // State returns the current accumulated state. Each Send call applies

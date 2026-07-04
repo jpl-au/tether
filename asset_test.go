@@ -56,7 +56,7 @@ func TestAssetURLMissingReturnsUnhashed(t *testing.T) {
 func TestAssetStylesheet(t *testing.T) {
 	a := testAssetFS()
 	n := a.Stylesheet("styles.css")
-	html := string(n.Render())
+	html := string(n.RenderBytes())
 
 	if !strings.Contains(html, "rel=\"stylesheet\"") {
 		t.Errorf("expected rel=stylesheet, got:\n%s", html)
@@ -69,7 +69,7 @@ func TestAssetStylesheet(t *testing.T) {
 func TestAssetScript(t *testing.T) {
 	a := testAssetFS()
 	n := a.Script("app.js")
-	html := string(n.Render())
+	html := string(n.RenderBytes())
 
 	if !strings.Contains(html, "<script") {
 		t.Errorf("expected <script> tag, got:\n%s", html)

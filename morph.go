@@ -34,7 +34,7 @@ func walkMorphKeys(n node.Node, wanted map[string]bool, morphs *[]wire.Morph) {
 	if d, ok := n.(node.Dynamic); ok {
 		key := d.DynamicKey()
 		if key != "" && wanted[key] {
-			*morphs = append(*morphs, wire.Morph{Key: key, HTML: n.Render()})
+			*morphs = append(*morphs, wire.Morph{Key: key, HTML: n.RenderBytes()})
 			delete(wanted, key)
 			return
 		}

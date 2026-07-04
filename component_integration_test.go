@@ -2,6 +2,7 @@ package tether
 
 import (
 	"context"
+	"io"
 	"testing"
 	"testing/synctest"
 
@@ -177,7 +178,7 @@ func TestComponentIntegrationMultiInstance(t *testing.T) {
 		}
 		sess.status.Store(int32(Pending))
 		tree := sess.render(sess.state)
-		differ.Render(tree)
+		differ.Render(tree, io.Discard)
 
 		go sess.readTransport(sess.events)
 		go sess.run()
@@ -265,7 +266,7 @@ func TestComponentIntegrationSideEffects(t *testing.T) {
 		}
 		sess.status.Store(int32(Pending))
 		tree := sess.render(sess.state)
-		differ.Render(tree)
+		differ.Render(tree, io.Discard)
 
 		go sess.readTransport(sess.events)
 		go sess.run()
@@ -357,7 +358,7 @@ func TestComponentIntegrationToggleAndClear(t *testing.T) {
 		}
 		sess.status.Store(int32(Pending))
 		tree := sess.render(sess.state)
-		differ.Render(tree)
+		differ.Render(tree, io.Discard)
 
 		go sess.readTransport(sess.events)
 		go sess.run()
@@ -418,7 +419,7 @@ func TestComponentManualRouteTyped(t *testing.T) {
 		}
 		sess.status.Store(int32(Pending))
 		tree := sess.render(sess.state)
-		differ.Render(tree)
+		differ.Render(tree, io.Discard)
 
 		go sess.readTransport(sess.events)
 		go sess.run()
@@ -480,7 +481,7 @@ func TestComponentEqualComponentSkipsRender(t *testing.T) {
 		}
 		sess.status.Store(int32(Pending))
 		tree := sess.render(sess.state)
-		differ.Render(tree)
+		differ.Render(tree, io.Discard)
 
 		go sess.readTransport(sess.events)
 		go sess.run()

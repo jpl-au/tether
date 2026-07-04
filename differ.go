@@ -12,7 +12,8 @@ import (
 // not know which implementation it holds - the choice is made at
 // session creation time based on [StatefulConfig.Memoise].
 type engine interface {
-	Render(root node.Node, w ...io.Writer) []byte
+	Render(root node.Node, w io.Writer)
+	RenderBytes(root node.Node) []byte
 	Diff(root node.Node) ([]jit.Patch, *jit.StructuralChange)
 	DiffKey(key string, subtree node.Node) *jit.Patch
 	Export() []byte
@@ -34,7 +35,7 @@ func (h *Handler[S]) engine(d *jit.Differ, state S, seed bool) engine {
 		m := jit.NewMemoiser()
 		if seed {
 			tree := h.cfg.Render(state)
-			m.Render(tree)
+			m.Render(tree, io.Discard)
 		}
 		return m
 	}

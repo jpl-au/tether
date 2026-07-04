@@ -2,6 +2,7 @@ package tether
 
 import (
 	"context"
+	"io"
 	"testing"
 	"testing/synctest"
 
@@ -67,7 +68,7 @@ func newMountSession(state mountState, mt Transport, mounts []ComponentMount[mou
 	}
 	sess.status.Store(int32(Pending))
 	tree := sess.render(sess.state)
-	differ.Render(tree)
+	differ.Render(tree, io.Discard)
 	return sess
 }
 
@@ -181,7 +182,7 @@ func TestMountRouteSetsEventTarget(t *testing.T) {
 		}
 		sess.status.Store(int32(Pending))
 		tree := sess.render(sess.state)
-		differ.Render(tree)
+		differ.Render(tree, io.Discard)
 
 		go sess.readTransport(sess.events)
 		go sess.run()

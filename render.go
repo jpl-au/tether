@@ -63,18 +63,26 @@ type tetherBody struct {
 	runtime           ClientRuntime
 }
 
-func (p *tetherBody) Render(w ...io.Writer) []byte {
+// Render writes the body to w. Write errors are intentionally not
+// checked: this writes to an http.ResponseWriter during the initial
+// GET, and a failure means the client disconnected - a normal
+// condition that requires no action. Use WriteTo to observe it.
+func (p *tetherBody) Render(w io.Writer) {
+	_, _ = p.WriteTo(w)
+}
+
+// WriteTo writes the body to w, returning the byte count and any
+// write error. Satisfies io.WriterTo.
+func (p *tetherBody) WriteTo(w io.Writer) (int64, error) {
 	var buf bytes.Buffer
 	p.RenderBuilder(&buf)
-	if len(w) > 0 && w[0] != nil {
-		// Write error is intentionally not checked. This writes to
-		// an http.ResponseWriter during the initial GET. A failure
-		// means the client disconnected - a normal condition that
-		// requires no action. The node.Node interface does not
-		// return an error.
-		buf.WriteTo(w[0])
-		return nil
-	}
+	return buf.WriteTo(w)
+}
+
+// RenderBytes returns the body as a byte slice.
+func (p *tetherBody) RenderBytes() []byte {
+	var buf bytes.Buffer
+	p.RenderBuilder(&buf)
 	return buf.Bytes()
 }
 

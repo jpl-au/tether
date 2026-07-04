@@ -29,7 +29,7 @@ func collectFragments(root node.Node) map[string][]byte {
 func walkFragments(n node.Node, frags map[string][]byte) {
 	if d, ok := n.(node.Dynamic); ok {
 		if key := d.DynamicKey(); key != "" {
-			frags[key] = n.Render()
+			frags[key] = n.RenderBytes()
 			return
 		}
 	}

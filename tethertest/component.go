@@ -76,7 +76,7 @@ func (h *ComponentHarness[C]) Mount() {
 func (h *ComponentHarness[C]) Component() C { return h.comp }
 
 // HTML returns the component's rendered HTML.
-func (h *ComponentHarness[C]) HTML() string { return string(h.comp.Render().Render()) }
+func (h *ComponentHarness[C]) HTML() string { return string(h.comp.Render().RenderBytes()) }
 
 // Toast returns the toast from the most recent event.
 func (h *ComponentHarness[C]) Toast() string { return h.last.Toast }

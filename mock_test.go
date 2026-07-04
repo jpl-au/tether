@@ -244,6 +244,6 @@ func newTestSession(state counterState, mt Transport) *StatefulSession[counterSt
 	// changes must use transition().
 	sess.status.Store(int32(Pending))
 	tree := sess.render(sess.state)
-	differ.Render(tree)
+	differ.Render(tree, io.Discard)
 	return sess
 }

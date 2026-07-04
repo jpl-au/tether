@@ -2,6 +2,7 @@ package tether
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"time"
 
@@ -68,7 +69,7 @@ func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 	tree := h.cfg.Render(state)
 
 	differ := jit.NewDiffer()
-	html := differ.Render(tree)
+	html := differ.RenderBytes(tree)
 
 	id := newID()
 	now := time.Now()
@@ -303,7 +304,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 			// no session ID. Seed the differ so the first diff
 			// produces targeted patches.
 			tree := h.cfg.Render(state)
-			differ.Render(tree)
+			differ.Render(tree, io.Discard)
 		}
 	}
 
@@ -423,7 +424,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 	if stale {
 		sess.cmds <- func() {
 			tree := sess.render(sess.state)
-			html := sess.engine.Render(tree)
+			html := sess.engine.RenderBytes(tree)
 			sess.send(wire.Update{Morphs: []wire.Morph{{Key: "", HTML: html}}})
 		}
 	}
@@ -570,7 +571,7 @@ func (h *Handler[S]) restoreSession(id string, r *http.Request, transport Transp
 	// Build a fresh session with the restored state.
 	differ := jit.NewDiffer()
 	tree := h.cfg.Render(state)
-	differ.Render(tree)
+	differ.Render(tree, io.Discard)
 
 	now := time.Now()
 	ctx, cancel := context.WithCancel(context.Background())
@@ -677,7 +678,7 @@ func (h *Handler[S]) restoreSession(id string, r *http.Request, transport Transp
 	// are in sync. This mirrors the catch-up send in reattach.
 	sess.cmds <- func() {
 		tree := sess.render(sess.state)
-		html := sess.engine.Render(tree)
+		html := sess.engine.RenderBytes(tree)
 		u := wire.Update{
 			Morphs: []wire.Morph{{Key: "", HTML: html}},
 		}

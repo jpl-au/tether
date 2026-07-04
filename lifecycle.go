@@ -2,6 +2,7 @@ package tether
 
 import (
 	"context"
+	"io"
 	"net/http"
 
 	jit "github.com/jpl-au/fluent-jit"
@@ -93,11 +94,11 @@ func (h *Handler[S]) reattach(sess *StatefulSession[S], transport Transport) <-c
 		switch {
 		case change != nil:
 			// Structural change - full morph required.
-			html := sess.engine.Render(tree)
+			html := sess.engine.RenderBytes(tree)
 			u.Morphs = []wire.Morph{{Key: "", HTML: html}}
 		case patches == nil:
 			// Unseeded differ (no snapshots) - full morph.
-			html := sess.engine.Render(tree)
+			html := sess.engine.RenderBytes(tree)
 			u.Morphs = []wire.Morph{{Key: "", HTML: html}}
 		case len(patches) > 0:
 			wp := make([]wire.Patch, len(patches))
@@ -242,7 +243,7 @@ func (h *Handler[S]) thaw(sess *StatefulSession[S], r *http.Request, transport T
 	// a one-shot event for the session's whole lifetime.
 	differ := jit.NewDiffer()
 	tree := h.cfg.Render(state)
-	differ.Render(tree)
+	differ.Render(tree, io.Discard)
 
 	sess.state = state
 	sess.stateSnap.Store(state)

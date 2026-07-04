@@ -29,7 +29,7 @@ func (s *StatefulSession[S]) sendDiff(eventID string, patches []jit.Patch, chang
 	// seeding the engine. Handled here so the event path (exec) and
 	// the update path (coalescedRender) recover identically.
 	if patches == nil && change == nil {
-		html := s.engine.Render(tree)
+		html := s.engine.RenderBytes(tree)
 		dev.Debug("unseeded engine, sending full morph",
 			"session", s.id,
 			"endpoint", s.endpoint,
@@ -47,7 +47,7 @@ func (s *StatefulSession[S]) sendDiff(eventID string, patches []jit.Patch, chang
 	}
 
 	if change != nil {
-		html := s.engine.Render(tree)
+		html := s.engine.RenderBytes(tree)
 		sc := StructuralChange{
 			Added:     change.Added,
 			Removed:   change.Removed,

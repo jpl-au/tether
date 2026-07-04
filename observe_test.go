@@ -2,6 +2,7 @@ package tether
 
 import (
 	"context"
+	"io"
 	"testing"
 	"testing/synctest"
 
@@ -105,7 +106,7 @@ func TestObserveCrossHandler(t *testing.T) {
 			stop:      cancelB,
 		}
 		sessB.status.Store(int32(Pending))
-		differB.Render(renderDash(dashState{}))
+		differB.Render(renderDash(dashState{}), io.Discard)
 
 		go sessB.readTransport(sessB.events)
 		go sessB.run()
@@ -199,7 +200,7 @@ func TestObserveMultipleValues(t *testing.T) {
 			stop:      cancel,
 		}
 		sess.status.Store(int32(Pending))
-		differ.Render(render(state{}))
+		differ.Render(render(state{}), io.Discard)
 
 		go sess.readTransport(sess.events)
 		go sess.run()

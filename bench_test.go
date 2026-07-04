@@ -25,7 +25,7 @@ import (
 func BenchmarkBindClick(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		el := bind.Apply(button.Text("+"), bind.OnClick("increment"))
-		_ = el.Render()
+		_ = el.RenderBytes()
 	}
 }
 
@@ -33,7 +33,7 @@ func BenchmarkBindClick(b *testing.B) {
 func BenchmarkSetDataDirect(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		el := button.Text("+").SetData("tether-click", "increment")
-		_ = el.Render()
+		_ = el.RenderBytes()
 	}
 }
 
@@ -43,7 +43,7 @@ func BenchmarkBindClickRenderOnly(b *testing.B) {
 	el := bind.Apply(button.Text("+"), bind.OnClick("increment"))
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = el.Render()
+		_ = el.RenderBytes()
 	}
 }
 
@@ -52,7 +52,7 @@ func BenchmarkSetDataDirectRenderOnly(b *testing.B) {
 	el := button.Text("+").SetData("tether-click", "increment")
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = el.Render()
+		_ = el.RenderBytes()
 	}
 }
 
@@ -175,7 +175,7 @@ func BenchmarkEventCycle(b *testing.B) {
 	sess.status.Store(int32(Pending))
 
 	tree := benchRender(benchState{Count: 0})
-	differ.Render(tree)
+	differ.Render(tree, io.Discard)
 
 	b.ResetTimer()
 	go sess.readTransport(sess.events)
@@ -209,14 +209,14 @@ func benchDiffScale(b *testing.B, n int) {
 	}
 
 	differ := jit.NewDiffer()
-	differ.Render(render(0))
+	differ.Render(render(0), io.Discard)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		tree := render(i + 1)
 		patches, change := differ.Diff(tree)
 		if change != nil {
-			differ.Render(tree)
+			differ.Render(tree, io.Discard)
 		}
 		_ = patches
 	}

@@ -173,7 +173,7 @@ func TestRenderNode(t *testing.T) {
 	if n == nil {
 		t.Fatal("RenderNode() returned nil")
 	}
-	html := string(n.Render())
+	html := string(n.RenderBytes())
 	if !contains(html, "Count: 0") {
 		t.Errorf("RenderNode HTML should contain Count: 0, got %s", html)
 	}

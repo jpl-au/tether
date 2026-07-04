@@ -2,6 +2,7 @@ package tether
 
 import (
 	"context"
+	"io"
 	"strconv"
 	"sync"
 	"testing"
@@ -57,7 +58,7 @@ func TestSharedCacheReuseDiagnostic(t *testing.T) {
 
 	newSharedSession := func(id string) *StatefulSession[counterState] {
 		eng := jit.NewMemoiser()
-		eng.Render(sharedRegion(1))
+		eng.Render(sharedRegion(1), io.Discard)
 		return &StatefulSession[counterState]{id: id, engine: eng}
 	}
 
@@ -104,7 +105,7 @@ func TestSharedCacheReuseDiagnosticSilentWithoutShared(t *testing.T) {
 		)
 	}
 	eng := jit.NewMemoiser()
-	eng.Render(plain(1))
+	eng.Render(plain(1), io.Discard)
 	s := &StatefulSession[counterState]{id: "S", engine: eng}
 	snap := collectDiagnostics(t, s)
 

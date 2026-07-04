@@ -2,6 +2,7 @@ package tether
 
 import (
 	"context"
+	"io"
 	"net/url"
 	"testing"
 	"testing/synctest"
@@ -83,7 +84,7 @@ func TestSessionNavigateEvent(t *testing.T) {
 		sess.status.Store(int32(Pending))
 
 		tree := sess.render(sess.state)
-		differ.Render(tree)
+		differ.Render(tree, io.Discard)
 
 		go sess.readTransport(sess.events)
 		go sess.run()
@@ -150,7 +151,7 @@ func TestSessionNavigateEventWithQuery(t *testing.T) {
 		sess.status.Store(int32(Pending))
 
 		tree := sess.render(sess.state)
-		differ.Render(tree)
+		differ.Render(tree, io.Discard)
 
 		go sess.readTransport(sess.events)
 		go sess.run()

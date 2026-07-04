@@ -3,6 +3,7 @@ package tether
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"strconv"
 	"strings"
 	"testing"
@@ -219,7 +220,7 @@ func TestPatchThroughDynamicParent(t *testing.T) {
 		}
 		sess.attachTransportCtx()
 		sess.status.Store(int32(Pending))
-		differ.Render(renderAll(sess.state))
+		differ.Render(renderAll(sess.state), io.Discard)
 
 		go sess.readTransport(sess.events)
 		go sess.run()
@@ -332,7 +333,7 @@ func TestPatchResetWithManyKeys(t *testing.T) {
 		}
 		sess.attachTransportCtx()
 		sess.status.Store(int32(Pending))
-		differ.Render(renderAll(sess.state))
+		differ.Render(renderAll(sess.state), io.Discard)
 
 		go sess.readTransport(sess.events)
 		go sess.run()

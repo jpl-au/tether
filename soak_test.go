@@ -71,7 +71,7 @@ func (c *soakClient) connect(id string) *connectedTransport {
 
 // sendEvents pushes n increment events through the transport.
 func (c *soakClient) sendEvents(ct *connectedTransport, n int) {
-	for i := 0; i < n; i++ {
+	for range n {
 		select {
 		case ct.ch <- Event{Type: "event", Action: "increment"}:
 		case <-time.After(5 * time.Second):
@@ -148,7 +148,7 @@ func TestLifecycleStress(t *testing.T) {
 	})
 
 	var wg sync.WaitGroup
-	for w := 0; w < workers; w++ {
+	for w := range workers {
 		c := &soakClient{
 			t:  t,
 			h:  h,
@@ -163,7 +163,7 @@ func TestLifecycleStress(t *testing.T) {
 		go func(seed int64) {
 			defer wg.Done()
 			rng := rand.New(rand.NewSource(seed))
-			for i := 0; i < iterations; i++ {
+			for range iterations {
 				id := c.getPage()
 				if id == "" {
 					return

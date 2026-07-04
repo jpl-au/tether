@@ -13,7 +13,7 @@ func TestCatchReturnsNormalResult(t *testing.T) {
 		return div.Text("hello")
 	}, span.Text("fallback"))
 
-	html := string(result.Render())
+	html := string(result.RenderBytes())
 	if html != "<div>hello</div>" {
 		t.Errorf("expected <div>hello</div>, got %s", html)
 	}
@@ -24,7 +24,7 @@ func TestCatchReturnsFallbackOnPanic(t *testing.T) {
 		panic("render failed")
 	}, span.Text("fallback"))
 
-	html := string(result.Render())
+	html := string(result.RenderBytes())
 	if html != "<span>fallback</span>" {
 		t.Errorf("expected <span>fallback</span>, got %s", html)
 	}
@@ -37,7 +37,7 @@ func TestCatchReturnsFallbackOnNilPanic(t *testing.T) {
 		return div.Text("unreachable")
 	}, span.Text("recovered"))
 
-	html := string(result.Render())
+	html := string(result.RenderBytes())
 	if html != "<span>recovered</span>" {
 		t.Errorf("expected <span>recovered</span>, got %s", html)
 	}

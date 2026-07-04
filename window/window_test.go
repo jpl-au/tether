@@ -21,7 +21,7 @@ func TestNewRendersVisibleRows(t *testing.T) {
 		RowHeight: 40,
 		Row:       row,
 	})
-	html := string(n.Render())
+	html := string(n.RenderBytes())
 
 	for i := 10; i < 15; i++ {
 		want := "row-" + strconv.Itoa(i)
@@ -46,7 +46,7 @@ func TestNewTopSpacer(t *testing.T) {
 		RowHeight: 40,
 		Row:       row,
 	})
-	html := string(n.Render())
+	html := string(n.RenderBytes())
 
 	// Top spacer: 20 rows * 40px = 800px.
 	if !strings.Contains(html, "height:800px") {
@@ -62,7 +62,7 @@ func TestNewBottomSpacer(t *testing.T) {
 		RowHeight: 40,
 		Row:       row,
 	})
-	html := string(n.Render())
+	html := string(n.RenderBytes())
 
 	// Bottom spacer: (100-10) * 40 = 3600px.
 	if !strings.Contains(html, "height:3600px") {
@@ -79,7 +79,7 @@ func TestNewClampsOffset(t *testing.T) {
 		RowHeight: 40,
 		Row:       row,
 	})
-	html := string(n.Render())
+	html := string(n.RenderBytes())
 
 	// All items are above the window; no rows rendered, bottom spacer is 0.
 	if strings.Contains(html, "row-") {
@@ -95,7 +95,7 @@ func TestNewClampsNegativeOffset(t *testing.T) {
 		RowHeight: 40,
 		Row:       row,
 	})
-	html := string(n.Render())
+	html := string(n.RenderBytes())
 
 	// Should start from 0.
 	if !strings.Contains(html, "row-0") {
@@ -115,7 +115,7 @@ func TestNewEmptyDataset(t *testing.T) {
 		RowHeight: 40,
 		Row:       row,
 	})
-	html := string(n.Render())
+	html := string(n.RenderBytes())
 
 	if strings.Contains(html, "row-") {
 		t.Error("no rows should be rendered for empty dataset")
@@ -130,7 +130,7 @@ func TestNewHasDynamicKey(t *testing.T) {
 		RowHeight: 40,
 		Row:       row,
 	})
-	html := string(n.Render())
+	html := string(n.RenderBytes())
 
 	if !strings.Contains(html, `data-tether-key="window"`) {
 		t.Error("expected Dynamic key on windowed container")
