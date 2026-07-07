@@ -1,10 +1,12 @@
 package tether
 
 import (
+	"bytes"
 	"encoding/hex"
 	"hash/fnv"
 
 	"github.com/jpl-au/fluent/node"
+	"github.com/jpl-au/tether/wire"
 )
 
 // Auto-fragments bring targeted updates to stateless pages without
@@ -14,30 +16,125 @@ import (
 // initial GET, refreshed by every response) and echoes the map with
 // each event. The server hashes its fresh render and sends back only
 // the fragments whose content actually changed.
+//
+// Everything below hangs off a single render pass. The tree renders
+// exactly once per request - decomposed the way the jit Differ
+// renders - and every keyed region is captured as a byte extent of
+// that output. Fragments, morphs and hashes are all slices of the
+// same bytes the client receives, so a Func closure whose evaluations
+// differ (unsorted map range, time-dependent content) cannot cause
+// the client to store a hash for content it was never sent. An
+// earlier implementation rendered the page and then walked the tree
+// again to render fragments, which evaluated every closure twice and
+// computed hashes from the second evaluation.
 
-// collectFragments walks the node tree and renders every outermost
-// Dynamic-keyed subtree, returning key → rendered HTML. The walk
-// stops descending once a keyed node matches (mirroring
-// extractMorphs), so nested keys belong to their enclosing fragment
-// and each byte of the page is owned by at most one fragment.
-func collectFragments(root node.Node) map[string][]byte {
-	frags := make(map[string][]byte)
-	walkFragments(root, frags)
+// extent records where a Dynamic-keyed region landed in the page
+// render.
+type extent struct {
+	key    string
+	start  int
+	end    int
+	nested bool // lies inside another keyed region
+}
+
+// renderPage renders the tree once, returning the page bytes and the
+// extent of every keyed region. The buffer is deliberately not
+// pooled: fragment and morph slices alias its backing array for the
+// life of the response, and a pooled buffer would hand that array to
+// the next render.
+func renderPage(tree node.Node) ([]byte, []extent) {
+	var buf bytes.Buffer
+	var exts []extent
+	renderExtents(tree, &buf, &exts, 0)
+	return buf.Bytes(), exts
+}
+
+// renderExtents renders n into buf exactly once, decomposed the same
+// way as the jit Differ: open tag, children, close tag. The generated
+// element code guarantees this sequence is byte-identical to
+// RenderBuilder. Containers without markup of their own (fragments,
+// conditionals, function components) contribute their children,
+// evaluating any closure once via Nodes. Nodes without children
+// render via RenderBuilder.
+func renderExtents(n node.Node, buf *bytes.Buffer, exts *[]extent, depth int) {
+	key := ""
+	if d, ok := n.(node.Dynamic); ok {
+		key = d.DynamicKey()
+	}
+	idx := -1
+	if key != "" {
+		idx = len(*exts)
+		*exts = append(*exts, extent{key: key, start: buf.Len(), nested: depth > 0})
+		depth++
+	}
+
+	if el, ok := n.(node.Element); ok {
+		el.RenderOpen(buf)
+		for _, child := range n.Nodes() {
+			if child != nil {
+				renderExtents(child, buf, exts, depth)
+			}
+		}
+		el.RenderClose(buf)
+	} else if children := n.Nodes(); len(children) > 0 {
+		for _, child := range children {
+			if child != nil {
+				renderExtents(child, buf, exts, depth)
+			}
+		}
+	} else {
+		n.RenderBuilder(buf)
+	}
+
+	if idx >= 0 {
+		(*exts)[idx].end = buf.Len()
+	}
+}
+
+// fragments returns the outermost keyed regions as slices of html.
+// Nested keys are excluded so each byte of the page is owned by at
+// most one fragment.
+func fragments(html []byte, exts []extent) map[string][]byte {
+	frags := make(map[string][]byte, len(exts))
+	for _, e := range exts {
+		if !e.nested {
+			frags[e.key] = html[e.start:e.end]
+		}
+	}
 	return frags
 }
 
-func walkFragments(n node.Node, frags map[string][]byte) {
-	if d, ok := n.(node.Dynamic); ok {
-		if key := d.DynamicKey(); key != "" {
-			frags[key] = n.RenderBytes()
-			return
-		}
+// morphsFor returns a [wire.Morph] per wanted key: the first
+// occurrence in document order wins, and a wanted key inside an
+// already-matched region is not returned separately - its bytes
+// already travel with the enclosing morph. Keys not found in the
+// tree are silently skipped; the caller logs them in dev mode.
+func morphsFor(html []byte, exts []extent, keys []string) []wire.Morph {
+	wanted := make(map[string]bool, len(keys))
+	for _, k := range keys {
+		wanted[k] = true
 	}
-	for _, child := range n.Nodes() {
-		if child != nil {
-			walkFragments(child, frags)
+	var morphs []wire.Morph
+	var matched []extent
+	for _, e := range exts {
+		if !wanted[e.key] {
+			continue
 		}
+		inside := false
+		for _, m := range matched {
+			if e.start >= m.start && e.end <= m.end {
+				inside = true
+				break
+			}
+		}
+		if inside {
+			continue
+		}
+		morphs = append(morphs, wire.Morph{Key: e.key, HTML: html[e.start:e.end]})
+		matched = append(matched, e)
+		delete(wanted, e.key)
 	}
+	return morphs
 }
 
 // fragmentHashes computes the content hash for each rendered

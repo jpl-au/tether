@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/jpl-au/fluent/node"
 	"github.com/jpl-au/tether/dev"
 	"github.com/jpl-au/tether/event"
 	"github.com/jpl-au/tether/mode"
@@ -176,19 +175,27 @@ func (p *statelessHandler[S]) serveGET(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tree := p.cfg.Render(state)
-	html := tree.RenderBytes()
 
-	// Seed the client's fragment-hash map. The island rides inside
-	// the tether root so the runtime finds it on init; standard JSON
-	// escaping keeps "</template>" out of the payload.
+	// Seed the client's fragment-hash map. The page renders once;
+	// fragments are byte ranges of that render, so the seeded hashes
+	// always describe the exact bytes the client receives. The island
+	// rides inside the tether root so the runtime finds it on init;
+	// standard JSON escaping keeps "</template>" out of the payload.
+	var html []byte
 	if p.cfg.AutoFragments {
-		if hashes := fragmentHashes(collectFragments(tree)); len(hashes) > 0 {
+		var exts []extent
+		html, exts = renderPage(tree)
+		frags := fragments(html, exts)
+
+		if hashes := fragmentHashes(frags); len(hashes) > 0 {
 			if data, err := json.Marshal(hashes); err == nil {
 				html = append(html, []byte(`<template data-tether-hashes>`)...)
 				html = append(html, data...)
 				html = append(html, []byte(`</template>`)...)
 			}
 		}
+	} else {
+		html = tree.RenderBytes()
 	}
 
 	content := &tetherBody{
@@ -296,13 +303,17 @@ func (p *statelessHandler[S]) servePOST(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
+	// One render serves the whole response: morphs, hashes and the
+	// full-page fallback are all byte ranges of the same pass, so the
+	// client can never store a hash for content it was not sent.
 	tree := p.cfg.Render(state)
+	html, exts := renderPage(tree)
 
 	var u wire.Update
 	switch {
 	case len(cs.MorphKeys) > 0:
 		// Explicit Morph always wins for this response.
-		morphs := extractMorphs(tree, cs.MorphKeys)
+		morphs := morphsFor(html, exts, cs.MorphKeys)
 		if dev.Enabled() {
 			found := make(map[string]bool, len(morphs))
 			for _, m := range morphs {
@@ -321,10 +332,9 @@ func (p *statelessHandler[S]) servePOST(w http.ResponseWriter, r *http.Request) 
 		}
 
 	case p.cfg.AutoFragments && ev.Hashes != nil:
-		u = p.autoFragmentUpdate(tree, ev)
+		u = autoFragmentUpdate(html, exts, ev)
 
 	default:
-		html := tree.RenderBytes()
 		u = wire.Update{
 			Morphs:  []wire.Morph{{Key: "", HTML: html}},
 			EventID: ev.EventID,
@@ -336,7 +346,7 @@ func (p *statelessHandler[S]) servePOST(w http.ResponseWriter, r *http.Request) 
 	// including on the explicit-Morph and fallback paths, which would
 	// otherwise leave the client's map stale.
 	if p.cfg.AutoFragments && u.Hashes == nil {
-		u.Hashes = fragmentHashes(collectFragments(tree))
+		u.Hashes = fragmentHashes(fragments(html, exts))
 	}
 	cs.Effects.merge(&u)
 
@@ -377,14 +387,16 @@ func (p *statelessHandler[S]) servePOST(w http.ResponseWriter, r *http.Request) 
 // render's fragment hashes against the map the client echoed. Only
 // changed fragments travel; the complete refreshed map rides along so
 // the client stays current. Structural changes (Dynamic keys added or
-// removed) and pages without keys fall back to a full root morph.
-func (p *statelessHandler[S]) autoFragmentUpdate(tree node.Node, ev Event) wire.Update {
-	frags := collectFragments(tree)
+// removed) and pages without keys fall back to a full root morph -
+// the same bytes the fragments were sliced from, so the hashes sent
+// with the fallback always describe the page the client now holds.
+func autoFragmentUpdate(html []byte, exts []extent, ev Event) wire.Update {
+	frags := fragments(html, exts)
 	fresh := fragmentHashes(frags)
 
 	if len(frags) == 0 || !sameKeys(ev.Hashes, fresh) {
 		return wire.Update{
-			Morphs:  []wire.Morph{{Key: "", HTML: tree.RenderBytes()}},
+			Morphs:  []wire.Morph{{Key: "", HTML: html}},
 			EventID: ev.EventID,
 			Hashes:  fresh,
 		}
