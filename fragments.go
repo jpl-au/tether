@@ -6,6 +6,7 @@ import (
 	"hash/fnv"
 
 	"github.com/jpl-au/fluent/node"
+	"github.com/jpl-au/tether/dev"
 	"github.com/jpl-au/tether/wire"
 )
 
@@ -135,6 +136,26 @@ func morphsFor(html []byte, exts []extent, keys []string) []wire.Morph {
 		delete(wanted, e.key)
 	}
 	return morphs
+}
+
+// warnUnstableFragments renders the tree a second time and compares
+// fragments between two identical evaluations. A mismatch means a
+// closure is nondeterministic (unsorted map range, time.Now, rand)
+// and its hash will never survive the round-trip to the client: the
+// fragment would be resent on every event, or worse, a change could
+// be reported as unchanged against a hash the user never saw.
+// Closure side effects fire twice as a consequence - that is the
+// point, and only dev mode ever calls this.
+func warnUnstableFragments(tree node.Node, frags map[string][]byte, path string) {
+	html2, exts2 := renderPage(tree)
+	frags2 := fragments(html2, exts2)
+	for key, b := range frags {
+		if b2, ok := frags2[key]; !ok || !bytes.Equal(b, b2) {
+			dev.Warn("fragment renders differently across two identical evaluations",
+				"key", key, "path", path,
+				"hint", "nondeterministic closure - unsorted map range, time.Now or rand?")
+		}
+	}
 }
 
 // fragmentHashes computes the content hash for each rendered

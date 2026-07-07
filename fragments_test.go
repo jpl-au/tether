@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	"github.com/jpl-au/fluent/html5/span"
 	"github.com/jpl-au/fluent/html5/ul"
 	"github.com/jpl-au/fluent/node"
+	"github.com/jpl-au/tether/dev"
 	"github.com/jpl-au/tether/wire"
 )
 
@@ -202,5 +204,37 @@ func TestStatelessGETHashesMatchServedFragments(t *testing.T) {
 	if hashes["frag"] != want {
 		t.Errorf("seeded hash %q does not describe the served fragment (hash %q) - client would store a hash for bytes it never received",
 			hashes["frag"], want)
+	}
+}
+
+// TestWarnUnstableFragments checks the dev-mode detector: two
+// identical evaluations that produce different bytes warn with the
+// fragment's key; deterministic fragments stay silent.
+func TestWarnUnstableFragments(t *testing.T) {
+	t.Cleanup(dev.Reset)
+	dev.Enable()
+
+	var logBuf bytes.Buffer
+	dev.SetLogger(slog.New(slog.NewTextHandler(&logBuf, nil)))
+
+	evaluation := 0
+	unstable := ul.New(node.Func(func() node.Node {
+		evaluation++
+		return li.Text(fmt.Sprintf("render-%d", evaluation))
+	}))
+	unstable.Dynamic("unstable")
+	stable := span.Text("same every time")
+	stable.Dynamic("stable")
+	tree := div.New(unstable, stable)
+
+	html, exts := renderPage(tree)
+	warnUnstableFragments(tree, fragments(html, exts), "/app")
+
+	logged := logBuf.String()
+	if !strings.Contains(logged, "renders differently") || !strings.Contains(logged, "unstable") {
+		t.Errorf("expected instability warning for key 'unstable', got: %s", logged)
+	}
+	if strings.Contains(logged, `key=stable`) {
+		t.Errorf("deterministic fragment must not warn, got: %s", logged)
 	}
 }

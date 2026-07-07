@@ -187,6 +187,10 @@ func (p *statelessHandler[S]) serveGET(w http.ResponseWriter, r *http.Request) {
 		html, exts = renderPage(tree)
 		frags := fragments(html, exts)
 
+		if dev.Enabled() {
+			warnUnstableFragments(tree, frags, r.URL.Path)
+		}
+
 		if hashes := fragmentHashes(frags); len(hashes) > 0 {
 			if data, err := json.Marshal(hashes); err == nil {
 				html = append(html, []byte(`<template data-tether-hashes>`)...)
