@@ -412,9 +412,12 @@ func TestConditionalBindings(t *testing.T) {
 		opt  bind.Option
 		attr string
 	}{
-		{"ShowWhen int", bind.ShowWhen("count", ">", 5), `data-tether-bind-show-when="count > 5"`},
+		// The comparison operators render as HTML entities (the attribute value is
+		// escaped); the browser decodes them back on getAttribute, so the binding
+		// still evaluates count > 5 / seconds < 10 at runtime.
+		{"ShowWhen int", bind.ShowWhen("count", ">", 5), `data-tether-bind-show-when="count &gt; 5"`},
 		{"HideWhen str", bind.HideWhen("status", "==", "done"), `data-tether-bind-hide-when="status == done"`},
-		{"ClassWhen", bind.ClassWhen("danger", "seconds", "<", 10), `data-tether-bind-class-when="danger seconds < 10"`},
+		{"ClassWhen", bind.ClassWhen("danger", "seconds", "<", 10), `data-tether-bind-class-when="danger seconds &lt; 10"`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
