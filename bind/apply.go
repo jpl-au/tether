@@ -423,7 +423,7 @@ func CopyToClipboard(selector string) Option { return Option{"tether-copy", sele
 // FlashText temporarily replaces the element's text content after a
 // client-side action succeeds (e.g. clipboard copy). The original
 // text is restored after the configured flash duration
-// (Client.FlashDuration, default 2s). No server round-trip. Pair
+// (Client.FlashDuration, default 5s). No server round-trip. Pair
 // with [CopyToClipboard] or other client-side actions:
 //
 //	bind.Apply(btn,

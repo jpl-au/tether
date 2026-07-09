@@ -2,11 +2,13 @@
 // updates.
 //
 // The [Format] type selects which [Encoder] implementation serialises
-// updates. Two formats are provided:
+// updates. Three formats are provided:
 //
 //   - [JSON] encodes as a single JSON object. This is the default.
 //   - [CBOR] encodes as a binary CBOR map (RFC 8949) for smaller
 //     payloads and faster encoding.
+//   - [HTML] sends updates as plain HTML for the stateless,
+//     one-request-one-response shape (no client runtime state).
 //
 // Set [Format] on [tether.App].WireFormat for an app-wide default, or
 // on [tether.StatefulConfig].WireFormat for a specific handler.

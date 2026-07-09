@@ -49,7 +49,7 @@
 // the new HTML and any side effects. The client applies the update
 // without a full page reload.
 //
-// Event binding helpers ([bind.Click], [bind.Submit], [bind.Input],
+// Event binding helpers ([bind.OnClick], [bind.OnSubmit], [bind.OnInput],
 // etc.) attach data-tether-* attributes to Fluent elements so the client
 // JS knows which DOM events to forward. Signal bindings and client-side
 // directives handle interactions that stay in the browser. See the bind

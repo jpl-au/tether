@@ -262,7 +262,7 @@ func (s *StatefulSession[S]) Download(url string) {
 }
 
 // Signal pushes a reactive value to the client. Elements bound to the
-// signal name via [Text], [Show], [Class], or [Attr]
+// signal name via [bind.Text], [bind.Show], [bind.Class], or [bind.Attr]
 // update instantly - no render cycle, no diff, no HTML. Inside Handle
 // the signal is buffered and sent atomically with the state diff.
 // Outside Handle it is sent as a standalone update.
