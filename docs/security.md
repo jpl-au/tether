@@ -247,27 +247,39 @@ stored events. If XSS is a concern, consider a strict
 ## HTML escaping
 
 The wire protocol sends pre-rendered HTML patches which the client applies
-via `innerHTML`. This is safe because the [fluent](https://github.com/jpl-au/fluent)
-template engine escapes all text content by default. The transport layer
-deliberately does not double-escape.
+via `innerHTML`. This is safe because [Fluent](https://github.com/jpl-au/fluent)
+escapes untrusted values by default, in two places:
+
+- **Text content** - `Text()` and `Textf()` HTML-escape their input.
+  `RawText()`/`RawTextf()` deliberately do not, for content you have
+  already sanitised.
+- **Attribute values** - every attribute set through a generated setter
+  (`Class`, `Href`, `SetAttribute`, `SetData`, ...) is HTML-escaped at set
+  time, and URL sinks (`href`, `src`, `action`, ...) are scheme-filtered to
+  an `http`/`https`/`mailto`/`tel`/`sms`/relative allowlist (an off-allowlist
+  scheme becomes the inert `node.UnsafeURL` sentinel). `SetAttributeRaw()`
+  stores a trusted value verbatim, without escaping.
+
+The transport layer deliberately does not double-escape.
 
 The trust chain:
 
 ```
-User state → fluent render (escapes) → HTML string → JSON patch → innerHTML
+User state → Fluent render (escapes text + attributes) → HTML string → JSON patch → innerHTML
 ```
 
-A failure at the fluent render step (e.g. raw user input inserted via
-`UnsafeRaw` without escaping) would result in XSS. The fluent engine is
-the single point of responsibility for escaping - audit it if you use
-`UnsafeRaw` or similar bypass functions.
+A failure would come from bypassing Fluent's escaping - inserting raw user
+input via `RawText()`/`RawTextf()` or `SetAttributeRaw()` without sanitising
+it first. Fluent is the single point of responsibility for escaping; audit
+any use of those raw hatches.
 
-For dynamic content beyond plain text - such as user-provided HTML
-fragments, inline scripts, or inline styles - fluent provides a
-`security` package with sanitisation utilities (`Sanitise`, `Safe`,
-`SafeScript`, `SafeStyle`). These validate content against known XSS
-patterns before rendering. See the
-[fluent documentation](https://github.com/jpl-au/fluent) for details.
+For untrusted *HTML markup* - user-provided HTML fragments, rendered
+markdown, rich-text input - reach for the
+[fluent-security](https://github.com/jpl-au/fluent-security) module. It
+wraps [bluemonday](https://github.com/microcosm-cc/bluemonday) and returns
+Fluent nodes directly: `security.HTML(input)` and `security.PlainText(input)`
+for the common cases, or the chainable `Cleaner` (`New()`, `RichText()`,
+`FromPolicy()`, `.Clean()`) for a custom policy.
 
 ## Developer responsibilities
 
@@ -314,8 +326,8 @@ XSS and session ID exfiltration from the DOM.
 | TLS | - | Deploy behind TLS |
 | Capacity limits | `App.MaxSessions`, `App.MaxPending`, `Limits.MaxEventBytes` | Set `App.MaxSessions` in production |
 | Per-IP rate limiting | - | Reverse proxy or Go middleware |
-| HTML escaping | Delegated to fluent's `Text()` (auto-escapes) | Audit any use of `UnsafeRaw` / `RawText` |
-| Content sanitisation | - | Use fluent's `security` package for dynamic content |
+| HTML escaping | Delegated to Fluent's `Text()` and attribute setters (auto-escape) | Audit any use of `RawText` / `SetAttributeRaw` |
+| Content sanitisation | - | Use the [fluent-security](https://github.com/jpl-au/fluent-security) module for untrusted HTML markup |
 | CSP headers | - | Add via reverse proxy or middleware |
 | Authentication | - | Implement via middleware or `InitialState` |
 | Authorisation | - | Implement via middleware or event handlers |
