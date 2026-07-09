@@ -50,7 +50,7 @@ Matching is case-insensitive against each item's text content. Mark items with `
 Render a list on the client from a signal holding a JSON array, with no server round-trip per change. Apply `Template` to a `<template>` element whose content is the markup for one item, using `{{field}}` placeholders (or `{{.}}` for a scalar array element). The server pushes the data as a JSON array; the client stamps one clone per element into the target container:
 
 ```go
-// <template> content: <li>{{name}} — {{email}}</li>
+// <template> content: <li>{{name}} - {{email}}</li>
 bind.Apply(itemTemplate, bind.Template("people", "#people-list"))
 
 // Server pushes the data - the client re-renders the list locally.

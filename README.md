@@ -68,6 +68,22 @@ Both modes share the same rendering engine, event system, and bind
 helpers. The difference is how state is managed - persistent or
 per-request.
 
+## Escaping and keys
+
+Fluent escapes attribute values at set time and filters URL attributes,
+so application state that flows into a render cannot break out of an
+attribute. `SetAttributeRaw` stores a value verbatim for the rare case
+where trusted markup needs to bypass this. The initial page is written
+straight to the response with Fluent's `WriteTo`; everything after that
+is a diff.
+
+Diffing is keyed. Mark the changing parts of the tree with
+`.Dynamic("key")` and the differ tracks each one individually; the
+client morphs the matching `data-fluent-key` element in place. Fragments
+wrapped in `jit.Memoise` render once and are reused until their inputs
+change. See [engine](docs/engine.md) for how the Differ and Memoiser
+compose.
+
 ## Standalone server
 
 When your application is a single handler, `ListenAndServe` handles
@@ -149,7 +165,7 @@ Bus events. See [cluster](docs/cluster.md) for details.
 
 ## Diagnostics
 
-`Handler.Diagnostics` is a typed event bus for framework-level signals  - 
+`Handler.Diagnostics` is a typed event bus for framework-level signals -
 transport errors, panics, buffer overflows, and more. Subscribe for metrics,
 alerting, or custom logging. See [operations](docs/operations.md#diagnostics-bus)
 for details and examples.

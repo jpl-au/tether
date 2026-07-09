@@ -107,14 +107,6 @@ because it does very little; numbers will move as features are added.
 CBOR support currently costs roughly 220 KB gzipped on top of the
 figures above due to reflection-based encoding.
 
-## Working example
-
-`fluent-examples/tether-wasm/` is a minimal end-to-end example:
-a tether handler wired with `Runtime.WASM(...)`, a `build.sh` that
-compiles the WASM and drops the artefacts into `static/`, and a page
-that exercises click and submit bindings. It is the easiest way to
-see the runtime in context and the recommended starting point.
-
 ## What works, what does not
 
 **Works:**
