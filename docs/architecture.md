@@ -35,7 +35,7 @@ Browser                         Server
   │                               │  InitialState(r) → state
   │                               │  OnNavigate(state, params) → state
   │                               │  Render(state) → node tree
-  │                               │  Differ.Render(tree) → HTML
+  │                               │  Differ.RenderBytes(tree) → HTML
   │                               │  Generate session ID
   │                               │  Store in pending pool
   │  <html>...</html>             │
