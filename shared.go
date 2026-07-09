@@ -3,7 +3,7 @@ package tether
 import jit "github.com/jpl-au/fluent-jit"
 
 // SetSharedCacheSize configures the process-global shared-fragment
-// cache used by [node.Shared] regions. n is the per-generation entry
+// cache used by [jit.Shared] regions. n is the per-generation entry
 // cap; the cache holds at most twice that many rendered fragments
 // across its two generations. Call once at startup, before serving
 // traffic.

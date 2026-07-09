@@ -51,7 +51,7 @@ to customise.
 
 Notable optional fields:
 - `Memoise bool` - use the Memoiser engine instead of the Differ. Render
-  functions must wrap each Dynamic region in `node.Memoise(key, fn)`.
+  functions must wrap each Dynamic region in `jit.Memoise(key, fn)`.
 - `Timeouts.SlowRender` - threshold for emitting `SlowRender` diagnostics.
 - `Timeouts.MemoiseMissThreshold` - threshold (0.0-1.0) for emitting
   `HighMemoiseMissRate` diagnostics. Only applies when `Memoise` is true.
@@ -160,7 +160,7 @@ subscribed automatically before `OnConnect` runs.
 
 A value wrapper that tracks a version counter. Every call to `With(newVal)`
 increments the version, producing a new `Versioned[T]`. Use `Version()` as
-the cache key for `node.Memoise`:
+the cache key for `jit.Memoise`:
 
 ```go
 type State struct {
@@ -168,7 +168,7 @@ type State struct {
     Count int
 }
 
-node.Memoise(s.Items.Version(), func() node.Node {
+jit.Memoise(s.Items.Version(), func() node.Node {
     return renderTable(s.Items.Val)
 })
 ```

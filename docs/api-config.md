@@ -158,7 +158,7 @@ When either callback is configured, the framework's own logging for that event i
 | `OnCommandDropped` | `func(*StatefulSession[S])` | Called when a command is dropped because buffers are full. When nil (default), the session is destroyed to prevent silent drift. When set, the developer handles it |
 | `Freeze` | `FreezeMode` | Frozen mode for disconnected sessions. `FreezeWithRestore` requires OnRestore; `FreezeWithConnect` falls back to OnConnect. Zero disables. See [frozen mode](frozen-mode.md) |
 | `Protocol` | `protocol.Protocol` | HTTP protocol (default `protocol.Auto` - detects per request). See [transport](transport.md#protocol-awareness) |
-| `Memoise` | `bool` | Use the Memoiser engine instead of the Differ. Render functions must use `node.Memoise` for each Dynamic region. See [engine guide](engine.md#memoiser-opt-in) |
+| `Memoise` | `bool` | Use the Memoiser engine instead of the Differ. Render functions must use `jit.Memoise` for each Dynamic region. See [engine guide](engine.md#memoiser-opt-in) |
 | `WireFormat` | `wire.Format` | Encoding for server-to-client updates (default `wire.JSON`). Overrides `App.WireFormat` for this handler |
 
 ### Security

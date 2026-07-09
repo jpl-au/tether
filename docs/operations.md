@@ -235,7 +235,7 @@ h.Diagnostics.SubscribeAsync(ctx, func(d tether.Diagnostic) {
 | `NavigateRedirectLoop` | An OnNavigate handler triggered more consecutive redirects than `Limits.MaxNavigateRedirects` allows |
 | `RenderCoalesced` | Multiple commands were batched into a single render-diff-send cycle. Detail contains the batch count. Only fires when the batch size exceeds one |
 | `HighMemoiseMissRate` | The memoisation cache miss ratio for a render cycle exceeded `Timeouts.MemoiseMissThreshold`. Usually indicates broken or overly granular cache keys. Only fires when Memoise is enabled |
-| `SharedCacheReuse` | A render cycle used the process-global shared-fragment cache (`node.Shared`). Detail reports hits and misses. An all-miss pattern across sessions means the shared keys are not aligning - usually a key derived from per-session state |
+| `SharedCacheReuse` | A render cycle used the process-global shared-fragment cache (`jit.Shared`). Detail reports hits and misses. An all-miss pattern across sessions means the shared keys are not aligning - usually a key derived from per-session state |
 
 `BufferOverflow` means the system coped (spawned a goroutine). `CommandDropped`
 means the session was critically overwhelmed - by default it is destroyed to

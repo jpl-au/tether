@@ -63,12 +63,12 @@ Use `Each` when only signal-bound values change (skips render).
 `Broadcast` fans the update out to every session, and each one renders
 independently in its own loop. When part of that render is identical for
 everyone - a room header, a shared leaderboard, a live scoreboard -
-wrap it in `node.Shared` so it renders once for the whole room instead
+wrap it in `jit.Shared` so it renders once for the whole room instead
 of once per member:
 
 ```go
 // With StatefulConfig.Memoise: true
-node.Shared("board:"+s.BoardVersion, func() node.Node {
+jit.Shared("board:"+s.BoardVersion, func() node.Node {
     return renderBoard(s.Board)
 })
 ```

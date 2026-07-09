@@ -271,7 +271,7 @@ Returns the updated state and `true` if a mount handled the event, or the origin
 ## Versioned
 
 `tether.Versioned[T]` wraps data with an automatic version counter
-for use with `node.Memoise`. The version increments on every `With`
+for use with `jit.Memoise`. The version increments on every `With`
 call, ensuring the memoisation key tracks data changes without manual
 bookkeeping.
 
@@ -287,7 +287,7 @@ renderTable(s.Items.Val)
 s.Items = s.Items.With(append(s.Items.Val, newItem))
 
 // Memoisation key:
-node.Memoise(s.Items.Version(), func() node.Node { ... })
+jit.Memoise(s.Items.Version(), func() node.Node { ... })
 ```
 
 | Method | Description |

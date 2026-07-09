@@ -356,17 +356,17 @@ type StatefulConfig[S any] struct {
 
 	// Memoise enables subtree memoisation for the render/diff pipeline.
 	// When true, the session uses a [jit.Memoiser] instead of a
-	// [jit.Differ]. Render functions that use [node.Memoise] nodes will
+	// [jit.Differ]. Render functions that use [jit.Memoise] nodes will
 	// skip unchanged subtrees entirely - the closure never runs and
 	// no HTML is rendered for regions whose memoisation key matches the
 	// previous render.
 	//
 	// This is an opt-in performance optimisation for pages with
 	// expensive render functions. Every Dynamic region should contain
-	// a [node.Memoise] child with a cache key. Dynamic regions without
+	// a [jit.Memoise] child with a cache key. Dynamic regions without
 	// a memoised child are always re-rendered (treated as a miss).
 	//
-	// Memoisation also unlocks [node.Shared], which reuses a region's
+	// Memoisation also unlocks [jit.Shared], which reuses a region's
 	// rendered bytes across sessions via a process-global cache - the
 	// closure runs at most once per key for the whole process, not once
 	// per session. Use it for regions broadcast identically to many

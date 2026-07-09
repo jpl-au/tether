@@ -13,7 +13,7 @@ import (
 )
 
 // memoiseNoopWarnOnce guards the one-time warning for a Memoise-enabled
-// handler whose render carries no node.Memoise regions.
+// handler whose render carries no jit.Memoise regions.
 var memoiseNoopWarnOnce sync.Once
 
 // sendDiff is the render-diff-send pipeline extracted from exec and
@@ -255,13 +255,13 @@ func (s *StatefulSession[S]) checkMemoiseStats() {
 		"misses", misses,
 	)
 
-	// Memoise is enabled but the render carried no node.Memoise regions,
+	// Memoise is enabled but the render carried no jit.Memoise regions,
 	// so the Memoiser has nothing to skip and behaves like the plain
 	// differ - the flag is a silent no-op. Warn once per process so the
 	// misconfiguration surfaces without spamming every render.
 	if ms.Memoised() == 0 {
 		memoiseNoopWarnOnce.Do(func() {
-			dev.Log().Warn("tether: Memoise is enabled but no node.Memoise regions were found in the render - the flag has no effect; wrap the expensive Dynamic regions in node.Memoise or disable Memoise")
+			dev.Log().Warn("tether: Memoise is enabled but no jit.Memoise regions were found in the render - the flag has no effect; wrap the expensive Dynamic regions in jit.Memoise or disable Memoise")
 		})
 	}
 	if s.memoiseMissThreshold > 0 {
@@ -276,7 +276,7 @@ func (s *StatefulSession[S]) checkMemoiseStats() {
 	}
 
 	// Shared-fragment cache activity, if this render used any
-	// node.Shared regions. A hit reused another session's bytes; a
+	// jit.Shared regions. A hit reused another session's bytes; a
 	// miss rendered fresh for the whole process.
 	if sharedHits, sharedMisses := ms.SharedStats(); sharedHits+sharedMisses > 0 {
 		dev.Debug("shared cache stats",

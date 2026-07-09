@@ -11,14 +11,14 @@ how each works, when to use them, and how they compose.
 
 Memoisation caches a region's render *within* one session. When the same
 region renders identically for many sessions - a shared header, a
-navigation bar, a live scoreboard broadcast to a room - `node.Shared`
+navigation bar, a live scoreboard broadcast to a room - `jit.Shared`
 extends that cache *across* sessions: the render runs at most once per
 key for the whole process, and every other session is served those
 bytes.
 
 ```go
 // Requires StatefulConfig.Memoise: true
-node.Shared("leaderboard:"+s.BoardVersion, func() node.Node {
+jit.Shared("leaderboard:"+s.BoardVersion, func() node.Node {
     return renderBoard(s.Board)   // runs once per version, not per session
 })
 ```
@@ -33,8 +33,8 @@ rendered bytes** - namespace it and derive it from the content
 (`"nav:v3"`, `"board:"+hash`), never from per-session state. Two
 sessions with the same key are served the same bytes, so a key that
 varies per user would serve one user's render to another. Plain
-`node.Memoise` is safe with a bare counter because its key is only
-compared within one session; `node.Shared` is compared across the whole
+`jit.Memoise` is safe with a bare counter because its key is only
+compared within one session; `jit.Shared` is compared across the whole
 process, hence the stricter contract.
 
 The cache is bounded (two generations, 2048 entries each by default;

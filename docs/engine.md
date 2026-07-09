@@ -42,7 +42,7 @@ the render+diff cost is a bottleneck.
 ## Memoiser (opt-in)
 
 The Memoiser is an alternative engine that skips unchanged subtrees.
-Each Dynamic region wraps its content in `node.Memoise` with a cache
+Each Dynamic region wraps its content in `jit.Memoise` with a cache
 key. When the key matches the previous render, the closure never
 runs and no HTML is produced for that region.
 
@@ -52,7 +52,7 @@ tether.Stateful(app, tether.StatefulConfig[State]{
     Render: func(s State) node.Node {
         return div.New(
             div.New(
-                node.Memoise(s.Items.Version(), func() node.Node {
+                jit.Memoise(s.Items.Version(), func() node.Node {
                     return renderTable(s.Items.Val)
                 }),
             ).Dynamic("items"),
@@ -85,7 +85,7 @@ type State struct {
 s.Items = s.Items.With(append(s.Items.Val, newItem))
 
 // Render:
-node.Memoise(s.Items.Version(), func() node.Node { ... })
+jit.Memoise(s.Items.Version(), func() node.Node { ... })
 ```
 
 The version increments on every `With` call. No manual bookkeeping.
@@ -177,7 +177,7 @@ render entirely for targeted server-push updates:
 ```go
 tether.StatefulConfig[State]{
     Memoise: true,
-    Render: render,  // uses node.Memoise for expensive regions
+    Render: render,  // uses jit.Memoise for expensive regions
 }
 
 // Timer updates one chart via Patch:
@@ -201,7 +201,7 @@ updates one chart at ~5-10µs instead of ~5-12ms for a full render.
 
 3. **Switch to Memoiser for expensive pages.** When profiling shows
    the full render is slow, set `Memoise: true` and wrap expensive
-   regions in `node.Memoise` with Versioned keys.
+   regions in `jit.Memoise` with Versioned keys.
 
 4. **Combine them.** Memoisation handles full renders efficiently. Patch
    handles targeted updates efficiently. Both on the same handler.

@@ -107,7 +107,7 @@ const (
 	HighMemoiseMissRate DiagnosticKind = "high_memoise_miss_rate"
 
 	// SharedCacheReuse signals that a render cycle used the process-
-	// global shared-fragment cache (see [node.Shared]). The Detail
+	// global shared-fragment cache (see [jit.Shared]). The Detail
 	// field reports hits and misses for the cycle: a hit reused another
 	// session's rendered bytes, a miss rendered fresh and populated the
 	// cache. All-miss cycles across sessions usually mean the shared
