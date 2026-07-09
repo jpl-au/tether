@@ -4,7 +4,10 @@ go 1.25.0
 
 require (
 	github.com/alicebob/miniredis/v2 v2.38.0
-	github.com/redis/go-redis/v9 v9.21.0
+	// Pinned to v9.20.0: v9.21.0's PeekPushNotificationName does a blocking
+	// Peek(36) that deadlocks Subscribe on short channel names (go-redis #3839).
+	// Lift the pin once upstream ships a fix.
+	github.com/redis/go-redis/v9 v9.20.0
 )
 
 require (
