@@ -13,7 +13,7 @@ import (
 	"github.com/jpl-au/fluent/node"
 )
 
-// sharedRegion builds a tree whose one Dynamic region is a node.Shared
+// sharedRegion builds a tree whose one Dynamic region is a jit.Shared
 // keyed by version, matching how a broadcast page would key a header or
 // leaderboard by its content version.
 func sharedRegion(version int) node.Node {
@@ -93,7 +93,7 @@ func TestSharedCacheReuseDiagnostic(t *testing.T) {
 
 // TestSharedCacheReuseDiagnosticSilentWithoutShared confirms the
 // diagnostic does not fire for a plain memoised render that uses no
-// node.Shared regions.
+// jit.Shared regions.
 func TestSharedCacheReuseDiagnosticSilentWithoutShared(t *testing.T) {
 	jit.ResetSharedCache()
 
@@ -114,7 +114,7 @@ func TestSharedCacheReuseDiagnosticSilentWithoutShared(t *testing.T) {
 
 	for _, d := range snap() {
 		if d.Kind == SharedCacheReuse {
-			t.Errorf("SharedCacheReuse should not fire without node.Shared, got %+v", d)
+			t.Errorf("SharedCacheReuse should not fire without jit.Shared, got %+v", d)
 		}
 	}
 }
