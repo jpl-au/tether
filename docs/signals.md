@@ -237,7 +237,24 @@ bind.Apply(span.New(), bind.Text("count"))
 span.Textf("Count: %d", s.Count).Dynamic("count")
 ```
 
-Pick one update path per element. Use signals for high-frequency updates that bypass rendering. Use state rendering for everything else.
+One refinement is allowed, and it is the flash-free way to seed: a
+signal-bound element may take its *initial* text from state, so the first
+paint is correct without waiting for the first signal push:
+
+```go
+// Right - state provides the initial value, the signal owns it after
+bind.Apply(span.Text(strconv.Itoa(s.Count)), bind.Text("count"))
+```
+
+This is safe on two conditions: the element carries no Dynamic key, and the
+handler keeps the state field and the signal in step (whatever bumps the
+signal bumps the state), so a later full morph repaints the same value the
+signal last wrote.
+
+Pick one update path per element - state may seed a signal-bound element's
+initial value, but only the signal writes to it afterwards. Use signals for
+high-frequency updates that bypass rendering. Use state rendering for
+everything else.
 
 ## When to use what
 
