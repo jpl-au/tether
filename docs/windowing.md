@@ -86,9 +86,10 @@ enter and leave the viewport), forcing a full morph instead of
 targeted patches.
 
 If you need per-row Dynamic keys within the window (e.g. for
-targeted updates via a future `Patch` API), use stable slot-based
-keys (`slot-0` through `slot-N`) rather than item-identity keys.
-The key set stays constant across scrolls; only the content changes.
+targeted updates via [`sess.Patch`](engine.md#patch-targeted-updates)),
+use stable slot-based keys (`slot-0` through `slot-N`) rather than
+item-identity keys. The key set stays constant across scrolls; only
+the content changes.
 
 ## Page size guidance
 

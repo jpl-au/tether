@@ -47,9 +47,9 @@ After a morph replaces part of the DOM, the client reapplies current signal valu
 
 **When to use signals:** high-frequency updates where a full render cycle is wasteful - counters, progress bars, online status indicators, form field synchronisation.
 
-## Client-side signal directives - instant feedback
+## Client-side signal actions - instant feedback
 
-Signal directives update signal values on the client without contacting the server at all. All signal bindings react instantly.
+Signal actions update signal values on the client without contacting the server at all. All signal bindings react instantly.
 
 ```go
 // Toggle a boolean signal on click
@@ -83,6 +83,61 @@ The server pushes one value; the client derives however many booleans it needs:
 ```go
 sess.Signal("count", s.Count)   // one push drives every count-based condition
 ```
+
+Under the hood these three helpers compile to the same postfix programs as [computed signals](#computed-signals---derive-values-on-the-client) below and run through the one client-side VM - there is a single evaluator, not a separate comparison path. `ShowWhen("count", ">", 5)` is exactly `Computed`-style sugar for the expression `count > 5`.
+
+## Computed signals - derive values on the client
+
+Conditional bindings derive a boolean; computed signals derive a **value**. `Computed(name, expr)` declares a computed signal: whenever any input signal the expression reads changes, the browser re-evaluates `expr` and publishes the result under `name`, driving every binding on `name` (`Text`, `Show`, `Class`, `Attr`, ...) with no server round-trip.
+
+```go
+// A live cart total from two server-pushed signals.
+bind.Apply(span.New(),
+    bind.Computed("cart.total", "cart.qty * cart.price"),
+    bind.Text("cart.total"),
+)
+```
+
+The four motivating cases, each a one-liner:
+
+```go
+// 1. Cart total: quantity times price.
+bind.Computed("cart.total", "cart.qty * cart.price")
+
+// 2. Character counter: characters left before the limit.
+bind.Computed("chars.left", "280 - len(draft)")
+
+// 3. "N selected": a label built by concatenation.
+bind.Computed("sel.label", "selected + ' selected'")
+
+// 4. Enable submit only when the form is valid.
+bind.Computed("form.ok", "len(email) > 3 and agreed")
+```
+
+### The operator set (closed list)
+
+The expression grammar is deliberately small and **has no function-call syntax**, so nothing outside this table can appear. `len` is a fixed unary operator, not a callable function.
+
+| Category | Operators |
+| --- | --- |
+| Arithmetic | `+` `-` `*` `/` `%` |
+| Comparison | `>` `>=` `<` `<=` `==` `!=` |
+| Boolean | `and` `or` `not` (aliases `&&` `\|\|` `!`) |
+| Unary | unary minus `-`, `not`, `len` (string or array length) |
+| Grouping | parentheses |
+| Literals | numbers, single- or double-quoted strings, `true`, `false` |
+| Operands | signal names, including dotted keys like `cart.qty` |
+
+`+` doubles as string concatenation when either side is a string. Comparisons work between arbitrary sub-expressions. Anything else - ternaries, indexing, member access, aggregates, function calls - is unrepresentable by design, which is what keeps the client a fixed interpreter with no `eval`.
+
+A malformed expression (unknown operator, unbalanced parentheses, an invalid identifier, or nesting deeper than 32 levels) panics at construction with a positioned message, exactly like an unknown operator in `ShowWhen`.
+
+### Two rules
+
+- **Declare a name once.** A computed name is owned by its expression. Do not declare the same name twice, and do not bind a plain server signal to a name a `Computed` also writes.
+- **The server pushes inputs, never computed outputs.** Push `cart.qty` and `cart.price`; let the client derive `cart.total`. Pushing a computed output from the server fights the client for ownership of that name.
+
+Computeds chain: a computed may read another computed's output, and the cascade resolves in one pass. A dependency cycle is detected on the client, reported via `Tether.onError`, and the offending branch is abandoned rather than looping.
 
 ## Client events - coordinate elements without the server
 
@@ -146,7 +201,7 @@ for truthiness. The signal store always holds properly typed values:
 
 - **Server → client**: `Signal("flag", false)` serialises to JSON `false`
   (boolean). `Signal("count", 42)` serialises to JSON `42` (number).
-- **Client-side directives**: `SetSignal` and `Optimistic` read string
+- **Client-side signal actions**: `SetSignal` and `Optimistic` read string
   values from HTML data attributes, but the runtime parses them to proper
   types before storing: `"true"` → `true`, `"false"` → `false`, `"42"` →
   `42`. Plain text stays as strings.
@@ -190,7 +245,7 @@ Pick one update path per element. Use signals for high-frequency updates that by
 |------|-----------|----------|
 | **Server rendering** | Yes | Structural changes, conditional rendering, list updates |
 | **Signals** | Server → client only | Counters, status indicators, progress bars |
-| **Signal directives** | None | Tab selection, menu state with server override |
+| **Signal actions** | None | Tab selection, menu state with server override |
 | **Optimistic updates** | Yes (with instant preview) | Like buttons, checkboxes, toggles |
 | **Client directives** | None | Drawer open/close, modal visibility |
 | **Client-side timers** | Start/stop only | Elapsed time, countdowns, stopwatches |

@@ -126,8 +126,7 @@ type Cluster interface {
 Two methods. The framework handles serialisation, self-filtering,
 and topic naming. Implementations only move bytes between nodes.
 
-See [tetheredis](https://github.com/jpl-au/tether/tetheredis) for
-a Redis Pub/Sub implementation.
+The `tetheredis` subpackage provides a Redis Pub/Sub implementation.
 
 ## Configuration
 
@@ -138,4 +137,8 @@ app := tether.App{
 ```
 
 One field on App. Buses and Values with topic names automatically
-participate. Without a Cluster, everything works locally as before.
+participate. Without a Cluster, everything works locally.
+
+---
+
+[← Back to documentation](../README.md#documentation)

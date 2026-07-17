@@ -104,10 +104,24 @@ bind.Collect("#selector")
 ### Timing
 
 ```go
-bind.Debounce(150*time.Millisecond)
+bind.Debounce(150*time.Millisecond)        // trailing edge (default)
+bind.DebounceLeading(300*time.Millisecond) // leading edge - fire first, then coalesce
 bind.Throttle(time.Second)
+bind.Delay(400*time.Millisecond)           // always send, just later
 bind.FilterKey("Enter")
 bind.EventData("key", "val")
+```
+
+### Event modifiers
+
+Change where a binding listens or when it fires. Stack with any event option.
+
+```go
+bind.Outside()   // fire on clicks OUTSIDE the element (click-outside)
+bind.Once()      // fire at most once
+bind.Window()    // listen at window level (global, e.g. Escape)
+bind.Document()  // listen at document level
+bind.Stop()      // stopPropagation - don't bubble to ancestor handlers
 ```
 
 ### Control
@@ -146,7 +160,7 @@ bind.OnSwipe("action")
 bind.OnLongPress("action")
 ```
 
-### Signal directives
+### Signal actions
 
 ```go
 bind.ToggleSignal("menuOpen")
@@ -172,8 +186,8 @@ bind.Hotkey("escape", "modal.close")
 ```
 
 Global hotkeys that fire regardless of which element has focus. The combo
-format uses `+` between modifiers and the key name. Multiple hotkeys can
-be applied to the same element.
+format uses `+` between modifiers and the key name. One hotkey per
+element - for several shortcuts, apply each to its own element.
 
 ### Drag and drop
 

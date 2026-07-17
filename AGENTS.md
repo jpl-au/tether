@@ -29,11 +29,14 @@ tether/              Root package - StatefulConfig, Handler, Session, Bus, Group
 ├── docs/            Markdown guides (architecture, API, events, signals, broadcasting, etc.)
 ├── event/           Event type constants (click, input, submit, navigate, etc.)
 ├── mode/            Transport mode constants (WebSocket, ServerSentEvents, Both, HTTP)
+├── protocol/        HTTP protocol selection (Auto, HTTP1, HTTP2, HTTP3)
 ├── push/            Web Push notification support (VAPID, Sender, Subscription)
 ├── router/          Multi-page routing - dispatches Render/Handle to the active page by URL path
 ├── sse/             SSE+POST transport implementation
 ├── tethertest/      Test harness - drives Handle functions and component dispatch without transport or goroutines
-├── wire/            Wire protocol - Update struct, Encoder interface, JSON encoding
+├── tetheredis/      Redis Pub/Sub Cluster implementation (separate module)
+├── window/          Virtual scrolling helper for large lists
+├── wire/            Wire protocol - Update struct, Encoder interface, JSON/CBOR/HTML encodings
 └── ws/              WebSocket transport implementation
 ```
 
@@ -185,9 +188,11 @@ destroyed. `Load` is included for tooling and debugging but is not called by
 the framework today - reconnecting sessions re-render from state, which
 re-seeds the differ.
 
-Nil by default (opt-in via `StatefulConfig.DiffStore`). No first-party implementations
-are provided - developers supply their own, backed by whatever storage suits
-their deployment (SQLite, Redis, filesystem, etc.).
+Nil by default (opt-in via `StatefulConfig.DiffStore`). The
+[tether-store](https://github.com/jpl-au/tether-store) repository provides
+ready-made implementations (`tether-store/fs` for development and
+single-node deployments); the interface is simple to implement against any
+other backend (SQLite, Redis, etc.).
 
 ### SessionStore
 
@@ -350,10 +355,11 @@ proxy connections alive.
 
 ## Wire protocol
 
-Server-to-client updates are JSON objects containing any combination of:
-`patches` (targeted content updates keyed by Dynamic key), `morphs`
-(structural DOM changes via idiomorph), `url`, `title`, `toast`, `flash`,
-`signals`, `announce`, `eventID`.
+Server-to-client updates are encoded messages (JSON by default; CBOR via
+`WireFormat`) containing any combination of: `patches` (targeted content
+updates keyed by Dynamic key), `morphs` (structural DOM changes via
+idiomorph), `url`, `title`, `toast`, `flash`, `signals`, `announce`,
+`scroll_to`, `download`, `prefetch`, `event_id`.
 
 **Patches** are the common case - a Dynamic-keyed element's HTML changed.
 **Morphs** are the fallback when the set of Dynamic keys changed between
@@ -437,6 +443,7 @@ the diagnostic bus. `DiagnosticKind` constants:
 | `NavigateRedirectLoop` | OnNavigate exceeded `Limits.MaxNavigateRedirects` |
 | `RenderCoalesced` | Multiple commands batched into one render cycle |
 | `HighMemoiseMissRate` | Memoisation miss ratio exceeds `Timeouts.MemoiseMissThreshold` |
+| `SharedCacheReuse` | A render cycle used the process-global `jit.Shared` fragment cache |
 
 See [operations](docs/operations.md#diagnostics-bus) for subscription
 examples and detailed descriptions.
@@ -482,7 +489,8 @@ Subscriptions are cleaned up automatically when the session is destroyed.
 | `session_store.go` | SessionStore interface for session state persistence |
 | `session_codec.go` | SessionCodec[S] interface + default CBOR implementation |
 | `session_envelope.go` | Envelope struct - wraps encoded S with session metadata |
-| `page.go` | StatelessConfig, stateless page handler |
+| `stateless.go` | Stateless page handler (GET render, POST event round-trip) |
+| `stateless_config.go` | StatelessConfig |
 | `effects.go` | Effects struct - buffers Toast, Signal, Navigate, etc. |
 | `render.go` | Render helpers, tetherBody (root div with data attributes) |
 | `asset.go` | Embedded asset serving with content-hashed URLs |

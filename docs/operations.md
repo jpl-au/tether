@@ -89,7 +89,7 @@ TETHER_DEV=1 go run .
 
 Dev mode does the following:
 
-1. **No service worker** - unregisters the service worker scoped to this handler's endpoint and skips registration, so you always get fresh assets. Workers registered by other handlers on the same origin are left alone
+1. **No service worker** - unregisters the service worker scoped to this handler's endpoint and skips registration, so you always get fresh assets. Workers registered by other handlers on the same origin are left alone. The client runtime is also served as readable, unminified source (production serves minified, precompressed bytes with `Accept-Encoding` negotiation)
 2. **Graceful reconnect** - when the server goes away, the page stays visible with a "Reconnecting..." bar. Once the server comes back, the client syncs the current URL so the server re-renders without a page reload. The page is never destroyed on disconnect or reconnect.
 3. **No caching** - the initial page always carries `Cache-Control: private, no-store` (it embeds the session token), in dev mode and production alike
 4. **Debug logging** - the default logger uses DEBUG level (when no Logger is provided)
@@ -173,8 +173,11 @@ Track client-side errors without browser dev tools:
 
 ```js
 Tether.onError = function(err) {
-    // err.type: "parse", "fetch", "worker", "push", "indexeddb", "render"
+    // err.type:    "parse", "fetch", "worker", "push", "indexeddb",
+    //              "render", "compute", "extension"
     // err.message: human-readable description
+    // err.slug:    stable kebab-case id, catalogued in docs/errors.md
+    //              (may be undefined for a handful of low-level sites)
     fetch("/errors", {
         method: "POST",
         body: JSON.stringify(err)
@@ -182,7 +185,7 @@ Tether.onError = function(err) {
 };
 ```
 
-When set, `Tether.onError` is called for every error and warning the JS runtime encounters. When not set, warnings are logged to `console.warn` and silent errors (parse failures, IndexedDB issues) remain silent.
+When set, `Tether.onError` is called for every error and warning the JS runtime encounters. When not set, warnings are logged to the console: each carries its `slug` and a `see tether/docs/errors.md#<slug>` pointer, and when an element is implicated the element object itself is passed to `console.error` so it is clickable and inspectable in devtools. Silent errors (parse failures, IndexedDB issues) remain silent. Look a slug up in the [error catalogue](errors.md) for what it means, why it fires, and the fix.
 
 ## Diagnostics bus
 
@@ -220,7 +223,7 @@ h.Diagnostics.SubscribeAsync(ctx, func(d tether.Diagnostic) {
 | Kind | Meaning |
 |------|---------|
 | `TransportError` | Failure reading from or writing to the transport. Normal disconnects (io.EOF) are not emitted |
-| `EncodeError` | JSON serialisation failure - usually an unencodable type in state or render output |
+| `EncodeError` | Wire serialisation failure (JSON or CBOR) - usually an unencodable type in state or render output |
 | `BufferOverflow` | Command channel was full; an overflow goroutine was spawned to deliver the command |
 | `CommandDropped` | Both the command buffer and the overflow goroutine cap were exhausted. By default the session is destroyed to prevent silent client drift. Set `OnCommandDropped` to override |
 | `CommandDiscarded` | A command or effect was silently discarded because the session is frozen or destroyed. Happens when code calls Update, Signal, Toast, etc. after disconnection |

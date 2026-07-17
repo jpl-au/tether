@@ -19,6 +19,7 @@ sess.ReplaceURL("/current?saved=1")       // replaceState
 sess.SetTitle("Settings - My App")        // document.title
 sess.Signal("count", 42)                  // push reactive value
 sess.Signals(map[string]any{"a": 1})      // push multiple values
+sess.Prefetch("/checkout")                // hint the browser to prefetch likely-next URLs
 sess.Push(push.Notification{...})         // Web Push notification
 sess.Morph("count", "title")             // targeted morphs (stateless only)
 ```

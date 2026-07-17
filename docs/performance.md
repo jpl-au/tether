@@ -43,9 +43,9 @@ diagnostic](operations.md) reports per-render hits and misses - an
 all-miss pattern across sessions means the keys are not aligning, which
 usually means a key is derived from per-session state.
 
-## Generic helpers vs SetData
+## bind.Apply vs SetData
 
-The generic helpers are ~47% slower than calling `SetData` directly. For performance-sensitive render paths, use `SetData`:
+`bind.Apply` and the option helpers are ~47% slower than calling `SetData` directly. For performance-sensitive render paths, use `SetData`:
 
 ```go
 button.Text("+").SetData("tether-click", "increment")
@@ -85,7 +85,7 @@ Applications using tether benefit from [Profile-Guided Optimisation](https://go.
 2. Place `default.pgo` in your main package directory
 3. `go build` - PGO is applied automatically
 
-Both generic helpers and direct `SetData` paths benefit from PGO.
+Both `bind.Apply` and direct `SetData` paths benefit from PGO.
 
 ---
 

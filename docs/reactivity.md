@@ -60,7 +60,7 @@ Tether provides three primitives for cross-session reactivity. They share a comm
 `Bus[T]` is the general-purpose pub/sub mechanism. It routes typed domain events to subscribers. Any session from any handler can subscribe, because Bus is parameterised on the **event type**, not the state type:
 
 ```go
-var messages = tether.NewBus[MessageSent]("messages")
+var messages = tether.NewBus[MessageSent]()
 
 // Publish from anywhere
 messages.Publish(MessageSent{Text: "hello"})
@@ -81,7 +81,7 @@ See [broadcasting](broadcasting.md#bus---typed-cross-session-events) for the ful
 2. **Immediate sync**  - when a session subscribes, the callback fires once with the current value so the session starts in sync
 
 ```go
-var onlineCount = tether.NewValue(0, "online-count")
+var onlineCount = tether.NewValue(0)
 
 // Update from anywhere
 onlineCount.Update(func(n int) int { return n + 1 })
@@ -132,7 +132,7 @@ tether.StatefulConfig[State]{
 }
 ```
 
-Watchers are activated during `OnConnect` and cleaned up automatically when the session is destroyed. No manual subscribe/unsubscribe.
+Watchers are subscribed just before `OnConnect` runs and cleaned up automatically when the session is destroyed. No manual subscribe/unsubscribe.
 
 ### Imperative  - tether.On and tether.Observe
 
@@ -206,7 +206,7 @@ The primitives are layered, not isolated:
 | Are subscribers from different handlers? | Yes | **Bus** |
 | Is the update a discrete event (message, notification)? | Yes | **Bus** |
 | Does the server need to push a value to the DOM without rendering? | Yes | **Signal** (`sess.Signal`) |
-| Does the client need instant feedback without a server round-trip? | Yes | **Client directive** (`bind.ToggleSignal`, `bind.SetSignal`) |
+| Does the client need instant feedback without a server round-trip? | Yes | **Signal action** (`bind.ToggleSignal`, `bind.SetSignal`) |
 
 These are not mutually exclusive. A chat application might use Bus for message events, Value for the online user count, Group for typing indicators, and Signals for unread badge counts  - all in the same handler.
 

@@ -143,7 +143,7 @@ OnConnect: func(sess *tether.StatefulSession[State]) {
 Use `Value` for shared state that sessions observe, `Bus` for discrete events, and `Group` for broadcasting state mutations:
 
 ```go
-var onlineCount = tether.NewValue(0, "online-count")
+var onlineCount = tether.NewValue(0)
 
 OnConnect: func(sess *tether.StatefulSession[State]) {
     onlineCount.Update(func(n int) int { return n + 1 })
@@ -191,7 +191,7 @@ Handle: func(sess tether.Session, s State, ev tether.Event) State {
 },
 ```
 
-`tether.Observe` and `tether.On` are still available for subscriptions that need to happen conditionally or later in the lifecycle (e.g. inside `OnConnect`).
+`tether.Observe` and `tether.On` suit subscriptions that need to happen conditionally or later in the lifecycle (e.g. inside `OnConnect`).
 
 Subscriptions created in `OnConnect` are cleaned up automatically when the session is destroyed. No manual unsubscribe needed.
 

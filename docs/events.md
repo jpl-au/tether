@@ -174,6 +174,103 @@ bind.Apply(div.New(),
 )
 ```
 
+### Leading-edge debounce
+
+`bind.Debounce` is trailing-edge: it waits for the pause, then sends the
+final value. `bind.DebounceLeading` is the opposite - it sends on the
+first keystroke and then suppresses further events until the input has
+been quiet for the interval. Use it when the first character should act
+immediately (open a suggestions panel, mark a field dirty) while the
+burst that follows is coalesced:
+
+```go
+bind.Apply(input.Text("q", ""),
+    bind.OnInput("search"),
+    bind.DebounceLeading(300*time.Millisecond),
+)
+```
+
+## Event modifiers
+
+Modifiers change *where* an event binding listens or *when* it fires.
+Stack them with any event option via `bind.Apply`. Like every binding
+they are declarative `data-tether-*` attributes handled by the client
+runtime - no eval, CSP-safe.
+
+### Outside (click-outside)
+
+`bind.Outside` fires the binding when the event happens **outside** the
+element rather than on it - the click-outside primitive for dropdowns,
+popovers, and modals. Put it on the open panel and the action fires
+whenever the user clicks anywhere else:
+
+```go
+bind.Apply(menuPanel,
+    bind.OnClick("menu.close"),
+    bind.Outside(),
+)
+```
+
+`Outside` takes priority over `Window`/`Document` when combined on one
+element.
+
+### Once
+
+`bind.Once` fires the binding at most once; every event after the first
+is ignored. A DOM morph that replaces the element resets the guard - the
+fresh element fires once again.
+
+```go
+bind.Apply(banner, bind.OnClick("promo.dismiss"), bind.Once())
+```
+
+### Window / Document scope
+
+`bind.Window` and `bind.Document` listen at the window or document level
+instead of on the element, so the binding fires no matter where the
+event occurs on the page. Use `Window` for a global keyboard handler -
+an Escape that closes a modal regardless of focus - without the element
+having to hold focus. Combine with `bind.FilterKey` to select one key:
+
+```go
+bind.Apply(modal,
+    bind.OnKeyDown("modal.close"),
+    bind.Window(),
+    bind.FilterKey("Escape"),
+)
+```
+
+`Document` is the same but scoped to `document`, for delegated handlers
+that should ignore events dispatched directly on the window object.
+
+### Stop propagation
+
+`bind.Stop` calls `stopPropagation` on the event so it does not bubble
+to ancestor handlers. Use it on a control inside a larger clickable
+region to keep the inner action from also triggering the outer one:
+
+```go
+bind.Apply(deleteBtn,
+    bind.OnClick("row.delete"),
+    bind.Stop(),
+    bind.EventData("id", rowID),
+)
+```
+
+### Delay
+
+`bind.Delay` postpones sending the event by a fixed interval after it
+fires. Unlike `Debounce`, which coalesces a burst, `Delay` always sends
+- just later. Use it to defer a hover-triggered load so a quick pass
+does not fire:
+
+```go
+bind.Apply(card,
+    bind.Event("mouseenter", "card.preview"),
+    bind.Delay(400*time.Millisecond),
+)
+```
+
 ## Loading states
 
 ### Disable during request
@@ -300,6 +397,10 @@ Handle: func(_ tether.Session, s State, ev tether.Event) State {
 ```go
 bind.Apply(div.New().ID("sentinel"), bind.OnViewport("load-more"))
 ```
+
+## Touch gestures
+
+`bind.OnSwipe` and `bind.OnLongPress` bind swipe and long-press gestures on touch devices. See [extensions](extensions.md#touch-gestures) for details and parameters.
 
 ## Component event routing
 

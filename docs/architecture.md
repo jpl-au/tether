@@ -209,7 +209,7 @@ SSE heartbeats (`:\n\n` comment lines) are sent at `Timeouts.Heartbeat` (default
 
 ## Update protocol
 
-The server sends JSON messages containing any combination of:
+The server sends update messages (JSON by default; CBOR when `WireFormat` is set - see [transport](transport.md#wire-format)) containing any combination of:
 
 | Field | Purpose |
 |-------|---------|
@@ -224,6 +224,7 @@ The server sends JSON messages containing any combination of:
 | `announce` | Screen-reader text via aria-live region |
 | `scroll_to` | Smooth-scroll an element into view |
 | `download` | Trigger a file download from a URL |
+| `prefetch` | URLs to speculatively fetch (Speculation Rules API, with `<link rel="prefetch">` fallback) |
 | `event_id` | Echo of the triggering event for client-side correlation |
 
 ### Patches vs morphs

@@ -182,7 +182,7 @@ session's own entry.
 `tether.Bus` routes typed domain events to subscribers. Unlike Group, Bus is parameterised on the **event type** rather than the state type, so sessions from different handlers can communicate:
 
 ```go
-var messages = tether.NewBus[MessageSent]("messages")
+var messages = tether.NewBus[MessageSent]()
 ```
 
 Subscribe a session declaratively via `StatefulConfig.Watchers`:
@@ -252,7 +252,7 @@ Register raw subscriptions via a `Setup(ctx context.Context)` function called fr
 
 ```go
 // handler/messages.go
-var messageBus = tether.NewBus[MessageSent]("messages")
+var messageBus = tether.NewBus[MessageSent]()
 
 func Setup(ctx context.Context) {
     messageBus.Subscribe(ctx, func(msg MessageSent) {
@@ -291,7 +291,7 @@ messageBus.SubscribeAsync(ctx, func(msg MessageSent) {
 `tether.Value` holds a single value that sessions can observe. When the value changes, all observers are notified automatically. Built on Bus internally:
 
 ```go
-var onlineCount = tether.NewValue(0, "online-count")
+var onlineCount = tether.NewValue(0)
 ```
 
 Observe declaratively via `StatefulConfig.Watchers` - the current value is delivered immediately on connect:
@@ -325,6 +325,10 @@ current := onlineCount.Load()                           // lock-free read
 ```
 
 Use Value for state that multiple sessions need to stay in sync with (online counts, shared configuration). Use Bus for discrete domain events (chat messages, activity feeds).
+
+## Multi-node deployments
+
+Everything on this page is node-local by default. To route Bus events and Value updates across nodes, set a `Cluster` on `App` and give the primitives topic names - see [cluster](cluster.md). Groups stay local; cross-node broadcasting flows through clustered Bus events.
 
 ## When to use what
 

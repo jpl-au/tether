@@ -110,3 +110,7 @@ where reducing server load takes priority over user-perceived latency.
 
 **Jitter (enabled):** Universal best practice. The cost is negligible and the
 benefit during multi-client reconnection scenarios is significant.
+
+---
+
+[← Back to documentation](../README.md#documentation)

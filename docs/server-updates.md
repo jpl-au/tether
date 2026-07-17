@@ -27,12 +27,30 @@ Available side effects:
 | `sess.ReplaceURL(url)` | Update URL without history entry |
 | `sess.Signal(key, value)` | Push a reactive value to bound elements |
 | `sess.Signals(map)` | Push multiple reactive values at once |
+| `sess.ScrollTo(selector)` | Smooth-scroll the element at a CSS selector into view |
+| `sess.Download(url)` | Trigger a file download in the browser |
+| `sess.Prefetch(urls...)` | Hint the browser to speculatively fetch likely-next URLs |
 
 When no side effects are needed, just return the new state.
 
+### Prefetch
+
+When a step completes and the next page is obvious - a wizard advancing, a "checkout" button appearing, a search result the user is about to open - hint the browser to fetch it ahead of the click so the navigation feels instant:
+
+```go
+case "step-2-complete":
+    s.Step = 3
+    sess.Prefetch("/checkout")   // warm the next page while the user reads step 3
+    return s
+```
+
+The client uses the [Speculation Rules API](https://developer.mozilla.org/en-US/docs/Web/API/Speculation_Rules_API) where supported, appending a `<script type="speculationrules">` element whose body is declarative JSON (`{"prefetch":[{"urls":[...]}]}`). This is browser data, never executed code - tether uses no `eval` and no `innerHTML`. Where the API is unavailable, it falls back to one `<link rel="prefetch">` per URL. Each URL is emitted at most once per page lifetime, so repeating a `Prefetch` for the same target is a no-op.
+
+Prefetch is a hint, not a guarantee - the browser may ignore it under data-saver mode or memory pressure. Prefetch only URLs you are confident the user will visit; over-prefetching wastes bandwidth. Strict `script-src` deployments need one extra CSP keyword - see [security.md](security.md#speculation-rules-prefetch).
+
 ### Effect coalescing
 
-Rapid `Update` calls (broadcast storms, watcher bursts) coalesce into one render cycle, and their effects merge: scalar effects (`Toast`, `Announce`, `ScrollTo`, `Download`, `SetTitle`, `Navigate`) are last-write-wins - only the final value in the batch reaches the client - while map effects (`Flash`, `Signals`) merge key by key. When every occurrence matters (a stream of notifications, say), model them as state and render them, or give each its own signal key, rather than relying on one scalar effect per update.
+Rapid `Update` calls (broadcast storms, watcher bursts) coalesce into one render cycle, and their effects merge: scalar effects (`Toast`, `Announce`, `ScrollTo`, `Download`, `SetTitle`, `Navigate`) are last-write-wins - only the final value in the batch reaches the client - while map effects (`Flash`, `Signals`) merge key by key and `Prefetch` accumulates every hinted URL. When every occurrence matters (a stream of notifications, say), model them as state and render them, or give each its own signal key, rather than relying on one scalar effect per update.
 
 ### Selector helpers vs signals
 

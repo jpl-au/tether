@@ -77,26 +77,28 @@ Because sessions are in-memory, horizontal scaling requires **sticky sessions**
 (session affinity) at the load balancer. A client must always reconnect to
 the same server node to reclaim its state.
 
-If a server node crashes, all sessions on that node are lost. Clients
-reconnect and receive a fresh `InitialState` - any unsaved ephemeral UI
-state is gone.
+If a server node crashes, all sessions on that node are lost unless a
+`SessionStore` is configured. Without one, clients reconnect and receive
+a fresh `InitialState` - any unsaved state is gone. With one, state is
+restored from the store on reconnect, and can even be reclaimed on a
+different node (node migration). See [session-store](session-store.md).
 
-`Bus` and `Group` are **node-local**. `Bus.Publish` only reaches subscribers
-on the same process. To broadcast across nodes (chat, live updates),
-bridge the Bus with an external message broker (Redis Pub/Sub, NATS,
-or similar):
+`Bus`, `Value`, and `Group` are **node-local** by default - `Bus.Publish`
+only reaches subscribers on the same process. To broadcast across nodes
+(chat, live updates), set a `Cluster` on `App` and give the Bus or Value
+a topic name - events are then routed through the broker to every node:
 
 ```go
-// Subscribe to an external source and publish locally.
-func bridgeBus(ctx context.Context, bus *tether.Bus[Message]) {
-    sub := redis.Subscribe(ctx, "messages")
-    for msg := range sub.Channel() {
-        var m Message
-        json.Unmarshal([]byte(msg.Payload), &m)
-        bus.Publish(m)
-    }
+app := tether.App{
+    Cluster: tetheredis.New(rdb),
 }
+var messages = tether.NewBus[Message](tether.BusConfig{Topic: "messages"})
 ```
+
+Groups stay local; cross-node broadcasting flows through clustered Bus
+events. See [cluster](cluster.md) for how self-filtering, serialisation,
+and custom brokers (NATS, etc. via the two-method `Cluster` interface)
+work.
 
 ## Capacity planning
 

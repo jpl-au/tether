@@ -32,6 +32,7 @@ app := tether.App{
 | `Client` | `Client` | | Browser-side settings (debounce, transitions, flash duration, etc.) |
 | `WireFormat` | `wire.Format` | `wire.JSON` | Default wire encoding for all handlers. Per-handler override via `StatefulConfig.WireFormat` takes precedence |
 | `Security` | `Security` | | CSRF protection and session binding settings |
+| `Cluster` | `Cluster` | nil (local) | Cross-node broker for Bus and Value topics. See [cluster](cluster.md) |
 
 ---
 
@@ -114,8 +115,11 @@ When either callback is configured, the framework's own logging for that event i
 | `DisableHeartbeat` | `bool` | false | Stop transport keep-alive frames |
 | `PendingCheck` | `time.Duration` | 10s | How often the background goroutine scans for expired pending sessions |
 | `SlowRender` | `time.Duration` | 0 (disabled) | Emit a `SlowRender` diagnostic when render+diff exceeds this duration |
-| `Retry` | `time.Duration` | 1s | Initial client reconnection delay |
-| `MaxRetry` | `time.Duration` | 30s | Maximum exponential backoff |
+| `MemoiseMissThreshold` | `float64` | 0 (disabled) | Emit a `HighMemoiseMissRate` diagnostic when the memoisation miss ratio exceeds this value |
+| `Retry` | `time.Duration` | 500ms | Initial client reconnection delay |
+| `MaxRetry` | `time.Duration` | 10s | Maximum exponential backoff |
+| `BackoffMultiplier` | `float64` | 1.5 | Growth factor for the reconnection delay |
+| `DisableJitter` | `bool` | false | Turn off retry-delay randomisation (see [reconnection](reconnection.md)) |
 
 ### Limits
 
@@ -139,6 +143,7 @@ When either callback is configured, the framework's own logging for that event i
 | `TransitionTimeout` | `time.Duration` | 5s | Fallback for CSS `transitionend` |
 | `FlashDuration` | `time.Duration` | 5s | Flash message auto-clear duration |
 | `ToastDuration` | `time.Duration` | 5s | Toast notification auto-dismiss duration |
+| `ViewTransitions` | `bool` | false | Wrap each morph/patch in a native View Transition where supported (respects `prefers-reduced-motion`). See [client-side.md](client-side.md#view-transitions) |
 | `BackgroundSync` | `bool` | false | Queue failed SSE events in IndexedDB for replay |
 | `SyncRetention` | `time.Duration` | 1h | How long queued events survive before expiry |
 | `Runtime` | `ClientRuntime` | `Runtime.Default()` | Browser-side client implementation. Use `Runtime.WASM("/static/client.wasm")` for a Go WASM client |

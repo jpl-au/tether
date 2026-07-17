@@ -58,10 +58,10 @@ handler := tether.Stateful(app, tether.StatefulConfig[State]{
 
 CBOR gives smaller payloads and faster decode. The framework writes
 the chosen format to `data-tether-wire-format` on the root element;
-the WASM client reads that attribute to pick the matching decoder.
-
-The JS runtime only supports JSON. Do not set `wire.CBOR` on a handler
-that uses the default runtime.
+the WASM client reads that attribute to pick the matching decoder and
+decodes CBOR natively in Go. (The default JS runtime also supports
+CBOR - it auto-loads a decoder extension. See
+[transport](transport.md#wire-format).)
 
 ## Building the WASM blob
 
@@ -96,11 +96,11 @@ The TinyGo script picks this up automatically when it is on `PATH`.
 
 PoC measurements against a JSON-only client:
 
-| Build       | Raw    | Gzip   |
-|-------------|--------|--------|
-| stdlib Go   | 3.3 MB | 930 KB |
-| TinyGo      | 985 KB | 352 KB |
-| `tether.js` | 74 KB  | 20 KB  |
+| Build                  | Raw    | Gzip   |
+|------------------------|--------|--------|
+| stdlib Go              | 3.3 MB | 930 KB |
+| TinyGo                 | 985 KB | 352 KB |
+| `tether.js` (minified) | 36 KB  | 11 KB  |
 
 These are a baseline, not a commitment. The runtime is small today
 because it does very little; numbers will move as features are added.
@@ -141,3 +141,7 @@ interface is designed to accommodate that.
 This is active R&D. The API shape, the scope of WASM's role, and
 whether the WASM runtime ultimately becomes a first-class framework
 offering are all open questions.
+
+---
+
+[← Back to documentation](../README.md#documentation)

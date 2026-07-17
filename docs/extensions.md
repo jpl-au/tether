@@ -227,7 +227,7 @@ Browser-side features that go beyond the core runtime ship as separate extension
 |-----------|-----------------|----------|
 | `tether-upload.js` | `bind.Upload` | File uploads with progress signals |
 | `tether-drag-and-drop.js` | `bind.Draggable`, `bind.Sortable` | Drag and drop, sortable lists |
-| `tether-touch.js` | `bind.Swipe`, `bind.LongPress` | Touch gestures |
+| `tether-touch.js` | `bind.OnSwipe`, `bind.OnLongPress` | Touch gestures |
 | `tether-hotkey.js` | `bind.Hotkey` | Global keyboard shortcuts |
 | `tether-timer.js` | `bind.Timer` | Client-side timers |
 | `tether-select.js` | `bind.Selectable` | Click/ctrl/shift multi-select |

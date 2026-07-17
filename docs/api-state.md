@@ -33,13 +33,14 @@ For auto-registration, pass groups via `StatefulConfig.Groups`.
 Typed pub/sub for cross-session communication. Create one per event type at program startup and share it across handlers:
 
 ```go
-var messages = tether.NewBus[MessageSent]("messages")
+var messages = tether.NewBus[MessageSent]()
 ```
 
-An optional `BusConfig` can customise async subscriber behaviour:
+An optional `BusConfig` can name a cluster topic and customise async subscriber behaviour:
 
 ```go
-var events = tether.NewBus[Event]("events", tether.BusConfig{
+var events = tether.NewBus[Event](tether.BusConfig{
+    Topic:         "events",      // distribute via App.Cluster; empty = local only
     AsyncWorkers:  128,           // default 64
     AsyncOverflow: tether.Drop,   // default Block
 })
@@ -47,6 +48,7 @@ var events = tether.NewBus[Event]("events", tether.BusConfig{
 
 | `BusConfig` field | Type | Default | Description |
 |-------------------|------|---------|-------------|
+| `Topic` | `string` | `""` | Cluster topic name; when set and `App.Cluster` is configured, events are routed cross-node (see [cluster](cluster.md)) |
 | `AsyncWorkers` | `int` | 64 | Maximum concurrent goroutines for async subscribers |
 | `AsyncOverflow` | `AsyncOverflow` | `Block` | What happens when all worker slots are full |
 
@@ -109,7 +111,7 @@ Watchers: []tether.Watcher[State]{
 },
 ```
 
-`tether.On` is still available for conditional subscriptions in `OnConnect`.
+`tether.On` suits conditional subscriptions made in `OnConnect`.
 
 ### Bus vs Group
 
@@ -120,6 +122,12 @@ Bus is parameterised on the **event type** - any session can subscribe regardles
 ## Value
 
 Shared observable state that notifies sessions when it changes. Built on top of Bus internally:
+
+```go
+var onlineCount = tether.NewValue(0)
+```
+
+An optional topic name distributes the Value across nodes when `App.Cluster` is configured (see [cluster](cluster.md)); without a topic the Value is local to the process:
 
 ```go
 var onlineCount = tether.NewValue(0, "online-count")
@@ -162,7 +170,7 @@ Watchers: []tether.Watcher[State]{
 },
 ```
 
-`tether.Observe` is still available for conditional subscriptions in `OnConnect`.
+`tether.Observe` suits conditional subscriptions made in `OnConnect`.
 
 ### Value vs Bus
 

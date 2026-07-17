@@ -28,21 +28,16 @@ mux.Handle("/counter", tether.Stateful(tether.App{}, tether.StatefulConfig[Count
             bind.Apply(button.Text("+1"), bind.OnClick("increment")),
         )
     },
-    Handle: func(_ tether.Session, state CounterState, event tether.Event) CounterState {
-        if event.Action == "increment" {
+    Handle: func(_ tether.Session, state CounterState, ev tether.Event) CounterState {
+        if ev.Action == "increment" {
             state.Count++
         }
         return state
     },
 }))
 
-// Serve the client JS runtime.
-mux.Handle("/_tether/", http.StripPrefix("/_tether/", tether.ServeClient()))
-```
-
-When the handler is not at root, mount the client JS runtime separately:
-
-```go
+// The handler is not mounted at "/", so serve the client JS runtime separately.
+// A handler mounted at "/" serves it automatically - no extra mux setup.
 mux.Handle("/_tether/", http.StripPrefix("/_tether/", tether.ServeClient()))
 ```
 
@@ -193,9 +188,11 @@ for details and examples.
 | [Frozen mode](docs/frozen-mode.md) | Zero-memory disconnected sessions via `Freeze` |
 | [DiffStore](docs/store.md) | External snapshot persistence for disconnected sessions |
 | [Transport](docs/transport.md) | WebSocket, SSE, resilience |
+| [Reconnection](docs/reconnection.md) | Client reconnection backoff, jitter, tuning |
 | [WASM runtime](docs/wasm.md) | Experimental Go WASM client as an alternative to `tether.js` |
 | [Push notifications](docs/push-notifications.md) | Web Push with VAPID |
 | [Operations](docs/operations.md) | Health check, drain, dev mode, diagnostics, error reporting |
+| [Error catalogue](docs/errors.md) | Client-side error/warning slugs surfaced via `Tether.onError` |
 | [Scaling](docs/scaling.md) | Per-session overhead, horizontal scaling, capacity planning |
 | [Security](docs/security.md) | TLS, session identity, origin checking, CSRF, rate limiting |
 | [Best practices](docs/best-practices.md) | Common patterns, performance tips, pitfalls to avoid |
@@ -207,7 +204,10 @@ for details and examples.
 
 | Library | Licence | Purpose |
 |---------|---------|---------|
-| [idiomorph](https://github.com/bigskysoftware/idiomorph) 0.3.0 | [0BSD](https://opensource.org/license/0bsd) | DOM morphing (bundled JS) |
+| [idiomorph](https://github.com/bigskysoftware/idiomorph) 0.7.4 | [0BSD](https://opensource.org/license/0bsd) | DOM morphing (bundled JS) |
 | [lxzan/gws](https://github.com/lxzan/gws) | [Apache-2.0](https://github.com/lxzan/gws/blob/main/LICENSE) | WebSocket transport |
 | [fxamacker/cbor](https://github.com/fxamacker/cbor) | [MIT](https://github.com/fxamacker/cbor/blob/master/LICENSE) | CBOR encoding for session state persistence |
+| [andybalholm/brotli](https://github.com/andybalholm/brotli) | [MIT](https://github.com/andybalholm/brotli/blob/master/LICENSE) | Brotli compression for SSE streams and client assets |
+| [klauspost/compress](https://github.com/klauspost/compress) | [BSD-3-Clause](https://github.com/klauspost/compress/blob/master/LICENSE) | gzip/zstd/deflate compression for SSE streams and client assets |
+| [tdewolff/minify](https://github.com/tdewolff/minify) | [MIT](https://github.com/tdewolff/minify/blob/master/LICENSE) | Build-time minification of the bundled client JS (`go generate`) |
 | [golang.org/x/crypto](https://pkg.go.dev/golang.org/x/crypto) | [BSD-3-Clause](https://cs.opensource.google/go/x/crypto/+/master:LICENSE) | VAPID push notification encryption |

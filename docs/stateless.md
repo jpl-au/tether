@@ -28,7 +28,7 @@ GET requests render the full page. POST requests handle a client event, render t
 
 2. **POST** - `InitialState(r)` reconstructs state from scratch (stateless - no memory of previous requests), `Handle` processes the event, `Render` builds the new tree, and the framework returns an update with a root morph and any side effects - a JSON envelope by default, or plain HTML with `WireFormat: wire.HTML`. The client morphs the page in place.
 
-The POST response uses the same wire format as stateful mode, so the client JS handles both identically. The key difference: stateful mode sends targeted patches to keyed elements, while stateless mode always sends a full root morph (since there is no previous tree to diff against).
+The POST response uses the same wire format as stateful mode, so the client JS handles both identically. The key difference: stateful mode sends targeted patches to keyed elements, while stateless mode defaults to a full root morph (there is no previous tree to diff against). [Targeted morphs](#targeted-morphs) and [AutoFragments](#automatic-fragments-autofragments) narrow the response when you need to.
 
 ## StatelessConfig
 

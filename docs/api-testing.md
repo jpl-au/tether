@@ -12,7 +12,7 @@ h := tethertest.New(tethertest.Config[State]{
     Components: []tether.ComponentMount[State]{
         tether.Mount("likes", getLikes, setLikes),
     },
-    Middleware: []tethertest.Middleware[State]{withAuth},
+    Middleware: []tether.Middleware[State]{withAuth},
     OnNavigate: onNavigate,
 })
 ```
@@ -69,7 +69,7 @@ h.Replaced()                     // last URL used ReplaceURL (not Navigate)
 
 ### Middleware
 
-`tethertest.Middleware` wraps the `Session`-based handler used by tethertest and `StatelessConfig`:
+The harness uses the same `tether.Middleware[S]` type as `StatefulConfig` and `StatelessConfig`, wrapping the `Session`-based handler:
 
 ```go
 type HandleFunc[S any] func(tether.Session, S, tether.Event) S

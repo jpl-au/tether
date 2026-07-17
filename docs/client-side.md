@@ -45,6 +45,38 @@ ul.New(
 
 Matching is case-insensitive against each item's text content. Mark items with `FilterItem` to filter a specific subset; when no items are marked, every direct child of the container is treated as an item. Pair it with a [client event](signals.md#client-events---coordinate-elements-without-the-server) to add a Clear button - clearing a filter input that is bound to a signal re-runs the filter, so every item reappears.
 
+## Computed signals
+
+Derive a value on the client from other signals. `Computed(name, expr)` compiles the infix expression to a compact postfix program in Go; the browser runs it on a tiny stack VM and republishes the result under `name` whenever an input changes. No round-trip, and - because the client is a fixed interpreter over a closed opcode set rather than an `eval` - no relaxation of a strict `script-src 'self'` CSP.
+
+```go
+// Cart total: quantity times price, pushed by the server as two signals.
+bind.Apply(span.New(),
+    bind.Computed("cart.total", "cart.qty * cart.price"),
+    bind.Text("cart.total"),
+)
+
+// Character counter for a 280-char limit.
+bind.Apply(small.New(),
+    bind.Computed("chars.left", "280 - len(draft)"),
+    bind.Text("chars.left"),
+)
+
+// "N selected" label.
+bind.Computed("sel.label", "selected + ' selected'")
+
+// Enable submit only when the form is valid - the bound attribute
+// sets disabled while the form is still invalid.
+bind.Apply(button.Text("Submit"),
+    bind.Computed("form.invalid", "len(email) <= 3 or not agreed"),
+    bind.Attr("disabled", "form.invalid"),
+)
+```
+
+The operator set is a closed list: arithmetic `+ - * / %`, comparisons `> >= < <= == !=`, boolean `and or not` (aliases `&& || !`), unary minus, `len` (string or array length), parentheses, and literals (numbers, quoted strings, `true`, `false`). `+` concatenates when either operand is a string. There is no function-call syntax, so nothing outside that list is expressible. A malformed expression panics at construction.
+
+Two rules keep ownership clear: **declare a name once**, and **the server pushes inputs, never computed outputs** - push `cart.qty` and `cart.price`, let the client derive `cart.total`. Computeds chain (one may read another's output) and a dependency cycle is reported via `Tether.onError` rather than looping. The [conditional bindings](signals.md#conditional-bindings---derive-booleans-on-the-client) `ShowWhen`/`HideWhen`/`ClassWhen` share this same engine. See [signals.md](signals.md#computed-signals---derive-values-on-the-client) for the full operator table.
+
 ## Signal-driven templates
 
 Render a list on the client from a signal holding a JSON array, with no server round-trip per change. Apply `Template` to a `<template>` element whose content is the markup for one item, using `{{field}}` placeholders (or `{{.}}` for a scalar array element). The server pushes the data as a JSON array; the client stamps one clone per element into the target container:
@@ -98,6 +130,30 @@ bind.Apply(div.New(children...), bind.Transition("fade"))
 ```
 
 Enter: `tether-{name}-enter` is added before insertion and removed next frame. Leave: `tether-{name}-leave` is added and the node waits for `transitionend` before removal (`TransitionTimeout` fallback, default 5s).
+
+### View Transitions
+
+For a cross-fade over the whole update instead of per-element enter/leave classes, flip one switch:
+
+```go
+tether.App{
+    Client: tether.Client{ViewTransitions: true},
+}
+```
+
+When enabled and the browser supports `document.startViewTransition`, every server-driven morph/patch is wrapped in a native [View Transition](https://developer.mozilla.org/en-US/docs/Web/API/View_Transitions_API), so DOM changes animate smoothly rather than snapping. When the API is unsupported, or the user has `prefers-reduced-motion: reduce` set, updates apply instantly - behaviour is identical to the switch being off, so it is safe to leave on. All post-update work (effects, autofocus, signals, hooks) keeps its ordering; only the DOM mutation is wrapped.
+
+Scoping is deliberately native: tether adds no per-element API. Give an element a stable `view-transition-name` in your CSS and the browser animates it independently across the update.
+
+```css
+/* Animate the hero image on its own, separate from the page fade */
+.hero-image { view-transition-name: hero; }
+
+/* Customise the default cross-fade */
+::view-transition-old(root) { animation-duration: 0.2s; }
+```
+
+Because `view-transition-name` must be unique per rendered frame, apply it to a single element (or generate a per-item name for a list), not a repeated class across many visible elements.
 
 ## Timers
 

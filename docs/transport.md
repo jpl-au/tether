@@ -80,7 +80,7 @@ Pass `ws.Options` to configure the WebSocket transport:
 
 ```go
 ws.Upgrade(ws.Options{
-    ReadLimit: 128 << 10,  // max message size (default 32 KB)
+    ReadLimit: 128 << 10,  // max message size in bytes
 })
 ```
 
@@ -140,9 +140,28 @@ Compression levels:
 - `ws.CompressionBalanced` - middle ground
 - `ws.CompressionSmallest` - smallest payloads, highest CPU
 
-SSE compression is handled by the reverse proxy (nginx, Caddy,
-Cloudflare) via standard `Content-Encoding` negotiation - tether does
-not need any configuration for it.
+SSE responses are compressed by tether itself, **enabled by default**.
+The transport negotiates an algorithm against the client's
+`Accept-Encoding` header (brotli, zstd, gzip, or deflate) and sets the
+`Content-Encoding` response header; the browser decompresses
+transparently, so no client-side code is needed. Each event is flushed
+through the compressor immediately, so compression adds no latency.
+SSE payloads are highly compressible text (HTML fragments, JSON
+patches), so this typically cuts stream bandwidth by well over half.
+
+Configure it via `sse.Compression` on `sse.Options`:
+
+```go
+sse.Upgrade(sse.Options{
+    Compression: sse.Compression{
+        Disabled: false,                    // on by default
+        Level:    sse.CompressionFastest,   // default; also Balanced, Smallest
+    },
+})
+```
+
+Set `Compression.Disabled` to opt out - for example when a reverse
+proxy already compresses the stream.
 
 ### Connection state
 
@@ -174,6 +193,11 @@ connections. WebSocket sends ping frames and sets read deadlines - if the
 client fails to respond with a pong, the connection is closed and the
 normal disconnect flow runs. This detects silently dropped connections
 that would otherwise leave sessions hanging indefinitely.
+
+When a transport drops, the client reconnects with exponential backoff
+and jitter - see [reconnection](reconnection.md) for the algorithm and
+tuning knobs (`Timeouts.Retry`, `MaxRetry`, `BackoffMultiplier`,
+`DisableJitter`).
 
 ## Service worker
 
@@ -265,6 +289,7 @@ state change and hands it to the encoder. Key fields:
 - `Signals` - reactive values pushed to bound elements
 - `Toast`, `Flash`, `Announce` - notifications and accessibility
 - `ScrollTo`, `Download` - client-side actions
+- `Prefetch` - likely-next URLs to hint the browser to prefetch
 - `EventID` - correlation with the triggering event
 
 ## Event resilience (SSE)
