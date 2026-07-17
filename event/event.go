@@ -54,7 +54,7 @@ const (
 	// data-tether-paste attribute. The pasted text is in Data["value"].
 	Paste Type = "paste"
 
-	// Viewport fires when a [bind.Viewport]-marked sentinel element
+	// Viewport fires when a bind.OnViewport-marked sentinel element
 	// enters the visible viewport. Use this to implement infinite
 	// scroll: load the next page of data when the sentinel is reached.
 	Viewport Type = "viewport"

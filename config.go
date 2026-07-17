@@ -9,8 +9,11 @@ import (
 // Timeouts groups duration-based settings for session lifecycle,
 // reconnection, and transport keep-alive.
 type Timeouts struct {
-	// Idle closes sessions that receive no client events within this
-	// duration. Zero means no idle timeout.
+	// Idle closes sessions with no activity within this duration.
+	// Activity includes client events, Update and Patch calls, and
+	// server-push effects (Signal, Toast, etc.), so a session the
+	// server is actively updating never counts as idle. Zero means
+	// no idle timeout.
 	Idle time.Duration
 
 	// MaxLifetime closes sessions after this duration regardless of
@@ -155,6 +158,16 @@ type Client struct {
 	// ToastDuration is how long toast notifications remain visible
 	// before animating out. Zero defaults to 5 seconds.
 	ToastDuration time.Duration
+
+	// ViewTransitions wraps each morph/patch application in a native
+	// View Transition (document.startViewTransition) so DOM updates
+	// cross-fade instead of snapping. It is a single opt-in switch: when
+	// true and the browser supports the API, every server-driven update
+	// animates; when false, unsupported, or the user has
+	// prefers-reduced-motion set, updates apply instantly exactly as
+	// before. Scope individual elements with the native CSS
+	// view-transition-name property - tether adds no per-element API.
+	ViewTransitions bool
 
 	// BackgroundSync enables IndexedDB event queuing and background
 	// sync for SSE mode. When true, failed POST events are stored in

@@ -224,8 +224,8 @@ func (h *Handler[S]) thaw(sess *StatefulSession[S], r *http.Request, transport T
 	// side moves the status first owns the session. Losing means
 	// Shutdown already transitioned Frozen → Destroyed - back out and
 	// let Shutdown's cleanup stand rather than reviving a session the
-	// process is tearing down (previously this race could panic with
-	// an invalid destroyed → active transition).
+	// process is tearing down, which would be an invalid
+	// destroyed → active transition.
 	if !sess.status.CompareAndSwap(int32(Frozen), int32(Active)) {
 		h.mu.Lock()
 		delete(h.active, sess.id)

@@ -27,6 +27,7 @@ type Update struct {
 	Toast    string            // if non-empty, show a global notification
 	ScrollTo string            // if non-empty, scroll element into view
 	Download string            // if non-empty, trigger a file download from this URL
+	Prefetch []string          // likely-next URLs to hint the browser to prefetch
 	EventID  string            // echoed from the triggering Event for correlation
 
 	// Hashes carries the complete current content-hash map for the

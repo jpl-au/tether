@@ -43,13 +43,20 @@ func (w *mockWriter) Flush() {
 	}
 }
 
+// newSW wraps a ResponseWriter in a streamWriter for tests that drive
+// the writer goroutine directly (no compression).
+func newSW(w http.ResponseWriter) *streamWriter {
+	return &streamWriter{dst: w, rc: http.NewResponseController(w)}
+}
+
 func newTestTransport() (*transport, *mockWriter) {
 	w := newMockWriter()
 	t := &transport{
-		writes: make(chan []byte, 4),
-		done:   make(chan struct{}),
+		writes:   make(chan *bytes.Buffer, 4),
+		done:     make(chan struct{}),
+		finished: make(chan struct{}),
 	}
-	go t.writeLoop(w, w)
+	go t.writeLoop(newSW(w))
 	return t, w
 }
 
@@ -242,10 +249,11 @@ func (fw *failWriter) Write(b []byte) (int, error) {
 func TestReceiveEventReturnsWriteError(t *testing.T) {
 	fw := newFailWriter(1) // fail on first write
 	tr := &transport{
-		writes: make(chan []byte, 4),
-		done:   make(chan struct{}),
+		writes:   make(chan *bytes.Buffer, 4),
+		done:     make(chan struct{}),
+		finished: make(chan struct{}),
 	}
-	go tr.writeLoop(fw, fw)
+	go tr.writeLoop(newSW(fw))
 
 	// Send triggers writeLoop to write, which will fail.
 	tr.Send([]byte(`{"x":1}`))
@@ -268,10 +276,11 @@ func TestStartHeartbeatWritesComments(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		w := newMockWriter()
 		tr := &transport{
-			writes: make(chan []byte, 4),
-			done:   make(chan struct{}),
+			writes:   make(chan *bytes.Buffer, 4),
+			done:     make(chan struct{}),
+			finished: make(chan struct{}),
 		}
-		go tr.writeLoop(w, w)
+		go tr.writeLoop(newSW(w))
 
 		tr.StartHeartbeat(5 * time.Second)
 
@@ -293,10 +302,11 @@ func TestStartHeartbeatStopsOnClose(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		w := newMockWriter()
 		tr := &transport{
-			writes: make(chan []byte, 4),
-			done:   make(chan struct{}),
+			writes:   make(chan *bytes.Buffer, 4),
+			done:     make(chan struct{}),
+			finished: make(chan struct{}),
 		}
-		go tr.writeLoop(w, w)
+		go tr.writeLoop(newSW(w))
 
 		tr.StartHeartbeat(5 * time.Second)
 		tr.Close()

@@ -20,8 +20,8 @@
 // Tether.onError is an optional callback for client-side error reporting.
 // When set, it receives an object with {type, message} for every error
 // or warning the runtime encounters. Types: "parse", "fetch", "worker",
-// "push", "indexeddb", "render". If not set, warnings are logged to
-// the console and silent errors remain silent.
+// "push", "indexeddb", "render", "compute", and "extension". If not set,
+// warnings are logged to the console and silent errors remain silent.
 window.Tether = window.Tether || {};
 window.Tether.hooks = window.Tether.hooks || {};
 window.Tether.signals = window.Tether.signals || {};
@@ -48,6 +48,13 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
   var debounceTimers = {};
   var leavingNodes = new Set();
   var pendingElements = {};
+  // Elements whose bind.Once binding has already fired. A WeakSet keyed
+  // on the element so a morph that replaces the node resets the guard.
+  var firedOnce = new WeakSet();
+  // Ref-counts of in-flight events per loading indicator element, so an
+  // indicator shared by overlapping events clears only when the last one
+  // settles (see disablePending / restorePending).
+  var indicatorCounts = new WeakMap();
   var eventCounter = 0;
   var transportMode = "ws"; // "ws", "sse", or "auto" - set from data-tether-transport
   var connectionMode = "ws";
@@ -59,6 +66,7 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
   var syncRetention = 3600000; // 1 hour default
   var flashDuration = 5000;
   var toastDuration = 5000;
+  var viewTransitions = false;
   var pendingCount = 0;
   var eventDataPrefix = "data-tether-data-";
   // Fragment content hashes for stateless auto-fragments: seeded by
@@ -66,6 +74,17 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
   // wholesale from every response's hashes field. Null when the page
   // does not use auto-fragments.
   var fragmentHashes = null;
+
+  // Computed signals. A [data-tether-computed="name|<program>"] element
+  // registers a computed signal here: computedByName holds one spec per
+  // name (declare a name once), computedByDep maps each input signal to
+  // the specs that read it so a write finds exactly what to recompute,
+  // and recomputing guards against dependency cycles during a cascade.
+  // Parsed programs are cached per element in programCache.
+  var computedByName = Object.create(null);
+  var computedByDep = Object.create(null);
+  var recomputing = Object.create(null);
+  var programCache = new WeakMap();
 
   // --- Extension listener registries ---
   //
@@ -92,24 +111,33 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
       try {
         list[i](a, b);
       } catch (e) {
-        reportError("extension", "listener threw: " + e);
+        reportError("extension", "listener threw: " + e, false, "listener-threw");
       }
     }
   }
 
   // Report an error or warning to the Tether.onError callback if set.
-  // Falls back to console.warn for non-silent errors. The callback is
+  // Falls back to console for non-silent errors. The callback is
   // guarded - a throwing error reporter must not abort the runtime
   // work (e.g. remaining patches) that triggered the report.
-  function reportError(type, message, silent) {
+  //
+  // slug is a stable kebab-case identifier catalogued in
+  // tether/docs/errors.md; it is added to the onError payload and, in
+  // the console fallback, turned into a "see ...#slug" pointer. When an
+  // element is implicated it is passed as a trailing console.error
+  // argument so it is clickable and inspectable in devtools.
+  function reportError(type, message, silent, slug, element) {
     if (typeof window.Tether.onError === "function") {
       try {
-        window.Tether.onError({ type: type, message: message });
+        window.Tether.onError({ type: type, message: message, slug: slug });
       } catch (e) {
         console.warn("tether: Tether.onError callback threw: " + e);
       }
     } else if (!silent) {
-      console.warn("tether: " + message);
+      var out = "tether: " + message;
+      if (slug) out += " [" + slug + "] - see tether/docs/errors.md#" + slug;
+      if (element) console.error(out, element);
+      else console.warn(out);
     }
   }
 
@@ -124,7 +152,7 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
     try {
       return parent.querySelector(selector);
     } catch (e) {
-      reportError("render", "invalid selector: " + selector);
+      reportError("render", "invalid selector: " + selector, false, "invalid-selector");
       return null;
     }
   }
@@ -133,7 +161,7 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
     try {
       return parent.querySelectorAll(selector);
     } catch (e) {
-      reportError("render", "invalid selector: " + selector);
+      reportError("render", "invalid selector: " + selector, false, "invalid-selector");
       return [];
     }
   }
@@ -166,6 +194,7 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
     syncRetention = parseInt(root.getAttribute("data-tether-sync-retention")) || 3600000;
     flashDuration = parseInt(root.getAttribute("data-tether-flash-duration")) || 5000;
     toastDuration = parseInt(root.getAttribute("data-tether-toast-duration")) || 5000;
+    viewTransitions = root.hasAttribute("data-tether-view-transitions");
     // Remove cloak attributes so hidden elements become visible now
     // that the runtime is ready. The server injects a style rule that
     // hides [data-tether-cloak] elements before JS loads.
@@ -182,7 +211,7 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
         var seedRaw = hashSeed.content ? hashSeed.content.textContent : hashSeed.textContent;
         fragmentHashes = JSON.parse(seedRaw);
       } catch (err) {
-        reportError("parse", "failed to parse fragment hash seed: " + err);
+        reportError("parse", "failed to parse fragment hash seed: " + err, false, "fragment-hash-seed-parse", hashSeed);
       }
     }
 
@@ -203,6 +232,12 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
       bindEditables(root);
       observeViewportElements(root);
     }
+
+    // Register computed-signal declarations present in the initial render
+    // (the whole document, so shell-level declarations count too). Each
+    // defers until its inputs arrive via the first applySignals; the
+    // bindings on them apply harmlessly against the still-empty signals.
+    reapplySignals(document.documentElement);
 
     // On page unload, send a beacon so the server can destroy the
     // session immediately instead of waiting for the disconnect timer.
@@ -258,14 +293,14 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
       var workerURL = "/_tether/tether-worker.js?syncRetention=" + syncRetention;
       navigator.serviceWorker.register(workerURL, { scope: endpoint || "/" })
         .catch(function (err) {
-          reportError("worker", "service worker registration failed: " + err);
+          reportError("worker", "service worker registration failed: " + err, false, "service-worker-registration-failed");
         });
     } else if (root.hasAttribute("data-tether-push-key") && "serviceWorker" in navigator) {
       // Push-only service worker: receives push events and shows
       // notifications without intercepting fetch requests or caching.
       navigator.serviceWorker.register("/_tether/tether-push-worker.js", { scope: endpoint || "/" })
         .catch(function (err) {
-          reportError("worker", "push worker registration failed: " + err);
+          reportError("worker", "push worker registration failed: " + err, false, "push-worker-registration-failed");
         });
     }
 
@@ -328,7 +363,7 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
       if (!resp.ok) throw new Error("status " + resp.status);
       return resp.text();
     }).then(cb).catch(function (err) {
-      reportError("fetch", "connect ticket request failed: " + err, true);
+      reportError("fetch", "connect ticket request failed: " + err, true, "connect-ticket-failed");
       if (root) root.setAttribute("data-tether-state", "disconnected");
       showReconnectBar();
       scheduleReconnect();
@@ -380,7 +415,7 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
       try {
         msg = window.Tether.decode(e.data);
       } catch (err) {
-        reportError("parse", "failed to parse WebSocket message: " + err, true);
+        reportError("parse", "failed to parse WebSocket message: " + err, true, "ws-message-parse");
         return;
       }
       applyMessage(msg);
@@ -442,7 +477,7 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
       try {
         msg = window.Tether.decode(e.data);
       } catch (err) {
-        reportError("parse", "failed to parse SSE message: " + err, true);
+        reportError("parse", "failed to parse SSE message: " + err, true, "sse-message-parse");
         return;
       }
       applyMessage(msg);
@@ -575,7 +610,7 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
         } else {
           // VAPID key changed - subscription is useless, discard it.
           sub.unsubscribe().catch(function (err) {
-            reportError("push", "unsubscribe failed: " + err);
+            reportError("push", "unsubscribe failed: " + err, false, "push-unsubscribe-failed");
           });
         }
       });
@@ -610,7 +645,7 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
         sendPushSubscription(sub);
       });
     }).catch(function (err) {
-      reportError("push", "push subscription failed: " + err);
+      reportError("push", "push subscription failed: " + err, false, "push-subscribe-failed");
     });
   }
 
@@ -630,7 +665,7 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
       // blips during mobile handoffs or server rolling deploys.
       setTimeout(function () {
         fetch(url, opts).catch(function (err) {
-          reportError("push", "push subscription POST failed: " + err);
+          reportError("push", "push subscription POST failed: " + err, false, "push-subscribe-post-failed");
         });
       }, 2000);
     });
@@ -688,7 +723,7 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
         });
       }
     }).catch(function (err) {
-      reportError("indexeddb", "failed to queue event: " + err, true);
+      reportError("indexeddb", "failed to queue event: " + err, true, "event-queue-failed");
     });
   }
 
@@ -730,7 +765,7 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
         }
       };
     }).catch(function (err) {
-      reportError("indexeddb", "failed to replay queued events: " + err, true);
+      reportError("indexeddb", "failed to replay queued events: " + err, true, "event-replay-failed");
     });
   }
 
@@ -754,7 +789,7 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
         deleteEventFromDB(db, key);
       }
     }).catch(function (err) {
-      reportError("fetch", "event replay failed: " + err, true);
+      reportError("fetch", "event replay failed: " + err, true, "event-replay-failed");
     });
   }
 
@@ -785,93 +820,163 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
         }
       }
 
-      // Apply content patches first, then structural morphs.
-      if (msg.patches) {
-        for (var i = 0; i < msg.patches.length; i++) {
-          applyPatch(msg.patches[i]);
+      // The DOM-mutating portion: content patches first, then
+      // structural morphs. Isolated into one function so it can run
+      // inside a View Transition callback - startViewTransition
+      // snapshots the DOM before and after this runs and cross-fades
+      // between the two.
+      function applyDOM() {
+        if (msg.patches) {
+          for (var i = 0; i < msg.patches.length; i++) {
+            applyPatch(msg.patches[i]);
+          }
         }
-      }
-      if (msg.morphs) {
-        for (var i = 0; i < msg.morphs.length; i++) {
-          applyMorph(msg.morphs[i]);
-        }
-      }
-
-      if (msg.url) {
-        if (msg.replace) {
-          history.replaceState({}, "", msg.url);
-        } else if (msg.url !== location.pathname + location.search) {
-          history.pushState({}, "", msg.url);
-          // Server-driven navigation: pushState changes the URL but
-          // does not trigger popstate, so the server never learns about
-          // the new URL. Send a navigate event so OnNavigate can update
-          // state and re-render for the target page. The same-URL check
-          // above breaks the echo loop that would otherwise form when
-          // OnNavigate re-navigates to the URL the browser is already on.
-          sendNavigate(msg.url);
-        }
-      }
-      if (msg.title) {
-        document.title = msg.title;
-      }
-      if (msg.flash) {
-        for (var selector in msg.flash) {
-          var el = safeQuery(document, selector);
-          if (el) {
-            el.textContent = msg.flash[selector];
-            (function (target) {
-              setTimeout(function () { target.textContent = ""; }, flashDuration);
-            })(el);
+        if (msg.morphs) {
+          for (var i = 0; i < msg.morphs.length; i++) {
+            applyMorph(msg.morphs[i]);
           }
         }
       }
-      if (msg.announce) {
-        announce(msg.announce);
-      }
-      if (msg.toast) {
-        toast(msg.toast);
-      }
-      if (msg.scroll_to) {
-        var scrollTarget = safeQuery(document, msg.scroll_to);
-        if (scrollTarget) scrollTarget.scrollIntoView({ behavior: "smooth", block: "nearest" });
-      }
-      if (msg.download) {
-        var a = document.createElement("a");
-        a.href = msg.download;
-        a.download = "";
-        a.style.display = "none";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-      }
-      if (msg.signals) {
-        applySignals(msg.signals);
+
+      // Everything sequenced after the morph flush: effects, signal
+      // reapplication, autofocus, extension hooks. This ordering is
+      // preserved whether or not a View Transition wraps the mutation -
+      // with transitions on, it runs once the update callback has
+      // completed (the DOM is already mutated by then).
+      function postFlush() {
+        if (msg.url) {
+          if (msg.replace) {
+            history.replaceState({}, "", msg.url);
+          } else if (msg.url !== location.pathname + location.search) {
+            history.pushState({}, "", msg.url);
+            // Server-driven navigation: pushState changes the URL but
+            // does not trigger popstate, so the server never learns about
+            // the new URL. Send a navigate event so OnNavigate can update
+            // state and re-render for the target page. The same-URL check
+            // above breaks the echo loop that would otherwise form when
+            // OnNavigate re-navigates to the URL the browser is already on.
+            sendNavigate(msg.url);
+          }
+        }
+        if (msg.title) {
+          document.title = msg.title;
+        }
+        if (msg.flash) {
+          for (var selector in msg.flash) {
+            var el = safeQuery(document, selector);
+            if (el) {
+              el.textContent = msg.flash[selector];
+              (function (target) {
+                setTimeout(function () { target.textContent = ""; }, flashDuration);
+              })(el);
+            }
+          }
+        }
+        if (msg.announce) {
+          announce(msg.announce);
+        }
+        if (msg.toast) {
+          toast(msg.toast);
+        }
+        if (msg.scroll_to) {
+          var scrollTarget = safeQuery(document, msg.scroll_to);
+          if (scrollTarget) scrollTarget.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }
+        if (msg.download) {
+          var a = document.createElement("a");
+          a.href = msg.download;
+          a.download = "";
+          a.style.display = "none";
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        }
+        if (msg.prefetch) {
+          applyPrefetch(msg.prefetch);
+        }
+        if (msg.signals) {
+          applySignals(msg.signals);
+        }
+
+        // Set focus on the designated element after all DOM updates.
+        // Uses data-tether-autofocus (not data-tether-focus, which is the
+        // event binding attribute for the Focus helper). Only runs when
+        // the DOM actually changed and the element isn't already focused,
+        // so signal-only broadcasts can't steal focus from the user.
+        if (msg.patches || msg.morphs) {
+          var focusEl = root.querySelector("[data-tether-autofocus]");
+          if (focusEl && focusEl !== document.activeElement) focusEl.focus();
+        }
+
+        // Lazy-load extension scripts when their marker attributes first
+        // appear in the DOM after a morph. This eliminates the need for
+        // hidden marker elements on the initial page.
+        loadExtensions();
+        applyValidation(root);
+        bindEditables(root);
+
+        // Notify extensions that the DOM has been updated so they can
+        // re-scan for new elements (e.g. hotkeys or timers added by a
+        // morph). Both channels fire: registered onUpdate listeners and
+        // the tether:update DOM event.
+        notify(updateListeners, root);
+        document.dispatchEvent(new CustomEvent("tether:update", { detail: { root: root } }));
       }
 
-      // Set focus on the designated element after all DOM updates.
-      // Uses data-tether-autofocus (not data-tether-focus, which is the
-      // event binding attribute for the Focus helper). Only runs when
-      // the DOM actually changed and the element isn't already focused,
-      // so signal-only broadcasts can't steal focus from the user.
-      if (msg.patches || msg.morphs) {
-        var focusEl = root.querySelector("[data-tether-autofocus]");
-        if (focusEl && focusEl !== document.activeElement) focusEl.focus();
+      // Opt-in View Transitions: wrap only the DOM mutation, keeping all
+      // post-morph work after the update callback resolves. Skipped when
+      // disabled, unsupported, when the update mutates no DOM (a
+      // signal-only broadcast), or when the user prefers reduced motion -
+      // in which case behaviour is byte-for-byte identical to before.
+      var useTransition = viewTransitions &&
+        (msg.patches || msg.morphs) &&
+        typeof document.startViewTransition === "function" &&
+        !(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
+      if (useTransition) {
+        var transition = document.startViewTransition(applyDOM);
+        transition.updateCallbackDone.then(postFlush, postFlush);
+      } else {
+        applyDOM();
+        postFlush();
       }
-
-      // Lazy-load extension scripts when their marker attributes first
-      // appear in the DOM after a morph. This eliminates the need for
-      // hidden marker elements on the initial page.
-      loadExtensions();
-      applyValidation(root);
-      bindEditables(root);
-
-      // Notify extensions that the DOM has been updated so they can
-      // re-scan for new elements (e.g. hotkeys or timers added by a
-      // morph). Both channels fire: registered onUpdate listeners and
-      // the tether:update DOM event.
-      notify(updateListeners, root);
-      document.dispatchEvent(new CustomEvent("tether:update", { detail: { root: root } }));
     });
+  }
+
+  // Track URLs already hinted to the browser so a repeated Prefetch
+  // effect never appends a duplicate rule or link for the page's life.
+  var prefetchedURLs = {};
+
+  // applyPrefetch hints the browser to speculatively fetch likely-next
+  // URLs. Where the Speculation Rules API is available it appends a
+  // <script type="speculationrules"> element whose body is declarative
+  // JSON data (never executed - no eval, no innerHTML), so tether's
+  // no-eval posture is intact. Otherwise it falls back to one
+  // <link rel="prefetch"> per URL. Each URL is emitted at most once.
+  function applyPrefetch(urls) {
+    var fresh = [];
+    for (var i = 0; i < urls.length; i++) {
+      var url = urls[i];
+      if (url && !prefetchedURLs[url]) {
+        prefetchedURLs[url] = true;
+        fresh.push(url);
+      }
+    }
+    if (fresh.length === 0) return;
+
+    if (typeof HTMLScriptElement !== "undefined" &&
+        HTMLScriptElement.supports && HTMLScriptElement.supports("speculationrules")) {
+      var script = document.createElement("script");
+      script.type = "speculationrules";
+      script.textContent = JSON.stringify({ prefetch: [{ urls: fresh }] });
+      document.head.appendChild(script);
+    } else {
+      for (var j = 0; j < fresh.length; j++) {
+        var link = document.createElement("link");
+        link.rel = "prefetch";
+        link.href = fresh[j];
+        document.head.appendChild(link);
+      }
+    }
   }
 
   // --- Accessibility live region ---
@@ -1038,7 +1143,7 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
     var indicatorSelector = el.getAttribute("data-tether-indicator");
     if (indicatorSelector) {
       entry.indicator = safeQuery(document, indicatorSelector);
-      if (entry.indicator) entry.indicator.classList.add("tether-pending");
+      if (entry.indicator) acquireIndicator(entry.indicator);
     }
 
     if (++pendingCount === 1 && root) {
@@ -1054,13 +1159,36 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
     if (!entry) return;
     if (!entry.disabled) entry.el.removeAttribute("disabled");
     if (entry.text !== undefined) entry.el.textContent = entry.text;
-    if (entry.indicator) entry.indicator.classList.remove("tether-pending");
+    if (entry.indicator) releaseIndicator(entry.indicator);
 
     if (--pendingCount === 0 && root) {
       root.classList.remove("tether-loading");
     }
 
     delete pendingElements[eventID];
+  }
+
+  // acquireIndicator / releaseIndicator ref-count the tether-pending
+  // class on a loading indicator. Two elements can point their
+  // bind.Indicator at the same selector (or one element can fire twice
+  // before the first settles); without ref-counting, the first event to
+  // finish would clear the indicator while a later event is still in
+  // flight. The class is added on the first acquire and removed only on
+  // the last release.
+  function acquireIndicator(el) {
+    var n = (indicatorCounts.get(el) || 0) + 1;
+    indicatorCounts.set(el, n);
+    if (n === 1) el.classList.add("tether-pending");
+  }
+
+  function releaseIndicator(el) {
+    var n = (indicatorCounts.get(el) || 0) - 1;
+    if (n <= 0) {
+      indicatorCounts.delete(el);
+      el.classList.remove("tether-pending");
+    } else {
+      indicatorCounts.set(el, n);
+    }
   }
 
   // restoreAllPending clears every outstanding loading state. Called
@@ -1296,6 +1424,49 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
 
   // --- Patching and morphing ---
 
+  // isEditingActiveElement reports whether the user is currently typing in
+  // a form field or contenteditable region. Used to arm ignoreActiveValue
+  // only when there is in-progress text to protect.
+  function isEditingActiveElement() {
+    var el = document.activeElement;
+    if (!el || el === document.body) return false;
+    var tag = el.tagName;
+    return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el.isContentEditable === true;
+  }
+
+  // morphOptions builds the idiomorph config shared by every morph.
+  //
+  // ignoreActiveValue keeps a server patch from overwriting the value of the
+  // input the user is actively typing in: idiomorph skips the value attribute
+  // and live value of document.activeElement, so in-progress text survives a
+  // re-render that would otherwise reset it. It is armed only while a form
+  // field or contenteditable is focused - idiomorph's ignoreActiveValue also
+  // skips morphing the *children* of the active element, so leaving it on
+  // unconditionally would freeze the subtree of whatever is focused during a
+  // morph (a clicked link, a button), breaking client-side navigation and any
+  // update that re-renders around the focused control.
+  //
+  // restoreFocus is disabled. When on, idiomorph re-focuses the active
+  // input/textarea by id after every morph and reapplies its selection
+  // range, firing focus/focusin/select events. Tether manages focus itself
+  // (data-tether-autofocus, and in-place morphs keep the caret without
+  // help), so idiomorph's re-focus is redundant and its extra events
+  // perturb focus-sensitive behaviour.
+  //
+  // A fresh object is returned each call so idiomorph never mutates shared
+  // state; pass extra keys (e.g. morphStyle) to merge them in.
+  function morphOptions(extra) {
+    var opts = {
+      callbacks: morphCallbacks,
+      ignoreActiveValue: isEditingActiveElement(),
+      restoreFocus: false
+    };
+    if (extra) {
+      for (var k in extra) opts[k] = extra[k];
+    }
+    return opts;
+  }
+
   function applyPatch(patch) {
     var el = safeQuery(document, attrSelector("data-fluent-key", patch.key));
     if (!el) return;
@@ -1307,12 +1478,12 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
     var template = document.createElement("template");
     template.innerHTML = patch.html;
     if (template.content.childElementCount > 1) {
-      reportError("render", "patch for key '" + patch.key + "' contains multiple root elements; only the first will be used");
+      reportError("render", "patch for key '" + patch.key + "' contains multiple root elements; only the first will be used", false, "multiple-root-elements", el);
     }
     var newEl = template.content.firstElementChild;
     if (!newEl) return;
 
-    Idiomorph.morph(el, newEl, {callbacks: morphCallbacks});
+    Idiomorph.morph(el, newEl, morphOptions());
   }
 
   function applyMorph(morph) {
@@ -1330,20 +1501,20 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
       // firstElementChild would strip that wrapper because
       // idiomorph would use the element's children instead.
       if (root && morph.html) {
-        Idiomorph.morph(root, morph.html, {morphStyle: "innerHTML", callbacks: morphCallbacks});
+        Idiomorph.morph(root, morph.html, morphOptions({morphStyle: "innerHTML"}));
       }
     } else {
       // Scoped morph targets a keyed container.
       var template = document.createElement("template");
       template.innerHTML = morph.html;
+      var el = safeQuery(document, attrSelector("data-fluent-key", morph.key));
       if (template.content.childElementCount > 1) {
-        reportError("render", "morph for key '" + morph.key + "' contains multiple root elements; only the first will be used");
+        reportError("render", "morph for key '" + morph.key + "' contains multiple root elements; only the first will be used", false, "multiple-root-elements", el);
       }
       var newEl = template.content.firstElementChild;
       if (!newEl) return;
-      var el = safeQuery(document, attrSelector("data-fluent-key", morph.key));
       if (el) {
-        Idiomorph.morph(el, newEl, {callbacks: morphCallbacks});
+        Idiomorph.morph(el, newEl, morphOptions());
       }
     }
   }
@@ -1362,6 +1533,9 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
     window.Tether.signals[key] = value;
     updateSignalBindings(key, value);
     notify(signalListeners, key, value);
+    // A write may feed one or more computed signals. Recompute them last,
+    // once the raw write has landed, so their programs read the new value.
+    recomputeDependents(key);
   }
 
   function applySignals(updates) {
@@ -1421,74 +1595,194 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
       els[i].value = value == null ? "" : String(value);
     }
 
-    // Conditional show bindings: data-tether-bind-show-when="signal op value"
-    els = document.querySelectorAll("[data-tether-bind-show-when]");
-    for (var i = 0; i < els.length; i++) {
-      applyConditionalShow(els[i], "data-tether-bind-show-when", key, value, false);
+    // Conditional bindings (show-when / hide-when / class-when) compile
+    // to postfix programs and run through the shared VM. A program may
+    // read several signals, so on any signal change re-evaluate them all.
+    applyConditionals(document);
+  }
+
+  // --- Computed signal VM ---
+  //
+  // Computed signals and the conditional bindings share one evaluator.
+  // The server compiles an infix expression to a postfix program - an
+  // array of [opcode, arg] cells - and this stack machine runs it. There
+  // is no eval and no Function: the opcode set is fixed and closed, so a
+  // strict script-src 'self' CSP holds. Opcodes: 0 push signal value,
+  // 1 push number/boolean literal, 2 push string literal, 3 binary op,
+  // 4 unary op.
+  function runProgram(program, signals) {
+    var stack = [];
+    for (var i = 0; i < program.length; i++) {
+      var op = program[i][0], arg = program[i][1];
+      if (op === 0) stack.push(signals[arg]);
+      else if (op === 1 || op === 2) stack.push(arg);
+      else if (op === 3) { var b = stack.pop(), a = stack.pop(); stack.push(binaryOp(arg, a, b)); }
+      else stack.push(unaryOp(arg, stack.pop()));
     }
+    return stack.pop();
+  }
 
-    // Conditional hide bindings: data-tether-bind-hide-when="signal op value"
-    els = document.querySelectorAll("[data-tether-bind-hide-when]");
-    for (var i = 0; i < els.length; i++) {
-      applyConditionalShow(els[i], "data-tether-bind-hide-when", key, value, true);
+  // binaryOp applies one binary operator. "+" doubles as string concat
+  // when either operand is a string; ordered comparisons are numeric and
+  // yield false on non-numbers.
+  function binaryOp(op, a, b) {
+    if (op === "+") {
+      if (typeof a === "string" || typeof b === "string") {
+        return (a == null ? "" : String(a)) + (b == null ? "" : String(b));
+      }
+      return Number(a) + Number(b);
     }
+    if (op === "-") return Number(a) - Number(b);
+    if (op === "*") return Number(a) * Number(b);
+    if (op === "/") return Number(a) / Number(b);
+    if (op === "%") return Number(a) % Number(b);
+    if (op === "==") return a == b;
+    if (op === "!=") return a != b;
+    if (op === "and") return isTruthy(a) && isTruthy(b);
+    if (op === "or") return isTruthy(a) || isTruthy(b);
+    var x = Number(a), y = Number(b);
+    if (isNaN(x) || isNaN(y)) return false;
+    if (op === ">") return x > y;
+    if (op === ">=") return x >= y;
+    if (op === "<") return x < y;
+    return x <= y;
+  }
 
-    // Conditional class bindings: data-tether-bind-class-when="class signal op value"
-    els = document.querySelectorAll("[data-tether-bind-class-when]");
-    for (var i = 0; i < els.length; i++) {
-      applyConditionalClass(els[i], key, value);
+  // unaryOp applies not / neg / len. len is string or array length;
+  // anything else has length 0.
+  function unaryOp(op, v) {
+    if (op === "not") return !isTruthy(v);
+    if (op === "neg") return -Number(v);
+    if (typeof v === "string" || Array.isArray(v)) return v.length;
+    return 0;
+  }
+
+  // parseProgram decodes a program's JSON once and caches it on the
+  // element, re-parsing only if the attribute text changes across morphs.
+  function parseProgram(el, raw) {
+    var cached = programCache.get(el);
+    if (cached && cached.raw === raw) return cached.program;
+    var program;
+    try {
+      program = JSON.parse(raw);
+    } catch (e) {
+      reportError("parse", "invalid computed program: " + e, false, "invalid-computed-program", el);
+      return null;
+    }
+    programCache.set(el, { raw: raw, program: program });
+    return program;
+  }
+
+  // depsReady is true when every signal a program reads is present. A
+  // binding stays untouched until its inputs arrive, so it never reflects
+  // a half-populated state.
+  function depsReady(program) {
+    for (var i = 0; i < program.length; i++) {
+      if (program[i][0] === 0 && !window.Tether.signals.hasOwnProperty(program[i][1])) return false;
+    }
+    return true;
+  }
+
+  // programDeps lists the distinct signals a program reads (its opcode-0
+  // cells). Dependencies are derived here rather than shipped separately.
+  function programDeps(program) {
+    var deps = [];
+    for (var i = 0; i < program.length; i++) {
+      if (program[i][0] === 0 && deps.indexOf(program[i][1]) === -1) deps.push(program[i][1]);
+    }
+    return deps;
+  }
+
+  // registerComputed wires a "name|<program>" declaration into the
+  // dependency map. Re-declaring a name (e.g. after a morph re-adds the
+  // element) refreshes the wiring in place rather than duplicating it.
+  function registerComputed(el) {
+    var raw = el.getAttribute("data-tether-computed");
+    if (!raw) return;
+    var bar = raw.indexOf("|");
+    if (bar === -1) return;
+    var name = raw.slice(0, bar);
+    var program = parseProgram(el, raw.slice(bar + 1));
+    if (!program) return;
+    var spec = { name: name, program: program, deps: programDeps(program) };
+    var prev = computedByName[name];
+    if (prev) {
+      for (var i = 0; i < prev.deps.length; i++) {
+        var list = computedByDep[prev.deps[i]];
+        var at = list ? list.indexOf(prev) : -1;
+        if (at !== -1) list.splice(at, 1);
+      }
+    }
+    computedByName[name] = spec;
+    for (var j = 0; j < spec.deps.length; j++) {
+      (computedByDep[spec.deps[j]] || (computedByDep[spec.deps[j]] = [])).push(spec);
+    }
+    evaluateComputed(spec);
+  }
+
+  // evaluateComputed runs a spec only once all its inputs are present,
+  // deferring otherwise until a dependency first arrives.
+  function evaluateComputed(spec) {
+    if (depsReady(spec.program)) recomputeComputed(spec);
+  }
+
+  // recomputeComputed runs the program and publishes the result under the
+  // computed's name via setSignal - which drives its bindings and cascades
+  // to any computed that reads it. The recomputing guard aborts a branch
+  // that re-enters the same name (a cycle) and reports it, never throwing.
+  function recomputeComputed(spec) {
+    if (recomputing[spec.name]) {
+      reportError("compute", "cycle detected recomputing signal " + spec.name, false, "computed-cycle");
+      return;
+    }
+    recomputing[spec.name] = true;
+    try {
+      setSignal(spec.name, runProgram(spec.program, window.Tether.signals));
+    } finally {
+      delete recomputing[spec.name];
     }
   }
 
-  // parseCondition splits a "signal op value" (or "class signal op value")
-  // binding attribute into its parts. lead is how many leading tokens
-  // precede the signal name (0 for show/hide, 1 for class). Returns null
-  // when the attribute is malformed so callers skip it safely.
-  function parseCondition(raw, lead) {
-    var parts = raw.split(/\s+/);
-    if (parts.length < lead + 3) return null;
-    return {
-      prefix: parts.slice(0, lead),
-      signal: parts[lead],
-      op: parts[lead + 1],
-      // The operand is the remainder, rejoined so string values with
-      // spaces survive the split.
-      operand: parts.slice(lead + 2).join(" ")
-    };
+  // recomputeDependents re-evaluates every computed that reads key, called
+  // from setSignal after each write.
+  function recomputeDependents(key) {
+    var specs = computedByDep[key];
+    if (!specs) return;
+    for (var i = 0; i < specs.length; i++) evaluateComputed(specs[i]);
   }
 
-  // evalCondition compares a signal value against an operand using op.
-  // Numeric operands compare numerically; ==/!= fall back to string
-  // comparison so status strings and booleans work too.
-  function evalCondition(value, op, operandStr) {
-    var operand = parseSignalValue(operandStr);
-    if (op === "==") return value == operand;
-    if (op === "!=") return value != operand;
-    var a = Number(value), b = Number(operand);
-    if (isNaN(a) || isNaN(b)) return false;
-    if (op === ">") return a > b;
-    if (op === ">=") return a >= b;
-    if (op === "<") return a < b;
-    if (op === "<=") return a <= b;
-    return false;
+  // applyConditional evaluates one show-when / hide-when / class-when
+  // binding against the current signals and applies its DOM effect. All
+  // three compile to the same postfix programs as computed signals.
+  function applyConditional(el) {
+    var raw = el.getAttribute("data-tether-bind-show-when");
+    if (raw != null) { toggleWhen(el, raw, false); return; }
+    raw = el.getAttribute("data-tether-bind-hide-when");
+    if (raw != null) { toggleWhen(el, raw, true); return; }
+    raw = el.getAttribute("data-tether-bind-class-when");
+    if (raw != null) {
+      var bar = raw.indexOf("|");
+      if (bar === -1) return;
+      var program = parseProgram(el, raw.slice(bar + 1));
+      if (program && depsReady(program)) {
+        el.classList.toggle(raw.slice(0, bar), isTruthy(runProgram(program, window.Tether.signals)));
+      }
+    }
   }
 
-  // applyConditionalShow toggles display for a show-when/hide-when
-  // binding. invert is true for hide-when. Only acts when the binding's
-  // signal matches the one that changed (key).
-  function applyConditionalShow(el, attr, key, value, invert) {
-    var c = parseCondition(el.getAttribute(attr) || "", 0);
-    if (!c || c.signal !== key) return;
-    var on = evalCondition(value, c.op, c.operand);
-    if (invert) on = !on;
-    el.style.display = on ? "" : "none";
+  // toggleWhen drives display for a show-when (invert false) or hide-when
+  // (invert true) binding.
+  function toggleWhen(el, raw, invert) {
+    var program = parseProgram(el, raw);
+    if (!program || !depsReady(program)) return;
+    var on = isTruthy(runProgram(program, window.Tether.signals));
+    el.style.display = (invert ? !on : on) ? "" : "none";
   }
 
-  // applyConditionalClass toggles a CSS class for a class-when binding.
-  function applyConditionalClass(el, key, value) {
-    var c = parseCondition(el.getAttribute("data-tether-bind-class-when") || "", 1);
-    if (!c || c.signal !== key) return;
-    el.classList.toggle(c.prefix[0], evalCondition(value, c.op, c.operand));
+  function applyConditionals(scope) {
+    var els = scope.querySelectorAll(
+      "[data-tether-bind-show-when],[data-tether-bind-hide-when],[data-tether-bind-class-when]");
+    for (var i = 0; i < els.length; i++) applyConditional(els[i]);
   }
 
   // parseSignalValue converts a string from an HTML data attribute into
@@ -1521,7 +1815,8 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
     var bound = el.querySelectorAll(
       "[data-tether-bind-text],[data-tether-bind-show],[data-tether-bind-hide]," +
       "[data-tether-bind-class],[data-tether-bind-attr],[data-tether-bind-value]," +
-      "[data-tether-bind-show-when],[data-tether-bind-hide-when],[data-tether-bind-class-when]"
+      "[data-tether-bind-show-when],[data-tether-bind-hide-when],[data-tether-bind-class-when]," +
+      "[data-tether-computed]"
     );
     for (var i = 0; i < bound.length; i++) {
       applySignalsToElement(bound[i]);
@@ -1573,22 +1868,11 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
       el.value = signals[valueSignal] == null ? "" : String(signals[valueSignal]);
     }
 
-    // Conditional bindings: re-evaluate against the current signal value
-    // after a morph so a freshly added element reflects the latest state.
-    var showWhen = parseCondition(el.getAttribute("data-tether-bind-show-when") || "", 0);
-    if (showWhen && signals.hasOwnProperty(showWhen.signal)) {
-      el.style.display = evalCondition(signals[showWhen.signal], showWhen.op, showWhen.operand) ? "" : "none";
-    }
-
-    var hideWhen = parseCondition(el.getAttribute("data-tether-bind-hide-when") || "", 0);
-    if (hideWhen && signals.hasOwnProperty(hideWhen.signal)) {
-      el.style.display = evalCondition(signals[hideWhen.signal], hideWhen.op, hideWhen.operand) ? "none" : "";
-    }
-
-    var classWhen = parseCondition(el.getAttribute("data-tether-bind-class-when") || "", 1);
-    if (classWhen && signals.hasOwnProperty(classWhen.signal)) {
-      el.classList.toggle(classWhen.prefix[0], evalCondition(signals[classWhen.signal], classWhen.op, classWhen.operand));
-    }
+    // Register a computed declaration so it recomputes on future writes,
+    // and re-evaluate any conditional binding against the current signals
+    // so a freshly morphed element reflects the latest state.
+    if (el.hasAttribute("data-tether-computed")) registerComputed(el);
+    applyConditional(el);
   }
 
   // --- Event delegation ---
@@ -1609,6 +1893,7 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
     for (var i = 0; i < eventTypes.length; i++) {
       bindEventType(eventTypes[i][0], eventTypes[i][1]);
     }
+    bindScopedEvents();
     root.addEventListener("click", handleToggles);
     root.addEventListener("click", handleLinks);
     root.addEventListener("click", handleClipboard);
@@ -1679,164 +1964,270 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
       var target = e.target.closest("[data-" + dataAttr + "]");
       if (!target) return;
 
-      var action = target.getAttribute("data-" + dataAttr);
-      if (!action) return;
+      // Outside / Window / Document bindings are served by the scoped
+      // listeners in bindScopedEvents, not by root delegation. Skipping
+      // them here keeps each binding firing exactly once.
+      if (target.hasAttribute("data-tether-outside") || target.hasAttribute("data-tether-at")) return;
 
-      // Auto-prefix: if the element is inside a data-tether-prefix
-      // container, prepend the prefix so components can use bare
-      // action names (e.g. "send") while the server routes them via
-      // the full prefixed name (e.g. "shoutbox.send").
-      var prefix = findPrefix(target);
-      if (prefix && action.indexOf(prefix + ".") !== 0) {
-        action = prefix + "." + action;
+      handleBoundEvent(target, domEvent, dataAttr, e);
+    }, domEvent === "focus" || domEvent === "blur");
+  }
+
+  // handleBoundEvent runs the shared pipeline for a server event binding:
+  // action resolution and prefixing, the once/confirm/stop guards,
+  // optimistic signals, data collection, and the timing controls
+  // (debounce, throttle, delay) before the event is sent. Both root
+  // delegation (bindEventType) and the scoped Outside/Window/Document
+  // listeners (bindScopedEvents) funnel through here so a binding behaves
+  // identically wherever it listens.
+  function handleBoundEvent(target, domEvent, dataAttr, e) {
+    var action = target.getAttribute("data-" + dataAttr);
+    if (!action) return;
+
+    // FilterKey (bind.FilterKey): a keydown binding restricted to one key
+    // ignores every other key before any side effect runs - so a wrong key
+    // never spends the Once budget, fires an optimistic signal, or calls
+    // preventDefault. Unrelated to data-fluent-key, the diff engine's
+    // element identity.
+    if (domEvent === "keydown") {
+      var filterKey = target.getAttribute("data-tether-filterkey");
+      if (filterKey && filterKey !== e.key) return;
+    }
+
+    // Once (bind.Once) fires the binding a single time. The guard is
+    // here; the WeakSet is only updated once the binding commits below,
+    // so a cancelled confirm dialog does not spend the single firing. A
+    // morph that replaces the element yields a new node, which fires
+    // once again.
+    if (target.hasAttribute("data-tether-once") && firedOnce.has(target)) return;
+
+    // Auto-prefix: if the element is inside a data-tether-prefix
+    // container, prepend the prefix so components can use bare
+    // action names (e.g. "send") while the server routes them via
+    // the full prefixed name (e.g. "shoutbox.send").
+    var prefix = findPrefix(target);
+    if (prefix && action.indexOf(prefix + ".") !== 0) {
+      action = prefix + "." + action;
+    }
+
+    // Show a confirmation dialog if the element requests one.
+    var confirmMsg = target.getAttribute("data-tether-confirm");
+    if (confirmMsg && !window.confirm(confirmMsg)) return;
+
+    // The binding is now committed. Spend the Once budget (after any
+    // cancelled confirm) and stop propagation (bind.Stop) if requested
+    // so ancestor handlers do not also fire.
+    if (target.hasAttribute("data-tether-once")) firedOnce.add(target);
+    if (target.hasAttribute("data-tether-stop")) e.stopPropagation();
+
+    // Apply optimistic signal changes before sending the event.
+    // The server's response overwrites these via applySignals.
+    var optSet = target.getAttribute("data-tether-optimistic");
+    if (optSet) {
+      var idx = optSet.indexOf(" ");
+      var key = idx === -1 ? optSet : optSet.substring(0, idx);
+      var val = parseSignalValue(idx === -1 ? "true" : optSet.substring(idx + 1));
+      Tether.setSignal(key, val);
+    }
+    var optToggle = target.getAttribute("data-tether-optimistic-toggle");
+    if (optToggle) {
+      Tether.setSignal(optToggle, !isTruthy(Tether.signals[optToggle]));
+    }
+
+    // Prevent default for submit events and reset the form after
+    // sending so the input fields clear. The server re-renders with
+    // empty values but the form isn't inside a Dynamic key, so the
+    // client needs to clear it locally.
+    if (domEvent === "submit" || target.hasAttribute("data-tether-prevent-default")) {
+      e.preventDefault();
+    }
+
+    // Client-side validation: if the form contains fields with
+    // tether validation attributes, check them before sending.
+    // Uses the browser's native constraint validation API.
+    if (domEvent === "submit" && !validateForm(target)) return;
+
+    var data = {};
+
+    // Collect custom data attributes (data-tether-data-*)
+    for (var j = 0; j < target.attributes.length; j++) {
+      var attr = target.attributes[j];
+      if (attr.name.indexOf(eventDataPrefix) === 0) {
+        var key = attr.name.substring(eventDataPrefix.length);
+        data[key] = attr.value;
       }
+    }
 
-      // Show a confirmation dialog if the element requests one.
-      var confirmMsg = target.getAttribute("data-tether-confirm");
-      if (confirmMsg && !window.confirm(confirmMsg)) return;
-
-      // Apply optimistic signal changes before sending the event.
-      // The server's response overwrites these via applySignals.
-      var optSet = target.getAttribute("data-tether-optimistic");
-      if (optSet) {
-        var idx = optSet.indexOf(" ");
-        var key = idx === -1 ? optSet : optSet.substring(0, idx);
-        var val = parseSignalValue(idx === -1 ? "true" : optSet.substring(idx + 1));
-        Tether.setSignal(key, val);
-      }
-      var optToggle = target.getAttribute("data-tether-optimistic-toggle");
-      if (optToggle) {
-        Tether.setSignal(optToggle, !isTruthy(Tether.signals[optToggle]));
-      }
-
-      // Prevent default for submit events and reset the form after
-      // sending so the input fields clear. The server re-renders with
-      // empty values but the form isn't inside a Dynamic key, so the
-      // client needs to clear it locally.
-      if (domEvent === "submit" || target.hasAttribute("data-tether-prevent-default")) {
-        e.preventDefault();
-      }
-
-      // Client-side validation: if the form contains fields with
-      // tether validation attributes, check them before sending.
-      // Uses the browser's native constraint validation API.
-      if (domEvent === "submit" && !validateForm(target)) return;
-
-      var data = {};
-
-      // Collect custom data attributes (data-tether-data-*)
-      for (var j = 0; j < target.attributes.length; j++) {
-        var attr = target.attributes[j];
-        if (attr.name.indexOf(eventDataPrefix) === 0) {
-          var key = attr.name.substring(eventDataPrefix.length);
-          data[key] = attr.value;
+    // Collect current values from elements matching data-tether-collect.
+    // Keyed by the element's name or id so the server can read them
+    // by field name without the caller needing a form wrapper.
+    var collectSelector = target.getAttribute("data-tether-collect");
+    if (collectSelector) {
+      safeQueryAll(document, collectSelector).forEach(function (el) {
+        var key = el.name || el.id;
+        if (!key) return;
+        if (el.type === "checkbox" || el.type === "radio") {
+          data[key] = el.checked ? "true" : "false";
+        } else {
+          data[key] = el.value || "";
         }
-      }
+      });
+    }
 
-      // Collect current values from elements matching data-tether-collect.
-      // Keyed by the element's name or id so the server can read them
-      // by field name without the caller needing a form wrapper.
-      var collectSelector = target.getAttribute("data-tether-collect");
-      if (collectSelector) {
-        safeQueryAll(document, collectSelector).forEach(function (el) {
-          var key = el.name || el.id;
-          if (!key) return;
-          if (el.type === "checkbox" || el.type === "radio") {
-            data[key] = el.checked ? "true" : "false";
+    // Collect selected item IDs from a selectable container.
+    var collectSelected = target.getAttribute("data-tether-collect-selected");
+    if (collectSelected) {
+      var ids = [];
+      safeQueryAll(document, collectSelected + " .tether-selected").forEach(function (el) {
+        var id = el.getAttribute("data-tether-data-id");
+        if (id) ids.push(id);
+      });
+      data.selected = ids.join(",");
+    }
+
+    // Collect event-specific data
+    switch (domEvent) {
+      case "input":
+      case "change":
+        data.value = target.value || "";
+        // Checkboxes and radios always report their value attribute
+        // (default "on"), which doesn't tell the server whether the
+        // control is checked or unchecked. Send the checked state so
+        // the server can distinguish between the two.
+        if (target.type === "checkbox" || target.type === "radio") {
+          data.checked = target.checked ? "true" : "false";
+        }
+        break;
+
+      case "keydown":
+        // FilterKey was already applied at the top of handleBoundEvent.
+        data.key = e.key || "";
+        if (e.ctrlKey) data.ctrl = "true";
+        if (e.shiftKey) data.shift = "true";
+        if (e.altKey) data.alt = "true";
+        if (e.metaKey) data.meta = "true";
+        break;
+
+      case "submit":
+        var formData = new FormData(target);
+        formData.forEach(function (value, key) {
+          if (data[key]) {
+            data[key] += "," + value;
           } else {
-            data[key] = el.value || "";
+            data[key] = value;
           }
         });
-      }
+        break;
 
-      // Collect selected item IDs from a selectable container.
-      var collectSelected = target.getAttribute("data-tether-collect-selected");
-      if (collectSelected) {
-        var ids = [];
-        safeQueryAll(document, collectSelected + " .tether-selected").forEach(function (el) {
-          var id = el.getAttribute("data-tether-data-id");
-          if (id) ids.push(id);
-        });
-        data.selected = ids.join(",");
-      }
+      case "paste":
+        var clipData = (e.clipboardData || window.clipboardData);
+        data.value = clipData ? clipData.getData("text") : "";
+        break;
+    }
 
-      // Collect event-specific data
-      switch (domEvent) {
-        case "input":
-        case "change":
-          data.value = target.value || "";
-          // Checkboxes and radios always report their value attribute
-          // (default "on"), which doesn't tell the server whether the
-          // control is checked or unchecked. Send the checked state so
-          // the server can distinguish between the two.
-          if (target.type === "checkbox" || target.type === "radio") {
-            data.checked = target.checked ? "true" : "false";
-          }
-          break;
-
-        case "keydown":
-          // If data-tether-filterkey is set (bind.FilterKey), only send
-          // the event when the pressed key matches. Unrelated to
-          // data-fluent-key, the diff engine's element identity.
-          var filter = target.getAttribute("data-tether-filterkey");
-          if (filter && filter !== e.key) return;
-
-          data.key = e.key || "";
-          if (e.ctrlKey) data.ctrl = "true";
-          if (e.shiftKey) data.shift = "true";
-          if (e.altKey) data.alt = "true";
-          if (e.metaKey) data.meta = "true";
-          break;
-
-        case "submit":
-          var formData = new FormData(target);
-          formData.forEach(function (value, key) {
-            if (data[key]) {
-              data[key] += "," + value;
-            } else {
-              data[key] = value;
-            }
-          });
-          break;
-
-        case "paste":
-          var clipData = (e.clipboardData || window.clipboardData);
-          data.value = clipData ? clipData.getData("text") : "";
-          break;
-      }
-
-      // Debounce input events
-      if (domEvent === "input") {
-        var delay = parseInt(target.getAttribute("data-tether-debounce")) || defaultDebounce;
-        var timerKey = dataAttr + ":" + action;
-
+    // Debounce input events. The leading-edge variant (bind.DebounceLeading)
+    // sends on the first keystroke and then suppresses events until the
+    // input has been quiet for the interval; the default trailing-edge
+    // variant (bind.Debounce) waits for the pause before sending.
+    if (domEvent === "input") {
+      var timerKey = dataAttr + ":" + action;
+      var leading = parseInt(target.getAttribute("data-tether-debounce-leading"));
+      if (leading > 0) {
+        var idle = !debounceTimers[timerKey];
         clearTimeout(debounceTimers[timerKey]);
         debounceTimers[timerKey] = setTimeout(function () {
-          sendEvent(domEvent, action, data);
-        }, delay);
+          delete debounceTimers[timerKey];
+        }, leading);
+        if (idle) sendEvent(domEvent, action, data);
         return;
       }
+      var delay = parseInt(target.getAttribute("data-tether-debounce")) || defaultDebounce;
+      clearTimeout(debounceTimers[timerKey]);
+      debounceTimers[timerKey] = setTimeout(function () {
+        sendEvent(domEvent, action, data);
+      }, delay);
+      return;
+    }
 
-      // Throttle if configured
-      var throttle = parseInt(target.getAttribute("data-tether-throttle"));
-      if (throttle > 0) {
-        var throttleKey = "throttle:" + dataAttr + ":" + action;
-        if (debounceTimers[throttleKey]) return;
-        debounceTimers[throttleKey] = setTimeout(function () {
-          delete debounceTimers[throttleKey];
-        }, throttle);
-      }
+    // Throttle if configured
+    var throttle = parseInt(target.getAttribute("data-tether-throttle"));
+    if (throttle > 0) {
+      var throttleKey = "throttle:" + dataAttr + ":" + action;
+      if (debounceTimers[throttleKey]) return;
+      debounceTimers[throttleKey] = setTimeout(function () {
+        delete debounceTimers[throttleKey];
+      }, throttle);
+    }
 
+    // fire sends the event and starts the element's pending/disable
+    // state. bind.Delay defers it by a fixed interval; without a delay
+    // it runs synchronously.
+    function fire() {
       var eid = sendEvent(domEvent, action, data);
       if (eid) disablePending(target, eid);
+    }
 
-      // Reset form fields after submit only when explicitly requested.
-      // In a server-driven framework the server controls field values
-      // via the re-render - auto-resetting races the server's state.
-      if (domEvent === "submit" && target.hasAttribute("data-tether-reset")) {
-        target.reset();
+    var delayMs = parseInt(target.getAttribute("data-tether-delay"));
+    if (delayMs > 0) {
+      setTimeout(fire, delayMs);
+    } else {
+      fire();
+    }
+
+    // Reset form fields after submit only when explicitly requested.
+    // In a server-driven framework the server controls field values
+    // via the re-render - auto-resetting races the server's state.
+    if (domEvent === "submit" && target.hasAttribute("data-tether-reset")) {
+      target.reset();
+    }
+  }
+
+  // bindScopedEvents wires the Outside / Window / Document modifiers.
+  // These bindings cannot use root delegation: an Outside click lands on
+  // a different element than the one that owns the binding, and a
+  // Window/Document binding must catch events that never enter the tether
+  // root. One delegated listener per event type is attached at both the
+  // document and window level; it queries the DOM live at dispatch time,
+  // so morphed-in bindings are picked up without any rebinding.
+  function bindScopedEvents() {
+    for (var i = 0; i < eventTypes.length; i++) {
+      var domEvent = eventTypes[i][0];
+      var dataAttr = eventTypes[i][1];
+      var useCapture = domEvent === "focus" || domEvent === "blur";
+      document.addEventListener(domEvent, makeScopedHandler(domEvent, dataAttr, "document"), useCapture);
+      window.addEventListener(domEvent, makeScopedHandler(domEvent, dataAttr, "window"), useCapture);
+    }
+  }
+
+  // makeScopedHandler returns a delegated listener for one event type at
+  // one scope ("document" or "window"). Outside detection runs only on
+  // the document-scope listener so it fires exactly once per event; a
+  // window/document binding fires from the listener whose scope matches
+  // its data-tether-at value, again exactly once.
+  function makeScopedHandler(domEvent, dataAttr, scope) {
+    return function (e) {
+      var els = safeQueryAll(document, "[data-" + dataAttr + "]");
+      for (var i = 0; i < els.length; i++) {
+        var el = els[i];
+        if (!el.getAttribute("data-" + dataAttr)) continue;
+
+        // Outside takes priority: fire when the event happened outside
+        // the element. Guarded to the document scope to avoid a double
+        // fire from the window-level listener.
+        if (el.hasAttribute("data-tether-outside")) {
+          if (scope === "document" && !el.contains(e.target)) {
+            handleBoundEvent(el, domEvent, dataAttr, e);
+          }
+          continue;
+        }
+
+        // Window/Document scope: fire regardless of where the event
+        // occurred, from the matching listener only.
+        if (el.getAttribute("data-tether-at") === scope) {
+          handleBoundEvent(el, domEvent, dataAttr, e);
+        }
       }
-    }, domEvent === "focus" || domEvent === "blur");
+    };
   }
 
   // Events raised while the WebSocket is still connecting (e.g. a
@@ -1879,7 +2270,7 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
         var fx = JSON.parse(raw);
         for (var k in fx) msg[k] = fx[k];
       } catch (err) {
-        reportError("parse", "failed to parse effects island: " + err);
+        reportError("parse", "failed to parse effects island: " + err, false, "effects-island-parse", fxEl);
       }
       fxEl.parentNode.removeChild(fxEl);
     }
@@ -1941,7 +2332,7 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
         if (seq !== fetchSeq) { restorePending(id); return; }
         applyMessage(msg);
       }).catch(function (err) {
-        reportError("fetch", "page event failed: " + err);
+        reportError("fetch", "page event failed: " + err, false, "page-event-failed");
         restorePending(id);
       });
       return id;
@@ -1961,7 +2352,7 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
         // does not stay permanently disabled.
         if (!resp.ok) restorePending(id);
       }).catch(function (err) {
-        reportError("fetch", "event POST failed: " + err, true);
+        reportError("fetch", "event POST failed: " + err, true, "event-post-failed");
         restorePending(id);
         if (backgroundSync) queueFailedEvent(payload);
       });
@@ -2233,8 +2624,8 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
   // --- Client-side signal actions ---
   //
   // Signal actions let developers toggle or set signal values without
-  // a server round-trip. All signal bindings (BindShow, BindClass,
-  // BindText, etc.) react instantly. The server can override any
+  // a server round-trip. All signal bindings (bind.Show, bind.Class,
+  // bind.Text, etc.) react instantly. The server can override any
   // client-set signal via Session.Signal at any time.
 
   function handleSignalActions(e) {
@@ -2424,8 +2815,8 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
     return window.Tether.signals[key];
   };
 
-  // isTruthy is the truthiness rule the core uses for BindShow,
-  // BindHide, BindClass, and BindAttr. Exposed so extensions treat
+  // isTruthy is the truthiness rule the core uses for bind.Show,
+  // bind.Hide, bind.Class, and bind.Attr. Exposed so extensions treat
   // signal values identically.
   window.Tether.isTruthy = isTruthy;
 

@@ -5,7 +5,7 @@
 // controls them by pushing signals: "name.running" (boolean)
 // starts/pauses, and setting "name" to a number resets the value.
 // The element's text content is updated with the formatted time on
-// each tick - no BindText needed.
+// each tick - no bind.Text needed.
 
 (function () {
   "use strict";
@@ -104,7 +104,7 @@
   }
 
   // stopTimer clears the interval and marks the running signal as
-  // false so BindShow/BindHide elements react immediately even if the
+  // false so bind.Show/bind.Hide elements react immediately even if the
   // server does not explicitly push false.
   function stopTimer(t) {
     if (t.interval) {

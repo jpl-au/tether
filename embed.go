@@ -15,14 +15,20 @@ import (
 )
 
 // clientFS embeds the client-side JS runtime and the idiomorph library.
-// These files are served at the /_tether/ path by the Handler.
+// The readable sources under client/ are the authoritative, dev-mode
+// asset; the client/dist tree holds the minified and precompressed
+// variants that production serves, generated from the sources by
+// gen_client.go. Both are embedded so the process can serve either
+// depending on dev mode. All are served under the /_tether/ path.
 //
+//go:generate go run gen_client.go
 //go:embed client/tether.js client/idiomorph.min.js client/tether-worker.js client/tether-push-worker.js client/tether-upload.js client/tether-drag-and-drop.js client/tether-touch.js client/tether-hotkey.js client/tether-timer.js client/tether-select.js client/tether-template.js client/tether-wasm.js client/tether-wire-cbor.js
+//go:embed client/dist
 var clientFS embed.FS
 
-// clientFiles returns an fs.FS rooted at the client/ directory so that
-// file paths served by http.FileServer match the expected URL paths
-// (e.g. /tether.js rather than /client/tether.js).
+// clientFiles returns an fs.FS rooted at the client/ directory so
+// callers can read an embedded script by its bare name (tether.js
+// rather than client/tether.js).
 func clientFiles() fs.FS {
 	sub, err := fs.Sub(clientFS, "client")
 	if err != nil {
@@ -66,12 +72,31 @@ func clientVersion() string {
 	return clientVersionVal
 }
 
-// buildWorkerJS returns the service worker JS with the cache version
-// derived from the embedded client files and any application assets.
-// The version hash and precache URLs are injected at serve time so the
-// browser's service worker update check detects changes whenever the
-// library is rebuilt or any precached asset changes.
-func buildWorkerJS(assets []*Asset) []byte {
+// workerTemplate returns the service-worker template to inject into.
+// Production serves the minified template from client/dist; dev mode
+// serves the readable source so the worker is debuggable.
+func workerTemplate() []byte {
+	name := "tether-worker.js"
+	if !dev.Enabled() {
+		name = "dist/tether-worker.js"
+	}
+	raw, err := fs.ReadFile(clientFiles(), name)
+	if err != nil {
+		panic("tether: failed to read embedded worker script: " + err.Error())
+	}
+	return raw
+}
+
+// buildWorkerJS injects the cache version and precache list into the
+// given service-worker template. The version hash is derived from the
+// embedded client files and any application assets, so the browser's
+// service worker update check fires whenever the library is rebuilt or
+// any precached asset changes.
+//
+// The template is either the readable source or its minified form; the
+// injection targets both spellings of the precache placeholder so the
+// same routine works in dev and production.
+func buildWorkerJS(assets []*Asset, template []byte) []byte {
 	// Start from the base client hash and mix in each asset collection
 	// so the worker version changes when any asset content changes.
 	h := sha256.New()
@@ -83,11 +108,9 @@ func buildWorkerJS(assets []*Asset) []byte {
 	}
 	version := hex.EncodeToString(h.Sum(nil))[:12]
 
-	raw, err := fs.ReadFile(clientFiles(), "tether-worker.js")
-	if err != nil {
-		panic("tether: failed to read embedded worker script: " + err.Error())
-	}
-	body := bytes.Replace(raw,
+	// The version lives in a string literal, which survives minification
+	// unchanged, so one target matches both templates.
+	body := bytes.Replace(template,
 		[]byte(`"tether-v1"`),
 		[]byte(`"tether-`+version+`"`), 1)
 
@@ -96,9 +119,20 @@ func buildWorkerJS(assets []*Asset) []byte {
 		if err != nil {
 			panic("tether: failed to marshal precache URLs: " + err.Error())
 		}
-		body = bytes.Replace(body,
-			[]byte("var PRECACHE_EXTRA = [];"),
-			[]byte("var PRECACHE_EXTRA = "+string(extra)+";"), 1)
+		// The readable source declares the placeholder on its own line;
+		// the minifier folds it into a merged var statement and drops the
+		// spacing and semicolon. Only one of these forms is present in a
+		// given template, and each keeps its own surrounding syntax.
+		replacements := []struct{ target, with []byte }{
+			{[]byte("var PRECACHE_EXTRA = [];"), []byte("var PRECACHE_EXTRA = " + string(extra) + ";")},
+			{[]byte("PRECACHE_EXTRA=[]"), []byte("PRECACHE_EXTRA=" + string(extra))},
+		}
+		for _, r := range replacements {
+			if bytes.Contains(body, r.target) {
+				body = bytes.Replace(body, r.target, r.with, 1)
+				break
+			}
+		}
 	}
 
 	return body
@@ -117,50 +151,82 @@ func ServeClient() http.Handler {
 	return a.jsHandler()
 }
 
-// jsHandler builds an http.Handler that serves the embedded
-// client runtime. The Handler mounts this at /_tether/ so the HTML page
-// can load tether.js and idiomorph. The service worker script
-// gets special treatment: its CACHE_VERSION is set to a content hash
-// of the embedded files, and a Service-Worker-Allowed header permits
-// the client to register the worker at any scope (the client scopes
-// to the handler's endpoint via data-tether-endpoint).
+// jsHandler builds an http.Handler that serves the embedded client
+// runtime. The Handler mounts this at /_tether/ so the HTML page can
+// load tether.js and idiomorph.
+//
+// Production serves the minified, precompressed assets from client/dist
+// with Accept-Encoding negotiation (brotli, then gzip, then identity).
+// Dev mode instead serves the readable, unminified sources so developers
+// can set breakpoints and read stack traces against real code.
+//
+// The service worker gets special treatment in both modes: its
+// CACHE_VERSION is set to a content hash of the embedded files, and a
+// Service-Worker-Allowed header permits the client to register the
+// worker at any scope (the client scopes to the handler's endpoint via
+// data-tether-endpoint). Because its body is assembled per application
+// it is compressed once, at first request, rather than by go generate.
 func (app *App) jsHandler() http.Handler {
-	fileServer := http.FileServer(http.FS(clientFiles()))
-
 	var workerOnce sync.Once
-	var workerBody []byte
-	var pushWorkerOnce sync.Once
-	var pushWorkerBody []byte
+	var workerAsset clientAsset
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		p := strings.TrimPrefix(r.URL.Path, "/")
-		switch p {
-		case "tether-worker.js":
-			workerOnce.Do(func() {
-				workerBody = buildWorkerJS(app.Assets)
-			})
-			w.Header().Set("Service-Worker-Allowed", "/")
-			w.Header().Set("Content-Type", "application/javascript")
-			if _, err := w.Write(workerBody); err != nil {
-				dev.Log().Warn("failed to write worker script", "err", err)
-			}
 
-		case "tether-push-worker.js":
-			pushWorkerOnce.Do(func() {
-				raw, err := fs.ReadFile(clientFiles(), "tether-push-worker.js")
-				if err != nil {
-					panic("tether: failed to read embedded push worker script: " + err.Error())
-				}
-				pushWorkerBody = raw
-			})
-			w.Header().Set("Service-Worker-Allowed", "/")
-			w.Header().Set("Content-Type", "application/javascript")
-			if _, err := w.Write(pushWorkerBody); err != nil {
-				dev.Log().Warn("failed to write push worker script", "err", err)
-			}
-
-		default:
-			fileServer.ServeHTTP(w, r)
+		if dev.Enabled() {
+			app.serveDevClient(w, r, p)
+			return
 		}
+
+		if p == clientWorker {
+			workerOnce.Do(func() {
+				workerAsset = compressAsset(buildWorkerJS(app.Assets, workerTemplate()))
+			})
+			w.Header().Set("Service-Worker-Allowed", "/")
+			writeClientAsset(w, r, workerAsset)
+			return
+		}
+
+		asset, ok := clientAssets()[p]
+		if !ok {
+			http.NotFound(w, r)
+			return
+		}
+		if p == clientPushWorker {
+			w.Header().Set("Service-Worker-Allowed", "/")
+		}
+		writeClientAsset(w, r, asset)
 	})
+}
+
+// serveDevClient serves the readable, unminified source for a client
+// path uncompressed. Only flat file names embedded under client/ are
+// served, so requests can neither reach the dist tree nor traverse out
+// of it.
+func (app *App) serveDevClient(w http.ResponseWriter, r *http.Request, p string) {
+	if p == clientWorker {
+		w.Header().Set("Service-Worker-Allowed", "/")
+		w.Header().Set("Content-Type", jsContentType)
+		if _, err := w.Write(buildWorkerJS(app.Assets, workerTemplate())); err != nil {
+			dev.Log().Warn("tether: failed to write worker script", "err", err)
+		}
+		return
+	}
+
+	if strings.Contains(p, "/") {
+		http.NotFound(w, r)
+		return
+	}
+	data, err := fs.ReadFile(clientFiles(), p)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if p == clientPushWorker {
+		w.Header().Set("Service-Worker-Allowed", "/")
+	}
+	w.Header().Set("Content-Type", jsContentType)
+	if _, err := w.Write(data); err != nil {
+		dev.Log().Warn("tether: failed to write client asset", "err", err)
+	}
 }

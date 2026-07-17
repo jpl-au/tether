@@ -59,8 +59,8 @@ func TestClientWorkerHeader(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Errorf("status = %d, want %d", w.Code, http.StatusOK)
 		}
-		if w.Header().Get("Content-Type") != "application/javascript" {
-			t.Errorf("Content-Type = %q, want %q", w.Header().Get("Content-Type"), "application/javascript")
+		if w.Header().Get("Content-Type") != "text/javascript; charset=utf-8" {
+			t.Errorf("Content-Type = %q, want %q", w.Header().Get("Content-Type"), "text/javascript; charset=utf-8")
 		}
 	})
 
@@ -107,7 +107,7 @@ func TestClientPrecache(t *testing.T) {
 	if !strings.Contains(body, "/static/logo.svg?v=") {
 		t.Error("worker JS should contain hashed precache URL for logo.svg")
 	}
-	if strings.Contains(body, "PRECACHE_EXTRA = []") {
+	if strings.Contains(body, "PRECACHE_EXTRA=[]") {
 		t.Error("worker JS should have replaced the empty PRECACHE_EXTRA placeholder")
 	}
 }
@@ -120,7 +120,7 @@ func TestClientNoPrecache(t *testing.T) {
 	handler.ServeHTTP(w, req)
 
 	body := w.Body.String()
-	if !strings.Contains(body, "PRECACHE_EXTRA = []") {
+	if !strings.Contains(body, "PRECACHE_EXTRA=[]") {
 		t.Error("worker JS should keep empty PRECACHE_EXTRA when no precache URLs given")
 	}
 }

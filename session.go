@@ -278,6 +278,11 @@ type Session interface {
 	Flash(selector, text string)
 	ScrollTo(selector string)
 	Download(url string)
+	// Prefetch hints the browser to speculatively fetch likely-next
+	// URLs so a subsequent navigation is instant. The client uses the
+	// Speculation Rules API where supported and falls back to
+	// <link rel="prefetch">. Each URL is fetched at most once per page.
+	Prefetch(urls ...string)
 	Signal(key string, value any)
 	Signals(signals map[string]any)
 	Push(n push.Notification) error
@@ -409,6 +414,12 @@ func (cs *CaptureSession) ScrollTo(selector string) { cs.Effects.ScrollTo = sele
 
 // Download buffers a file download URL for replay after connection.
 func (cs *CaptureSession) Download(url string) { cs.Effects.Download = url }
+
+// Prefetch buffers likely-next URLs for the browser to speculatively
+// fetch. Multiple calls accumulate.
+func (cs *CaptureSession) Prefetch(urls ...string) {
+	cs.Effects.Prefetch = append(cs.Effects.Prefetch, urls...)
+}
 
 // Flash buffers a targeted flash message keyed by CSS selector.
 func (cs *CaptureSession) Flash(selector, text string) {

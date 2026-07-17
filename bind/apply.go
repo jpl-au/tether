@@ -1,7 +1,6 @@
 package bind
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -163,6 +162,20 @@ func Debounce(d time.Duration) Option {
 	return Option{"tether-debounce", strconv.Itoa(int(d.Milliseconds()))}
 }
 
+// DebounceLeading is a leading-edge debounce: it sends the event
+// immediately on the first keystroke, then suppresses further events
+// until the input has been quiet for d. [Debounce] is the opposite
+// (trailing-edge) - it waits for the pause before sending. Reach for
+// the leading edge when the first character should act at once (opening
+// a suggestions panel, marking a field dirty) while the burst that
+// follows is coalesced. Panics if d is negative.
+func DebounceLeading(d time.Duration) Option {
+	if d < 0 {
+		panic("bind: DebounceLeading duration must not be negative")
+	}
+	return Option{"tether-debounce-leading", strconv.Itoa(int(d.Milliseconds()))}
+}
+
 // Throttle sets a minimum interval between events from this element.
 // Unlike [Debounce] which waits for a pause, Throttle fires the first
 // event immediately and drops subsequent events until the interval
@@ -181,6 +194,60 @@ func Throttle(d time.Duration) Option {
 // mirroring this option's name - it is unrelated to data-fluent-key,
 // the diff engine's element identity.
 func FilterKey(key string) Option { return Option{"tether-filterkey", key} }
+
+// Event modifiers - change where an event binding listens or when it
+// fires. Stack them with any event option ([OnClick], [OnKeyDown],
+// [Event], ...) via [Apply]. They are declarative attributes handled by
+// the client runtime, so they add no eval and stay CSP-safe.
+
+// Outside fires the binding when the event happens OUTSIDE the element
+// rather than on it. This is the click-outside primitive for dropdowns,
+// popovers, and modals: put [OnClick] and Outside on the open panel and
+// the action fires whenever the user clicks anywhere else. Outside takes
+// priority over [Window] and [Document] when combined on one element.
+//
+//	// Close the menu when a click lands outside its panel.
+//	bind.Apply(panel, bind.OnClick("menu.close"), bind.Outside())
+func Outside() Option { return Option{"tether-outside", ""} }
+
+// Once fires the binding at most once; every event after the first is
+// ignored. A DOM morph that replaces the element resets this - the
+// fresh element fires once again. Pair with [Outside] for a dismiss
+// handler that runs a single time.
+func Once() Option { return Option{"tether-once", ""} }
+
+// Window listens for the event at the window level instead of on the
+// element, so it fires no matter where the event occurs on the page.
+// Use it for global keyboard handlers - an Escape that closes a modal
+// regardless of focus - without the element having to hold focus.
+// Combine with [FilterKey] to select a single key.
+//
+//	bind.Apply(modal, bind.OnKeyDown("modal.close"), bind.Window(), bind.FilterKey("Escape"))
+func Window() Option { return Option{"tether-at", "window"} }
+
+// Document listens for the event at the document level instead of on
+// the element. Like [Window] but scoped to document, which is the right
+// choice for delegated handlers that should ignore events dispatched
+// directly on the window object.
+func Document() Option { return Option{"tether-at", "document"} }
+
+// Stop calls stopPropagation on the event so it does not bubble to
+// ancestor handlers. Use it on a control inside a larger clickable
+// region to keep the inner action from also triggering the outer one -
+// for example a delete button inside a row that itself opens on click.
+func Stop() Option { return Option{"tether-stop", ""} }
+
+// Delay postpones sending the event to the server by d after it fires.
+// Unlike [Debounce], which coalesces a burst, Delay always sends - just
+// later. Use it to defer a hover-triggered load so a quick pass-through
+// does not fire, or to stagger an action behind an animation. Panics if
+// d is negative.
+func Delay(d time.Duration) Option {
+	if d < 0 {
+		panic("bind: Delay duration must not be negative")
+	}
+	return Option{"tether-delay", strconv.Itoa(int(d.Milliseconds()))}
+}
 
 // Data sets a custom data-tether-* attribute on the element. This is
 // the escape hatch for attributes not covered by the built-in options.
@@ -400,11 +467,14 @@ func PushSubscribe() Option { return Option{"tether-push-subscribe", ""} }
 // change, and clean up when it is removed from the DOM.
 func Hook(name string) Option { return Option{"tether-hook", name} }
 
-// Transition enables CSS enter/leave transitions on the element. The
-// name maps to CSS class prefixes: {name}-enter-from, {name}-enter-to,
-// {name}-leave-from, {name}-leave-to. When the element is added to the
-// DOM, the enter classes are applied; when removed, the leave classes
-// animate the element out before it is actually deleted.
+// Transition enables CSS enter/leave transitions on the element. When
+// the element is added to the DOM the client adds tether-{name}-enter
+// before insertion and removes it on the next frame, so a CSS transition
+// runs from the enter state to the resting state. When the element is
+// removed the client adds tether-{name}-leave and waits for transitionend
+// (or Client.TransitionTimeout, default 5s) before deleting the node.
+// Define both classes in your stylesheet, e.g. .tether-fade-enter and
+// .tether-fade-leave for Transition("fade").
 func Transition(name string) Option { return Option{"tether-transition", name} }
 
 // Clipboard options - copy text to the clipboard without a server
@@ -637,11 +707,15 @@ func checkOp(op string) {
 // "==" and "!=" also compare strings and booleans. Panics on an unknown
 // operator.
 //
+// ShowWhen is sugar over [Computed]'s engine: it compiles to the same
+// postfix program the client VM runs for computed signals, so there is a
+// single evaluator on the client rather than a separate comparison path.
+//
 //	// Visible only once the count passes five.
 //	bind.Apply(warning, bind.ShowWhen("count", ">", 5))
 func ShowWhen(signal, op string, value any) Option {
 	checkOp(op)
-	return Option{"tether-bind-show-when", signal + " " + op + " " + fmt.Sprint(value)}
+	return Option{"tether-bind-show-when", comparisonProgram(signal, op, value)}
 }
 
 // HideWhen is the inverse of [ShowWhen]: the element is hidden
@@ -649,7 +723,7 @@ func ShowWhen(signal, op string, value any) Option {
 // unknown operator.
 func HideWhen(signal, op string, value any) Option {
 	checkOp(op)
-	return Option{"tether-bind-hide-when", signal + " " + op + " " + fmt.Sprint(value)}
+	return Option{"tether-bind-hide-when", comparisonProgram(signal, op, value)}
 }
 
 // ClassWhen adds the CSS class while the named signal compares true
@@ -660,7 +734,7 @@ func HideWhen(signal, op string, value any) Option {
 //	bind.Apply(timer, bind.ClassWhen("danger", "seconds", "<", 10))
 func ClassWhen(class, signal, op string, value any) Option {
 	checkOp(op)
-	return Option{"tether-bind-class-when", class + " " + signal + " " + op + " " + fmt.Sprint(value)}
+	return Option{"tether-bind-class-when", class + "|" + comparisonProgram(signal, op, value)}
 }
 
 // Client-side events - let one element trigger a client-side action on

@@ -1,6 +1,7 @@
 package bind_test
 
 import (
+	"html"
 	"strings"
 	"testing"
 	"time"
@@ -86,6 +87,57 @@ func TestApplyTimingOptions(t *testing.T) {
 	if !strings.Contains(html, `data-tether-debounce="150"`) {
 		t.Errorf("missing debounce in:\n%s", html)
 	}
+}
+
+func TestDebounceLeading(t *testing.T) {
+	html := string(bind.Apply(input.Text("q", ""),
+		bind.OnInput("search"),
+		bind.DebounceLeading(200*time.Millisecond),
+	).RenderBytes())
+	if !strings.Contains(html, `data-tether-debounce-leading="200"`) {
+		t.Errorf("missing leading debounce in:\n%s", html)
+	}
+}
+
+func TestEventModifiers(t *testing.T) {
+	tests := []struct {
+		name string
+		opt  bind.Option
+		attr string
+	}{
+		{"Outside", bind.Outside(), `data-tether-outside`},
+		{"Once", bind.Once(), `data-tether-once`},
+		{"Window", bind.Window(), `data-tether-at="window"`},
+		{"Document", bind.Document(), `data-tether-at="document"`},
+		{"Stop", bind.Stop(), `data-tether-stop`},
+		{"Delay", bind.Delay(250 * time.Millisecond), `data-tether-delay="250"`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			html := string(bind.Apply(button.Text("x"), tt.opt).RenderBytes())
+			if !strings.Contains(html, tt.attr) {
+				t.Errorf("missing %s in:\n%s", tt.attr, html)
+			}
+		})
+	}
+}
+
+func TestDelayNegativePanics(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Error("Delay with negative duration should panic")
+		}
+	}()
+	bind.Delay(-time.Second)
+}
+
+func TestDebounceLeadingNegativePanics(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Error("DebounceLeading with negative duration should panic")
+		}
+	}()
+	bind.DebounceLeading(-time.Second)
 }
 
 func TestFilterKey(t *testing.T) {
@@ -410,20 +462,24 @@ func TestConditionalBindings(t *testing.T) {
 	tests := []struct {
 		name string
 		opt  bind.Option
-		attr string
+		attr string // expected attribute, with the JSON program HTML-unescaped
 	}{
-		// The comparison operators render as HTML entities (the attribute value is
-		// escaped); the browser decodes them back on getAttribute, so the binding
-		// still evaluates count > 5 / seconds < 10 at runtime.
-		{"ShowWhen int", bind.ShowWhen("count", ">", 5), `data-tether-bind-show-when="count &gt; 5"`},
-		{"HideWhen str", bind.HideWhen("status", "==", "done"), `data-tether-bind-hide-when="status == done"`},
-		{"ClassWhen", bind.ClassWhen("danger", "seconds", "<", 10), `data-tether-bind-class-when="danger seconds &lt; 10"`},
+		// Conditional bindings now compile to postfix programs. The
+		// attribute value is HTML-escaped on render (quotes, <, >); the
+		// browser decodes it back on getAttribute, so the client VM parses
+		// the JSON below. show-when/hide-when carry the bare program;
+		// class-when prefixes the class name and a pipe.
+		{"ShowWhen int", bind.ShowWhen("count", ">", 5), `data-tether-bind-show-when="[[0,"count"],[1,5],[3,">"]]"`},
+		{"HideWhen str", bind.HideWhen("status", "==", "done"), `data-tether-bind-hide-when="[[0,"status"],[2,"done"],[3,"=="]]"`},
+		{"ClassWhen", bind.ClassWhen("danger", "seconds", "<", 10), `data-tether-bind-class-when="danger|[[0,"seconds"],[1,10],[3,"<"]]"`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			html := string(bind.Apply(div.New(), tt.opt).RenderBytes())
-			if !strings.Contains(html, tt.attr) {
-				t.Errorf("missing %s in:\n%s", tt.attr, html)
+			// Decode HTML entities so the assertion reads the program as the
+			// browser sees it after getAttribute, not the escaped wire form.
+			got := html.UnescapeString(string(bind.Apply(div.New(), tt.opt).RenderBytes()))
+			if !strings.Contains(got, tt.attr) {
+				t.Errorf("missing %s in:\n%s", tt.attr, got)
 			}
 		})
 	}

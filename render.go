@@ -58,6 +58,7 @@ type tetherBody struct {
 	wireFormat        wire.Format
 	worker            bool
 	pushKey           string
+	viewTransitions   bool
 	backgroundSync    bool
 	syncRetention     time.Duration
 	runtime           ClientRuntime
@@ -138,6 +139,9 @@ func (p *tetherBody) RenderBuilder(buf *bytes.Buffer) {
 	buf.WriteString(`" data-tether-toast-duration="`)
 	buf.WriteString(strconv.FormatInt(p.toastDuration.Milliseconds(), 10))
 	buf.WriteString(`"`)
+	if p.viewTransitions {
+		buf.WriteString(` data-tether-view-transitions`)
+	}
 	if p.worker {
 		buf.WriteString(` data-tether-worker`)
 	}

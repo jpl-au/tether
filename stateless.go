@@ -210,6 +210,7 @@ func (p *statelessHandler[S]) serveGET(w http.ResponseWriter, r *http.Request) {
 		transitionTimeout: p.app.Client.TransitionTimeout,
 		flashDuration:     p.app.Client.FlashDuration,
 		toastDuration:     p.app.Client.ToastDuration,
+		viewTransitions:   p.app.Client.ViewTransitions,
 		runtime:           p.app.Client.Runtime,
 	}
 

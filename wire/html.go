@@ -53,6 +53,7 @@ type effectsMessage struct {
 	Toast    string            `json:"toast,omitempty"`
 	ScrollTo string            `json:"scroll_to,omitempty"`
 	Download string            `json:"download,omitempty"`
+	Prefetch []string          `json:"prefetch,omitempty"`
 }
 
 // encodeEffects serialises the side-effect fields of u. ok is false
@@ -62,7 +63,7 @@ type effectsMessage struct {
 func encodeEffects(u Update) (data []byte, ok bool, err error) {
 	if u.URL == "" && u.Title == "" && len(u.Flash) == 0 && len(u.Signals) == 0 &&
 		u.Announce == "" && u.Toast == "" && u.ScrollTo == "" && u.Download == "" &&
-		u.Hashes == nil {
+		len(u.Prefetch) == 0 && u.Hashes == nil {
 		return nil, false, nil
 	}
 	data, err = json.Marshal(effectsMessage{
@@ -76,6 +77,7 @@ func encodeEffects(u Update) (data []byte, ok bool, err error) {
 		Toast:    u.Toast,
 		ScrollTo: u.ScrollTo,
 		Download: u.Download,
+		Prefetch: u.Prefetch,
 	})
 	if err != nil {
 		return nil, false, err

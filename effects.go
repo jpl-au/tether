@@ -19,8 +19,9 @@ import (
 // Scalar effects (Toast, Announce, ScrollTo, Download, Title, URL)
 // are last-write-wins: when several Updates coalesce into one render
 // cycle, only the final value of each scalar reaches the client. Map
-// effects (Flash, Signals) merge by key. Effects that must all be
-// delivered should be distinct signals or separate events.
+// effects (Flash, Signals) merge by key, and Prefetch accumulates
+// (every hinted URL is kept). Effects that must all be delivered
+// should be distinct signals or separate events.
 type Effects struct {
 	Announce string
 	Flash    map[string]string
@@ -31,13 +32,14 @@ type Effects struct {
 	Replace  bool // true for replaceState, false for pushState
 	ScrollTo string
 	Download string
+	Prefetch []string // likely-next URLs to hint to the browser
 }
 
 // Any reports whether any side effects have been buffered.
 func (fx *Effects) Any() bool {
 	return fx.Announce != "" || fx.Flash != nil || fx.Signals != nil ||
 		fx.Toast != "" || fx.Title != "" || fx.URL != "" || fx.ScrollTo != "" ||
-		fx.Download != ""
+		fx.Download != "" || fx.Prefetch != nil
 }
 
 // copyInto merges the buffered effects into dst - set scalar fields
@@ -76,6 +78,9 @@ func (fx *Effects) copyInto(dst *Effects) {
 	if fx.Download != "" {
 		dst.Download = fx.Download
 	}
+	if fx.Prefetch != nil {
+		dst.Prefetch = append(dst.Prefetch, fx.Prefetch...)
+	}
 }
 
 // merge copies buffered effects into an update message.
@@ -104,5 +109,8 @@ func (fx *Effects) merge(u *wire.Update) {
 	}
 	if fx.Download != "" {
 		u.Download = fx.Download
+	}
+	if fx.Prefetch != nil {
+		u.Prefetch = fx.Prefetch
 	}
 }

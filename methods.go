@@ -261,6 +261,18 @@ func (s *StatefulSession[S]) Download(url string) {
 	s.enqueueFx(func(fx *Effects) { fx.Download = url })
 }
 
+// Prefetch hints the browser to speculatively fetch one or more
+// likely-next URLs, so a subsequent navigation to any of them is
+// instant. The client uses the Speculation Rules API where supported
+// and falls back to <link rel="prefetch"> otherwise. Each URL is
+// fetched at most once per page lifetime. Inside Handle the hints are
+// buffered; outside they are sent as a standalone update.
+//
+//	sess.Prefetch("/checkout", "/cart")
+func (s *StatefulSession[S]) Prefetch(urls ...string) {
+	s.enqueueFx(func(fx *Effects) { fx.Prefetch = append(fx.Prefetch, urls...) })
+}
+
 // Signal pushes a reactive value to the client. Elements bound to the
 // signal name via [bind.Text], [bind.Show], [bind.Class], or [bind.Attr]
 // update instantly - no render cycle, no diff, no HTML. Inside Handle

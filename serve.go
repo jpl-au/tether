@@ -98,6 +98,7 @@ func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 		toastDuration:     h.app.Client.ToastDuration,
 		worker:            h.cfg.Worker,
 		pushKey:           pushKey,
+		viewTransitions:   h.app.Client.ViewTransitions,
 		backgroundSync:    h.app.Client.BackgroundSync,
 		syncRetention:     h.app.Client.SyncRetention,
 		runtime:           h.app.Client.Runtime,
