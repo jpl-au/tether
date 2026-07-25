@@ -301,7 +301,7 @@ func validSignalName(name string) bool {
 	if name == "" {
 		return false
 	}
-	for _, seg := range strings.Split(name, ".") {
+	for seg := range strings.SplitSeq(name, ".") {
 		if seg == "" || !isIdentStart(seg[0]) {
 			return false
 		}

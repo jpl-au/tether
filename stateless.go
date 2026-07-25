@@ -13,7 +13,7 @@ import (
 	"github.com/jpl-au/tether/wire"
 )
 
-// Page creates an [http.Handler] for a stateless page. State is
+// Stateless creates an [http.Handler] for a stateless page. State is
 // reconstructed from each HTTP request - nothing persists between
 // interactions. GET requests render the full HTML page. POST requests
 // handle a client event and return a JSON update with the new HTML
@@ -261,7 +261,7 @@ func (p *statelessHandler[S]) servePOST(w http.ResponseWriter, r *http.Request) 
 	}
 
 	state := p.cfg.InitialState(r)
-	cs := &CaptureSession{PushErr: ErrPushPreWarm}
+	cs := &CaptureSession{Ctx: r.Context(), PushErr: ErrPushPreWarm}
 
 	// In stateless mode, non-navigate events need URL-derived state as
 	// a starting point because stateless mode reconstructs state from

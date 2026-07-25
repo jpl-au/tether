@@ -93,7 +93,7 @@ func TestRouteNoPartialPrefixMatch(t *testing.T) {
 	w := testWidget{Count: 0}
 	sess := &CaptureSession{SessionID: "test"}
 
-	// "counter_extra.inc" should NOT match prefix "counter"  -
+	// "counter_extra.inc" should NOT match prefix "counter" -
 	// Route requires "counter." as the delimiter.
 	ev := Event{Action: "counter_extra.inc"}
 	got := RouteTyped(w, "counter", sess, ev)

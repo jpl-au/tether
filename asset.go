@@ -20,7 +20,7 @@ import (
 )
 
 // Asset manages an asset filesystem with content-hashed URLs.
-// Construct one as a struct literal and pass it to [StatefulConfig].Assets.
+// Construct one as a struct literal and pass it to [App].Assets.
 // The first call to [Asset.URL], [Asset.Stylesheet], or [Asset.Script]
 // (or handler startup) walks the filesystem and hashes every file.
 //
@@ -285,13 +285,13 @@ func (a *Asset) precacheURLs() []string {
 }
 
 // mountAssets creates an [assetMount] for each [Asset].
-func (app *App) mountAssets() []assetMount {
-	mounts := make([]assetMount, len(app.Assets))
-	for i, a := range app.Assets {
-		a.init()
-		handler := http.StripPrefix(a.prefix, a.handler)
+func (a *App) mountAssets() []assetMount {
+	mounts := make([]assetMount, len(a.Assets))
+	for i, asset := range a.Assets {
+		asset.init()
+		handler := http.StripPrefix(asset.prefix, asset.handler)
 		handler = cacheHandler(handler)
-		mounts[i] = assetMount{prefix: a.prefix, handler: handler}
+		mounts[i] = assetMount{prefix: asset.prefix, handler: handler}
 	}
 	return mounts
 }

@@ -62,12 +62,16 @@ const (
 	// in-memory state.
 	SessionStoreError DiagnosticKind = "session_store_error"
 
-	// CommandDiscarded signals that a command or effect was silently
-	// discarded because the session is frozen or destroyed. This
-	// happens when code calls Update, Signal, Toast, or other
-	// session methods after the client has disconnected (frozen) or
-	// the session has been permanently destroyed. The Detail field
-	// contains the session status at the time of discard.
+	// CommandDiscarded signals that a command or effect could not be
+	// delivered and was dropped. This happens when code calls Update,
+	// Signal, Toast, or other session methods against a session that
+	// is frozen, destroyed, or disconnected. The Detail field carries
+	// the session status, or "disconnected" when the session is alive
+	// but its transport has dropped.
+	//
+	// State changes survive a disconnect - only the effects that would
+	// have ridden with them are lost. The reattach catch-up re-sends
+	// the DOM the client missed.
 	CommandDiscarded DiagnosticKind = "command_discarded"
 
 	// StateSizeExceeded signals that the serialised session state

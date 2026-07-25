@@ -66,6 +66,15 @@ tether.Stateless(app, tether.StatelessConfig[State]{
         tether.Mount("widget", getWidget, setWidget),
     },
 
+    // Optional: wrap Handle with cross-cutting behaviour. Component
+    // and navigate events flow through the chain too, matching the
+    // stateful composition.
+    Middleware: []tether.Middleware[State]{withAuth},
+
+    // Optional: label this handler in the "tether: ready" startup log.
+    // Useful when several handlers share a mux.
+    Name: "marketing",
+
     // Optional: response encoding for POST events. wire.JSON (the
     // default) shares the stateful envelope; wire.HTML answers with
     // plain HTML fragments - curl-inspectable, no envelope.

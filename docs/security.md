@@ -20,9 +20,9 @@ responsibility ends.
 ## TLS is required
 
 Session IDs are bearer tokens - knowing one is sufficient to send events,
-reconnect, upload files, and register push subscriptions. They travel in
-WebSocket upgrade URLs, POST headers, and HTML attributes. Without TLS, any
-network observer can intercept them.
+reconnect, upload files, and register push subscriptions. They travel in POST
+headers and HTML attributes (never in a URL - see [below](#why-the-session-id-is-never-in-a-url)).
+Without TLS, any network observer can intercept them.
 
 **Always deploy behind TLS in production.** Use a reverse proxy (nginx,
 Caddy, Cloudflare) or `Handler.ListenAndServeTLS` directly.

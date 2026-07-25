@@ -208,6 +208,9 @@ func (c *Client) defaults() {
 	if c.ToastDuration == 0 {
 		c.ToastDuration = defaultToastDuration
 	}
+	if c.SyncRetention == 0 {
+		c.SyncRetention = defaultSyncRetention
+	}
 }
 
 // Security groups CSRF protection and session binding settings.
@@ -329,6 +332,13 @@ const (
 // production remains quiet. Helps developers understand which values
 // the framework chose on their behalf when debugging timeout or
 // capacity issues.
+//
+// The three arguments are the caller's values as they were *before*
+// defaults were applied - a field is only reported when the developer
+// left it zero. Comparing the filled value against the default instead
+// would report every field a developer had deliberately set to the same
+// value as the framework's choice, which is the opposite of useful when
+// the whole point is to see what you did not configure.
 func logAppliedDefaults(t Timeouts, l Limits, app App) {
 	if !dev.Enabled() {
 		return
@@ -339,49 +349,48 @@ func logAppliedDefaults(t Timeouts, l Limits, app App) {
 		defaults = append(defaults, name, value)
 	}
 
-	// Timeouts that were defaulted (already filled by caller).
-	if t.Reconnect == defaultReconnectTimeout {
-		add("Timeouts.Reconnect", t.Reconnect)
+	if t.Reconnect == 0 {
+		add("Timeouts.Reconnect", defaultReconnectTimeout)
 	}
-	if t.Pending == defaultPendingTimeout {
-		add("Timeouts.Pending", t.Pending)
+	if t.Pending == 0 {
+		add("Timeouts.Pending", defaultPendingTimeout)
 	}
-	if t.Heartbeat == defaultHeartbeatInterval {
-		add("Timeouts.Heartbeat", t.Heartbeat)
+	if t.Heartbeat == 0 {
+		add("Timeouts.Heartbeat", defaultHeartbeatInterval)
 	}
-	if t.Retry == defaultRetryDelay {
-		add("Timeouts.Retry", t.Retry)
+	if t.Retry == 0 {
+		add("Timeouts.Retry", defaultRetryDelay)
 	}
-	if t.MaxRetry == defaultMaxRetryDelay {
-		add("Timeouts.MaxRetry", t.MaxRetry)
+	if t.MaxRetry == 0 {
+		add("Timeouts.MaxRetry", defaultMaxRetryDelay)
 	}
-	if t.BackoffMultiplier == defaultBackoffMultiplier {
-		add("Timeouts.BackoffMultiplier", t.BackoffMultiplier)
+	// Below 1 rather than zero: Stateful treats any sub-1 multiplier as
+	// unset, since it would shrink the backoff instead of growing it.
+	if t.BackoffMultiplier < 1 {
+		add("Timeouts.BackoffMultiplier", defaultBackoffMultiplier)
 	}
-	if t.PendingCheck == defaultPendingCheckInterval {
-		add("Timeouts.PendingCheck", t.PendingCheck)
-	}
-
-	// Limits that were defaulted.
-	if l.MaxEventBytes == defaultMaxEventBytes {
-		add("Limits.MaxEventBytes", l.MaxEventBytes)
-	}
-	if l.MaxPushSubscriptionBytes == defaultMaxPushSubscriptionBytes {
-		add("Limits.MaxPushSubscriptionBytes", l.MaxPushSubscriptionBytes)
-	}
-	if l.CmdBufferSize == defaultCmdBufferSize {
-		add("Limits.CmdBufferSize", l.CmdBufferSize)
-	}
-	if l.MaxNavigateRedirects == defaultMaxNavigateRedirects {
-		add("Limits.MaxNavigateRedirects", l.MaxNavigateRedirects)
+	if t.PendingCheck == 0 {
+		add("Timeouts.PendingCheck", defaultPendingCheckInterval)
 	}
 
-	// App-level defaults.
-	if app.MaxPending == defaultMaxPending {
-		add("App.MaxPending", app.MaxPending)
+	if l.MaxEventBytes == 0 {
+		add("Limits.MaxEventBytes", defaultMaxEventBytes)
 	}
-	if app.ShutdownGrace == defaultShutdownGrace {
-		add("App.ShutdownGrace", app.ShutdownGrace)
+	if l.MaxPushSubscriptionBytes == 0 {
+		add("Limits.MaxPushSubscriptionBytes", defaultMaxPushSubscriptionBytes)
+	}
+	if l.CmdBufferSize == 0 {
+		add("Limits.CmdBufferSize", defaultCmdBufferSize)
+	}
+	if l.MaxNavigateRedirects == 0 {
+		add("Limits.MaxNavigateRedirects", defaultMaxNavigateRedirects)
+	}
+
+	if app.MaxPending == 0 {
+		add("App.MaxPending", defaultMaxPending)
+	}
+	if app.ShutdownGrace == 0 {
+		add("App.ShutdownGrace", defaultShutdownGrace)
 	}
 
 	if len(defaults) > 0 {

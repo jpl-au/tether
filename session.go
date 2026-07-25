@@ -29,8 +29,15 @@ type StructuralChange struct {
 // Passed to [StatefulConfig.OnNoPatch] so the developer can log, count, or
 // ignore it as appropriate.
 type NoPatch struct {
-	Source string // "update", "navigate", or "event"
-	Action string // event action; empty for "update" source
+	// Source is "update" for a render driven by [StatefulSession.Update],
+	// and otherwise the DOM event type that triggered the render
+	// ("click", "input", "submit", "navigate", ...). Compare against
+	// the [event] package constants rather than raw strings.
+	Source string
+
+	// Action is the event action that triggered the render. Empty for
+	// the "update" source, which has no originating event.
+	Action string
 }
 
 // RenderFunc builds a Fluent node tree from the current state. It is
@@ -41,7 +48,7 @@ type NoPatch struct {
 type RenderFunc[S any] func(state S) node.Node
 
 // defaultCmdBufferSize is the capacity of the command channel when
-// [StatefulConfig].CmdBufferSize is zero.
+// [Limits].CmdBufferSize is zero.
 const defaultCmdBufferSize = 64
 
 // StatefulSession represents a single connected client. Each browser tab
@@ -299,6 +306,14 @@ type Session interface {
 	Close()
 }
 
+// Compile-time interface satisfaction checks.
+var (
+	_ Session = (*CaptureSession)(nil)
+	_ Session = (*StatefulSession[struct{}])(nil)
+	_ emitter = (*CaptureSession)(nil)
+	_ emitter = (*StatefulSession[struct{}])(nil)
+)
+
 // CaptureSession implements [Session] by buffering side effects into
 // an [Effects] struct instead of sending them to a client. It is used
 // during pre-warming, stateless page handling, and testing.
@@ -312,15 +327,6 @@ type Session interface {
 // In tests, Ctx can be omitted (defaults to context.Background):
 //
 //	cs := &CaptureSession{SessionID: "my-id"}
-//
-// Compile-time interface satisfaction checks.
-var (
-	_ Session = (*CaptureSession)(nil)
-	_ Session = (*StatefulSession[struct{}])(nil)
-	_ emitter = (*CaptureSession)(nil)
-	_ emitter = (*StatefulSession[struct{}])(nil)
-)
-
 type CaptureSession struct {
 	// SessionID is returned by ID().
 	SessionID string

@@ -184,16 +184,16 @@ func writeClientAsset(w http.ResponseWriter, r *http.Request, a clientAsset) {
 // Returns "" for identity.
 func negotiateEncoding(accept string) string {
 	q := map[string]float64{}
-	for _, part := range strings.Split(accept, ",") {
+	for part := range strings.SplitSeq(accept, ",") {
 		token := strings.TrimSpace(part)
 		if token == "" {
 			continue
 		}
 		name := token
 		val := 1.0
-		if i := strings.IndexByte(token, ';'); i >= 0 {
-			name = strings.TrimSpace(token[:i])
-			val = parseQ(token[i+1:])
+		if before, after, ok := strings.Cut(token, ";"); ok {
+			name = strings.TrimSpace(before)
+			val = parseQ(after)
 		}
 		q[strings.ToLower(name)] = val
 	}
@@ -222,7 +222,7 @@ func negotiateEncoding(accept string) string {
 // Accept-Encoding token's semicolon. Absent or malformed q defaults to
 // 1 (fully acceptable).
 func parseQ(params string) float64 {
-	for _, p := range strings.Split(params, ";") {
+	for p := range strings.SplitSeq(params, ";") {
 		p = strings.TrimSpace(p)
 		if v, ok := strings.CutPrefix(p, "q="); ok {
 			f, err := strconv.ParseFloat(strings.TrimSpace(v), 64)

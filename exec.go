@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/jpl-au/tether/dev"
+	"github.com/jpl-au/tether/event"
 	"github.com/jpl-au/tether/wire"
 )
 
@@ -70,7 +71,7 @@ func (s *StatefulSession[S]) exec(ev Event) {
 	// Navigate(), re-process the redirect target server-side rather
 	// than round-tripping to the client. Effects from intermediate
 	// steps are preserved unless the redirect target overwrites them.
-	if ev.Type == "navigate" && fx.URL != "" {
+	if ev.Type == event.Navigate && fx.URL != "" {
 		for i := range s.maxNavigateRedirects {
 			redirectURL := fx.URL
 			u, err := url.Parse(redirectURL)
@@ -83,7 +84,7 @@ func (s *StatefulSession[S]) exec(ev Event) {
 			fx.URL = ""
 			fx.Replace = false
 			redirectEv := Event{
-				Type: "navigate",
+				Type: event.Navigate,
 				Data: map[string]string{"path": u.Path, "search": u.RawQuery},
 			}
 			newState = s.runHandle(newState, redirectEv)
@@ -109,6 +110,16 @@ func (s *StatefulSession[S]) exec(ev Event) {
 				fx.Replace = true
 			}
 		}
+	}
+
+	// The transport dropped between the client sending this event and
+	// the loop reaching it. Commit the state - the event was still
+	// valid - but leave the engine baseline alone so the reattach
+	// catch-up can send what the client missed.
+	if s.deferRender(fx) {
+		s.state = newState
+		s.stateSnap.Store(s.state)
+		return
 	}
 
 	if s.equal != nil && s.equal(s.state, newState) {
@@ -152,7 +163,7 @@ func (s *StatefulSession[S]) exec(ev Event) {
 		switch {
 		case s.onNoPatch != nil:
 			s.onNoPatch(s, NoPatch{Source: source, Action: ev.Action})
-		case ev.Type == "navigate":
+		case ev.Type == event.Navigate:
 			dev.Debug("navigate produced no patches",
 				"session", s.id,
 				"endpoint", s.endpoint,

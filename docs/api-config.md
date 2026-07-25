@@ -59,6 +59,7 @@ tether.Stateful(app, tether.StatefulConfig[State]{
 | `OnNavigate` | `func(Session, S, Params) S` | Handles URL navigation and initial load. Redirects via `Navigate()` are resolved inline (no client round-trip). |
 | `Layout` | `func(S, node.Node) node.Node` | Wraps the tether root in a full HTML document |
 | `Equal` | `func(a, b S) bool` | Skips render when state is unchanged |
+| `Name` | `string` | Label for this handler in the `tether: ready` startup log. Use it to tell apart handlers that share a mux |
 
 ### Transport
 
@@ -95,7 +96,7 @@ Mode constants: `mode.HTTP`, `mode.WebSocket`, `mode.ServerSentEvents`, `mode.Bo
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `Source` | `string` | `"update"`, `"navigate"`, or `"event"` |
+| `Source` | `string` | `"update"` for an `Update`-driven render, otherwise the DOM event type (`"click"`, `"input"`, `"navigate"`, ...) |
 | `Action` | `string` | Event action; empty for `"update"` source |
 
 When either callback is configured, the framework's own logging for that event is suppressed - the callback controls the output. When nil and DevMode is active, a debug message is logged instead.

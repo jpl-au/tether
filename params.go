@@ -46,7 +46,7 @@ type Params struct {
 	Path string
 
 	// Query holds the parsed URL query parameters. It is nil when the
-	// URL has no query string. All extraction methods are nil-safe  -
+	// URL has no query string. All extraction methods are nil-safe -
 	// calling Get, IntDefault, etc. on a nil Query returns zero values or
 	// defaults without panicking, because url.Values is a map type and
 	// nil map reads return zero values in Go.

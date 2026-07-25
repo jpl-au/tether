@@ -156,6 +156,13 @@ func (s *StatefulSession[S]) Patch(key string, fn func(S) (S, node.Node)) {
 		s.state = newState
 		s.stateSnap.Store(s.state)
 
+		// DiffKey advances the stored snapshot for this key, so with no
+		// transport it would strand the client on stale markup. See
+		// deferRender.
+		if s.deferRender(nil) {
+			return
+		}
+
 		renderStart := time.Now()
 		patch := s.engine.DiffKey(key, subtree)
 		renderDuration := time.Since(renderStart)
@@ -234,9 +241,9 @@ func (s *StatefulSession[S]) Announce(text string) {
 }
 
 // Flash sends a one-time notification to the client. The selector is
-// a CSS selector for the target element; the text is displayed for 5
-// seconds. Inside Handle the flash is buffered; outside it is sent
-// as a standalone update.
+// a CSS selector for the target element; the text clears itself after
+// [Client].FlashDuration (5 seconds by default). Inside Handle the
+// flash is buffered; outside it is sent as a standalone update.
 func (s *StatefulSession[S]) Flash(selector, text string) {
 	s.enqueueFx(func(fx *Effects) {
 		if fx.Flash == nil {

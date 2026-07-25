@@ -220,6 +220,18 @@ The panic message carries the position within the expression.
 `OnClientEvent` accepts only a `SetSignal` or `ToggleSignal` action.
 Pass one of those.
 
+### bind-unsupported-event
+
+`Event` was given a DOM event the client runtime does not delegate. The
+client attaches its listeners up front, so an event outside that set
+would render an attribute nothing ever reads - the binding would simply
+never fire. Supported: `click`, `dblclick`, `input`, `change`, `submit`,
+`keydown`, `focus`, `blur`, `paste`, `contextmenu`, `mouseover`.
+
+Most of these have a dedicated option (`bind.OnClick`, `bind.OnInput`,
+...); use `bind.Event` for the rest. For anything else, handle it in the
+browser with a client directive rather than a server round-trip.
+
 ---
 
 [← Back to documentation](../README.md#documentation)

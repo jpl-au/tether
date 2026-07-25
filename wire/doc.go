@@ -15,6 +15,9 @@
 // Per-handler settings override the app default. The zero value is
 // [JSON].
 //
-// Custom encoders can implement the [Encoder] interface and be wired
-// in via a new [Format] constant.
+// The set of formats is closed. [Encoder] is exported so callers can
+// wrap or inspect an encoding, but tether resolves a [Format] to its
+// encoder internally: a constant declared outside this package falls
+// through to [JSON]. Adding a format means adding it here and to that
+// resolution.
 package wire

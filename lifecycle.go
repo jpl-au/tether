@@ -83,10 +83,13 @@ func (h *Handler[S]) reattach(sess *StatefulSession[S], transport Transport) <-c
 		}
 
 		// Re-render and send the minimal update to catch the client
-		// up. When the differ has snapshots (from Import or still in
-		// memory), Diff produces targeted patches. Otherwise, Render
-		// sends a full morph. URL and title are always included so
-		// the browser's address bar and document title stay in sync.
+		// up. The baseline still describes the DOM the browser is
+		// showing - renders during the disconnect window are deferred
+		// precisely so it does (see deferRender) - so Diff produces
+		// exactly the patches the client missed while away. An
+		// unseeded engine falls back to a full morph. URL and title
+		// are always included so the browser's address bar and
+		// document title stay in sync.
 		tree := sess.render(sess.state)
 		patches, change := sess.engine.Diff(tree)
 

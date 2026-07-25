@@ -4,7 +4,7 @@
 // minimal overhead. This is the default and preferred transport.
 //
 // Pass ws.Upgrade() as the Upgrade field in [tether.StatefulConfig]. Origin
-// checking is handled by the tether handler via [tether.StatefulConfig].TrustedOrigins
+// checking is handled by the tether handler via [tether.Security].TrustedOrigins
 // rather than by the websocket library directly.
 package ws
 
@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jpl-au/tether/dev"
 	xport "github.com/jpl-au/tether/internal/transport"
 	"github.com/lxzan/gws"
 )
@@ -79,7 +80,7 @@ type Options struct {
 	// will accept from a client. Messages exceeding this limit cause
 	// the connection to be closed with a protocol error. When zero,
 	// the library default is used. Set this to match
-	// [tether.StatefulConfig].MaxEventBytes for consistent limits across
+	// [tether.Limits].MaxEventBytes for consistent limits across
 	// transport modes.
 	ReadLimit int64
 
@@ -96,7 +97,7 @@ type Options struct {
 // and returns a Transport that the session uses for its entire lifetime.
 //
 // Origin checking is handled by the tether handler via
-// [tether.StatefulConfig].TrustedOrigins, so the upgrader does not perform its
+// [tether.Security].TrustedOrigins, so the upgrader does not perform its
 // own origin verification.
 func Upgrade(opts ...Options) func(http.ResponseWriter, *http.Request) (xport.Transport, error) {
 	var o Options
@@ -163,7 +164,12 @@ func (h *eventHandler) OnMessage(conn *gws.Conn, msg *gws.Message) {
 	var ev xport.Event
 	if err := json.Unmarshal(msg.Bytes(), &ev); err != nil {
 		t.closeWithErr(err)
-		conn.WriteClose(1007, []byte("invalid payload"))
+		// Best effort: the peer sent something we cannot parse, so a
+		// failed close frame changes nothing - the connection is going
+		// away either way.
+		if err := conn.WriteClose(1007, []byte("invalid payload")); err != nil {
+			dev.Debug("ws: close frame write failed", "error", err)
+		}
 		return
 	}
 
@@ -177,7 +183,9 @@ func (h *eventHandler) OnPong(conn *gws.Conn, _ []byte) {
 	// Reset the read deadline so the connection stays alive as long
 	// as the client is responding. The zero time removes the deadline
 	// entirely; StartHeartbeat will set a fresh one on the next tick.
-	conn.SetDeadline(time.Time{})
+	if err := conn.SetDeadline(time.Time{}); err != nil {
+		dev.Debug("ws: clearing read deadline failed", "error", err)
+	}
 }
 
 func (h *eventHandler) OnClose(conn *gws.Conn, err error) {
@@ -281,7 +289,9 @@ func (t *transport) StartHeartbeat(interval time.Duration) {
 		for {
 			select {
 			case <-ticker.C:
-				t.conn.SetDeadline(time.Now().Add(deadline))
+				if err := t.conn.SetDeadline(time.Now().Add(deadline)); err != nil {
+					dev.Debug("ws: setting read deadline failed", "error", err)
+				}
 				if err := t.conn.WritePing(nil); err != nil {
 					return
 				}

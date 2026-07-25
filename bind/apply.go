@@ -1,6 +1,7 @@
 package bind
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -96,12 +97,44 @@ func OnPaste(action string) Option { return Option{"tether-paste", action} }
 // sentinel scrolls into view, the server loads the next page of data.
 func OnViewport(action string) Option { return Option{"tether-viewport", action} }
 
-// Event forwards an arbitrary DOM event to the server. Use this for
-// event types not covered by the built-in options (OnClick, OnSubmit,
-// etc.). The eventType is the standard DOM event name.
+// serverEvents lists every DOM event the client runtime delegates to
+// the server. Keep it in sync with eventTypes in client/tether.js -
+// an entry here with no listener there renders an attribute nothing
+// reads, so TestServerEventsMatchClient guards the pair.
+//
+// The set is closed because the wire format cannot distinguish a
+// custom event attribute (data-tether-dblclick) from a control
+// attribute (data-tether-disable): the client has to know the event
+// names up front to delegate them.
+var serverEvents = []string{
+	"click",
+	"dblclick",
+	"input",
+	"change",
+	"submit",
+	"keydown",
+	"focus",
+	"blur",
+	"paste",
+	"contextmenu",
+	"mouseover",
+}
+
+// Event forwards a DOM event to the server. Use this for the event
+// types that have no dedicated option (OnClick, OnSubmit, etc.):
 //
 //	bind.Apply(el, bind.Event("dblclick", "open-editor"))
+//
+// The eventType is the standard DOM event name and must be one the
+// client runtime delegates - click, dblclick, input, change, submit,
+// keydown, focus, blur, paste, contextmenu, or mouseover. Anything
+// else panics at construction time rather than rendering an attribute
+// the browser would never act on.
 func Event(eventType, action string) Option {
+	if !slices.Contains(serverEvents, eventType) {
+		panic("bind: Event does not support " + strconv.Quote(eventType) +
+			" - the client runtime delegates only " + strings.Join(serverEvents, ", "))
+	}
 	return Option{"tether-" + eventType, action}
 }
 
@@ -333,7 +366,7 @@ func AutoScroll() Option { return Option{"tether-auto-scroll", ""} }
 func Cloak() Option { return Option{"tether-cloak", ""} }
 
 // Permanent excludes the element from DOM morphing. When idiomorph
-// processes a server update, it skips elements marked permanent  -
+// processes a server update, it skips elements marked permanent -
 // their content, attributes, and children are preserved exactly as-is.
 // Use this for elements with client-side state that must survive server
 // updates (e.g. a video player, an interactive map, or a third-party

@@ -59,7 +59,7 @@ type BusConfig struct {
 // exists - they pass the Session they already have.
 //
 // [*StatefulSession] satisfies emitter via its command-loop enqueue.
-// [*CaptureSession] satisfies emitter with synchronous enqueue  -
+// [*CaptureSession] satisfies emitter with synchronous enqueue -
 // the function runs immediately in the caller's goroutine.
 type emitter interface {
 	enqueue(fn func())
@@ -116,11 +116,10 @@ type subscriber[E any] struct {
 	async     bool            // true for SubscribeAsync subscribers
 }
 
-// NewBus creates an empty bus ready to accept subscribers. The topic
-// An optional [BusConfig] can be provided to customise async worker
-// limits, overflow behaviour, and cluster topic. Without config, the
-// bus operates locally with 64 concurrent async workers and blocks
-// when the semaphore is full.
+// NewBus creates an empty bus ready to accept subscribers. An optional
+// [BusConfig] customises async worker limits, overflow behaviour, and
+// the cluster topic. Without config, the bus operates locally with 64
+// concurrent async workers and blocks when the semaphore is full.
 //
 //	var messages = tether.NewBus[MessageSent](tether.BusConfig{Topic: "messages"})
 //	var local    = tether.NewBus[InternalEvent]()
@@ -204,6 +203,9 @@ func (b *Bus[E]) Publish(event E) {
 // blocking callback stalls that session's command loop. For expensive
 // work, use [Bus.SubscribeAsync] or [On] which routes through the
 // subscriber's own command loop.
+//
+// A panic in the callback is recovered and logged; the publisher and
+// the remaining subscribers are unaffected.
 func (b *Bus[E]) Subscribe(ctx context.Context, fn func(E)) func() {
 	return b.subscribe(ctx, fn, "")
 }
@@ -224,7 +226,10 @@ func (b *Bus[E]) SubscribeAsync(ctx context.Context, fn func(E)) func() {
 	return b.subscribeAsync(ctx, fn, "")
 }
 
-// Len returns the number of active subscribers. Lock-free.
+// Len returns the number of registered subscribers. Lock-free. A
+// subscription whose context has just been cancelled is still counted
+// until its removal runs, so treat this as a close estimate rather than
+// an exact live count.
 func (b *Bus[E]) Len() int {
 	return len(b.loadSubs())
 }
@@ -321,9 +326,24 @@ func (b *Bus[E]) publish(event E, senderID string) {
 		if s.async {
 			b.dispatchAsync(s.fn, event)
 		} else {
-			s.fn(event)
+			b.dispatchSync(s.fn, event)
 		}
 	}
+}
+
+// dispatchSync runs a synchronous callback in the publisher's
+// goroutine. The panic recovery matches dispatchAsync: one broken
+// subscriber must not take down the publisher, which for [Bus.Publish]
+// is often an unrelated goroutine (a change listener, a queue consumer)
+// with no recovery of its own. Remaining subscribers still receive the
+// event.
+func (b *Bus[E]) dispatchSync(fn func(E), event E) {
+	defer func() {
+		if r := recover(); r != nil {
+			dev.Log().Error("panic in bus subscriber", "panic", r)
+		}
+	}()
+	fn(event)
 }
 
 // dispatchAsync runs an async callback with semaphore bounding. The

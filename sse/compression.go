@@ -113,7 +113,7 @@ func negotiate(acceptEncoding string, level CompressionLevel) (string, func(io.W
 // RFC 9110 - "gzip;q=0" means the client refuses gzip.
 func acceptedEncodings(header string) map[string]bool {
 	accepted := make(map[string]bool)
-	for _, part := range strings.Split(header, ",") {
+	for part := range strings.SplitSeq(header, ",") {
 		token, params, _ := strings.Cut(strings.TrimSpace(part), ";")
 		token = strings.ToLower(strings.TrimSpace(token))
 		if token == "" {
@@ -131,7 +131,7 @@ func acceptedEncodings(header string) map[string]bool {
 // zero. A malformed q-value is treated as no preference (not refused),
 // keeping negotiation resilient to junk input.
 func refused(params string) bool {
-	for _, p := range strings.Split(params, ";") {
+	for p := range strings.SplitSeq(params, ";") {
 		key, value, ok := strings.Cut(strings.TrimSpace(p), "=")
 		if !ok || strings.ToLower(strings.TrimSpace(key)) != "q" {
 			continue

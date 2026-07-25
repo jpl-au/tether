@@ -9,10 +9,14 @@ a fresh session is started.
 ## When to use it
 
 Enable frozen mode when sessions do not need background processing
-during disconnect. If your sessions use timers, broadcasts, or
-`Update()` calls that fire while disconnected, frozen mode will
-discard those - use the default (non-frozen) disconnect behaviour
-instead.
+during disconnect. A frozen session has no command loop, so timers,
+broadcasts, and `Update()` calls that fire while it is away are
+discarded outright and the state they would have produced is lost.
+
+The default (non-frozen) behaviour keeps the loop running, so those
+mutations still apply and the reconnect sends the client everything it
+missed. Side effects (`Toast`, `Signal`, `Flash`) are dropped either
+way - only state survives a disconnect.
 
 Frozen mode is ideal for:
 
@@ -90,7 +94,7 @@ panic: tether: FreezeWithRestore requires OnRestore - implement OnRestore to re-
 
 ```
 1. Transport closes
-2. DiffStore.Save(snapshots)     - if configured
+2. DiffStore.Save(snapshots) - if configured
 3. SessionStore.Save(state, ttl) - serialise S + metadata
 4. OnDisconnect fires
 5. Release S (zero value) and differ (nil)

@@ -207,6 +207,7 @@ for details and examples.
 | [idiomorph](https://github.com/bigskysoftware/idiomorph) 0.7.4 | [0BSD](https://opensource.org/license/0bsd) | DOM morphing (bundled JS) |
 | [lxzan/gws](https://github.com/lxzan/gws) | [Apache-2.0](https://github.com/lxzan/gws/blob/main/LICENSE) | WebSocket transport |
 | [fxamacker/cbor](https://github.com/fxamacker/cbor) | [MIT](https://github.com/fxamacker/cbor/blob/master/LICENSE) | CBOR encoding for session state persistence |
+| [fsnotify](https://github.com/fsnotify/fsnotify) | [BSD-3-Clause](https://github.com/fsnotify/fsnotify/blob/main/LICENSE) | Filesystem watching for `Asset.WatchDir` |
 | [andybalholm/brotli](https://github.com/andybalholm/brotli) | [MIT](https://github.com/andybalholm/brotli/blob/master/LICENSE) | Brotli compression for SSE streams and client assets |
 | [klauspost/compress](https://github.com/klauspost/compress) | [BSD-3-Clause](https://github.com/klauspost/compress/blob/master/LICENSE) | gzip/zstd/deflate compression for SSE streams and client assets |
 | [tdewolff/minify](https://github.com/tdewolff/minify) | [MIT](https://github.com/tdewolff/minify/blob/master/LICENSE) | Build-time minification of the bundled client JS (`go generate`) |

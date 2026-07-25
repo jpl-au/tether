@@ -45,13 +45,13 @@ usually means a key is derived from per-session state.
 
 ## bind.Apply vs SetData
 
-`bind.Apply` and the option helpers are ~47% slower than calling `SetData` directly. For performance-sensitive render paths, use `SetData`:
+`bind.Apply` and the option helpers cost ~25-30% more than calling `SetData` directly. For performance-sensitive render paths, use `SetData`:
 
 ```go
 button.Text("+").SetData("tether-click", "increment")
 ```
 
-In practice the difference is ~250ns per element - negligible unless you're rendering thousands of event-bound elements per frame.
+In practice the difference is well under 100ns per element - negligible unless you're rendering thousands of event-bound elements per frame. Measure on your own hardware with `go test -bench 'BenchmarkBindClick|BenchmarkSetDataDirect'`; the ratio is stable but the absolute figures are not.
 
 ## Windowing
 

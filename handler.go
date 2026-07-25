@@ -77,7 +77,7 @@ type Handler[S any] struct {
 	encoder wire.Encoder
 
 	// assetMounts serves embedded application assets at their
-	// configured URL prefixes, one per [Asset] in StatefulConfig.Assets.
+	// configured URL prefixes, one per [Asset] in App.Assets.
 	assetMounts []assetMount
 
 	// Diagnostics emits framework-level events so application code

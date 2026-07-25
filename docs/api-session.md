@@ -11,7 +11,7 @@ Call these inside `Handle` to buffer effects into the same update message, or fr
 ```go
 sess.Toast("Settings saved")              // global notification
 sess.Announce("Item added to cart")       // screen reader live region
-sess.Flash("#notice", "Saved")            // notification at selector (5s)
+sess.Flash("#notice", "Saved")            // notification at selector (Client.FlashDuration)
 sess.ScrollTo("#new-item")               // smooth scroll element into view
 sess.Download("/export/report.csv")      // trigger file download via HTTP
 sess.Navigate("/success")                 // pushState

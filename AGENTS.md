@@ -28,6 +28,7 @@ tether/              Root package - StatefulConfig, Handler, Session, Bus, Group
 ├── dev/             Debug logging - dev.Enable() activates, dev.Debug() is a no-op when disabled
 ├── docs/            Markdown guides (architecture, API, events, signals, broadcasting, etc.)
 ├── event/           Event type constants (click, input, submit, navigate, etc.)
+├── internal/        transport/ - the shared Event struct and BinarySender interface
 ├── mode/            Transport mode constants (WebSocket, ServerSentEvents, Both, HTTP)
 ├── protocol/        HTTP protocol selection (Auto, HTTP1, HTTP2, HTTP3)
 ├── push/            Web Push notification support (VAPID, Sender, Subscription)
@@ -234,7 +235,7 @@ creates event copies with a different action for prefix stripping.
 setup. The framework calls it during session startup for StatefulConfig.Components
 mounts. Components that don't need setup omit it.
 
-`StatelessConfig.Components` mirrors `StatefulConfig.Components` for stateless pages  - 
+`StatelessConfig.Components` mirrors `StatefulConfig.Components` for stateless pages -
 same `RouteMount` dispatch before Handle, same `Mount` constructor.
 
 ### Router[S] (router package)
@@ -457,43 +458,67 @@ Subscriptions are cleaned up automatically when the session is destroyed.
 
 | File | Purpose |
 |------|---------|
+| `doc.go` | Package doc - the two handler modes, wire format, client runtime |
+| `app.go` | App - configuration shared across every handler in the process |
+| `stateful.go` | `Stateful` constructor - validation, defaults, Handle composition |
+| `stateful_config.go` | StatefulConfig |
 | `config.go` | Timeouts, Limits, Client, Security structs (shared) |
 | `handler.go` | Handler - session pools, routing, transport upgrade |
+| `status.go` | Status state machine and the guarded `transition` |
 | `diagnostic.go` | Diagnostic struct, DiagnosticKind constants, panicErr helper |
-| `session.go` | Session struct, enqueue, enqueueFx, drainFx, emitDiagnostic |
+| `session.go` | Session interface, StatefulSession, CaptureSession, enqueue, enqueueFx, drainFx |
 | `loop.go` | Command loop (run), runCmd, readTransport |
 | `exec.go` | Event dispatch, navigate redirects, render after handle |
 | `disconnect.go` | Transport close, session persistence, cleanup, timers |
 | `send.go` | Render-diff-send pipeline, encoding, memoiser stats |
 | `methods.go` | Session methods - State, Update, Close, Toast, Navigate, Signal, Push |
+| `effects.go` | Effects struct - buffers Toast, Signal, Navigate, etc. |
 | `handle.go` | HandleFunc type, middleware chain |
-| `serve.go` | HTTP handler (ServeHTTP), session creation, restore from store |
+| `middleware.go` | Middleware type and Chain |
+| `event.go` | Event type alias over the internal transport event |
+| `params.go` | Params - URL path and query extraction for OnNavigate |
+| `serve.go` | Session creation, initial page render, restore from store |
+| `http.go` | ServeHTTP routing, POST events, connect ticket, destroy beacon, push subscribe |
+| `ticket.go` | One-time connect tickets - keeps the session ID out of transport URLs |
+| `csrf.go` | TrustedOrigins validation, CrossOriginProtection construction |
 | `lifecycle.go` | Reattach (reconnect), thaw (frozen restore), pool transitions |
 | `pending.go` | Background reaper for expired pre-warmed sessions |
 | `upload.go` | File upload handler with MIME validation |
-| `http.go` | POST event handler, push subscription handler |
 | `versioned.go` | Versioned[T] - version-tracked values for memoisation cache keys |
 | `differ.go` | Engine interface, Memoise/Differ selection |
+| `shared.go` | SetSharedCacheSize - re-export of the jit.Shared cache bound |
 | `component.go` | Component interface, EqualComponent, Route, RouteTyped |
 | `mount.go` | ComponentMount interface, Mount constructor, RouteMount dispatch |
 | `bus.go` | Bus - typed pub/sub with atomic reads and copy-on-write |
+| `bus_cluster.go` | Bus cluster publish/subscribe over the Cluster broker |
 | `group.go` | Group - session pool with Broadcast/BroadcastOthers/Each |
 | `value.go` | Value - shared observable state with Bus internally |
+| `value_cluster.go` | Value cluster publish/subscribe over the Cluster broker |
+| `presence.go` | Presence - per-session metadata shared across a group |
 | `cluster.go` | Cluster interface, topic registry, CBOR envelopes, self-filtering |
 | `tetheredis/` | Redis Pub/Sub Cluster implementation (separate module) |
 | `observe.go` | Observe - atomic subscribe + initial value delivery |
 | `emit.go` | On - subscribe a session to a Bus with sender filtering |
 | `watcher.go` | Watcher interface, WatchValue, WatchBus - declarative StatefulConfig subscriptions |
 | `transport.go` | Transport interface |
+| `detect.go` | Per-request HTTP protocol detection for protocol.Auto |
 | `diff_store.go` | DiffStore interface for external snapshot persistence |
 | `session_store.go` | SessionStore interface for session state persistence |
 | `session_codec.go` | SessionCodec[S] interface + default CBOR implementation |
 | `session_envelope.go` | Envelope struct - wraps encoded S with session metadata |
 | `stateless.go` | Stateless page handler (GET render, POST event round-trip) |
 | `stateless_config.go` | StatelessConfig |
-| `effects.go` | Effects struct - buffers Toast, Signal, Navigate, etc. |
+| `fragments.go` | Auto-fragments - hash-diffed targeted morphs for stateless pages |
 | `render.go` | Render helpers, tetherBody (root div with data attributes) |
+| `runtime.go` | ClientRuntime - JS (default) or WASM script injection |
+| `embed.go` | Embedded client runtime and the /_tether/ handler |
+| `clientassets.go` | Client asset compression, content negotiation, cache headers |
+| `gen_client.go` | `go generate` command - minifies and precompresses client/dist |
 | `asset.go` | Embedded asset serving with content-hashed URLs |
+| `catch.go` | Catch - render-time panic containment with a fallback node |
+| `errors.go` | Sentinel errors for push |
+| `logging.go` | initLog - DevMode resolution and the scoped dev logger |
+| `debug.go` | Dev-only dashboard at /_tether/debug |
 | `listen.go` | ListenAndServe (method + package-level), Drainable interface, signal trapping, graceful shutdown |
 | `drain.go` | Graceful drain - stop accepting new sessions, wait for existing |
 | `health.go` | Health check endpoint |

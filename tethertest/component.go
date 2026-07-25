@@ -6,7 +6,7 @@ import (
 )
 
 // ComponentHarness drives a [tether.Component] in isolation for testing.
-// Events are dispatched directly to the component's Handle method  -
+// Events are dispatched directly to the component's Handle method -
 // no prefix stripping, no wrapper state, no transport plumbing.
 //
 //	h := tethertest.NewComponent(MyWidget{Count: 0})
@@ -99,6 +99,15 @@ func (h *ComponentHarness[C]) Announce() string { return h.last.Announce }
 
 // HasAnnounce reports whether the most recent event triggered a matching announcement.
 func (h *ComponentHarness[C]) HasAnnounce(text string) bool { return h.last.Announce == text }
+
+// ScrollTo returns the CSS selector scrolled into view by the most recent event.
+func (h *ComponentHarness[C]) ScrollTo() string { return h.last.ScrollTo }
+
+// Download returns the download URL from the most recent event.
+func (h *ComponentHarness[C]) Download() string { return h.last.Download }
+
+// Prefetch returns the URLs hinted for prefetching by the most recent event.
+func (h *ComponentHarness[C]) Prefetch() []string { return h.last.Prefetch }
 
 // Flash returns the flash messages from the most recent event.
 func (h *ComponentHarness[C]) Flash() map[string]string { return h.last.Flash }

@@ -1877,8 +1877,12 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
 
   // --- Event delegation ---
 
+  // Every DOM event delegated to the server. Keep in sync with
+  // serverEvents in bind/apply.go, which rejects anything absent here
+  // at construction time; TestServerEventsMatchClient guards the pair.
   var eventTypes = [
     ["click", "tether-click"],
+    ["dblclick", "tether-dblclick"],
     ["input", "tether-input"],
     ["change", "tether-change"],
     ["submit", "tether-submit"],
@@ -1886,7 +1890,8 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
     ["focus", "tether-focus"],
     ["blur", "tether-blur"],
     ["paste", "tether-paste"],
-    ["contextmenu", "tether-contextmenu"]
+    ["contextmenu", "tether-contextmenu"],
+    ["mouseover", "tether-mouseover"]
   ];
 
   function bindEvents() {

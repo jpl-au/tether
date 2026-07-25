@@ -45,7 +45,7 @@ func Stateful[S any](app App, cfg StatefulConfig[S]) *Handler[S] {
 		panic("tether: StatefulConfig.Handle is required")
 	}
 	if cfg.Mode == mode.HTTP {
-		panic("tether: mode.HTTP is for tether.Page - use mode.WebSocket, mode.ServerSentEvents, or mode.Both")
+		panic("tether: mode.HTTP is for tether.Stateless - use mode.WebSocket, mode.ServerSentEvents, or mode.Both")
 	}
 	// Inherit transport functions from App when the handler does not
 	// set its own. Per-handler values always take precedence. When
@@ -118,6 +118,11 @@ func Stateful[S any](app App, cfg StatefulConfig[S]) *Handler[S] {
 			cfg.Protocol = protocol.Auto
 		}
 	}
+	// Log which fields the developer left unset before filling them, so
+	// the list reflects what the framework chose rather than what the
+	// values happen to be afterwards. Dev mode only.
+	logAppliedDefaults(cfg.Timeouts, cfg.Limits, app)
+
 	if cfg.Timeouts.Reconnect == 0 {
 		cfg.Timeouts.Reconnect = defaultReconnectTimeout
 	}
@@ -146,9 +151,6 @@ func Stateful[S any](app App, cfg StatefulConfig[S]) *Handler[S] {
 		cfg.Timeouts.BackoffMultiplier = defaultBackoffMultiplier
 	}
 	app.Client.defaults()
-	if app.Client.SyncRetention == 0 {
-		app.Client.SyncRetention = defaultSyncRetention
-	}
 	if cfg.Timeouts.Heartbeat == 0 {
 		cfg.Timeouts.Heartbeat = defaultHeartbeatInterval
 	}
@@ -172,11 +174,6 @@ func Stateful[S any](app App, cfg StatefulConfig[S]) *Handler[S] {
 	if cfg.Fallback == nil {
 		cfg.Fallback = sse.Upgrade()
 	}
-
-	// Log which defaults were applied so developers can see what the
-	// framework chose on their behalf. Only fires in dev mode to avoid
-	// noise in production.
-	logAppliedDefaults(cfg.Timeouts, cfg.Limits, app)
 
 	// Validate boundaries now that defaults are applied.
 	if cfg.Timeouts.Retry > cfg.Timeouts.MaxRetry {

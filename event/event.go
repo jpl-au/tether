@@ -10,10 +10,14 @@ package event
 // serialises the originating DOM event's type into this field.
 type Type string
 
-// Custom creates a Type from a raw string. Use this for custom DOM
-// events that are not covered by the predefined constants.
+// Custom creates a Type from a raw string. Use this for the DOM events
+// that have no predefined constant here - typically when constructing
+// an Event by hand in a test, or when matching one in Handle.
 //
-//	tether.Event{Type: event.Custom("mouseover"), Action: "hover"}
+//	tether.Event{Type: event.Custom("dblclick"), Action: "open-editor"}
+//
+// The client only sends the events it delegates; [bind.Event] lists
+// them and rejects the rest at construction time.
 func Custom(name string) Type { return Type(name) }
 
 const (

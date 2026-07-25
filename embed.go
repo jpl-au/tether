@@ -166,7 +166,7 @@ func ServeClient() http.Handler {
 // worker at any scope (the client scopes to the handler's endpoint via
 // data-tether-endpoint). Because its body is assembled per application
 // it is compressed once, at first request, rather than by go generate.
-func (app *App) jsHandler() http.Handler {
+func (a *App) jsHandler() http.Handler {
 	var workerOnce sync.Once
 	var workerAsset clientAsset
 
@@ -174,13 +174,13 @@ func (app *App) jsHandler() http.Handler {
 		p := strings.TrimPrefix(r.URL.Path, "/")
 
 		if dev.Enabled() {
-			app.serveDevClient(w, r, p)
+			a.serveDevClient(w, r, p)
 			return
 		}
 
 		if p == clientWorker {
 			workerOnce.Do(func() {
-				workerAsset = compressAsset(buildWorkerJS(app.Assets, workerTemplate()))
+				workerAsset = compressAsset(buildWorkerJS(a.Assets, workerTemplate()))
 			})
 			w.Header().Set("Service-Worker-Allowed", "/")
 			writeClientAsset(w, r, workerAsset)
@@ -203,11 +203,11 @@ func (app *App) jsHandler() http.Handler {
 // path uncompressed. Only flat file names embedded under client/ are
 // served, so requests can neither reach the dist tree nor traverse out
 // of it.
-func (app *App) serveDevClient(w http.ResponseWriter, r *http.Request, p string) {
+func (a *App) serveDevClient(w http.ResponseWriter, r *http.Request, p string) {
 	if p == clientWorker {
 		w.Header().Set("Service-Worker-Allowed", "/")
 		w.Header().Set("Content-Type", jsContentType)
-		if _, err := w.Write(buildWorkerJS(app.Assets, workerTemplate())); err != nil {
+		if _, err := w.Write(buildWorkerJS(a.Assets, workerTemplate())); err != nil {
 			dev.Log().Warn("tether: failed to write worker script", "err", err)
 		}
 		return

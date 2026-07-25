@@ -16,6 +16,40 @@ import (
 // handler whose render carries no jit.Memoise regions.
 var memoiseNoopWarnOnce sync.Once
 
+// deferRender reports whether the render-diff-send pipeline must be
+// skipped because the client's transport is gone.
+//
+// Diffing costs nothing to skip and everything to get wrong here. The
+// engine's stored snapshots describe the DOM the browser is currently
+// showing, and Diff advances them to the tree it was handed. With no
+// transport the patches are discarded, so diffing anyway would move the
+// baseline past bytes the browser never received - and the reattach
+// catch-up in [Handler.reattach] diffs against exactly that baseline,
+// so it would then find nothing to send and the client would stay stale
+// for the rest of the session. Leaving the baseline where the client's
+// DOM actually is makes the catch-up produce precisely the patches the
+// client missed.
+//
+// Effects buffered for this cycle cannot be delivered and are reported
+// as discarded, matching the frozen-session contract.
+func (s *StatefulSession[S]) deferRender(fx *Effects) bool {
+	if s.transport != nil {
+		return false
+	}
+	dev.Debug("render deferred, client disconnected",
+		"session", s.id,
+		"endpoint", s.endpoint,
+	)
+	if fx != nil && fx.Any() {
+		s.emitDiagnostic(Diagnostic{
+			Kind:      CommandDiscarded,
+			SessionID: s.id,
+			Detail:    "disconnected",
+		})
+	}
+	return true
+}
+
 // sendDiff is the render-diff-send pipeline extracted from exec and
 // Update. It handles patches, structural changes, the unseeded-engine
 // case, and the no-diff case where only the eventID needs echoing.
@@ -111,6 +145,14 @@ func (s *StatefulSession[S]) send(u wire.Update) {
 		s.lastTitle = u.Title
 	}
 	if s.transport == nil {
+		// Standalone effects raised while the client is away. The
+		// render pipeline is guarded by deferRender before it reaches
+		// here, so this is the effect-only path.
+		s.emitDiagnostic(Diagnostic{
+			Kind:      CommandDiscarded,
+			SessionID: s.id,
+			Detail:    "disconnected",
+		})
 		return
 	}
 	data, err := s.encoder.Encode(u)
@@ -189,6 +231,10 @@ func (s *StatefulSession[S]) coalescedRender() {
 	}()
 
 	s.drainFx(fx)
+
+	if s.deferRender(fx) {
+		return
+	}
 
 	if s.coalescedCount > 1 {
 		s.emitDiagnostic(Diagnostic{

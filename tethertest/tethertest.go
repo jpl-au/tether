@@ -45,7 +45,7 @@ type Config[S any] struct {
 	// State is the initial state for each test interaction.
 	State S
 
-	// Render builds a node tree from the current state. Optional  -
+	// Render builds a node tree from the current state. Optional -
 	// only required when calling [Harness.HTML], [Harness.Render],
 	// or [Harness.RenderNode].
 	Render tether.RenderFunc[S]
@@ -78,7 +78,7 @@ type Config[S any] struct {
 	Components []tether.ComponentMount[S]
 
 	// Layout wraps the rendered content for [Harness.Render] and
-	// [Harness.HTML], mirroring [tether.StatefulConfig].Layout. Optional  -
+	// [Harness.HTML], mirroring [tether.StatefulConfig].Layout. Optional -
 	// when absent, only the content node is rendered.
 	Layout func(S, node.Node) node.Node
 
@@ -114,7 +114,7 @@ type Harness[S any] struct {
 	morphKeys []string
 }
 
-// New creates a test harness. The harness invokes Handle directly  -
+// New creates a test harness. The harness invokes Handle directly -
 // no HTTP server, no JSON round-trip, no goroutines.
 //
 // Component routing, OnNavigate, and middleware are composed into
@@ -285,6 +285,25 @@ func (h *Harness[S]) Flash() map[string]string {
 // Go types - no JSON round-tripping.
 func (h *Harness[S]) Signals() map[string]any {
 	return h.last.Signals
+}
+
+// ScrollTo returns the CSS selector scrolled into view by the most
+// recent Send call. Returns an empty string if none was triggered.
+func (h *Harness[S]) ScrollTo() string {
+	return h.last.ScrollTo
+}
+
+// Download returns the download URL from the most recent Send call.
+// Returns an empty string if no download was triggered.
+func (h *Harness[S]) Download() string {
+	return h.last.Download
+}
+
+// Prefetch returns the URLs hinted for prefetching by the most recent
+// Send call, in the order they were requested. Returns nil if none
+// were hinted.
+func (h *Harness[S]) Prefetch() []string {
+	return h.last.Prefetch
 }
 
 // MorphKeys returns the Dynamic keys declared via [tether.Session.Morph]

@@ -129,7 +129,7 @@ func (h *Handler[S]) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // (available in all browsers since 2023), then Origin is compared
 // against TrustedOrigins or the Host header as a fallback.
 //
-// Requests without Sec-Fetch-Site or Origin headers are allowed  -
+// Requests without Sec-Fetch-Site or Origin headers are allowed -
 // they come from same-origin navigations or non-browser clients.
 func (h *Handler[S]) wsOriginAllowed(r *http.Request) bool {
 	// Sec-Fetch-Site is the primary signal. Modern browsers send it
@@ -203,7 +203,11 @@ func (h *Handler[S]) handleConnectTicket(w http.ResponseWriter, r *http.Request)
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	io.WriteString(w, tok)
+	if _, err := io.WriteString(w, tok); err != nil {
+		// The client vanished before it could read the ticket. It
+		// expires on its own, so there is nothing to undo.
+		dev.Debug("connect ticket write failed", "error", err)
+	}
 }
 
 // handleDestroyBeacon destroys a session the client knows is
