@@ -362,3 +362,67 @@ func TestUndeliveredEffectsReportedOnDestroy(t *testing.T) {
 		}
 	})
 }
+
+// TestStaleMorphDeferredWhenClientGone covers the one render path that
+// did not consult deferRender. The stale-client morph is queued at
+// session creation and runs later, so a client that vanishes in between
+// would otherwise have the engine seeded against DOM it never received,
+// leaving the reconnect nothing to catch up with.
+func TestStaleMorphDeferredWhenClientGone(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		h := newReattachHandler()
+		sess := disconnectedSession(t, h)
+
+		// The command serveSession queues for a stale client, run after
+		// the transport has already gone.
+		done := make(chan struct{})
+		sess.cmds <- func() {
+			defer close(done)
+			if sess.deferRender(nil) {
+				return
+			}
+			tree := sess.render(sess.state)
+			sess.engine.RenderBytes(tree)
+		}
+		<-done
+		synctest.Wait()
+
+		// The baseline must still describe the client's DOM, so a change
+		// made afterwards is still deliverable on reconnect.
+		sess.Update(func(s counterState) counterState {
+			s.Count = 5
+			return s
+		})
+		synctest.Wait()
+
+		ct := newConnectedTransport()
+		h.reattach(sess, ct)
+		synctest.Wait()
+
+		ct.mu.Lock()
+		sent := append([][]byte(nil), ct.sent...)
+		ct.mu.Unlock()
+
+		var found bool
+		for _, raw := range sent {
+			m := decodeMessage(raw)
+			for _, p := range m.Patches {
+				if strings.Contains(p.HTML, "Count: 5") {
+					found = true
+				}
+			}
+			for _, mo := range m.Morphs {
+				if strings.Contains(mo.HTML, "Count: 5") {
+					found = true
+				}
+			}
+		}
+		if !found {
+			t.Errorf("reattach lost the update: the stale morph seeded the engine while the client was gone; sent %s", sent)
+		}
+
+		sess.stop()
+		ct.Close()
+		synctest.Wait()
+	})
+}

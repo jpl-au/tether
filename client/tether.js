@@ -912,9 +912,10 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
         }
 
         // Attach listeners for any event type this update introduced.
-        // Root delegation already covers new elements carrying a type
-        // that is bound; a type appearing for the first time needs its
-        // own listener, exactly like a lazily loaded extension.
+        // Delegation already covers new elements carrying a type that
+        // is bound; a type appearing for the first time needs its own
+        // listener, exactly like a lazily loaded extension. Only the
+        // morphed tree can have changed, so the scan starts at root.
         discoverEvents(root);
 
         // Lazy-load extension scripts when their marker attributes first
@@ -1929,7 +1930,13 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
           bindScopedEvent(type);
         }
       }
-      if (node.content) discoverEvents(node.content);
+      // Template content is a detached fragment querySelectorAll cannot
+      // reach, and tether-template.js stamps that markup into the page
+      // client-side with no server round trip to trigger another scan.
+      // Gate on the tag: HTMLMetaElement.content reflects the attribute
+      // as a string, so a bare truthiness check walks into <meta> and
+      // throws, taking every binding on the page with it.
+      if (node.tagName === "TEMPLATE" && node.content) discoverEvents(node.content);
     }
   }
 
@@ -1953,8 +1960,35 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
     }, { capture: true, passive: false });
   }
 
+  // warnBindingsOutsideRoot reports event bindings the framework cannot
+  // reach. Delegation is scoped to the tether root because that is the
+  // subtree the server renders and diffs; a binding in the Layout shell
+  // sits outside it and would never fire. Rather than widen delegation
+  // to a region the diff engine never updates, say so plainly. Dev mode
+  // only - one whole-document query at startup, and nothing shipped to
+  // production.
+  function warnBindingsOutsideRoot() {
+    if (!devMode || !root) return;
+    var all = document.querySelectorAll("*");
+    for (var i = 0; i < all.length; i++) {
+      var el = all[i];
+      if (root.contains(el)) continue;
+      var attrs = el.attributes;
+      for (var j = 0; j < attrs.length; j++) {
+        if (attrs[j].name.lastIndexOf(eventAttrPrefix, 0) !== 0) continue;
+        reportError("render",
+          "event binding on an element outside the tether root will never fire: " +
+          attrs[j].name + '="' + attrs[j].value + '". Bindings belong inside Render, ' +
+          "not in the Layout shell, which is rendered once and never diffed.",
+          false, "binding-outside-root", el);
+        break;
+      }
+    }
+  }
+
   function bindEvents() {
     discoverEvents(root);
+    warnBindingsOutsideRoot();
     // click is bound unconditionally: the framework's own root handlers
     // below need it whether or not the page carries a click binding.
     bindEventType("click");
@@ -2023,6 +2057,10 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
     return parts.join(".");
   }
 
+  // bindEventType attaches the delegated listener for one DOM event.
+  // Delegation is on the tether root, which is the subtree the server
+  // renders and diffs. warnBindingsOutsideRoot reports anything bound
+  // beyond it.
   function bindEventType(domEvent) {
     if (boundTypes[domEvent]) return;
     boundTypes[domEvent] = true;
@@ -2048,6 +2086,28 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
 
       handleBoundEvent(target, domEvent, dataAttr, e);
     });
+  }
+
+  // bindingKey identifies one binding on one element, so the timing
+  // controls hold a window per element rather than per action. Two rows
+  // in a list sharing an action own separate debounce, throttle and
+  // frame slots - sharing one was invisible at a 300ms input debounce
+  // and obvious at frame timing on pointer events.
+  //
+  // The id lives in a WeakMap rather than an attribute: the server
+  // never renders it, so a morph would strip an attribute straight back
+  // off, and the map lets the entry be collected with the element.
+  // idiomorph preserves elements in place, so a morphed row keeps its
+  // pending timers.
+  var bindingIds = new WeakMap();
+  var bindingSeq = 0;
+  function bindingKey(el, dataAttr, action) {
+    var id = bindingIds.get(el);
+    if (!id) {
+      id = String(++bindingSeq);
+      bindingIds.set(el, id);
+    }
+    return id + ":" + dataAttr + ":" + action;
   }
 
   // handleBoundEvent runs the shared pipeline for a server event binding:
@@ -2207,7 +2267,7 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
     // input has been quiet for the interval; the default trailing-edge
     // variant (bind.Debounce) waits for the pause before sending.
     if (domEvent === "input") {
-      var timerKey = dataAttr + ":" + action;
+      var timerKey = bindingKey(target, dataAttr, action);
       var leading = parseInt(target.getAttribute("data-tether-debounce-leading"));
       if (leading > 0) {
         var idle = !debounceTimers[timerKey];
@@ -2229,7 +2289,7 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
     // Throttle if configured
     var throttle = parseInt(target.getAttribute("data-tether-throttle"));
     if (throttle > 0) {
-      var throttleKey = "throttle:" + dataAttr + ":" + action;
+      var throttleKey = "throttle:" + bindingKey(target, dataAttr, action);
       if (debounceTimers[throttleKey]) return;
       debounceTimers[throttleKey] = setTimeout(function () {
         delete debounceTimers[throttleKey];
@@ -2247,7 +2307,7 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
     if (continuousEvents[domEvent] && !throttle &&
         !target.hasAttribute("data-tether-delay") &&
         !target.hasAttribute("data-tether-debounce")) {
-      var frameKey = "frame:" + dataAttr + ":" + action;
+      var frameKey = "frame:" + bindingKey(target, dataAttr, action);
       var pending = !!framePending[frameKey];
       framePending[frameKey] = { target: target, data: data };
       if (pending) return;

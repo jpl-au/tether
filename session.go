@@ -548,6 +548,15 @@ func (s *StatefulSession[S]) enqueueFx(fn func(*Effects)) {
 				select {
 				case s.fxCh <- fn:
 				case <-s.loopDone:
+					// The loop left before this closure could be
+					// handed over. cleanup cannot see it - it is parked
+					// here, not in the channel - so it reports itself
+					// rather than disappearing.
+					s.emitDiagnostic(Diagnostic{
+						Kind:      CommandDiscarded,
+						SessionID: s.id,
+						Detail:    "effect never reached the loop: session ended while it was queued behind a full buffer",
+					})
 				}
 			}()
 		default:
@@ -652,6 +661,13 @@ func (s *StatefulSession[S]) enqueue(fn func()) {
 				select {
 				case s.cmds <- fn:
 				case <-s.loopDone:
+					// Same as enqueueFx: parked outside the channel, so
+					// invisible to cleanup and silent unless it says so.
+					s.emitDiagnostic(Diagnostic{
+						Kind:      CommandDiscarded,
+						SessionID: s.id,
+						Detail:    "command never reached the loop: session ended while it was queued behind a full buffer",
+					})
 				}
 			}()
 		default:

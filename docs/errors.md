@@ -88,6 +88,18 @@ sess.Signal("tax", 4)
 bind.Computed("total", `subtotal + tax`)
 ```
 
+### binding-outside-root
+
+**Type:** `render` (dev mode only). An element outside the tether root
+carries a server event binding. Delegation is scoped to the root - the
+subtree the server renders and diffs - so the binding will never fire.
+
+Almost always a binding placed in `StatefulConfig.Layout`, which wraps
+the root in a full HTML document. The Layout is rendered once on the
+initial GET and never diffed, so even if the event did reach the server,
+nothing it changed there could be sent back. Move the binding inside
+`Render`.
+
 ### effects-island-parse
 
 **Type:** `parse`. In HTML (stateless) mode the `<template

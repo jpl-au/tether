@@ -436,6 +436,16 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 	// produce targeted patches.
 	if stale {
 		sess.cmds <- func() {
+			// The client can vanish between creating the session and
+			// this command running. RenderBytes seeds the engine, so
+			// rendering with no transport would move the baseline past
+			// DOM the browser never received - the drift deferRender
+			// exists to prevent. The engine stays unseeded instead, and
+			// the reconnect sends a full morph exactly as this would
+			// have.
+			if sess.deferRender(nil) {
+				return
+			}
 			tree := sess.render(sess.state)
 			html := sess.engine.RenderBytes(tree)
 			sess.send(wire.Update{Morphs: []wire.Morph{{Key: "", HTML: html}}})

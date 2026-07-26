@@ -248,6 +248,16 @@ func (s *StatefulSession[S]) send(u wire.Update) {
 		if u.Signals == nil {
 			return
 		}
+		// One unencodable value takes every signal in the batch with
+		// it, and a batch can be a whole reconnect window's worth
+		// rather than one cycle. Name the loss: EncodeError alone says
+		// something failed to encode, not that the client is now
+		// missing state it will never be sent again.
+		s.emitDiagnostic(Diagnostic{
+			Kind:      CommandDiscarded,
+			SessionID: s.id,
+			Detail:    fmt.Sprintf("%d signal(s) dropped - the batch could not be encoded", len(u.Signals)),
+		})
 		u.Signals = nil
 		data, err = s.encoder.Encode(u)
 		if err != nil {
