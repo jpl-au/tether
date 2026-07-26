@@ -46,6 +46,9 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
   var defaultDebounce = 0;
   var transitionTimeout = 0;
   var debounceTimers = {};
+  // Latest pending sample per continuous-event binding, flushed once per
+  // animation frame. See the coalescing block in handleBoundEvent.
+  var framePending = {};
   var leavingNodes = new Set();
   var pendingElements = {};
   // Elements whose bind.Once binding has already fired. A WeakSet keyed
@@ -907,6 +910,12 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
           var focusEl = root.querySelector("[data-tether-autofocus]");
           if (focusEl && focusEl !== document.activeElement) focusEl.focus();
         }
+
+        // Attach listeners for any event type this update introduced.
+        // Root delegation already covers new elements carrying a type
+        // that is bound; a type appearing for the first time needs its
+        // own listener, exactly like a lazily loaded extension.
+        discoverEvents(root);
 
         // Lazy-load extension scripts when their marker attributes first
         // appear in the DOM after a morph. This eliminates the need for
@@ -1877,28 +1886,78 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
 
   // --- Event delegation ---
 
-  // Every DOM event delegated to the server. Keep in sync with
-  // serverEvents in bind/apply.go, which rejects anything absent here
-  // at construction time; TestServerEventsMatchClient guards the pair.
-  var eventTypes = [
-    ["click", "tether-click"],
-    ["dblclick", "tether-dblclick"],
-    ["input", "tether-input"],
-    ["change", "tether-change"],
-    ["submit", "tether-submit"],
-    ["keydown", "tether-keydown"],
-    ["focus", "tether-focus"],
-    ["blur", "tether-blur"],
-    ["paste", "tether-paste"],
-    ["contextmenu", "tether-contextmenu"],
-    ["mouseover", "tether-mouseover"]
-  ];
+  // Every server event binding renders data-tether-event-<domEvent>.
+  // The prefix is what tells an event binding apart from a control
+  // attribute, so the set of event types is open: discoverEvents finds
+  // the names a page actually uses, at load and after every update.
+  // Keep in step with eventAttr in bind/apply.go.
+  var eventAttrPrefix = "data-tether-event-";
+
+  // Event types already listening, so discovery is idempotent. Null
+  // prototype so an event named "toString" cannot read as bound.
+  var boundTypes = Object.create(null);
+  var scopedTypes = Object.create(null);
+
+  // Continuous events fire far faster than a server round trip can
+  // absorb, so they coalesce to the latest sample once per frame.
+  // bind.Throttle, bind.Debounce and bind.Delay all override this.
+  var continuousEvents = {
+    mousemove: true, pointermove: true, touchmove: true, drag: true,
+    dragover: true, scroll: true, wheel: true, resize: true
+  };
+
+  // discoverEvents attaches listeners for every event name present in
+  // el's subtree. Runs at load and after each update, so a binding
+  // morphed in later is live without the server declaring it up front.
+  // Template content is searched too: tether-template.js stamps that
+  // markup into the page client-side, with no server round trip to
+  // trigger another scan.
+  function discoverEvents(el) {
+    if (!el) return;
+    var all = el.querySelectorAll("*");
+    for (var i = -1; i < all.length; i++) {
+      var node = i < 0 ? el : all[i];
+      if (node.nodeType !== 1) continue;
+      var attrs = node.attributes;
+      for (var j = 0; j < attrs.length; j++) {
+        var name = attrs[j].name;
+        if (name.lastIndexOf(eventAttrPrefix, 0) !== 0) continue;
+        var type = name.slice(eventAttrPrefix.length);
+        if (!type) continue;
+        bindEventType(type);
+        if (node.hasAttribute("data-tether-outside") || node.hasAttribute("data-tether-at")) {
+          bindScopedEvent(type);
+        }
+      }
+      if (node.content) discoverEvents(node.content);
+    }
+  }
+
+  // listen registers handler for one DOM event in whichever phase can
+  // see it. Every dispatch runs the capture path from the window down to
+  // the target; only a bubbling one runs the path back up. Registering
+  // both and letting each claim the events it owns means tether needs no
+  // table of which events bubble: a bubbling event is handled on the way
+  // up, which is the ordering bind.Stop relies on, and a non-bubbling one
+  // (focus, blur, scroll, mouseenter) on the way down.
+  //
+  // passive:false because browsers make wheel and touch listeners
+  // passive by default on document and window, which would turn
+  // bind.PreventDefault into a console error.
+  function listen(target, type, handler) {
+    target.addEventListener(type, function (e) {
+      if (e.bubbles) handler(e);
+    }, { passive: false });
+    target.addEventListener(type, function (e) {
+      if (!e.bubbles) handler(e);
+    }, { capture: true, passive: false });
+  }
 
   function bindEvents() {
-    for (var i = 0; i < eventTypes.length; i++) {
-      bindEventType(eventTypes[i][0], eventTypes[i][1]);
-    }
-    bindScopedEvents();
+    discoverEvents(root);
+    // click is bound unconditionally: the framework's own root handlers
+    // below need it whether or not the page carries a click binding.
+    bindEventType("click");
     root.addEventListener("click", handleToggles);
     root.addEventListener("click", handleLinks);
     root.addEventListener("click", handleClipboard);
@@ -1964,18 +2023,31 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
     return parts.join(".");
   }
 
-  function bindEventType(domEvent, dataAttr) {
-    root.addEventListener(domEvent, function (e) {
-      var target = e.target.closest("[data-" + dataAttr + "]");
+  function bindEventType(domEvent) {
+    if (boundTypes[domEvent]) return;
+    boundTypes[domEvent] = true;
+    var dataAttr = "tether-event-" + domEvent;
+    // Built once per type rather than per dispatch.
+    var selector = "[" + CSS.escape(eventAttrPrefix + domEvent) + "]";
+
+    listen(root, domEvent, function (e) {
+      var t = e.target;
+      if (!t || t.nodeType !== 1) return;
+      // A bubbling event belongs to the nearest bound ancestor; a
+      // non-bubbling one only to the element it was dispatched on,
+      // exactly as addEventListener on that element would behave. The
+      // exact match is also what stops mouseenter firing an ancestor's
+      // binding for every descendant entered.
+      var target = e.bubbles ? t.closest(selector) : (t.matches(selector) ? t : null);
       if (!target) return;
 
       // Outside / Window / Document bindings are served by the scoped
-      // listeners in bindScopedEvents, not by root delegation. Skipping
+      // listeners in bindScopedEvent, not by root delegation. Skipping
       // them here keeps each binding firing exactly once.
       if (target.hasAttribute("data-tether-outside") || target.hasAttribute("data-tether-at")) return;
 
       handleBoundEvent(target, domEvent, dataAttr, e);
-    }, domEvent === "focus" || domEvent === "blur");
+    });
   }
 
   // handleBoundEvent runs the shared pipeline for a server event binding:
@@ -2164,6 +2236,31 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
       }, throttle);
     }
 
+    // Continuous events (mousemove, scroll, wheel, ...) fire far faster
+    // than a round trip, so with no explicit timing they coalesce to one
+    // event per animation frame. The pending sample is overwritten
+    // rather than queued, so the server receives where the pointer
+    // ENDED, not where it was when the frame opened - which is what a
+    // leading-edge throttle would have sent. Everything above this point
+    // (PreventDefault, Stop, optimistic signals, data collection) has
+    // already run for every occurrence.
+    if (continuousEvents[domEvent] && !throttle &&
+        !target.hasAttribute("data-tether-delay") &&
+        !target.hasAttribute("data-tether-debounce")) {
+      var frameKey = "frame:" + dataAttr + ":" + action;
+      var pending = !!framePending[frameKey];
+      framePending[frameKey] = { target: target, data: data };
+      if (pending) return;
+      requestAnimationFrame(function () {
+        var latest = framePending[frameKey];
+        delete framePending[frameKey];
+        if (!latest) return;
+        var eid = sendEvent(domEvent, action, latest.data);
+        if (eid) disablePending(latest.target, eid);
+      });
+      return;
+    }
+
     // fire sends the event and starts the element's pending/disable
     // state. bind.Delay defers it by a fixed interval; without a delay
     // it runs synchronously.
@@ -2194,14 +2291,20 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
   // root. One delegated listener per event type is attached at both the
   // document and window level; it queries the DOM live at dispatch time,
   // so morphed-in bindings are picked up without any rebinding.
-  function bindScopedEvents() {
-    for (var i = 0; i < eventTypes.length; i++) {
-      var domEvent = eventTypes[i][0];
-      var dataAttr = eventTypes[i][1];
-      var useCapture = domEvent === "focus" || domEvent === "blur";
-      document.addEventListener(domEvent, makeScopedHandler(domEvent, dataAttr, "document"), useCapture);
-      window.addEventListener(domEvent, makeScopedHandler(domEvent, dataAttr, "window"), useCapture);
-    }
+  // bindScopedEvent attaches the document- and window-level listeners a
+  // bind.Outside / bind.Window / bind.Document binding needs. Attached
+  // only for the types a page actually scopes: a scoped handler queries
+  // the whole document on every dispatch, so binding them for every
+  // discovered type would make a wheel or mousemove binding pay two
+  // full-document queries per tick. resize only ever fires on window, so
+  // without this path bind.On("resize", ...) would never reach the
+  // server at all.
+  function bindScopedEvent(domEvent) {
+    if (scopedTypes[domEvent]) return;
+    scopedTypes[domEvent] = true;
+    var dataAttr = "tether-event-" + domEvent;
+    listen(document, domEvent, makeScopedHandler(domEvent, dataAttr, "document"));
+    listen(window, domEvent, makeScopedHandler(domEvent, dataAttr, "window"));
   }
 
   // makeScopedHandler returns a delegated listener for one event type at

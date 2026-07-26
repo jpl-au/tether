@@ -14,9 +14,12 @@ broadcasts, and `Update()` calls that fire while it is away are
 discarded outright and the state they would have produced is lost.
 
 The default (non-frozen) behaviour keeps the loop running, so those
-mutations still apply and the reconnect sends the client everything it
-missed. Side effects (`Toast`, `Signal`, `Flash`) are dropped either
-way - only state survives a disconnect.
+mutations still apply, and the reconnect sends the client everything it
+missed - both the state changes and the side effects that described
+them (`Toast`, `Flash`, `Announce`, `Signal`, `SetTitle`). See
+[architecture](architecture.md#session-pools) for the full contract.
+A frozen session has no loop to hold either, so nothing survives except
+what the SessionStore persisted.
 
 Frozen mode is ideal for:
 

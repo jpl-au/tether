@@ -220,17 +220,28 @@ The panic message carries the position within the expression.
 `OnClientEvent` accepts only a `SetSignal` or `ToggleSignal` action.
 Pass one of those.
 
-### bind-unsupported-event
+### bind-unbindable-event-name
 
-`Event` was given a DOM event the client runtime does not delegate. The
-client attaches its listeners up front, so an event outside that set
-would render an attribute nothing ever reads - the binding would simply
-never fire. Supported: `click`, `dblclick`, `input`, `change`, `submit`,
-`keydown`, `focus`, `blur`, `paste`, `contextmenu`, `mouseover`.
+`On` was given an event name that cannot be carried in an attribute
+name. The binding renders as `data-tether-event-<name>`, and HTML
+lowercases attribute names, so the name must be lowercase and contain
+only letters, digits and `-` `_` `.` `:`.
 
-Most of these have a dedicated option (`bind.OnClick`, `bind.OnInput`,
-...); use `bind.Event` for the rest. For anything else, handle it in the
-browser with a client directive rather than a server round-trip.
+Every DOM event name qualifies, as do the usual custom-event
+conventions (`sl-change`, `cart:updated`). A mixed-case custom event
+does not: the browser would lowercase the attribute and the two would
+never match.
+
+```go
+// Wrong - the attribute would render as data-tether-event-mouseover
+bind.On("mouseOver", "hover")
+
+// Right
+bind.On("mouseover", "hover")
+```
+
+To forward a genuinely mixed-case custom event, dispatch it from a
+`bind.Hook` with `Tether.sendEvent`.
 
 ---
 

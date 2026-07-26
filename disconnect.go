@@ -162,8 +162,21 @@ func (s *StatefulSession[S]) cleanup() {
 		s.idleTimer.Stop()
 	}
 	if Status(s.status.Load()) == Frozen {
+		// A frozen session cannot be holding effects: freeze happens
+		// inside onTransportClose, before the loop processes anything
+		// that could raise one, and enqueueFx discards with a
+		// diagnostic from then on. Reporting here would also race a
+		// concurrent thaw, which rebuilds the very channels the report
+		// reads.
 		return
 	}
+	// Nothing will ever deliver what is still buffered: the loop is
+	// leaving for good. One report covers reconnect expiry, idle
+	// timeout, MaxLifetime, DisableReconnect, a dropped command and
+	// Shutdown. Closures parked in overflow goroutines are not visible
+	// here - they unblock on loopDone and discard themselves - so this
+	// covers the held and buffered effects only.
+	s.reportUndelivered()
 	if s.disconnectTimer != nil {
 		s.disconnectTimer.Stop()
 	}
@@ -193,6 +206,27 @@ func (s *StatefulSession[S]) cleanup() {
 	if s.handler != nil {
 		s.handler.sessionDestroyed(s)
 	}
+}
+
+// reportUndelivered emits a diagnostic for effects the session is
+// carrying when its loop exits. Held effects were waiting for a
+// reconnect that never came; queued closures never reached the loop.
+// Both are genuine losses, and a session that dies quietly having
+// swallowed a developer's Toast or Signal is the failure this
+// diagnostic exists to make visible. Runs on the loop goroutine.
+func (s *StatefulSession[S]) reportUndelivered() {
+	held := s.heldFx != nil && s.heldFx.Any()
+	queued := len(s.fxCh)
+	if !held && queued == 0 {
+		return
+	}
+	s.heldFx = nil
+	s.emitDiagnostic(Diagnostic{
+		Kind:      CommandDiscarded,
+		SessionID: s.id,
+		Detail: fmt.Sprintf("session ended with undelivered effects (held: %t, queued: %d, status: %s)",
+			held, queued, Status(s.status.Load())),
+	})
 }
 
 // startTimers sets up per-session lifecycle timers. Called once during

@@ -34,9 +34,13 @@ func TestConstants(t *testing.T) {
 	}
 }
 
-func TestCustom(t *testing.T) {
-	got := event.Custom("mouseover")
-	if string(got) != "mouseover" {
-		t.Errorf("Custom(%q) = %q, want %q", "mouseover", got, "mouseover")
+// TestTypeComparesToAnyEventName pins that Type is a plain defined
+// string type, so an event bound with bind.On but with no constant here
+// still compares directly in Handle. This is why no Custom constructor
+// is needed.
+func TestTypeComparesToAnyEventName(t *testing.T) {
+	var got event.Type = "wheel"
+	if got != "wheel" {
+		t.Errorf("event.Type should compare to a bare event name, got %q", got)
 	}
 }

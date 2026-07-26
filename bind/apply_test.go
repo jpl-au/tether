@@ -21,7 +21,7 @@ func TestApplyMultipleOptions(t *testing.T) {
 	html := string(el.RenderBytes())
 
 	for _, want := range []string{
-		`data-tether-click="delete"`,
+		`data-tether-event-click="delete"`,
 		`data-tether-confirm="Are you sure?"`,
 		`data-tether-disable="Deleting..."`,
 	} {
@@ -37,15 +37,15 @@ func TestApplyEventOptions(t *testing.T) {
 		opt  bind.Option
 		attr string
 	}{
-		{"OnClick", bind.OnClick("act"), `data-tether-click="act"`},
-		{"OnSubmit", bind.OnSubmit("act"), `data-tether-submit="act"`},
-		{"OnInput", bind.OnInput("act"), `data-tether-input="act"`},
-		{"OnChange", bind.OnChange("act"), `data-tether-change="act"`},
-		{"OnKeyDown", bind.OnKeyDown("act"), `data-tether-keydown="act"`},
-		{"OnFocus", bind.OnFocus("act"), `data-tether-focus="act"`},
-		{"OnBlur", bind.OnBlur("act"), `data-tether-blur="act"`},
+		{"OnClick", bind.OnClick("act"), `data-tether-event-click="act"`},
+		{"OnSubmit", bind.OnSubmit("act"), `data-tether-event-submit="act"`},
+		{"OnInput", bind.OnInput("act"), `data-tether-event-input="act"`},
+		{"OnChange", bind.OnChange("act"), `data-tether-event-change="act"`},
+		{"OnKeyDown", bind.OnKeyDown("act"), `data-tether-event-keydown="act"`},
+		{"OnFocus", bind.OnFocus("act"), `data-tether-event-focus="act"`},
+		{"OnBlur", bind.OnBlur("act"), `data-tether-event-blur="act"`},
 		{"OnViewport", bind.OnViewport("act"), `data-tether-viewport="act"`},
-		{"OnPaste", bind.OnPaste("act"), `data-tether-paste="act"`},
+		{"OnPaste", bind.OnPaste("act"), `data-tether-event-paste="act"`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -254,7 +254,7 @@ func TestApplyCompositionWithSignalBindings(t *testing.T) {
 	html := string(el.RenderBytes())
 
 	for _, want := range []string{
-		`data-tether-click="like"`,
+		`data-tether-event-click="like"`,
 		`data-tether-disable="Liking..."`,
 		`data-tether-bind-show="isLiked"`,
 		`data-tether-optimistic-toggle="liked"`,
@@ -273,19 +273,19 @@ func TestApplyNoOptions(t *testing.T) {
 	}
 }
 
-func TestEventArbitrary(t *testing.T) {
-	el := bind.Apply(div.New(), bind.Event("dblclick", "open-editor"))
+func TestOnArbitrary(t *testing.T) {
+	el := bind.Apply(div.New(), bind.On("dblclick", "open-editor"))
 	html := string(el.RenderBytes())
-	if !strings.Contains(html, `data-tether-dblclick="open-editor"`) {
+	if !strings.Contains(html, `data-tether-event-dblclick="open-editor"`) {
 		t.Errorf("missing dblclick attribute in:\n%s", html)
 	}
 }
 
-func TestEventOption(t *testing.T) {
-	el := bind.Apply(div.New(), bind.Event("mouseover", "hover"))
+func TestOnOption(t *testing.T) {
+	el := bind.Apply(div.New(), bind.On("mouseenter", "hover"))
 	html := string(el.RenderBytes())
-	if !strings.Contains(html, `data-tether-mouseover="hover"`) {
-		t.Errorf("missing mouseover attribute in:\n%s", html)
+	if !strings.Contains(html, `data-tether-event-mouseenter="hover"`) {
+		t.Errorf("missing mouseenter attribute in:\n%s", html)
 	}
 }
 
@@ -313,12 +313,12 @@ func TestCollectMultipleSelectors(t *testing.T) {
 
 func TestPreventDefault(t *testing.T) {
 	el := bind.Apply(div.New(),
-		bind.Event("contextmenu", "menu.open"),
+		bind.On("contextmenu", "menu.open"),
 		bind.PreventDefault(),
 	)
 	html := string(el.RenderBytes())
 	for _, want := range []string{
-		`data-tether-contextmenu="menu.open"`,
+		`data-tether-event-contextmenu="menu.open"`,
 		`data-tether-prevent-default`,
 	} {
 		if !strings.Contains(html, want) {

@@ -22,7 +22,7 @@ func (e Event) Bind(dest any) error                // struct-tag form binding
 func (e Event) WithAction(action string) Event     // copy with different Action
 ```
 
-Event type constants live in the `event` package: `event.Click`, `event.Input`, `event.Submit`, `event.Change`, `event.KeyDown`, `event.Focus`, `event.Blur`, `event.Navigate`, `event.Viewport`, `event.Online`, `event.Offline`, `event.AppInstalled`. Create custom types with `event.Custom("name")`.
+Event type constants live in the `event` package: `event.Click`, `event.Input`, `event.Submit`, `event.Change`, `event.KeyDown`, `event.Focus`, `event.Blur`, `event.Navigate`, `event.Viewport`, `event.Online`, `event.Offline`, `event.AppInstalled`. Create custom types with `event.Type("name")`.
 
 ### Typed data extraction
 
@@ -97,7 +97,7 @@ bind.OnInput("act")         bind.OnChange("act")
 bind.OnKeyDown("act")       bind.OnFocus("act")
 bind.OnBlur("act")          bind.OnViewport("act")
 bind.OnPaste("act")
-bind.Event("dblclick", "act")
+bind.On("dblclick", "act")
 bind.Collect("#selector")
 ```
 

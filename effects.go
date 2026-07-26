@@ -35,6 +35,26 @@ type Effects struct {
 	Prefetch []string // likely-next URLs to hint to the browser
 }
 
+// fxFrom recovers the effect fields of an update. send() reaches the
+// no-transport case holding a [wire.Update] rather than the [Effects]
+// it was built from, and the buffer that outlives the disconnect is
+// keyed on Effects. Patches and morphs are deliberately not carried
+// over: the reattach diff regenerates them from the current state.
+func fxFrom(u wire.Update) *Effects {
+	return &Effects{
+		Announce: u.Announce,
+		Flash:    u.Flash,
+		Signals:  u.Signals,
+		Toast:    u.Toast,
+		Title:    u.Title,
+		URL:      u.URL,
+		Replace:  u.Replace,
+		ScrollTo: u.ScrollTo,
+		Download: u.Download,
+		Prefetch: u.Prefetch,
+	}
+}
+
 // Any reports whether any side effects have been buffered.
 func (fx *Effects) Any() bool {
 	return fx.Announce != "" || fx.Flash != nil || fx.Signals != nil ||
@@ -81,6 +101,66 @@ func (fx *Effects) copyInto(dst *Effects) {
 	if fx.Prefetch != nil {
 		dst.Prefetch = append(dst.Prefetch, fx.Prefetch...)
 	}
+}
+
+// mergeBounded merges src into fx like [Effects.copyInto], but refuses
+// Flash and Signals keys once the two maps together hold limit distinct
+// keys. It returns how many keys were refused so the caller can report
+// them; updates to keys already held always apply, so a page with a
+// fixed set of signals is never affected however long it merges.
+//
+// The bound exists because the disconnect window has no natural end: a
+// handler that mints a fresh key per event would otherwise grow these
+// maps for the whole reconnect timeout. src is consumed - it is always
+// a freshly built, loop-local Effects - so refused keys are simply left
+// behind.
+func (fx *Effects) mergeBounded(src *Effects, limit int) int {
+	held := len(fx.Flash) + len(fx.Signals)
+	refused := 0
+
+	if src.Flash != nil && fx.Flash == nil {
+		fx.Flash = make(map[string]string, len(src.Flash))
+	}
+	for k, v := range src.Flash {
+		if _, ok := fx.Flash[k]; !ok {
+			if held >= limit {
+				refused++
+				continue
+			}
+			held++
+		}
+		fx.Flash[k] = v
+	}
+
+	if src.Signals != nil && fx.Signals == nil {
+		fx.Signals = make(map[string]any, len(src.Signals))
+	}
+	for k, v := range src.Signals {
+		if _, ok := fx.Signals[k]; !ok {
+			if held >= limit {
+				refused++
+				continue
+			}
+			held++
+		}
+		fx.Signals[k] = v
+	}
+
+	// Scalars are last-write-wins and cost nothing to keep.
+	if src.Announce != "" {
+		fx.Announce = src.Announce
+	}
+	if src.Toast != "" {
+		fx.Toast = src.Toast
+	}
+	if src.Title != "" {
+		fx.Title = src.Title
+	}
+	if src.URL != "" {
+		fx.URL = src.URL
+		fx.Replace = src.Replace
+	}
+	return refused
 }
 
 // merge copies buffered effects into an update message.

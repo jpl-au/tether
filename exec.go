@@ -20,6 +20,64 @@ func (s *StatefulSession[S]) runHandle(state S, ev Event) S {
 	return s.handle(s, state, ev)
 }
 
+// resolveHeldNavigate runs the application's Handle for a navigation
+// raised while the client was disconnected, so the session's state
+// catches up with the URL before the reattach diff is taken.
+//
+// Without this the client would be told to push a URL for a page
+// OnNavigate never saw: it would echo a navigate event straight back
+// and render the previous page's DOM under the new address in the
+// meantime. Resolving here mirrors the redirect loop in exec - the
+// framework settles navigation on the server rather than round-tripping
+// - and lets the catch-up sync the address bar with Replace instead of
+// pushing a history entry the client would have to answer.
+//
+// The URL stays in lastURL either way, so the caller's replay covers it.
+// Runs on the loop goroutine, from reattach's command.
+func (s *StatefulSession[S]) resolveHeldNavigate() {
+	if s.heldFx == nil || s.heldFx.URL == "" {
+		return
+	}
+	target := s.heldFx.URL
+	// Consumed here: the catch-up replays it from lastURL as a
+	// Replace, so leaving it would push a duplicate history entry.
+	s.heldFx.URL = ""
+	s.heldFx.Replace = false
+
+	u, err := url.Parse(target)
+	if err != nil {
+		dev.Warn("malformed held navigate URL",
+			"session", s.id, "url", target, "error", err)
+		return
+	}
+
+	fx := &Effects{}
+	defer func() {
+		if r := recover(); r != nil {
+			err := panicErr(r)
+			dev.Log().Error("panic resolving held navigate", "session", s.id, "url", target, "panic", r)
+			s.emitDiagnostic(Diagnostic{
+				Kind:      HandlerPanic,
+				SessionID: s.id,
+				Err:       err,
+				Detail:    "held navigate:" + target,
+			})
+		}
+	}()
+
+	s.state = s.runHandle(s.state, Event{
+		Type: event.Navigate,
+		Data: map[string]string{"path": u.Path, "search": u.RawQuery},
+	})
+	s.stateSnap.Store(s.state)
+
+	// Effects the navigate handler raised join the held batch. A
+	// further Navigate from it is a redirect chain; lastURL follows it
+	// so the client lands on the final URL.
+	s.drainFx(fx)
+	s.holdFx(fx)
+}
+
 // exec processes a single client event: handle it, re-render, diff,
 // and send patches to the transport.
 func (s *StatefulSession[S]) exec(ev Event) {

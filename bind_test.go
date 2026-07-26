@@ -17,7 +17,7 @@ func TestClickRendersDataAttribute(t *testing.T) {
 	el := bind.Apply(button.Text("+"), bind.OnClick("increment"))
 	html := string(el.RenderBytes())
 
-	if !strings.Contains(html, `data-tether-click="increment"`) {
+	if !strings.Contains(html, `data-tether-event-click="increment"`) {
 		t.Errorf("expected data-tether-click attribute in HTML:\n%s", html)
 	}
 }
@@ -26,7 +26,7 @@ func TestSubmitRendersDataAttribute(t *testing.T) {
 	el := bind.Apply(form.New(), bind.OnSubmit("save"))
 	html := string(el.RenderBytes())
 
-	if !strings.Contains(html, `data-tether-submit="save"`) {
+	if !strings.Contains(html, `data-tether-event-submit="save"`) {
 		t.Errorf("expected data-tether-submit attribute in HTML:\n%s", html)
 	}
 }
@@ -35,7 +35,7 @@ func TestInputRendersDataAttribute(t *testing.T) {
 	el := bind.Apply(input.Text("name", ""), bind.OnInput("update"))
 	html := string(el.RenderBytes())
 
-	if !strings.Contains(html, `data-tether-input="update"`) {
+	if !strings.Contains(html, `data-tether-event-input="update"`) {
 		t.Errorf("expected data-tether-input attribute in HTML:\n%s", html)
 	}
 }
@@ -206,7 +206,7 @@ func TestChangeRendersDataAttribute(t *testing.T) {
 	el := bind.Apply(dropdown.New(), bind.OnChange("filter"))
 	html := string(el.RenderBytes())
 
-	if !strings.Contains(html, `data-tether-change="filter"`) {
+	if !strings.Contains(html, `data-tether-event-change="filter"`) {
 		t.Errorf("expected data-tether-change attribute in HTML:\n%s", html)
 	}
 }
@@ -215,7 +215,7 @@ func TestKeyDownRendersDataAttribute(t *testing.T) {
 	el := bind.Apply(input.Text("cmd", ""), bind.OnKeyDown("exec"))
 	html := string(el.RenderBytes())
 
-	if !strings.Contains(html, `data-tether-keydown="exec"`) {
+	if !strings.Contains(html, `data-tether-event-keydown="exec"`) {
 		t.Errorf("expected data-tether-keydown attribute in HTML:\n%s", html)
 	}
 }
@@ -224,7 +224,7 @@ func TestFocusRendersDataAttribute(t *testing.T) {
 	el := bind.Apply(input.Text("name", ""), bind.OnFocus("focus-name"))
 	html := string(el.RenderBytes())
 
-	if !strings.Contains(html, `data-tether-focus="focus-name"`) {
+	if !strings.Contains(html, `data-tether-event-focus="focus-name"`) {
 		t.Errorf("expected data-tether-focus attribute in HTML:\n%s", html)
 	}
 }
@@ -233,7 +233,7 @@ func TestBlurRendersDataAttribute(t *testing.T) {
 	el := bind.Apply(input.Text("name", ""), bind.OnBlur("blur-name"))
 	html := string(el.RenderBytes())
 
-	if !strings.Contains(html, `data-tether-blur="blur-name"`) {
+	if !strings.Contains(html, `data-tether-event-blur="blur-name"`) {
 		t.Errorf("expected data-tether-blur attribute in HTML:\n%s", html)
 	}
 }
@@ -248,7 +248,7 @@ func TestFilterKeyRendersDataAttribute(t *testing.T) {
 	if !strings.Contains(html, `data-tether-filterkey="Enter"`) {
 		t.Errorf("expected data-tether-filterkey attribute in HTML:\n%s", html)
 	}
-	if !strings.Contains(html, `data-tether-keydown="exec"`) {
+	if !strings.Contains(html, `data-tether-event-keydown="exec"`) {
 		t.Errorf("expected data-tether-keydown attribute in HTML:\n%s", html)
 	}
 }
@@ -370,7 +370,7 @@ func TestApplyChains(t *testing.T) {
 		Class("btn")
 	html := string(el.RenderBytes())
 
-	if !strings.Contains(html, `data-tether-click="increment"`) {
+	if !strings.Contains(html, `data-tether-event-click="increment"`) {
 		t.Errorf("missing data-tether-click in HTML:\n%s", html)
 	}
 	if !strings.Contains(html, `style="cursor: pointer"`) {

@@ -166,6 +166,13 @@ type StatefulSession[S any] struct {
 	lastURL   string
 	lastTitle string
 
+	// heldFx accumulates the effects raised while the transport is
+	// gone, so the reattach catch-up can deliver them alongside the
+	// patches the client missed. Nil when nothing is held. Only the
+	// loop goroutine touches it, so no locking. See holdFx for which
+	// effects are held and which are dropped.
+	heldFx *Effects
+
 	// Push - sender is set from StatefulConfig, subscription arrives at runtime.
 	// pushSub is atomic so Push() can read it safely from any goroutine
 	// without routing through the command channel.

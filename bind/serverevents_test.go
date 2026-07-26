@@ -2,62 +2,57 @@ package bind
 
 import (
 	"os"
-	"regexp"
-	"slices"
+	"strings"
 	"testing"
 )
 
-// eventTypeEntry matches one ["click", "tether-click"] pair from the
-// eventTypes table in client/tether.js.
-var eventTypeEntry = regexp.MustCompile(`\["([a-z]+)",\s*"tether-([a-z]+)"\]`)
-
-// TestServerEventsMatchClient guards the seam between serverEvents and
-// the eventTypes table in client/tether.js. An event Go accepts but the
-// client never delegates renders an attribute nothing listens for - the
-// binding then does nothing at all, with no error to point at. This
-// test makes that mismatch a build failure rather than a silent no-op.
-func TestServerEventsMatchClient(t *testing.T) {
+// TestEventAttrPrefixMatchesClient guards the one string the Go and JS
+// halves must agree on. Every server event binding renders
+// data-tether-event-<name>, and the client's discovery scan finds them
+// by that prefix alone - so a change on one side and not the other
+// makes every binding on the page silently stop firing.
+func TestEventAttrPrefixMatchesClient(t *testing.T) {
 	src, err := os.ReadFile("../client/tether.js")
 	if err != nil {
 		t.Fatalf("read client runtime: %v", err)
 	}
+	want := `var eventAttrPrefix = "data-` + eventAttr + `";`
+	if !strings.Contains(string(src), want) {
+		t.Errorf("client/tether.js does not declare %s\nbind.eventAttr is %q, so the client must scan for that prefix", want, eventAttr)
+	}
+}
 
-	table := regexp.MustCompile(`(?s)var eventTypes = \[(.*?)\];`).FindSubmatch(src)
-	if table == nil {
-		t.Fatal("eventTypes table not found in client/tether.js - has it been renamed?")
-	}
-
-	var client []string
-	for _, m := range eventTypeEntry.FindAllSubmatch(table[1], -1) {
-		domEvent, attr := string(m[1]), string(m[2])
-		if domEvent != attr {
-			t.Errorf("client binds DOM event %q to data-tether-%s; bind.Event derives the attribute from the event name, so they must match", domEvent, attr)
-		}
-		client = append(client, domEvent)
-	}
-	if len(client) == 0 {
-		t.Fatal("eventTypes table parsed as empty")
-	}
-
-	for _, e := range serverEvents {
-		if !slices.Contains(client, e) {
-			t.Errorf("bind.Event accepts %q but client/tether.js never delegates it - the binding would silently do nothing", e)
-		}
-	}
-	for _, e := range client {
-		if !slices.Contains(serverEvents, e) {
-			t.Errorf("client/tether.js delegates %q but bind.Event rejects it - add it to serverEvents", e)
+// TestOnAcceptsAnyDomEvent is the regression test for the defect this
+// mechanism replaced: a fixed list in the client meant bind.Event
+// rendered attributes nothing listened for, so the binding did nothing
+// at all. Discovery removes the list, so no event name is unreachable.
+func TestOnAcceptsAnyDomEvent(t *testing.T) {
+	for _, name := range []string{
+		"click", "dblclick", "wheel", "mouseenter", "mouseleave",
+		"scroll", "resize", "pointerdown", "animationend",
+		"sl-change", "cart:updated", "my_event", "toggle",
+	} {
+		opt := On(name, "act")
+		if want := eventAttr + name; opt.key != want {
+			t.Errorf("On(%q) key = %q, want %q", name, opt.key, want)
 		}
 	}
 }
 
-// TestEventRejectsUndelegatedType pins the construction-time panic that
-// replaced the silent no-op.
-func TestEventRejectsUndelegatedType(t *testing.T) {
-	defer func() {
-		if recover() == nil {
-			t.Error("expected Event to panic for an event the client does not delegate")
-		}
-	}()
-	Event("wheel", "scroll")
+// TestOnRejectsUnbindableName pins the one case that cannot work: a
+// name HTML cannot carry in an attribute name. Panicking matches the
+// rest of the package (Debounce, MinLength, OnClientEvent) and is the
+// only option that is not silent in production, where dev.Warn is a
+// no-op.
+func TestOnRejectsUnbindableName(t *testing.T) {
+	for _, name := range []string{"", "mouseOver", "my event", "a\"b", "a>b", "a=b"} {
+		func() {
+			defer func() {
+				if recover() == nil {
+					t.Errorf("On(%q) should panic - the name cannot be carried in an attribute name", name)
+				}
+			}()
+			On(name, "act")
+		}()
+	}
 }

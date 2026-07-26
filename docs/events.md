@@ -20,7 +20,7 @@ Event type constants live in the `event` package. Import `github.com/jpl-au/teth
 | `event.Offline` | `"offline"` | Browser connection lost |
 | `event.AppInstalled` | `"appinstalled"` | PWA installed to home screen |
 
-Use `event.Custom("name")` to create constants for custom event names not covered above.
+Use `event.Type("name")` to create constants for custom event names not covered above.
 
 ## Binding events
 
@@ -36,9 +36,46 @@ bind.Apply(input.Text("msg", ""), bind.OnKeyDown("send"), bind.FilterKey("Enter"
 bind.Apply(input.Text("name", ""), bind.OnFocus("focus"))
 bind.Apply(input.Text("name", ""), bind.OnBlur("blur"))
 bind.Apply(div.New(), bind.OnViewport("load-more"))
-bind.Apply(el, bind.Event("dblclick", "open-editor"))
+bind.Apply(el, bind.On("dblclick", "open-editor"))
 bind.Apply(input.Text("q", ""), bind.OnPaste("paste-search"))
 ```
+
+### Any DOM event
+
+The `On*` helpers above are shorthands. `bind.On` takes the event name
+directly and works for **any** DOM event - there is no list to be on:
+
+```go
+bind.Apply(canvas, bind.On("wheel", "zoom"), bind.PreventDefault())
+bind.Apply(card, bind.On("mouseenter", "card.preview"), bind.Delay(400*time.Millisecond))
+bind.Apply(el, bind.On("sl-change", "sync"))   // custom events too
+```
+
+Each binding renders `data-tether-event-<name>`, and the client attaches
+a delegated listener for every event name it finds in the page - on load
+and after every update. Nothing is registered up front, so an event type
+that first appears in a morph works exactly like one present at first
+render.
+
+A binding fires where `addEventListener` on the same element would: an
+event that bubbles counts when it happens on a descendant, one that does
+not (`focus`, `blur`, `scroll`, `mouseenter`) only when the element
+itself is the target. Use `focusin`/`focusout` for the bubbling forms of
+focus and blur.
+
+**Continuous events are coalesced.** `mousemove`, `pointermove`,
+`touchmove`, `drag`, `dragover`, `scroll`, `wheel` and `resize` send at
+most one event per animation frame, keeping the latest sample - so the
+server learns where the pointer *stopped*, not where it was when the
+frame opened. `bind.Throttle`, `bind.Debounce` and `bind.Delay` override
+this. Per-event behaviour such as `bind.PreventDefault` still runs on
+every occurrence.
+
+The event name travels in the attribute name, which HTML lowercases, so
+it must be lowercase and contain only letters, digits and `-` `_` `.`
+`:`. Anything else panics at construction rather than rendering an
+attribute the browser would never act on - see
+[bind-unbindable-event-name](errors.md#bind-unbindable-event-name).
 
 ### PreventDefault
 
@@ -46,7 +83,7 @@ By default only submit events get `preventDefault`. Use `bind.PreventDefault()` 
 
 ```go
 bind.Apply(el,
-    bind.Event("contextmenu", "menu.open"),
+    bind.On("contextmenu", "menu.open"),
     bind.PreventDefault(),
 )
 ```
@@ -266,7 +303,7 @@ does not fire:
 
 ```go
 bind.Apply(card,
-    bind.Event("mouseenter", "card.preview"),
+    bind.On("mouseenter", "card.preview"),
     bind.Delay(400*time.Millisecond),
 )
 ```

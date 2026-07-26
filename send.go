@@ -3,6 +3,7 @@ package tether
 import (
 	"encoding/base64"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -16,8 +17,17 @@ import (
 // handler whose render carries no jit.Memoise regions.
 var memoiseNoopWarnOnce sync.Once
 
+// maxHeldKeys caps the distinct Flash and Signals keys held across one
+// disconnect window, counted over both maps together. Effects merge by
+// key, so a page with a fixed set of signals never approaches it however
+// long the client stays away or however hard the application
+// broadcasts. Only a handler minting a fresh key per event does, and
+// that would otherwise grow unchecked for the whole reconnect window.
+const maxHeldKeys = 256
+
 // deferRender reports whether the render-diff-send pipeline must be
-// skipped because the client's transport is gone.
+// skipped because the client's transport is gone, holding fx for the
+// reattach catch-up when it is.
 //
 // Diffing costs nothing to skip and everything to get wrong here. The
 // engine's stored snapshots describe the DOM the browser is currently
@@ -30,8 +40,13 @@ var memoiseNoopWarnOnce sync.Once
 // DOM actually is makes the catch-up produce precisely the patches the
 // client missed.
 //
-// Effects buffered for this cycle cannot be delivered and are reported
-// as discarded, matching the frozen-session contract.
+// Deciding and holding are one call on purpose. Split apart, a caller
+// that skipped the render but forgot to hold would drop the cycle's
+// effects with nothing to show for it - the silent loss this whole
+// mechanism exists to end. Pass nil when the cycle has no effects
+// (Patch renders a subtree and raises none).
+//
+// Runs on the loop goroutine, which owns both transport and heldFx.
 func (s *StatefulSession[S]) deferRender(fx *Effects) bool {
 	if s.transport != nil {
 		return false
@@ -40,14 +55,79 @@ func (s *StatefulSession[S]) deferRender(fx *Effects) bool {
 		"session", s.id,
 		"endpoint", s.endpoint,
 	)
-	if fx != nil && fx.Any() {
+	if fx != nil {
+		s.holdFx(fx)
+	}
+	return true
+}
+
+// holdFx keeps the effects raised while the client is away so the
+// reattach catch-up can deliver them, and drops the ones that would
+// arrive as a surprise.
+//
+// The cut is between what describes the page and what commands the
+// browser. A toast, a flash, a signal, an announcement and the document
+// title all still describe the page when the client returns, so they
+// are held and merged by the ordinary [Effects] coalescing rules - the
+// reconnect window behaves like any other coalesced batch. A scroll, a
+// download and a prefetch hint name a moment that has passed: firing
+// them on a user who has just come back is worse than not firing them
+// at all, and the download in particular is a synthesised click on a
+// URL that is often signed and by then expired. Those are dropped and
+// named in a [CommandDiscarded] diagnostic.
+//
+// The URL and title are also mirrored onto lastURL and lastTitle, which
+// [Handler.Shutdown] persists to the [SessionStore]. Without that a
+// session that navigated while away would be restored on the page it
+// left, not the one it was sent to.
+func (s *StatefulSession[S]) holdFx(fx *Effects) {
+	if !fx.Any() {
+		return
+	}
+
+	var dropped []string
+	if fx.ScrollTo != "" {
+		fx.ScrollTo = ""
+		dropped = append(dropped, "ScrollTo")
+	}
+	if fx.Download != "" {
+		fx.Download = ""
+		dropped = append(dropped, "Download")
+	}
+	if fx.Prefetch != nil {
+		fx.Prefetch = nil
+		dropped = append(dropped, "Prefetch")
+	}
+	if len(dropped) > 0 {
 		s.emitDiagnostic(Diagnostic{
 			Kind:      CommandDiscarded,
 			SessionID: s.id,
-			Detail:    "disconnected",
+			Detail:    "disconnected: " + strings.Join(dropped, ", "),
 		})
 	}
-	return true
+
+	// Mirror the navigation state the session store reads on shutdown.
+	// send() does this for delivered updates; a held one must too.
+	if fx.URL != "" {
+		s.lastURL = fx.URL
+	}
+	if fx.Title != "" {
+		s.lastTitle = fx.Title
+	}
+
+	if !fx.Any() {
+		return
+	}
+	if s.heldFx == nil {
+		s.heldFx = &Effects{}
+	}
+	if refused := s.heldFx.mergeBounded(fx, maxHeldKeys); refused > 0 {
+		s.emitDiagnostic(Diagnostic{
+			Kind:      CommandDiscarded,
+			SessionID: s.id,
+			Detail:    fmt.Sprintf("disconnected: %d new Flash/Signals keys over the %d held-key limit", refused, maxHeldKeys),
+		})
+	}
 }
 
 // sendDiff is the render-diff-send pipeline extracted from exec and
@@ -145,14 +225,11 @@ func (s *StatefulSession[S]) send(u wire.Update) {
 		s.lastTitle = u.Title
 	}
 	if s.transport == nil {
-		// Standalone effects raised while the client is away. The
-		// render pipeline is guarded by deferRender before it reaches
-		// here, so this is the effect-only path.
-		s.emitDiagnostic(Diagnostic{
-			Kind:      CommandDiscarded,
-			SessionID: s.id,
-			Detail:    "disconnected",
-		})
+		// Standalone effects raised outside a render cycle - a Toast
+		// from a timer, a Signal from a watcher. The render paths hold
+		// their effects via deferRender before reaching here, so this
+		// is the effect-only route into the same buffer.
+		s.holdFx(fxFrom(u))
 		return
 	}
 	data, err := s.encoder.Encode(u)

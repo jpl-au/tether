@@ -1,7 +1,6 @@
 package bind
 
 import (
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -52,44 +51,44 @@ func Prefix(name string) Option { return Option{"tether-prefix", name} }
 
 // OnClick forwards click events to the server. The action identifies
 // which click this is (e.g. "delete", "save") so Handle can switch on it.
-func OnClick(action string) Option { return Option{"tether-click", action} }
+func OnClick(action string) Option { return Option{eventAttr + "click", action} }
 
 // OnSubmit forwards form submissions to the server. All named fields
 // inside the form are automatically collected into [tether.Event].Data
 // so the handler can read them by name (ev.Data["email"], ev.Int("age")).
-func OnSubmit(action string) Option { return Option{"tether-submit", action} }
+func OnSubmit(action string) Option { return Option{eventAttr + "submit", action} }
 
 // OnInput forwards input events to the server with debouncing. The
 // element's current value is included automatically in
 // [tether.Event].Data["value"]. Debounce delay defaults to 300ms
 // (configurable via [tether.App].Client.DefaultDebounce or per-element
 // via [Debounce]).
-func OnInput(action string) Option { return Option{"tether-input", action} }
+func OnInput(action string) Option { return Option{eventAttr + "input", action} }
 
 // OnChange forwards change events to the server. Unlike [OnInput], this
 // fires once when the user commits a value (leaving a text field,
 // selecting a dropdown option, toggling a checkbox). The element's value
 // is included in [tether.Event].Data["value"].
-func OnChange(action string) Option { return Option{"tether-change", action} }
+func OnChange(action string) Option { return Option{eventAttr + "change", action} }
 
 // OnKeyDown forwards keydown events to the server. The pressed key name
 // (e.g. "Enter", "Escape", "ArrowUp") is available via
 // [tether.Event].Key(). Combine with [FilterKey] to restrict which
 // keys trigger the server event.
-func OnKeyDown(action string) Option { return Option{"tether-keydown", action} }
+func OnKeyDown(action string) Option { return Option{eventAttr + "keydown", action} }
 
 // OnFocus forwards focus events to the server. Fires when the element
 // receives keyboard focus (click, tab, or programmatic focus).
-func OnFocus(action string) Option { return Option{"tether-focus", action} }
+func OnFocus(action string) Option { return Option{eventAttr + "focus", action} }
 
 // OnBlur forwards blur events to the server. Fires when the element
 // loses keyboard focus. Useful for validating input on exit.
-func OnBlur(action string) Option { return Option{"tether-blur", action} }
+func OnBlur(action string) Option { return Option{eventAttr + "blur", action} }
 
 // OnPaste forwards paste events to the server. The pasted text is
 // included in [tether.Event].Data["value"]. Use this for
 // paste-to-search, paste-to-import, or paste-from-clipboard features.
-func OnPaste(action string) Option { return Option{"tether-paste", action} }
+func OnPaste(action string) Option { return Option{eventAttr + "paste", action} }
 
 // OnViewport fires when the element enters the visible viewport, using
 // an IntersectionObserver internally. Place this on a sentinel element
@@ -97,45 +96,74 @@ func OnPaste(action string) Option { return Option{"tether-paste", action} }
 // sentinel scrolls into view, the server loads the next page of data.
 func OnViewport(action string) Option { return Option{"tether-viewport", action} }
 
-// serverEvents lists every DOM event the client runtime delegates to
-// the server. Keep it in sync with eventTypes in client/tether.js -
-// an entry here with no listener there renders an attribute nothing
-// reads, so TestServerEventsMatchClient guards the pair.
+// eventAttr prefixes every server event binding. The prefix is the
+// client's only signal that an attribute names a DOM event rather than
+// a control (data-tether-disable, data-tether-at, ...), so it must stay
+// in step with eventAttrPrefix in client/tether.js. No control
+// attribute may begin with "event-".
+const eventAttr = "tether-event-"
+
+// On forwards a DOM event to the server. Any DOM event works: the
+// client attaches a delegated listener for each event name it finds in
+// the rendered HTML, at load and after every update, so nothing has to
+// be registered up front.
 //
-// The set is closed because the wire format cannot distinguish a
-// custom event attribute (data-tether-dblclick) from a control
-// attribute (data-tether-disable): the client has to know the event
-// names up front to delegate them.
-var serverEvents = []string{
-	"click",
-	"dblclick",
-	"input",
-	"change",
-	"submit",
-	"keydown",
-	"focus",
-	"blur",
-	"paste",
-	"contextmenu",
-	"mouseover",
+//	bind.Apply(el, bind.On("dblclick", "open-editor"))
+//	bind.Apply(card, bind.On("mouseenter", "card.preview"), bind.Delay(400*time.Millisecond))
+//	bind.Apply(canvas, bind.On("wheel", "zoom"), bind.PreventDefault())
+//
+// The dedicated options ([OnClick], [OnInput], [OnSubmit] and friends)
+// are the same mechanism with the event name filled in - reach for them
+// first, and for On when the event you want has no shorthand.
+//
+// A binding fires where addEventListener on the same element would: an
+// event that bubbles counts when it happens on a descendant, one that
+// does not (focus, blur, scroll, mouseenter) only when the element
+// itself is the target. Use "focusin" and "focusout" for the bubbling
+// forms of focus and blur.
+//
+// Continuous events - mousemove, pointermove, touchmove, drag,
+// dragover, scroll, wheel and resize - are coalesced to at most one
+// event per animation frame, keeping the latest, so a binding on them
+// cannot flood the transport. [Throttle], [Debounce] and [Delay]
+// override that; per-event behaviour like [PreventDefault] still runs
+// on every occurrence.
+//
+// The name travels in the attribute name, which HTML lowercases, so it
+// must be lowercase and may contain only letters, digits and - _ . or
+// : - every DOM event name qualifies, as do the usual custom-event
+// conventions ("sl-change", "cart:updated"). A name outside that
+// grammar cannot be carried at all, so it panics here rather than
+// rendering an attribute the browser would never act on. To forward a
+// mixed-case custom event, dispatch it from a [Hook] with
+// Tether.sendEvent.
+func On(name, action string) Option {
+	if !bindableEvent(name) {
+		panic("bind: On cannot bind event name " + strconv.Quote(name) +
+			" - an event name travels in an attribute name, so it must be lowercase and contain only letters, digits and - _ . :")
+	}
+	return Option{eventAttr + name, action}
 }
 
-// Event forwards a DOM event to the server. Use this for the event
-// types that have no dedicated option (OnClick, OnSubmit, etc.):
-//
-//	bind.Apply(el, bind.Event("dblclick", "open-editor"))
-//
-// The eventType is the standard DOM event name and must be one the
-// client runtime delegates - click, dblclick, input, change, submit,
-// keydown, focus, blur, paste, contextmenu, or mouseover. Anything
-// else panics at construction time rather than rendering an attribute
-// the browser would never act on.
-func Event(eventType, action string) Option {
-	if !slices.Contains(serverEvents, eventType) {
-		panic("bind: Event does not support " + strconv.Quote(eventType) +
-			" - the client runtime delegates only " + strings.Join(serverEvents, ", "))
+// bindableEvent reports whether name can be carried as the tail of the
+// attribute name data-tether-event-<name>. The check is a whitelist
+// rather than a blacklist because Fluent escapes attribute values but
+// writes keys verbatim, so an unchecked name would be an attribute
+// injection.
+func bindableEvent(name string) bool {
+	if name == "" {
+		return false
 	}
-	return Option{"tether-" + eventType, action}
+	for i := 0; i < len(name); i++ {
+		c := name[i]
+		switch {
+		case c >= 'a' && c <= 'z', c >= '0' && c <= '9':
+		case c == '-' || c == '_' || c == '.' || c == ':':
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 // Control options - modify how events behave without changing which
@@ -155,7 +183,7 @@ func Confirm(message string) Option { return Option{"tether-confirm", message} }
 // event. Use this with [Event] to handle events like contextmenu
 // without the browser's native menu appearing:
 //
-//	bind.Apply(el, bind.Event("contextmenu", "menu.open"), bind.PreventDefault())
+//	bind.Apply(el, bind.On("contextmenu", "menu.open"), bind.PreventDefault())
 func PreventDefault() Option { return Option{"tether-prevent-default", ""} }
 
 // Reset clears all form fields after a successful submit. Useful for

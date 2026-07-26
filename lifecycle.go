@@ -82,6 +82,16 @@ func (h *Handler[S]) reattach(sess *StatefulSession[S], transport Transport) <-c
 			}
 		}
 
+		// A Navigate raised while the client was away names a page the
+		// server never rendered: OnNavigate has not run for it, so the
+		// state and the target URL disagree. Resolve it here, before
+		// the diff, exactly as exec does for redirects inside a
+		// navigate event - the framework resolves navigation
+		// server-side rather than round-tripping to the client. The
+		// address bar is then synced with Replace so the client does
+		// not echo a navigate event back for a page it is already on.
+		sess.resolveHeldNavigate()
+
 		// Re-render and send the minimal update to catch the client
 		// up. The baseline still describes the DOM the browser is
 		// showing - renders during the disconnect window are deferred
@@ -119,6 +129,16 @@ func (h *Handler[S]) reattach(sess *StatefulSession[S], transport Transport) <-c
 		}
 		if sess.lastTitle != "" {
 			u.Title = sess.lastTitle
+		}
+		// Effects held during the window ride with the patches, so the
+		// client receives the state it missed and the notifications
+		// that went with it in one frame. Merged after the URL and
+		// title fallback so a held Title wins over the replayed one;
+		// the held URL was already folded into lastURL by holdFx and
+		// resolved above, so it never reaches this merge.
+		if sess.heldFx != nil {
+			sess.heldFx.merge(&u)
+			sess.heldFx = nil
 		}
 		sess.send(u)
 	}:
