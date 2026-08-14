@@ -12,7 +12,6 @@ import (
 	"sync"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/jpl-au/fluent/html5/attr/rel"
 	"github.com/jpl-au/fluent/html5/link"
 	"github.com/jpl-au/fluent/html5/script"
 	"github.com/jpl-au/fluent/node"
@@ -251,13 +250,13 @@ func (a *Asset) URL(path string) string {
 // Stylesheet returns a <link rel="stylesheet"> node for the given
 // asset path with a content-hashed URL.
 func (a *Asset) Stylesheet(path string) node.Node {
-	return link.New().Rel(rel.Stylesheet).Href(a.URL(path))
+	return link.Stylesheet(a.URL(path))
 }
 
 // Script returns a <script> node for the given asset path with a
 // content-hashed URL.
 func (a *Asset) Script(path string) node.Node {
-	return script.New().Src(a.URL(path))
+	return script.Src(a.URL(path))
 }
 
 // hash returns a single hash representing all files in the asset

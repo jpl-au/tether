@@ -478,7 +478,7 @@ func OptimisticToggle(signal string) Option { return Option{"tether-optimistic-t
 // keyed by the element's name or id attribute. Use this to send input
 // values with a click or keydown event without wrapping in a form:
 //
-//	bind.Apply(button.New().Text("Send"),
+//	bind.Apply(button.Text("Send"),
 //	    bind.OnClick("chat.send"),
 //	    bind.Collect("#message-input"),
 //	)
