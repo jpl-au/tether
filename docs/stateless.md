@@ -159,7 +159,7 @@ func render(s State) node.Node {
 }
 ```
 
-The response contains a single keyed morph for `"count"` instead of the full page. The client finds the element with `data-fluent-key="count"` and morphs only that subtree.
+The response contains a single keyed morph for `"count"` instead of the full page. The client finds the element with `id="count"` (a Dynamic key renders as the element's id) and morphs only that subtree.
 
 ### Multiple keys
 
@@ -279,7 +279,7 @@ With `sess.Morph("key")`, the body contains only the keyed fragments and the res
 ```
 $ curl -si ... | grep Tether-Morph
 Tether-Morph: keyed
-<span data-fluent-key="count">Count: 5</span>
+<span id="count">Count: 5</span>
 ```
 
 The client runtime detects the format from the response `Content-Type` - nothing to configure on the browser side, and the same page works with either format. Use `wire.HTML` when you want responses that are easy to inspect, test with curl, or serve through HTML-aware middleware; use the default `wire.JSON` when you prefer one envelope across stateless and stateful handlers.

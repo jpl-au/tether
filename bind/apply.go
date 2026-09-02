@@ -252,8 +252,8 @@ func Throttle(d time.Duration) Option {
 // FilterKey restricts an [OnKeyDown] binding to fire only for a specific
 // key (e.g. "Enter", "Escape"). Other keys are silently ignored by the
 // client and never reach the server. Renders as data-tether-filterkey,
-// mirroring this option's name - it is unrelated to data-fluent-key,
-// the diff engine's element identity.
+// mirroring this option's name - it is unrelated to the Dynamic key,
+// the diff engine's element identity that renders as the id.
 func FilterKey(key string) Option { return Option{"tether-filterkey", key} }
 
 // Event modifiers - change where an event binding listens or when it

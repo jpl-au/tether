@@ -74,7 +74,7 @@ is a diff.
 
 Diffing is keyed. Mark the changing parts of the tree with
 `.Dynamic("key")` and the differ tracks each one individually; the
-client morphs the matching `data-fluent-key` element in place. Fragments
+client morphs the element whose `id` is that key in place. Fragments
 wrapped in `jit.Memoise` render once and are reused until their inputs
 change. See [engine](docs/engine.md) for how the Differ and Memoiser
 compose.

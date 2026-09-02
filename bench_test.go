@@ -78,7 +78,7 @@ func benchEncodeUpdatePatches(b *testing.B, n int) {
 		key := fmt.Sprintf("key-%d", i)
 		patches[i] = wire.Patch{
 			Key:  key,
-			HTML: fmt.Appendf(nil, `<span data-fluent-key="%s">value %d</span>`, key, i),
+			HTML: fmt.Appendf(nil, `<span id="%s">value %d</span>`, key, i),
 		}
 	}
 	u := wire.Update{Patches: patches}
@@ -91,7 +91,7 @@ func benchEncodeUpdatePatches(b *testing.B, n int) {
 }
 
 func BenchmarkEncodeUpdateMorph(b *testing.B) {
-	html := []byte(`<div data-tether-root><span data-fluent-key="count">42</span><span data-fluent-key="name">Alice</span></div>`)
+	html := []byte(`<div data-tether-root><span id="count">42</span><span id="name">Alice</span></div>`)
 	u := wire.Update{
 		Morphs: []wire.Morph{{Key: "", HTML: html}},
 	}
@@ -124,10 +124,14 @@ func benchHandle(_ Session, s benchState, ev Event) benchState {
 	return s
 }
 
-// discardTransport satisfies Transport but discards all output.
+// discardTransport satisfies Transport but discards all output. When its
+// events run out it reports EOF and calls drained: a session keeps its
+// loop alive after the transport closes so a client can reconnect, so
+// the benchmark must cancel the session itself or run() never returns.
 type discardTransport struct {
-	mu     sync.Mutex
-	events []Event
+	mu      sync.Mutex
+	events  []Event
+	drained func()
 }
 
 func (d *discardTransport) Send(_ []byte) error { return nil }
@@ -135,6 +139,9 @@ func (d *discardTransport) ReceiveEvent() (Event, error) {
 	d.mu.Lock()
 	if len(d.events) == 0 {
 		d.mu.Unlock()
+		if d.drained != nil {
+			d.drained()
+		}
 		return Event{}, io.EOF
 	}
 	ev := d.events[0]
@@ -152,9 +159,11 @@ func BenchmarkEventCycle(b *testing.B) {
 		events[i] = Event{Type: event.Click, Action: "increment"}
 	}
 
-	dt := &discardTransport{events: events}
 	differ := jit.NewDiffer()
 	ctx, cancel := context.WithCancel(context.Background())
+	// The last event is handed to the loop before EOF is reported, so
+	// every event is handled before the cancellation is observed.
+	dt := &discardTransport{events: events, drained: cancel}
 
 	sess := &StatefulSession[benchState]{
 		id:        "bench",

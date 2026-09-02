@@ -143,7 +143,7 @@ func TestDebounceLeadingNegativePanics(t *testing.T) {
 func TestFilterKey(t *testing.T) {
 	html := string(bind.Apply(input.Text("q", ""), bind.FilterKey("Enter")).RenderBytes())
 	// FilterKey is tether's keyboard filter, named after the option
-	// that sets it - unrelated to data-fluent-key, the diff engine's
+	// that sets it - unrelated to the Dynamic key (the id), the diff engine's
 	// element identity.
 	want := `data-tether-filterkey="Enter"`
 	if !strings.Contains(html, want) {

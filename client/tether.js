@@ -170,8 +170,8 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
   }
 
   // Build an attribute selector with the value properly escaped.
-  // Example: attrSelector("data-fluent-key", key) returns
-  // '[data-fluent-key="<escaped>"]'
+  // Example: attrSelector("data-tether-bind-text", key) returns
+  // '[data-tether-bind-text="<escaped>"]'
   function attrSelector(attr, value) {
     return "[" + attr + '="' + CSS.escape(value) + '"]';
   }
@@ -1478,7 +1478,9 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
   }
 
   function applyPatch(patch) {
-    var el = safeQuery(document, attrSelector("data-fluent-key", patch.key));
+    // A Dynamic key renders as the element's id, so the lookup is a hash
+    // read rather than a document-wide attribute scan.
+    var el = document.getElementById(patch.key);
     if (!el) return;
 
     if (devMode) {
@@ -1517,7 +1519,7 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
       // Scoped morph targets a keyed container.
       var template = document.createElement("template");
       template.innerHTML = morph.html;
-      var el = safeQuery(document, attrSelector("data-fluent-key", morph.key));
+      var el = document.getElementById(morph.key);
       if (template.content.childElementCount > 1) {
         reportError("render", "morph for key '" + morph.key + "' contains multiple root elements; only the first will be used", false, "multiple-root-elements", el);
       }
@@ -2124,8 +2126,8 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
     // FilterKey (bind.FilterKey): a keydown binding restricted to one key
     // ignores every other key before any side effect runs - so a wrong key
     // never spends the Once budget, fires an optimistic signal, or calls
-    // preventDefault. Unrelated to data-fluent-key, the diff engine's
-    // element identity.
+    // preventDefault. Unrelated to the Dynamic key (the element's id), the
+    // diff engine's element identity.
     if (domEvent === "keydown") {
       var filterKey = target.getAttribute("data-tether-filterkey");
       if (filterKey && filterKey !== e.key) return;
@@ -2423,7 +2425,7 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
   // formats identically. The body is morph fragments, optionally
   // followed by a <template data-tether-effects> JSON island. When
   // keyed is true each top-level element is a targeted fragment
-  // addressed by its data-fluent-key; otherwise the whole body is a
+  // addressed by its id (the Dynamic key); otherwise the whole body is a
   // root morph.
   function parseHTMLUpdate(text, keyed, eventID) {
     var msg = { type: "update", event_id: eventID };
@@ -2447,7 +2449,7 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
     if (keyed) {
       var children = template.content.children;
       for (var i = 0; i < children.length; i++) {
-        var key = children[i].getAttribute("data-fluent-key");
+        var key = children[i].id;
         if (key) msg.morphs.push({ key: key, html: children[i].outerHTML });
       }
     } else {

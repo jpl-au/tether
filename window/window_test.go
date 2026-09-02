@@ -132,7 +132,7 @@ func TestNewHasDynamicKey(t *testing.T) {
 	})
 	html := string(n.RenderBytes())
 
-	if !strings.Contains(html, `data-fluent-key="window"`) {
+	if !strings.Contains(html, `id="window"`) {
 		t.Error("expected Dynamic key on windowed container")
 	}
 }

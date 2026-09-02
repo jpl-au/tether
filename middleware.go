@@ -1,5 +1,7 @@
 package tether
 
+import "slices"
+
 // Middleware wraps a [HandleFunc] to add cross-cutting behaviour.
 // Each middleware receives the next handler in the chain and returns
 // a new handler that may inspect or modify the event, state, or
@@ -21,8 +23,8 @@ type Middleware[S any] func(HandleFunc[S]) HandleFunc[S]
 // order. Given [A, B, C] and handler H, the resulting call order is:
 // A -> B -> C -> H.
 func Chain[S any](h HandleFunc[S], mw []Middleware[S]) HandleFunc[S] {
-	for i := len(mw) - 1; i >= 0; i-- {
-		h = mw[i](h)
+	for _, m := range slices.Backward(mw) {
+		h = m(h)
 	}
 	return h
 }
