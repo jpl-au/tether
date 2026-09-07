@@ -15,7 +15,8 @@
   // scan finds all data-tether-timer elements and registers them.
   // Runs on load and after each server update so dynamically added
   // timers are picked up and morph-replaced elements re-register.
-  function scan() {
+  function scan(root, domChanged) {
+    if (domChanged === false) return;
     var els = document.querySelectorAll("[data-tether-timer]");
     for (var i = 0; i < els.length; i++) {
       var el = els[i];

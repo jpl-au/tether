@@ -387,6 +387,13 @@ var form struct {
 ev.Bind(&form)
 ```
 
+`Bind` supports strings, booleans, `float64`, and signed and unsigned integers
+of every width except `uintptr`. Integer parsing checks the destination's range;
+negative values cannot bind to unsigned fields. Named integer types work too.
+`time.Duration` fields accept duration strings such as `"5s"`, `"250ms"` and
+`"1h30m"`, as well as decimal nanosecond counts. Missing fields keep their
+existing values; invalid values return an error identifying the field.
+
 ## Extra data
 
 Attach static key-value pairs to any event - they arrive in `ev.Data`:

@@ -19,7 +19,8 @@
   var registry = {};
   var isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform || "");
 
-  function build(root) {
+  function build(root, domChanged) {
+    if (domChanged === false) return;
     registry = {};
     if (!root) return;
     var els = root.querySelectorAll("[data-tether-hotkey]");

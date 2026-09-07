@@ -59,8 +59,9 @@ func RouteMount[S any](mounts []ComponentMount[S], sess Session, state S, ev Eve
 }
 
 // InitMounts calls [Mounter].Mount on each mounted component that
-// implements the [Mounter] interface. Called once per session after the
-// command loop starts. Components that do not implement Mounter are
+// implements the [Mounter] interface. Called after the command loop starts
+// on initial connection, thaw and crash recovery. Ordinary reattachment
+// does not mount again. Components that do not implement Mounter are
 // left unchanged.
 func InitMounts[S any](mounts []ComponentMount[S], sess Session, state S) S {
 	for _, m := range mounts {

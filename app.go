@@ -93,7 +93,7 @@ type App struct {
 	ShutdownGrace time.Duration
 
 	// MaxSessions limits the total number of concurrent sessions
-	// (pending + active + disconnected) across all handlers. Zero
+	// (pending + active + disconnected + initialising) per handler. Zero
 	// means unlimited. In production, set a limit to prevent
 	// resource exhaustion.
 	MaxSessions int
@@ -105,7 +105,7 @@ type App struct {
 	// thousands of requests without ever connecting. Pending sessions
 	// are cheap but unauthenticated - capping them separately
 	// prevents an attacker from crowding out legitimate active
-	// sessions under the global MaxSessions limit. Zero defaults to
+	// sessions under the handler's MaxSessions limit. Zero defaults to
 	// 128.
 	MaxPending int
 

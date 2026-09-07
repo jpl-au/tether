@@ -131,10 +131,13 @@ func Upgrade(opts ...Options) func(http.ResponseWriter, *http.Request) (xport.Tr
 
 		w.WriteHeader(http.StatusOK)
 
-		// Set the EventSource reconnection interval so the browser
-		// retries promptly if the stream drops before our JS loads. This
-		// first write also proves the flush path end-to-end.
+		// Set EventSource's fallback retry interval. Tether normally
+		// closes EventSource on error and applies its own retry policy.
+		// This first write also proves the flush path end-to-end.
 		if err := sw.writeFlush([]byte("retry: 1000\n\n")); err != nil {
+			if sw.comp != nil {
+				sw.comp.Close()
+			}
 			return nil, fmt.Errorf("sse: handshake write failed: %w", err)
 		}
 

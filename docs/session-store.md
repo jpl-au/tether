@@ -24,7 +24,7 @@ These are independent concerns:
 | **Data** | Opaque differ snapshots | Serialised state `S` + metadata |
 | **Purpose** | Memory optimisation | Crash recovery |
 | **Save trigger** | On disconnect | On disconnect + graceful shutdown |
-| **Load trigger** | Not called by framework | On crash recovery |
+| **Load trigger** | On ordinary reattachment | On thaw or crash recovery |
 | **StatefulConfig field** | `StatefulConfig.DiffStore` | `StatefulConfig.SessionStore` |
 
 A developer may use one without the other, both, or neither.
@@ -114,10 +114,13 @@ rejecting the reconnect.
 
 **On graceful shutdown:**
 
-Before the process exits, the framework saves all active sessions:
-
-1. For each session: encode `S`, wrap envelope, save with TTL
-2. TTL matches `App.ShutdownGrace`
+Shutdown cancels every session and waits for command loops to finish before
+saving final state. Active sessions are saved even when freeze is configured.
+Already frozen sessions keep their persisted state instead of overwriting it
+with the released zero value. Timers, groups, subscriptions and diff snapshots
+are cleaned up. Concurrent Shutdown callers wait for the same cleanup; cleanup
+continues if an individual caller's context expires. Saved state uses
+`App.ShutdownGrace` as its recovery TTL.
 
 On restart, reconnecting clients recover via the crash recovery path.
 

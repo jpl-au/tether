@@ -165,6 +165,7 @@
   // Re-bind after server updates. The core runtime fires tether:update
   // when it finishes applying patches and morphs.
   document.addEventListener("tether:update", function (e) {
+    if (e.detail && e.detail.domChanged === false) return;
     var target = e.detail && e.detail.root ? e.detail.root : root;
     if (target) bindUploads(target);
   });

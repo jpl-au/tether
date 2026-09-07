@@ -19,7 +19,7 @@ func (h *Handler[S]) Drain(ctx context.Context) error {
 
 	// Check immediately in case all pools are already empty.
 	h.mu.RLock()
-	empty := len(h.pending) == 0 && len(h.active) == 0 && len(h.disconnected) == 0
+	empty := len(h.pending) == 0 && len(h.active) == 0 && len(h.disconnected) == 0 && h.creating == 0
 	h.mu.RUnlock()
 	if empty {
 		return nil
@@ -40,7 +40,7 @@ func (h *Handler[S]) notifyDrain() {
 	if h.drainNotify == nil {
 		return
 	}
-	if h.draining.Load() && len(h.pending) == 0 && len(h.active) == 0 && len(h.disconnected) == 0 {
+	if h.draining.Load() && len(h.pending) == 0 && len(h.active) == 0 && len(h.disconnected) == 0 && h.creating == 0 {
 		select {
 		case h.drainNotify <- struct{}{}:
 		default:
@@ -57,7 +57,25 @@ func (h *Handler[S]) notifyDrain() {
 // must exit promptly. A goroutine that ignores its context will leak
 // and may race with the final state save. See [Session.Go].
 func (h *Handler[S]) Shutdown(ctx context.Context) error {
-	h.closeOnce.Do(func() { close(h.done) })
+	h.closeOnce.Do(func() {
+		h.shutdownDone = make(chan struct{})
+		close(h.done)
+		go func() {
+			h.shutdown()
+			close(h.shutdownDone)
+		}()
+	})
+	select {
+	case <-h.shutdownDone:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+// Cleanup continues after an individual caller's deadline. Every Shutdown
+// caller waits for the same loop completion and final persistence.
+func (h *Handler[S]) shutdown() {
 
 	h.mu.Lock()
 	sessions := make([]*StatefulSession[S], 0, len(h.active)+len(h.disconnected))
@@ -76,49 +94,27 @@ func (h *Handler[S]) Shutdown(ctx context.Context) error {
 	clear(h.disconnected)
 	h.mu.Unlock()
 
-	// Destroy all sessions. Frozen sessions keep their store
-	// entries so a restarting server can restore them - only the
-	// destroyed channel is closed to unblock waiters below. The
-	// compare-and-swap is the serialisation point against a
-	// concurrent thaw: if the thaw wins, the session is Active and
-	// falls through to the normal destroy path, which cancels its
-	// context and stops the freshly started loop.
+	// Keep recovery entries while cancelling every session, including
+	// frozen sessions whose lifetime subscriptions still need cleanup.
 	for _, sess := range sessions {
-		if sess.freeze && sess.status.CompareAndSwap(int32(Frozen), int32(Destroyed)) {
-			sess.destroyedOnce.Do(func() { close(sess.destroyed) })
-			continue
-		}
-		h.destroySession(sess)
+		h.releaseSession(sess, true)
 	}
 
-	// Wait for every loop goroutine to exit (or the caller's
-	// deadline, whichever comes first).
-	done := make(chan struct{})
-	go func() {
-		for _, sess := range sessions {
-			<-sess.destroyed
+	// Wait for every loop before reading its final state and timers.
+	for _, sess := range sessions {
+		<-sess.loopDone
+		// Frozen loops leave these timers armed for reconnect.
+		if sess.disconnectTimer != nil {
+			sess.disconnectTimer.Stop()
 		}
-		close(done)
-	}()
-
-	select {
-	case <-done:
-	case <-ctx.Done():
-		return ctx.Err()
+		if sess.lifetimeTimer != nil {
+			sess.lifetimeTimer.Stop()
+		}
 	}
 
 	// Wait for active upload handlers to finish so temp files are
 	// cleaned up before the process exits.
-	uploadDone := make(chan struct{})
-	go func() {
-		h.uploadWG.Wait()
-		close(uploadDone)
-	}()
-	select {
-	case <-uploadDone:
-	case <-ctx.Done():
-		return ctx.Err()
-	}
+	h.uploadWG.Wait()
 
 	// Loops have exited - state is stable, no goroutine is mutating
 	// s.state. Save with context.Background() since session contexts
@@ -134,11 +130,10 @@ func (h *Handler[S]) Shutdown(ctx context.Context) error {
 			ttl = defaultShutdownGrace
 		}
 		for _, sess := range sessions {
-			if sess.sessionStore != nil && !sess.freeze {
+			if sess.sessionStore != nil && !sess.stateReleased {
 				sess.saveSessionState(context.Background(), ttl)
 			}
 		}
 	}
 
-	return nil
 }

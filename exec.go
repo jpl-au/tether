@@ -10,13 +10,8 @@ import (
 	"github.com/jpl-au/tether/wire"
 )
 
-// runHandle invokes the composed Handle function with the handling
-// flag raised so State() can warn about stale reads. The flag is
-// lowered via defer so a panic recovered by OnPanic cannot leave it
-// stuck and turn every later State() call into a bogus warning.
+// runHandle invokes the composed Handle function on the command loop.
 func (s *StatefulSession[S]) runHandle(state S, ev Event) S {
-	s.handling.Store(true)
-	defer s.handling.Store(false)
 	return s.handle(s, state, ev)
 }
 
@@ -65,22 +60,48 @@ func (s *StatefulSession[S]) resolveHeldNavigate() {
 		}
 	}()
 
-	s.state = s.runHandle(s.state, Event{
+	// Resolve through the ordinary event/redirect pipeline, deferring DOM
+	// delivery until the attachment's catch-up has its final state.
+	transport := s.transport
+	s.transport = nil
+	defer func() { s.transport = transport }()
+	s.exec(Event{
 		Type: event.Navigate,
 		Data: map[string]string{"path": u.Path, "search": u.RawQuery},
 	})
-	s.stateSnap.Store(s.state)
 
 	// Effects the navigate handler raised join the held batch. A
 	// further Navigate from it is a redirect chain; lastURL follows it
 	// so the client lands on the final URL.
 	s.drainFx(fx)
 	s.holdFx(fx)
+	if s.heldFx != nil {
+		s.heldFx.URL = ""
+		s.heldFx.Replace = false
+	}
+}
+
+// An explicit back/forward navigation made while offline is newer client
+// intent and takes precedence over a held server navigation. An unchanged
+// browser URL is never echoed back over the server's catch-up.
+func (s *StatefulSession[S]) resolveReconnectNavigate(target string) {
+	if target != "" {
+		s.holdFx(&Effects{URL: target})
+	}
+	s.resolveHeldNavigate()
 }
 
 // exec processes a single client event: handle it, re-render, diff,
 // and send patches to the transport.
 func (s *StatefulSession[S]) exec(ev Event) {
+	if ev.Type == event.Navigate {
+		if path := ev.Data["path"]; path != "" {
+			s.lastURL = path
+			if query := ev.Data["search"]; query != "" {
+				s.lastURL += "?" + query
+			}
+		}
+	}
 	now := time.Now()
 	s.lastActivity.Store(now.UnixNano())
 	if s.idleTimer != nil {

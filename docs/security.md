@@ -35,11 +35,15 @@ Each session is identified by a cryptographically random ID generated with
 
 ### Session binding
 
-The framework verifies the `User-Agent` header on session reconnect by
-default. When a session is created, the client's User-Agent is captured.
-On every subsequent reconnect or session claim, the User-Agent must match
-the original. A mismatch rejects the connection and emits a
-`SessionBindingFailed` diagnostic.
+The framework captures the client's `User-Agent` when a session is created.
+By default, subsequent reconnects, session claims and client-requested
+destruction must present the same User-Agent. This includes unload beacons
+and the old session named by a page-refresh handoff (`Tether-Replaces`).
+A mismatch rejects the operation and emits a `SessionBindingFailed` diagnostic.
+Destroy beacons return HTTP 403; rejected handoffs close the new transport
+without destroying the old session. Destroying an already absent session
+remains an idempotent no-op. Server-initiated timeout and shutdown cleanup
+does not require a client User-Agent.
 
 This detects stolen session IDs presented from a different client. It does
 not prevent spoofing by an attacker who also knows the User-Agent string,
@@ -64,7 +68,8 @@ app := tether.App{
 ```
 
 The framework does not parse User-Agent strings itself. The developer
-provides the matching logic suited to their deployment.
+provides the matching logic suited to their deployment. The same matcher
+applies to reconnects, claims and client-requested destruction.
 
 #### Disabling entirely
 
@@ -78,8 +83,9 @@ app := tether.App{
 }
 ```
 
-When disabled, `SessionMatch` is ignored and any client can reconnect
-to any session.
+When disabled, `SessionMatch` is ignored and a client possessing a session
+ID can reconnect to or request destruction of that session regardless of
+User-Agent.
 
 ### Where the ID appears
 

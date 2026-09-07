@@ -235,9 +235,10 @@ type Security struct {
 	TrustedOrigins []string
 
 	// DisableSessionBinding turns off User-Agent verification on
-	// session reconnect entirely. When true, [SessionMatch] is
-	// ignored and possession of the session ID alone is enough to
-	// reconnect.
+	// session reconnect, claims and client-requested destruction
+	// (unload beacons and page-refresh handoffs). When true,
+	// [SessionMatch] is ignored and possession of the session ID
+	// alone is enough for these operations.
 	//
 	// Note that the User-Agent check is a tripwire, not real theft
 	// protection - an attacker who has stolen a session ID can
@@ -248,10 +249,10 @@ type Security struct {
 	DisableSessionBinding bool
 
 	// SessionMatch customises how the framework compares
-	// User-Agent strings on reconnect. The function receives the
-	// original UA (captured at session creation) and the
-	// reconnecting client's UA. Return true to allow the
-	// reconnect, false to reject it.
+	// User-Agent strings on reconnect, claims and client-requested
+	// destruction. The function receives the original UA (captured
+	// at session creation) and the requesting client's UA. Return
+	// true to allow the operation, false to reject it.
 	//
 	// When nil (the default), the framework performs an exact
 	// string match. This is the strictest and safest option.

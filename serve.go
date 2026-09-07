@@ -32,18 +32,16 @@ func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 
 	dev.Debug("serving initial page", "path", r.URL.Path, "remote", r.RemoteAddr)
 
-	h.mu.RLock()
-	if h.app.MaxPending > 0 && len(h.pending) >= h.app.MaxPending {
-		h.mu.RUnlock()
-		http.Error(w, "too many pending sessions", http.StatusServiceUnavailable)
-		return
-	}
-	if h.app.MaxSessions > 0 && len(h.pending)+len(h.active)+len(h.disconnected) >= h.app.MaxSessions {
-		h.mu.RUnlock()
+	if !h.reserveCapacity(true) {
 		http.Error(w, "too many sessions", http.StatusServiceUnavailable)
 		return
 	}
-	h.mu.RUnlock()
+	reserved := true
+	defer func() {
+		if reserved {
+			h.releaseCapacity(true)
+		}
+	}()
 
 	state := h.cfg.InitialState(r)
 	var effects Effects
@@ -74,6 +72,15 @@ func (h *Handler[S]) serveInitialPage(w http.ResponseWriter, r *http.Request) {
 	id := newID()
 	now := time.Now()
 	h.mu.Lock()
+	select {
+	case <-h.done:
+		h.mu.Unlock()
+		return
+	default:
+	}
+	h.creating--
+	h.pendingCreating--
+	reserved = false
 	h.pending[id] = &pendingSession[S]{state: state, differ: differ, createdAt: now, userAgent: r.UserAgent(), effects: effects}
 	h.mu.Unlock()
 
@@ -149,12 +156,13 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 	// URL would leak it into access logs, proxy logs, and APM traces.
 	// The ticket was issued moments ago by handleConnectTicket with
 	// the ID (and any replaced session) carried in request headers.
-	var id, replaces string
+	var id, replaces, navigate string
 	invalidTicket := false
 	if tok := r.URL.Query().Get("ticket"); tok != "" {
 		if t, ok := h.redeemTicket(tok, r.UserAgent()); ok {
 			id = t.session
 			replaces = t.replaces
+			navigate = t.navigate
 		} else {
 			// Expired, replayed, or forged. The client evidently ran
 			// the connect flow, so it is showing some page - treat it
@@ -182,13 +190,23 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 	// destroy the old session immediately instead of waiting for the
 	// 30s disconnect timer. sessionStorage on the client tracks which
 	// session was active in this tab before the refresh.
-	if replaces != "" {
-		h.destroyByID(replaces)
+	if replaces != "" && !h.destroyByID(replaces, r.UserAgent()) {
+		return
 	}
 
-	// Try to reattach to a disconnected session.
+	ready, claimed := h.claimConnection(id)
+	if !claimed {
+		return
+	}
+	defer ready()
+
+	// Reuse the session even if its previous transport is still attached.
 	h.mu.Lock()
-	if sess, ok := h.disconnected[id]; ok {
+	sess, ok := h.disconnected[id]
+	if !ok {
+		sess, ok = h.active[id]
+	}
+	if ok {
 		if !h.app.Security.matchUA(sess.userAgent, r.UserAgent()) {
 			h.mu.Unlock()
 			h.Diagnostics.Publish(Diagnostic{
@@ -199,32 +217,21 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 			return
 		}
 		frozen := Status(sess.status.Load()) == Frozen
-		delete(h.disconnected, id)
-		h.active[id] = sess
 		h.mu.Unlock()
 
 		started = true
 		if frozen {
-			h.thaw(sess, r, transport)
+			h.thawReady(sess, r, transport, ready, navigate)
 		} else {
-			if h.cfg.SessionStore != nil {
-				if err := h.cfg.SessionStore.Delete(sess.ctx, id); err != nil {
-					dev.Warn("session store delete failed on reconnect", "session", id, "error", err)
-					h.Diagnostics.Publish(Diagnostic{
-						Kind:      SessionStoreError,
-						SessionID: id,
-						Err:       err,
-						Detail:    "delete",
-					})
-				}
-			}
 			dev.Debug("session reattached", "session", id, "endpoint", sess.endpoint, "remote", r.RemoteAddr)
 			// Block only for this attachment's lifetime - the HTTP
 			// goroutine must stay alive while the transport is in use
 			// (SSE needs r.Context() valid), but holding it until the
 			// session is destroyed would pin one goroutine plus its
 			// request per reconnect.
-			<-h.reattach(sess, transport)
+			done := h.reattach(sess, transport, navigate)
+			ready()
+			<-done
 		}
 		return
 	}
@@ -235,7 +242,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 	// pool, but the store may have persisted state from a previous
 	// server instance.
 	if h.cfg.SessionStore != nil && id != "" {
-		if restored, ok := h.restoreSession(id, r, transport); ok {
+		if restored, ok := h.restoreReady(id, r, transport, ready, navigate); ok {
 			started = true
 			_ = restored // restoreSession blocked until the loop exited
 			return
@@ -246,6 +253,12 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 	var state S
 	var differ *jit.Differ
 	var effects Effects
+	reserved := false
+	defer func() {
+		if reserved {
+			h.releaseCapacity(false)
+		}
+	}()
 
 	h.mu.Lock()
 	if ps, ok := h.pending[id]; ok {
@@ -263,6 +276,8 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		differ = ps.differ
 		effects = ps.effects
 		delete(h.pending, id)
+		h.creating++
+		reserved = true
 	}
 	h.mu.Unlock()
 
@@ -282,15 +297,10 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 			return
 		}
 
-		// Enforce MaxSessions.
-		if h.app.MaxSessions > 0 {
-			h.mu.RLock()
-			full := len(h.pending)+len(h.active)+len(h.disconnected) >= h.app.MaxSessions
-			h.mu.RUnlock()
-			if full {
-				return
-			}
+		if !h.reserveCapacity(false) {
+			return
 		}
+		reserved = true
 
 		stale = id != "" || invalidTicket
 
@@ -323,7 +333,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 
 	now := time.Now()
 	ctx, cancel := context.WithCancel(context.Background())
-	sess := &StatefulSession[S]{
+	sess = &StatefulSession[S]{
 		id:                   id,
 		state:                state,
 		render:               h.cfg.Render,
@@ -387,11 +397,27 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 	if h.cfg.Timeouts.MaxLifetime > 0 {
 		sess.lifetimeTimer = time.AfterFunc(h.cfg.Timeouts.MaxLifetime, func() {
 			sess.stop()
+			h.sessionDestroyed(sess)
 		})
 	}
 	sess.startTimers()
 
 	h.mu.Lock()
+	select {
+	case <-h.done:
+		h.mu.Unlock()
+		sess.stop()
+		if sess.idleTimer != nil {
+			sess.idleTimer.Stop()
+		}
+		if sess.lifetimeTimer != nil {
+			sess.lifetimeTimer.Stop()
+		}
+		return
+	default:
+	}
+	h.creating--
+	reserved = false
 	h.active[id] = sess
 	h.mu.Unlock()
 
@@ -403,6 +429,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 	// deferred until after OnConnect to guarantee that no client
 	// events are processed before subscriptions are set up.
 	started = true
+	reader := sess.prepareReader()
 	go sess.run()
 
 	// Recover from panics during session initialisation (OnConnect,
@@ -446,6 +473,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 			if sess.deferRender(nil) {
 				return
 			}
+			sess.resolveReconnectNavigate(navigate)
 			tree := sess.render(sess.state)
 			html := sess.engine.RenderBytes(tree)
 			sess.send(wire.Update{Morphs: []wire.Morph{{Key: "", HTML: html}}})
@@ -482,9 +510,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		h.cfg.OnConnect(sess)
 	}
 
-	for _, g := range h.cfg.Groups {
-		g.Add(sess)
-	}
+	h.joinGroups(sess)
 	if len(h.cfg.Groups) > 0 {
 		dev.Debug("joined groups", "session", sess.id, "endpoint", sess.endpoint, "count", len(h.cfg.Groups))
 	}
@@ -495,7 +521,8 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 		hb.StartHeartbeat(h.cfg.Timeouts.Heartbeat)
 	}
 
-	go sess.readTransport(sess.events)
+	readerDone := reader()
+	ready()
 	dev.Debug("session ready", "session", sess.id, "endpoint", sess.endpoint)
 
 	// Block until this attachment's transport lifetime ends. The HTTP
@@ -506,6 +533,7 @@ func (h *Handler[S]) serveSession(w http.ResponseWriter, r *http.Request, upgrad
 	// a reconnect arrives on a fresh request and blocks on its own
 	// attachment context.
 	<-tctx.Done()
+	<-readerDone
 }
 
 // sessionCodec returns the codec for serialising state S. Uses the
@@ -523,23 +551,25 @@ func (h *Handler[S]) sessionCodec() SessionCodec[S] {
 // if the store has no data for this ID or restoration fails. The
 // caller should treat a false return as "no session to restore" and
 // continue with normal session creation.
-func (h *Handler[S]) restoreSession(id string, r *http.Request, transport Transport) (*StatefulSession[S], bool) {
+func (h *Handler[S]) restoreSession(id string, r *http.Request, transport Transport, navigate ...string) (*StatefulSession[S], bool) {
+	return h.restoreReady(id, r, transport, func() {}, navigate...)
+}
+
+func (h *Handler[S]) restoreReady(id string, r *http.Request, transport Transport, ready func(), navigate ...string) (*StatefulSession[S], bool) {
 	// Restores build a full session, so they respect the same gates
 	// as direct connects. Without this, the reconnect storm after a
 	// node restart - exactly when thousands of clients hold
 	// restorable IDs - could blow past MaxSessions, and a draining
 	// node would keep accepting work it is trying to shed.
-	if h.draining.Load() {
+	if !h.reserveCapacity(false) {
 		return nil, false
 	}
-	if h.app.MaxSessions > 0 {
-		h.mu.RLock()
-		full := len(h.pending)+len(h.active)+len(h.disconnected) >= h.app.MaxSessions
-		h.mu.RUnlock()
-		if full {
-			return nil, false
+	reserved := true
+	defer func() {
+		if reserved {
+			h.releaseCapacity(false)
 		}
-	}
+	}()
 
 	data, err := h.cfg.SessionStore.Load(r.Context(), id)
 	if err != nil {
@@ -593,8 +623,6 @@ func (h *Handler[S]) restoreSession(id string, r *http.Request, transport Transp
 
 	// Build a fresh session with the restored state.
 	differ := jit.NewDiffer()
-	tree := h.cfg.Render(state)
-	differ.Render(tree, io.Discard)
 
 	now := time.Now()
 	ctx, cancel := context.WithCancel(context.Background())
@@ -603,7 +631,7 @@ func (h *Handler[S]) restoreSession(id string, r *http.Request, transport Transp
 		state:                state,
 		render:               h.cfg.Render,
 		handle:               h.cfg.Handle,
-		engine:               h.engine(differ, state, true),
+		engine:               h.engine(differ, state, false),
 		encoder:              h.encoder,
 		wireFormat:           h.wireFormat,
 		transport:            transport,
@@ -660,16 +688,33 @@ func (h *Handler[S]) restoreSession(id string, r *http.Request, transport Transp
 	if h.cfg.Timeouts.MaxLifetime > 0 {
 		sess.lifetimeTimer = time.AfterFunc(h.cfg.Timeouts.MaxLifetime, func() {
 			sess.stop()
+			h.sessionDestroyed(sess)
 		})
 	}
 	sess.startTimers()
 
 	h.mu.Lock()
+	select {
+	case <-h.done:
+		h.mu.Unlock()
+		sess.stop()
+		if sess.idleTimer != nil {
+			sess.idleTimer.Stop()
+		}
+		if sess.lifetimeTimer != nil {
+			sess.lifetimeTimer.Stop()
+		}
+		return nil, false
+	default:
+	}
 	h.active[id] = sess
+	h.creating--
+	reserved = false
 	h.mu.Unlock()
 
 	sess.handler = h
 
+	reader := sess.prepareReader()
 	go sess.run()
 
 	// Recover from panics during session restoration (OnRestore,
@@ -694,12 +739,14 @@ func (h *Handler[S]) restoreSession(id string, r *http.Request, transport Transp
 		}
 	}()
 
-	// Send the restored content to the client. The differ is seeded
-	// with the current state, so Diff returns empty patches (nothing
-	// changed). Render the tree as a full morph and include the saved
+	// Seed the restored engine with its first delivered render. Send
+	// the tree as a full morph and include the saved
 	// URL and title so the browser's address bar and document title
 	// are in sync. This mirrors the catch-up send in reattach.
 	sess.cmds <- func() {
+		if len(navigate) > 0 {
+			sess.resolveReconnectNavigate(navigate[0])
+		}
 		tree := sess.render(sess.state)
 		html := sess.engine.RenderBytes(tree)
 		u := wire.Update{
@@ -712,7 +759,12 @@ func (h *Handler[S]) restoreSession(id string, r *http.Request, transport Transp
 		if sess.lastTitle != "" {
 			u.Title = sess.lastTitle
 		}
+		if sess.heldFx != nil {
+			sess.heldFx.merge(&u)
+			sess.heldFx = nil
+		}
 		sess.send(u)
+		h.clearRecovery(sess)
 	}
 
 	// Mount components before events arrive.
@@ -735,29 +787,18 @@ func (h *Handler[S]) restoreSession(id string, r *http.Request, transport Transp
 		h.cfg.OnConnect(sess)
 	}
 
-	for _, g := range h.cfg.Groups {
-		g.Add(sess)
-	}
+	h.joinGroups(sess)
 
 	if hb, ok := transport.(Heartbeater); ok && !h.cfg.Timeouts.DisableHeartbeat {
 		hb.StartHeartbeat(h.cfg.Timeouts.Heartbeat)
 	}
 
-	// Clean up the store entry now that the session is in memory.
-	if err := h.cfg.SessionStore.Delete(ctx, id); err != nil {
-		dev.Warn("session store delete failed after restore", "session", id, "error", err)
-		h.Diagnostics.Publish(Diagnostic{
-			Kind:      SessionStoreError,
-			SessionID: id,
-			Err:       err,
-			Detail:    "delete",
-		})
-	}
-
-	go sess.readTransport(sess.events)
+	readerDone := reader()
+	ready()
 	dev.Debug("session restored", "session", sess.id, "endpoint", sess.endpoint)
 
 	// Hold the HTTP goroutine only for this attachment's lifetime.
 	<-tctx.Done()
+	<-readerDone
 	return sess, true
 }

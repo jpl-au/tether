@@ -10,9 +10,9 @@ package ws
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 
@@ -205,11 +205,10 @@ func (h *eventHandler) OnClose(conn *gws.Conn, err error) {
 }
 
 // isNormalClose reports whether err represents a WebSocket closure that
-// is part of normal operation (code 1000 or 1001). gws returns a
-// structured error whose string contains the close code.
+// is part of normal operation (code 1000 or 1001).
 func isNormalClose(err error) bool {
-	s := err.Error()
-	return strings.Contains(s, "code=1000") || strings.Contains(s, "code=1001")
+	var closed *gws.CloseError
+	return errors.As(err, &closed) && (closed.Code == 1000 || closed.Code == 1001)
 }
 
 // Compile-time checks: *transport must satisfy xport.Transport,
@@ -233,14 +232,13 @@ type transport struct {
 	once   sync.Once
 }
 
-// closeWithErr records the terminal error and closes the events
-// channel so that ReceiveEvent unblocks. Safe to call multiple times;
+// closeWithErr records the terminal error and signals both readers and
+// message callbacks. Safe to call multiple times;
 // only the first call takes effect.
 func (t *transport) closeWithErr(err error) {
 	t.once.Do(func() {
 		t.err = err
 		close(t.done)
-		close(t.events)
 	})
 }
 
@@ -262,14 +260,15 @@ func (t *transport) SendBinary(data []byte) error {
 // Returns io.EOF when the connection is closed cleanly. All other
 // errors propagate as-is and will terminate the session.
 func (t *transport) ReceiveEvent() (xport.Event, error) {
-	ev, ok := <-t.events
-	if !ok {
+	select {
+	case ev := <-t.events:
+		return ev, nil
+	case <-t.done:
 		if t.err != nil {
 			return xport.Event{}, t.err
 		}
 		return xport.Event{}, io.EOF
 	}
-	return ev, nil
 }
 
 // StartHeartbeat sends WebSocket ping frames at the given interval

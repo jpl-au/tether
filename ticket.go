@@ -32,6 +32,7 @@ const connectTicketTTL = 30 * time.Second
 type connectTicket struct {
 	session   string
 	replaces  string
+	navigate  string
 	userAgent string
 	expires   time.Time
 }
@@ -40,7 +41,7 @@ type connectTicket struct {
 // token and returns it. Returns false when the ticket table is full -
 // outstanding tickets are capped by App.MaxPending, since like
 // pending sessions they are cheap, unauthenticated server state.
-func (h *Handler[S]) issueTicket(session, replaces, userAgent string, now time.Time) (string, bool) {
+func (h *Handler[S]) issueTicket(session, replaces, userAgent string, now time.Time, navigate ...string) (string, bool) {
 	h.ticketMu.Lock()
 	defer h.ticketMu.Unlock()
 
@@ -64,6 +65,11 @@ func (h *Handler[S]) issueTicket(session, replaces, userAgent string, now time.T
 		replaces:  replaces,
 		userAgent: userAgent,
 		expires:   now.Add(connectTicketTTL),
+	}
+	if len(navigate) > 0 {
+		ticket := h.tickets[tok]
+		ticket.navigate = navigate[0]
+		h.tickets[tok] = ticket
 	}
 	return tok, true
 }

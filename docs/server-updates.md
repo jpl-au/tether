@@ -127,8 +127,8 @@ Handle: func(sess tether.Session, state State, ev tether.Event) State {
 }
 ```
 
-In dev mode, a warning is emitted when `State()` is called during
-Handle to help catch this mistake early.
+An external read is valid even while Handle is running. The framework
+cannot distinguish the caller's goroutine, so it does not warn on these reads.
 
 `State()` is designed for external goroutines - background workers,
 timers, and broadcast callbacks that run outside Handle. In those

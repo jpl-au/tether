@@ -2,7 +2,6 @@ package tether
 
 import (
 	"context"
-	"io"
 	"net/http"
 
 	jit "github.com/jpl-au/fluent-jit"
@@ -17,7 +16,7 @@ import (
 // transport lifetime ends, so the HTTP handler goroutine can return
 // as soon as the transport is gone instead of blocking until the
 // session is destroyed.
-func (h *Handler[S]) reattach(sess *StatefulSession[S], transport Transport) <-chan struct{} {
+func (h *Handler[S]) reattach(sess *StatefulSession[S], transport Transport, navigate ...string) <-chan struct{} {
 	if hb, ok := transport.(Heartbeater); ok && !h.cfg.Timeouts.DisableHeartbeat {
 		hb.StartHeartbeat(h.cfg.Timeouts.Heartbeat)
 	}
@@ -55,9 +54,48 @@ func (h *Handler[S]) reattach(sess *StatefulSession[S], transport Transport) <-c
 	// goroutine-safe) but installed on the loop so only the loop
 	// mutates session fields.
 	tctx, tcancel := context.WithCancel(sess.ctx)
+	finished := make(chan struct{})
+	installed := make(chan struct{})
+	q := sess.queue()
+	loopDone := q.done
+	if sess.ctx.Err() != nil || sess.freezing.Load() || Status(sess.status.Load()) == Frozen || Status(sess.status.Load()) == Destroyed {
+		tcancel()
+		transport.Close()
+		close(finished)
+		return finished
+	}
+	// A freeze can win after the caller looked up an active session.
+	// Close the attempted attachment if its command never gets a loop.
+	go func() {
+		select {
+		case <-installed:
+		case <-loopDone:
+			select {
+			case <-installed:
+				return
+			default:
+			}
+			tcancel()
+			transport.Close()
+			close(finished)
+		}
+	}()
 
 	select {
-	case sess.cmds <- func() {
+	case q.cmds <- func() {
+		close(installed)
+		if sess.ctx.Err() != nil {
+			tcancel()
+			transport.Close()
+			close(finished)
+			return
+		}
+		h.mu.Lock()
+		if h.disconnected[sess.id] == sess {
+			delete(h.disconnected, sess.id)
+			h.active[sess.id] = sess
+		}
+		h.mu.Unlock()
 		// Stop the disconnect timer on the loop goroutine - the
 		// timer fields are loop-owned (cleanup reads them there).
 		// If the timer fires before this command runs, the caller
@@ -68,11 +106,19 @@ func (h *Handler[S]) reattach(sess *StatefulSession[S], transport Transport) <-c
 			sess.disconnectTimer = nil
 		}
 
+		takeover := sess.transport != nil
+		if sess.transportCancel != nil {
+			sess.transportCancel()
+		}
+		if sess.transport != nil {
+			sess.transport.Close()
+		}
 		sess.transport = transport
 		sess.transportCtx.Store(&tctx)
 		sess.transportCancel = tcancel
 		sess.events = make(chan Event)
-		go sess.readTransport(sess.events)
+		readerDone := sess.startReader()
+		go func() { <-tctx.Done(); <-readerDone; close(finished) }()
 
 		// Restore differ snapshots if available.
 		if diffData != nil {
@@ -90,7 +136,11 @@ func (h *Handler[S]) reattach(sess *StatefulSession[S], transport Transport) <-c
 		// server-side rather than round-tripping to the client. The
 		// address bar is then synced with Replace so the client does
 		// not echo a navigate event back for a page it is already on.
-		sess.resolveHeldNavigate()
+		if len(navigate) > 0 {
+			sess.resolveReconnectNavigate(navigate[0])
+		} else {
+			sess.resolveHeldNavigate()
+		}
 
 		// Re-render and send the minimal update to catch the client
 		// up. The baseline still describes the DOM the browser is
@@ -105,7 +155,7 @@ func (h *Handler[S]) reattach(sess *StatefulSession[S], transport Transport) <-c
 
 		var u wire.Update
 		switch {
-		case change != nil:
+		case takeover || change != nil:
 			// Structural change - full morph required.
 			html := sess.engine.RenderBytes(tree)
 			u.Morphs = []wire.Morph{{Key: "", HTML: html}}
@@ -141,26 +191,49 @@ func (h *Handler[S]) reattach(sess *StatefulSession[S], transport Transport) <-c
 			sess.heldFx = nil
 		}
 		sess.send(u)
+		if h.cfg.SessionStore != nil {
+			if err := h.cfg.SessionStore.Delete(sess.ctx, sess.id); err != nil {
+				sess.emitDiagnostic(Diagnostic{Kind: SessionStoreError, SessionID: sess.id, Err: err, Detail: "delete"})
+			}
+		}
 	}:
 	case <-sess.ctx.Done():
+		// The monitor owns finished when no command is installed.
+		tcancel()
 		transport.Close()
 	}
-	return tctx.Done()
+	return finished
 }
 
 // thaw restores a frozen session from the SessionStore and starts a
 // new command loop. The session's state, differ, channels, and timers
 // are rebuilt from scratch - the only things carried over from the
 // frozen stub are the ID, endpoint, user-agent, and metadata.
-func (h *Handler[S]) thaw(sess *StatefulSession[S], r *http.Request, transport Transport) {
-	// Stop the disconnect timer - the client is back.
-	if sess.disconnectTimer != nil {
-		sess.disconnectTimer.Stop()
-		sess.disconnectTimer = nil
-	}
+func (h *Handler[S]) thaw(sess *StatefulSession[S], r *http.Request, transport Transport, navigate ...string) {
+	h.thawReady(sess, r, transport, func() {}, navigate...)
+}
 
+func (h *Handler[S]) thawReady(sess *StatefulSession[S], r *http.Request, transport Transport, ready func(), navigate ...string) {
+	// Frozen is published before OnDisconnect finishes. Wait for the old
+	// loop's cleanup before accessing timers, state or queue fields.
+	sess.lifecycleMu.Lock()
+	oldDone := sess.loopDone
+	sess.lifecycleMu.Unlock()
+	select {
+	case <-oldDone:
+	case <-sess.ctx.Done():
+		transport.Close()
+		return
+	case <-r.Context().Done():
+		transport.Close()
+		return
+	}
 	// Load state from the store.
 	data, err := h.cfg.SessionStore.Load(r.Context(), sess.id)
+	if r.Context().Err() != nil {
+		transport.Close()
+		return
+	}
 	if err != nil || data == nil {
 		if err != nil {
 			dev.Warn("session store load failed on thaw", "session", sess.id, "error", err)
@@ -174,6 +247,7 @@ func (h *Handler[S]) thaw(sess *StatefulSession[S], r *http.Request, transport T
 		// Cannot restore - destroy the frozen stub.
 		h.mu.Lock()
 		delete(h.active, sess.id)
+		delete(h.disconnected, sess.id)
 		h.notifyDrain()
 		h.mu.Unlock()
 		h.destroySession(sess)
@@ -200,6 +274,7 @@ func (h *Handler[S]) thaw(sess *StatefulSession[S], r *http.Request, transport T
 		})
 		h.mu.Lock()
 		delete(h.active, sess.id)
+		delete(h.disconnected, sess.id)
 		h.notifyDrain()
 		h.mu.Unlock()
 		h.destroySession(sess)
@@ -227,6 +302,7 @@ func (h *Handler[S]) thaw(sess *StatefulSession[S], r *http.Request, transport T
 		})
 		h.mu.Lock()
 		delete(h.active, sess.id)
+		delete(h.disconnected, sess.id)
 		h.notifyDrain()
 		h.mu.Unlock()
 		h.destroySession(sess)
@@ -242,35 +318,37 @@ func (h *Handler[S]) thaw(sess *StatefulSession[S], r *http.Request, transport T
 		return
 	}
 
-	// Claim the frozen stub before touching its fields. The CAS is
-	// the serialisation point against a concurrent Shutdown: whichever
-	// side moves the status first owns the session. Losing means
-	// Shutdown already transitioned Frozen → Destroyed - back out and
-	// let Shutdown's cleanup stand rather than reviving a session the
-	// process is tearing down, which would be an invalid
-	// destroyed → active transition.
-	if !sess.status.CompareAndSwap(int32(Frozen), int32(Active)) {
-		h.mu.Lock()
-		delete(h.active, sess.id)
-		h.notifyDrain()
-		h.mu.Unlock()
+	// Serialise runtime replacement with destruction. Activation is
+	// published only after every field belongs to the new loop.
+	sess.lifecycleMu.Lock()
+	if sess.ctx.Err() != nil || Status(sess.status.Load()) != Frozen {
+		sess.lifecycleMu.Unlock()
 		if err := transport.Close(); err != nil {
 			dev.Warn("transport close failed on thaw", "session", sess.id, "error", err)
 		}
 		return
 	}
+	if sess.disconnectTimer != nil {
+		sess.disconnectTimer.Stop()
+		sess.disconnectTimer = nil
+	}
+	h.mu.Lock()
+	if h.disconnected[sess.id] == sess {
+		delete(h.disconnected, sess.id)
+		h.active[sess.id] = sess
+	}
+	h.mu.Unlock()
 
 	// Rebuild the session's runtime state. The destroyed channel and
 	// its once are deliberately not recreated - they are still armed
 	// from the session's creation (freeze skips them) and destroy is
 	// a one-shot event for the session's whole lifetime.
 	differ := jit.NewDiffer()
-	tree := h.cfg.Render(state)
-	differ.Render(tree, io.Discard)
 
 	sess.state = state
+	sess.stateReleased = false
 	sess.stateSnap.Store(state)
-	sess.engine = h.engine(differ, state, true)
+	sess.engine = h.engine(differ, state, false)
 	sess.transport = transport
 	tctx := sess.attachTransportCtx()
 	sess.events = make(chan Event)
@@ -278,8 +356,29 @@ func (h *Handler[S]) thaw(sess *StatefulSession[S], r *http.Request, transport T
 	sess.fxCh = make(chan func(*Effects), h.cfg.Limits.CmdBufferSize)
 	sess.overflowSem = make(chan struct{}, h.cfg.Limits.CmdBufferSize)
 	sess.loopDone = make(chan struct{})
+	sess.queueSnapshot.Store(&sessionQueue{sess.cmds, sess.fxCh, sess.overflowSem, sess.loopDone})
 	sess.lastURL = env.URL
 	sess.lastTitle = env.Title
+	ctx, cancel := context.WithCancel(sess.ctx)
+	sess.subscriptions.Store(&subscriptionLifetime{ctx: ctx, cancel: cancel})
+	sess.needsRender = false
+	sess.startTimers()
+
+	// The restored state can differ from the last DOM received before
+	// disconnect. Seed and deliver it even when no callback changes state.
+	sess.cmds <- func() {
+		if len(navigate) > 0 {
+			sess.resolveReconnectNavigate(navigate[0])
+		}
+		html := sess.engine.RenderBytes(sess.render(sess.state))
+		u := wire.Update{Morphs: []wire.Morph{{Key: "", HTML: html}}, URL: sess.lastURL, Title: sess.lastTitle, Replace: true}
+		if sess.heldFx != nil {
+			sess.heldFx.merge(&u)
+			sess.heldFx = nil
+		}
+		sess.send(u)
+		h.clearRecovery(sess)
+	}
 
 	if hb, ok := transport.(Heartbeater); ok && !h.cfg.Timeouts.DisableHeartbeat {
 		hb.StartHeartbeat(h.cfg.Timeouts.Heartbeat)
@@ -287,7 +386,16 @@ func (h *Handler[S]) thaw(sess *StatefulSession[S], r *http.Request, transport T
 
 	// Start the new loop before OnRestore so methods work inside
 	// the callback.
+	sess.transition(Active)
+	reader := sess.prepareReader()
 	go sess.run()
+	sess.lifecycleMu.Unlock()
+	defer func() {
+		if r := recover(); r != nil {
+			sess.emitDiagnostic(Diagnostic{Kind: HandlerPanic, SessionID: sess.id, Err: panicErr(r), Detail: "session thaw"})
+			sess.stop()
+		}
+	}()
 
 	if len(h.cfg.Components) > 0 {
 		sess.Update(func(s S) S {
@@ -307,27 +415,16 @@ func (h *Handler[S]) thaw(sess *StatefulSession[S], r *http.Request, transport T
 		h.cfg.OnConnect(sess)
 	}
 
-	for _, g := range h.cfg.Groups {
-		g.Add(sess)
-	}
+	h.joinGroups(sess)
 
-	// Clean up the store entry now that state is in memory.
-	if err := h.cfg.SessionStore.Delete(sess.ctx, sess.id); err != nil {
-		dev.Warn("session store delete failed after thaw", "session", sess.id, "error", err)
-		h.Diagnostics.Publish(Diagnostic{
-			Kind:      SessionStoreError,
-			SessionID: sess.id,
-			Err:       err,
-			Detail:    "delete",
-		})
-	}
-
-	go sess.readTransport(sess.events)
+	readerDone := reader()
+	ready()
 	dev.Debug("session thawed", "session", sess.id, "endpoint", sess.endpoint)
 
 	// Hold the HTTP goroutine only for this attachment's lifetime -
 	// the transport context ends on disconnect, freeze, or destroy.
 	<-tctx.Done()
+	<-readerDone
 }
 
 // sessionDisconnected moves a session from the active pool to the
@@ -335,6 +432,10 @@ func (h *Handler[S]) thaw(sess *StatefulSession[S], r *http.Request, transport T
 // immediately. Called from onTransportClose on the loop goroutine.
 func (h *Handler[S]) sessionDisconnected(sess *StatefulSession[S]) {
 	h.mu.Lock()
+	if h.active[sess.id] != sess {
+		h.mu.Unlock()
+		return // Shutdown or explicit destruction already claimed it.
+	}
 	delete(h.active, sess.id)
 	destroy := h.cfg.Timeouts.DisableReconnect
 	if !destroy {

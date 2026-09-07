@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"time"
 
 	"github.com/jpl-au/tether/event"
 )
@@ -85,8 +86,9 @@ func (e Event) WithAction(action string) Event {
 
 // Bind decodes the event's Data map into a struct. Fields are matched
 // by the "tether" struct tag; untagged exported fields use their
-// lowercased name. Supported field types: string, int, int64, float64,
-// bool.
+// lowercased first letter. Supported field types: string, signed and
+// unsigned integers (excluding uintptr), float64, bool, and time.Duration.
+// Durations accept strings such as "5s" or decimal nanosecond counts.
 //
 // This is the multi-field counterpart to the single-value helpers
 // (Value, Key, Int, Bool). Use Bind when a form submit sends several
@@ -134,12 +136,24 @@ func setField(fv reflect.Value, raw, key string) error {
 	switch fv.Kind() {
 	case reflect.String:
 		fv.SetString(raw)
-	case reflect.Int, reflect.Int64:
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		n, err := strconv.ParseInt(raw, 10, fv.Type().Bits())
+		if err != nil && fv.Type() == reflect.TypeFor[time.Duration]() {
+			// Preserve numeric nanosecond input while also accepting units.
+			var d time.Duration
+			d, err = time.ParseDuration(raw)
+			n = int64(d)
+		}
 		if err != nil {
 			return fmt.Errorf("tether: field %q: %w", key, err)
 		}
 		fv.SetInt(n)
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		n, err := strconv.ParseUint(raw, 10, fv.Type().Bits())
+		if err != nil {
+			return fmt.Errorf("tether: field %q: %w", key, err)
+		}
+		fv.SetUint(n)
 	case reflect.Float64:
 		n, err := strconv.ParseFloat(raw, 64)
 		if err != nil {

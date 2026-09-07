@@ -114,6 +114,13 @@ func buildWorkerJS(assets []*Asset, template []byte) []byte {
 		[]byte(`"tether-v1"`),
 		[]byte(`"tether-`+version+`"`), 1)
 
+	// Cache the same stamped URLs emitted by render.go and lazy loading;
+	// Cache API matching includes the query string.
+	for _, script := range []string{"tether.js", "idiomorph.min.js"} {
+		path := "/_tether/" + script
+		body = bytes.ReplaceAll(body, []byte(`"`+path+`"`), []byte(`"`+path+`?v=`+clientVersion()+`"`))
+	}
+
 	if len(precache) > 0 {
 		extra, err := json.Marshal(precache)
 		if err != nil {

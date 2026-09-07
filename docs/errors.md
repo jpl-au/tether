@@ -186,12 +186,6 @@ expensive `Dynamic` regions in `jit.Memoise`, or turn `Memoise` off.
 stateless mode - the stateful differ targets keys automatically via
 `Dynamic`. Remove the call.
 
-### state-during-handle
-
-`State() called during Handle`. The snapshot `State()` returns reflects
-state *before* the current event. Use the `state` parameter Handle
-receives instead.
-
 ---
 
 ## Construction-time panics (`bind` package)

@@ -13,7 +13,9 @@ import "github.com/jpl-au/tether/dev"
 // updates everyone else.
 //
 // The subscription is cleaned up automatically when the session is
-// destroyed (context cancelled). No manual unsubscribe needed.
+// frozen or destroyed. It survives ordinary transport loss. Re-register
+// imperative subscriptions in OnRestore (or its OnConnect fallback);
+// declarative Watchers are re-registered automatically on thaw.
 //
 // On is a top-level function rather than a Bus method because it needs
 // two type parameters (E for the event, S for the state). Go methods
@@ -25,8 +27,12 @@ import "github.com/jpl-au/tether/dev"
 //	})
 func On[E any, S any](s *StatefulSession[S], bus *Bus[E], fn func(E, S) S) {
 	dev.Debug("bus.on", "session", s.ID(), "endpoint", s.endpoint)
-	bus.subscribe(s.Context(), func(ev E) {
+	ctx := s.subscriptionContext()
+	bus.subscribe(ctx, func(ev E) {
 		s.Update(func(state S) S {
+			if ctx.Err() != nil {
+				return state
+			}
 			return fn(ev, state)
 		})
 	}, s.ID())

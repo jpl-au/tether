@@ -189,6 +189,7 @@
   // After server morphs, re-mark new draggable elements. Event
   // listeners are delegated so no re-binding is needed.
   document.addEventListener("tether:update", function (e) {
+    if (e.detail && e.detail.domChanged === false) return;
     var target = e.detail && e.detail.root ? e.detail.root : root;
     if (target) {
       markDraggable(target);

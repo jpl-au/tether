@@ -107,6 +107,12 @@ Client events (from the transport) are not coalesced - each event
 gets its own render cycle because events carry client correlation
 IDs that must be echoed back.
 
+With `Equal` configured, an unchanged batch skips its final render
+and diff while still delivering effects. If a `Patch` call or SSE
+event sends a patch or morph during the batch, the final render
+still runs: returning to the original state may require a correction
+to the DOM already sent to the browser.
+
 ### Targeted updates (Patch)
 
 `Session.Patch` bypasses the full render pipeline entirely. Instead
@@ -146,7 +152,7 @@ Effects called outside Handle (from `Session.Go` goroutines, timers, or broadcas
 
 ### State snapshots
 
-`Session.State()` uses a fast path when called from within Handle or a goroutine it spawned: it returns an atomic snapshot captured before Handle started, avoiding a channel round-trip that would deadlock the loop. Outside Handle, `State()` routes through the command channel for a consistent read.
+`StatefulSession.State()` reads the last completed mutation from an atomic snapshot. It never blocks or uses the command channel. During Handle, use the state parameter for in-flight changes; concurrent readers continue to see the previous completed state.
 
 ## Session pools
 
@@ -190,9 +196,13 @@ Side effects raised during the window are held on the session and delivered with
 
 When the client reconnects to the same node, the session is reattached: the transport is swapped, any stored snapshots are re-imported and the store entry deleted, and one diff against the preserved baseline sends exactly what changed while the client was away, together with the held effects. The browser's URL and title are replayed too (they live outside the DOM and would otherwise desync).
 
+A replacement connection can take over an attached session without losing state. The old transport and reader retire together; takeover sends a full catch-up morph. Back/forward navigation made while offline travels with the connect ticket and takes precedence over a held server navigation. Without offline navigation, catch-up preserves the server's chosen URL. Ordinary reattachment does not rerun startup callbacks or mounts.
+
+SSE POSTs are accepted during ordinary disconnects while the loop remains alive. Freezing and frozen sessions return `503` with `Retry-After`; destroyed sessions return `410`. Already acknowledged commands are applied before saving the freeze snapshot.
+
 When the client reconnects after a server restart (crash recovery), the framework restores the session from the SessionStore, fires `OnRestore` (or `OnConnect` as fallback), and sends a full update.
 
-**Frozen** sessions are disconnected sessions with `Freeze` enabled (see [FreezeMode](frozen-mode.md)). Instead of keeping the command loop running, the session persists state `S` to the SessionStore, releases state and the differ from memory, and exits the command loop. The session becomes a lightweight stub holding only its ID, endpoint, and metadata. Commands and effects sent to a frozen session are silently discarded. On reconnect, the framework loads state from the SessionStore, rebuilds the differ, starts a fresh command loop, and fires `OnRestore` (or `OnConnect` as fallback depending on the `FreezeMode`). See [frozen mode](frozen-mode.md) for details.
+**Frozen** sessions are disconnected sessions with `Freeze` enabled (see [FreezeMode](frozen-mode.md)). Instead of keeping the command loop running, the session persists state `S` to the SessionStore, releases state and the differ from memory, and exits the command loop. The session becomes a lightweight stub holding only its ID, endpoint, and metadata. Commands and effects sent to a frozen session are discarded with diagnostics. On reconnect, the framework loads state from the SessionStore, rebuilds the differ, starts a fresh command loop, and fires `OnRestore` (or `OnConnect` as fallback depending on the `FreezeMode`). See [frozen mode](frozen-mode.md) for details.
 
 ## Transport abstraction
 

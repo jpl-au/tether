@@ -42,10 +42,10 @@ const (
 	// critically overwhelmed.
 	CommandDropped DiagnosticKind = "command_dropped"
 
-	// SessionBindingFailed signals that a client attempted to claim
-	// or reconnect a session with a User-Agent that does not match
-	// the one captured when the session was created. This may
-	// indicate a stolen session ID. The connection is rejected.
+	// SessionBindingFailed signals that a client attempted to claim,
+	// reconnect or destroy a session with a User-Agent that does not
+	// match the one captured when the session was created. This may
+	// indicate a stolen session ID. The operation is rejected.
 	SessionBindingFailed DiagnosticKind = "session_binding_failed"
 
 	// StoreError signals a failure saving, loading, or deleting

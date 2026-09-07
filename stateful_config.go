@@ -141,17 +141,18 @@ type StatefulConfig[S any] struct {
 	// resources started in OnConnect. Optional.
 	OnDisconnect func(session *StatefulSession[S])
 
-	// Equal compares two states. When provided and the old and new state
-	// are equal, the render and diff are skipped entirely - no work is
-	// done and nothing is sent to the client. This is an optimisation
-	// for handlers where many events leave state unchanged (e.g.
-	// keystrokes that don't affect the model). Optional.
+	// Equal compares two states to skip rendering and diffing when they
+	// are equal. Effects and event acknowledgements are still sent.
+	// An Update batch still renders if an intervening patch or morph
+	// changed the DOM, even when its final state equals its initial state.
+	// This is an optimisation for handlers where many events leave state
+	// unchanged (e.g. keystrokes that don't affect the model). Optional.
 	Equal func(a, b S) bool
 
 	// OnStructuralChange is called whenever the diff engine detects that
-	// the render tree's structure has changed (Dynamic keys added,
-	// removed, or reordered). Structural changes force a full root morph
-	// instead of targeted patches, which is heavier for the client.
+	// a Dynamic key change needs a full root morph. Additions, removals
+	// and reorders within a stable Dynamic container use a scoped patch
+	// instead and do not trigger this callback.
 	//
 	// Use this callback to track these occurrences in production via
 	// telemetry or metrics. The change parameter describes exactly what
@@ -263,8 +264,8 @@ type StatefulConfig[S any] struct {
 
 	// DiffStore provides external persistence for disconnected session
 	// snapshots. When set, differ data is saved to the store on
-	// disconnect and deleted on reconnect (Render re-seeds the
-	// differ), freeing Go memory during the reconnect window. When
+	// disconnect, imported on reattachment and then deleted. Thaw
+	// builds a fresh engine and deletes the obsolete snapshot. When
 	// nil (default), snapshots remain in process memory.
 	DiffStore DiffStore
 
@@ -333,6 +334,9 @@ type StatefulConfig[S any] struct {
 	// lightweight stub holding only its ID and metadata. On
 	// reconnect, the framework loads state from the store, starts
 	// a fresh loop, and fires the restore callback.
+	// Failed persistence keeps the state and command loop alive. On and
+	// Observe subscriptions end on successful freeze and restart on thaw
+	// through Watchers or the restore callback. Mounts run again on thaw.
 	//
 	// This dramatically reduces memory for disconnected sessions
 	// at the cost of commands (Update, broadcasts, timer callbacks)
@@ -398,7 +402,7 @@ type PushConfig[S any] struct {
 	// The context is derived from the session and cancels when the
 	// session is destroyed - use it for database calls and external
 	// requests to avoid leaking goroutines. The subscription is passed
-	// as a parameter; do not read it from the session object as the
-	// store may not have completed yet. Optional.
+	// as a parameter and is already installed atomically on the session,
+	// so an immediate Push can use it. Optional.
 	OnSubscribe func(ctx context.Context, session *StatefulSession[S], sub push.Subscription)
 }

@@ -1,6 +1,6 @@
 # Frozen mode
 
-Frozen mode releases all session memory when a client disconnects.
+Frozen mode releases application state and engine memory when a client disconnects.
 Instead of keeping state and the command loop alive during the
 reconnect window, the session persists state to the SessionStore
 and shuts down. On reconnect, state is loaded from the store and
@@ -18,8 +18,9 @@ mutations still apply, and the reconnect sends the client everything it
 missed - both the state changes and the side effects that described
 them (`Toast`, `Flash`, `Announce`, `Signal`, `SetTitle`). See
 [architecture](architecture.md#session-pools) for the full contract.
-A frozen session has no loop to hold either, so nothing survives except
-what the SessionStore persisted.
+Effects raised after freeze are discarded. Effects already held before
+freeze can accompany same-process thaw; crash recovery restores only the
+state and metadata persisted by SessionStore.
 
 Frozen mode is ideal for:
 
@@ -97,33 +98,36 @@ panic: tether: FreezeWithRestore requires OnRestore - implement OnRestore to re-
 
 ```
 1. Transport closes
-2. DiffStore.Save(snapshots) - if configured
-3. SessionStore.Save(state, ttl) - serialise S + metadata
-4. OnDisconnect fires
-5. Release S (zero value) and differ (nil)
-6. Set status to Frozen
-7. Exit command loop
+2. Stop accepting HTTP events; apply already acknowledged commands
+3. DiffStore.Save(snapshots) - if configured
+4. SessionStore.Save(state, ttl) - serialise S + metadata
+5. Set status to Frozen and cancel On/Observe subscriptions
+6. Publish in the disconnected pool, then call OnDisconnect
+7. Release S (zero value) and differ (nil), then exit the command loop
 ```
+
+If state persistence fails, the session keeps its state and running loop.
+HTTP event POSTs return `503` with `Retry-After` while freezing or frozen;
+they cannot be acknowledged into an abandoned command queue.
 
 The session remains in the disconnected pool as a lightweight stub.
 The reconnect timer keeps running - if it fires before the client
-returns, the session is destroyed and the store entry expires via
-its TTL.
+returns, the session is destroyed and its stores, timers and group
+membership are cleaned up. The maximum session lifetime still applies.
 
 ### Reconnect (thaw)
 
 ```
 1. Client reconnects with session ID
 2. Framework finds frozen session in disconnected pool
-3. SessionStore.Load(id) → state bytes
-4. Decode state S from envelope
-5. Create fresh differ, render initial tree
-6. Rebuild channels, start new command loop
+3. Wait for the previous command loop and its cleanup to finish
+4. Load and decode state S from the envelope
+5. Rebuild engine, queues, subscription lifetime and idle timer
+6. Start the command loop with catch-up and obsolete-store cleanup queued
 7. Mount components, subscribe watchers
 8. OnRestore fires (or OnConnect as fallback)
 9. Join groups
-10. SessionStore.Delete(id)
-11. Start transport reader
+10. Start transport reader
 ```
 
 The thaw path is similar to crash recovery (`restoreSession`) but
@@ -133,7 +137,7 @@ endpoint, user-agent, and context.
 ### Commands while frozen
 
 Commands (`Update`, `Broadcast`, `Signal`, `Toast`, etc.) sent to a
-frozen session are silently discarded. The command loop has exited
+frozen session are discarded with a `CommandDiscarded` diagnostic. The command loop has exited
 and there is no channel to receive them. This is the key trade-off
 of frozen mode - background processing stops during disconnect.
 
@@ -149,8 +153,8 @@ Sessions have an explicit lifecycle status:
 | `Destroyed` | Permanently gone, context cancelled |
 
 The status is stored as an `atomic.Int32` on the session and is
-used by `enqueue`, `enqueueFx`, and `State()` to guard against
-operating on a session in an unexpected state.
+used by command acceptance to reject work when no loop can execute it.
+`State()` always reads an atomic snapshot, which is zero while frozen.
 
 ## Interaction with other features
 
@@ -164,16 +168,24 @@ render, and state is loaded from the SessionStore.
 
 ### Groups
 
-Groups are left on disconnect (via `OnDisconnect`) and rejoined on
-thaw (via `OnRestore` or `OnConnect`, plus `StatefulConfig.Groups`
-auto-join). The framework handles auto-join groups automatically
-during thaw.
+Automatic groups keep membership until permanent destruction. Broadcasts
+to frozen members are discarded. Manual membership can be removed in
+`OnDisconnect` and restored on thaw; automatic joins are idempotent.
 
 ### Watchers
 
-Watchers are re-subscribed during thaw, before `OnRestore` fires.
-Any values or bus events that arrived while frozen are lost - the
-session picks up the current state from its next render.
+`On` and `Observe` subscriptions end on freeze and survive ordinary
+disconnects. Watchers are re-subscribed before `OnRestore` on thaw.
+Imperative subscriptions must be recreated by that callback (or its
+`OnConnect` fallback). `Observe` reads the current shared Value again;
+bus events published while frozen are not replayed.
+
+### Components and goroutines
+
+Mounts run again on thaw and crash recovery, but not on ordinary
+reattachment. `Session.Go` uses the transport context and stops on loss of
+the attachment. Ordinary reattachment does not rerun `OnConnect` or restart
+that work. Use `Session.Context()` for work that must survive transport loss.
 
 ### Codec
 

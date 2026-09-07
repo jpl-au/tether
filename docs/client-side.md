@@ -287,8 +287,8 @@ Each subscription returns an unsubscribe function. Callbacks are guarded - a thr
 var off = Tether.onSignalChange(function (key, value) { ... });
 
 // After each applied server update (patches, morphs, effects).
-// Re-scan the DOM here for elements your extension manages.
-Tether.onUpdate(function (root) { ... });
+// Scan only when DOM content changed. Effect-only updates pass false.
+Tether.onUpdate(function (root, domChanged) { ... });
 
 // Around morphs: an element was added / is about to be removed.
 // Fires for the top-level node idiomorph touched - scan
@@ -318,10 +318,30 @@ function bind(el) {
     bound.add(el);
     el.addEventListener("click", ...);
 }
-Tether.onUpdate(function (root) {
+Tether.onUpdate(function (root, domChanged) {
+    if (!domChanged) return;
     root.querySelectorAll("[data-my-ext]").forEach(bind);
 });
 ```
+
+The `tether:update` DOM event also includes `detail.domChanged`. Signal
+bindings still update on effect-only messages. Conditional bindings are
+evaluated once after each server signal batch.
+
+Updates share one animation-frame queue. Hidden pages flush synchronously;
+the queue also flushes at its bound if a view transition stalls. URL, DOM
+and transient effects keep delivery order. Session assignment takes effect
+immediately so outgoing events use the correct session before the next frame.
+
+On `pagehide`, transports close. Persisted pages keep their session and
+reconnect on `pageshow`; departing pages send the destroy beacon.
+
+With `Client.BackgroundSync`, failed SSE POSTs are retained for retry on
+network errors, timeouts, overload (`429`) and server errors (including
+frozen-session `503`). Replay waits for each acknowledgement and stops at a
+retryable failure. Permanent client errors and expired entries are discarded.
+Worker replay keeps separate sessions independent, so a frozen tab does not
+block another tab's queued events.
 
 ---
 

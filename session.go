@@ -77,11 +77,17 @@ type StatefulSession[S any] struct {
 	// goroutine. The loop drains it after Handle/Update returns so
 	// effects are sent atomically with the diff. Outside of Handle,
 	// the loop picks them up and sends them as standalone updates.
-	fxCh chan func(*Effects)
+	fxCh          chan func(*Effects)
+	queueSnapshot atomic.Pointer[sessionQueue]
 
 	// Session lifetime - cancelled on permanent destruction.
 	ctx  context.Context
 	stop context.CancelFunc
+	// lifecycleMu serialises thaw's runtime replacement with destruction.
+	// State mutations continue to run exclusively on the command loop.
+	lifecycleMu   sync.Mutex
+	freezing      atomic.Bool
+	subscriptions atomic.Pointer[subscriptionLifetime]
 	// Transport lifetime - cancelled when the transport drops
 	// (disconnect or freeze). Recreated on reattach and thaw.
 	// Go() passes this context so background goroutines stop
@@ -119,13 +125,6 @@ type StatefulSession[S any] struct {
 	// returns this value when the loop is active - no channel
 	// round-trip, no blocking.
 	stateSnap atomic.Value
-
-	// handling is true while Handle is executing on the loop
-	// goroutine. Used by State() to emit a dev-mode warning when
-	// called during Handle - the snapshot is stale and the
-	// developer should use the state parameter instead. Atomic
-	// because State() is documented as safe from any goroutine.
-	handling atomic.Bool
 
 	// overflows counts how many times the command or effect buffer
 	// was full and a goroutine was spawned to deliver the item.
@@ -227,6 +226,10 @@ type StatefulSession[S any] struct {
 	// command loop - reducing memory to metadata only.
 	freeze bool
 
+	// stateReleased distinguishes a completed freeze from its configured
+	// policy. Read by Shutdown only after the command loop has exited.
+	stateReleased bool
+
 	// maxNavigateRedirects caps inline server-side redirects per
 	// navigate event. Set from Limits.MaxNavigateRedirects.
 	maxNavigateRedirects int
@@ -234,6 +237,11 @@ type StatefulSession[S any] struct {
 	// needsRender is set by Update mutations and cleared after the
 	// coalesced render runs. Only accessed on the loop goroutine.
 	needsRender bool
+
+	// batchHasDOMUpdate records an intervening patch or morph, so Equal
+	// cannot skip the final correction using the batch's original state.
+	// Reset before each command batch; only accessed on the loop goroutine.
+	batchHasDOMUpdate bool
 
 	// pendingSession is set when the server assigns a new session ID
 	// to a stale client. The next send includes it so the client can
@@ -261,6 +269,52 @@ type StatefulSession[S any] struct {
 	// diagnostics is the handler's diagnostic bus. The session emits
 	// transport errors, encode failures, panics, and buffer overflows.
 	diagnostics *Bus[Diagnostic]
+}
+
+type subscriptionLifetime struct {
+	ctx    context.Context
+	cancel context.CancelFunc
+}
+
+// A caller keeps one immutable queue generation across overflow delivery
+// and cleanup. Thaw can publish a new generation without redirecting old
+// goroutines into the new loop or racing channel-field reads.
+type sessionQueue struct {
+	cmds        chan func()
+	fxCh        chan func(*Effects)
+	overflowSem chan struct{}
+	done        <-chan struct{}
+}
+
+func (s *StatefulSession[S]) queue() *sessionQueue {
+	if q := s.queueSnapshot.Load(); q != nil {
+		return q
+	}
+	q := &sessionQueue{s.cmds, s.fxCh, s.overflowSem, s.loopDone}
+	if s.queueSnapshot.CompareAndSwap(nil, q) {
+		return q
+	}
+	return s.queueSnapshot.Load()
+}
+
+// subscriptionContext survives transport loss, but ends when state is
+// released on freeze. Thaw installs a fresh lifetime before resubscribing.
+func (s *StatefulSession[S]) subscriptionContext() context.Context {
+	s.lifecycleMu.Lock()
+	defer s.lifecycleMu.Unlock()
+	if p := s.subscriptions.Load(); p != nil {
+		return p.ctx
+	}
+	ctx, cancel := context.WithCancel(s.Context())
+	p := &subscriptionLifetime{ctx: ctx, cancel: cancel}
+	if !s.subscriptions.CompareAndSwap(nil, p) {
+		cancel()
+		return s.subscriptions.Load().ctx
+	}
+	if Status(s.status.Load()) == Frozen || Status(s.status.Load()) == Destroyed {
+		cancel()
+	}
+	return ctx
 }
 
 // Session is the interface every handler receives. It provides
@@ -488,9 +542,9 @@ func (s *StatefulSession[S]) Context() context.Context {
 // like tickers, watchers, or change listeners that should stop
 // when the client is no longer connected.
 //
-// On reconnect or thaw, OnConnect/OnRestore fires again and can
-// spawn fresh goroutines. This prevents duplicate goroutines from
-// accumulating across disconnect/reconnect cycles.
+// On thaw or crash recovery, OnRestore (or its OnConnect fallback)
+// can spawn fresh goroutines. Ordinary reattachment does not run
+// those callbacks, so it does not restart transport-bound work.
 //
 // For goroutines that must survive disconnects (rare), use
 // [StatefulSession.Context] directly: go fn(sess.Context()).
@@ -528,6 +582,7 @@ func (s *StatefulSession[S]) attachTransportCtx() context.Context {
 // an overflow goroutine delivers it - same semaphore-bounded
 // pattern as [enqueue].
 func (s *StatefulSession[S]) enqueueFx(fn func(*Effects)) {
+	q := s.queue()
 	st := Status(s.status.Load())
 	if st == Frozen || st == Destroyed {
 		s.emitDiagnostic(Diagnostic{
@@ -538,16 +593,16 @@ func (s *StatefulSession[S]) enqueueFx(fn func(*Effects)) {
 		return
 	}
 	select {
-	case s.fxCh <- fn:
+	case q.fxCh <- fn:
 	default:
 		s.logOverflow()
 		select {
-		case s.overflowSem <- struct{}{}:
+		case q.overflowSem <- struct{}{}:
 			go func() {
-				defer func() { <-s.overflowSem }()
+				defer func() { <-q.overflowSem }()
 				select {
-				case s.fxCh <- fn:
-				case <-s.loopDone:
+				case q.fxCh <- fn:
+				case <-q.done:
 					// The loop left before this closure could be
 					// handed over. cleanup cannot see it - it is parked
 					// here, not in the channel - so it reports itself
@@ -641,6 +696,7 @@ func (s *StatefulSession[S]) sendFx(fx *Effects) {
 // command is dropped and the session is destroyed unless the developer
 // has set [StatefulConfig.OnCommandDropped].
 func (s *StatefulSession[S]) enqueue(fn func()) {
+	q := s.queue()
 	st := Status(s.status.Load())
 	if st == Frozen || st == Destroyed {
 		s.emitDiagnostic(Diagnostic{
@@ -651,16 +707,16 @@ func (s *StatefulSession[S]) enqueue(fn func()) {
 		return
 	}
 	select {
-	case s.cmds <- fn:
+	case q.cmds <- fn:
 	default:
 		s.logOverflow()
 		select {
-		case s.overflowSem <- struct{}{}:
+		case q.overflowSem <- struct{}{}:
 			go func() {
-				defer func() { <-s.overflowSem }()
+				defer func() { <-q.overflowSem }()
 				select {
-				case s.cmds <- fn:
-				case <-s.loopDone:
+				case q.cmds <- fn:
+				case <-q.done:
 					// Same as enqueueFx: parked outside the channel, so
 					// invisible to cleanup and silent unless it says so.
 					s.emitDiagnostic(Diagnostic{

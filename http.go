@@ -1,6 +1,7 @@
 package tether
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -196,7 +197,15 @@ func (h *Handler[S]) handleConnectTicket(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	tok, ok := h.issueTicket(id, replaces, r.UserAgent(), time.Now())
+	navigate := r.Header.Get("Tether-Navigate")
+	if navigate != "" {
+		u, err := url.ParseRequestURI(navigate)
+		if err != nil || u.IsAbs() || u.Host != "" || !strings.HasPrefix(navigate, "/") || strings.HasPrefix(navigate, "//") || strings.ContainsRune(navigate, '\\') {
+			http.Error(w, "invalid reconnect navigation", http.StatusBadRequest)
+			return
+		}
+	}
+	tok, ok := h.issueTicket(id, replaces, r.UserAgent(), time.Now(), navigate)
 	if !ok {
 		http.Error(w, "too many pending connections", http.StatusServiceUnavailable)
 		return
@@ -234,7 +243,10 @@ func (h *Handler[S]) handleDestroyBeacon(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "invalid session ID", http.StatusBadRequest)
 		return
 	}
-	h.destroyByID(id)
+	if !h.destroyByID(id, r.UserAgent()) {
+		http.Error(w, "session binding failed", http.StatusForbidden)
+		return
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -263,6 +275,9 @@ func (h *Handler[S]) handlePostEvent(w http.ResponseWriter, r *http.Request) {
 
 	h.mu.RLock()
 	sess, ok := h.active[id]
+	if !ok {
+		sess, ok = h.disconnected[id]
+	}
 	h.mu.RUnlock()
 	if !ok {
 		http.Error(w, "session not found", http.StatusNotFound)
@@ -280,6 +295,11 @@ func (h *Handler[S]) handlePostEvent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	dev.Debug("POST event", "session", id, "action", ev.Action, "type", ev.Type, "path", r.URL.Path, "remote", r.RemoteAddr)
+	sess.lifecycleMu.Lock()
+	defer sess.lifecycleMu.Unlock()
+	if !postSessionAvailable(w, sess.ctx, Status(sess.status.Load()), sess.freezing.Load()) {
+		return
+	}
 
 	// Non-blocking send: if the buffer has room the event is accepted
 	// immediately. If not, check whether the session is closing (410)
@@ -319,6 +339,9 @@ func (h *Handler[S]) handlePushSubscribe(w http.ResponseWriter, r *http.Request)
 
 	h.mu.RLock()
 	sess, ok := h.active[id]
+	if !ok {
+		sess, ok = h.disconnected[id]
+	}
 	h.mu.RUnlock()
 	if !ok {
 		http.Error(w, "session not found", http.StatusNotFound)
@@ -337,20 +360,15 @@ func (h *Handler[S]) handlePushSubscribe(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Non-blocking send: store the subscription via the session loop
-	// so it doesn't race with other loop operations. If the buffer is
-	// full, the session is overloaded - return 429 to apply back-pressure
-	// (matching the pattern in handlePostEvent).
-	select {
-	case sess.cmds <- func() { sess.pushSub.Store(&sub) }:
-	default:
-		if sess.ctx.Err() != nil {
-			http.Error(w, "session closed", http.StatusGone)
-			return
-		}
-		http.Error(w, "session busy", http.StatusTooManyRequests)
+	sess.lifecycleMu.Lock()
+	if !postSessionAvailable(w, sess.ctx, Status(sess.status.Load()), sess.freezing.Load()) {
+		sess.lifecycleMu.Unlock()
 		return
 	}
+	// Installation is already atomic. Publish before the callback so
+	// an immediate Push sees the subscription it was just given.
+	sess.pushSub.Store(&sub)
+	sess.lifecycleMu.Unlock()
 
 	// Fire OnSubscribe asynchronously so the HTTP response returns
 	// immediately - the callback receives the subscription as a
@@ -373,4 +391,17 @@ func (h *Handler[S]) handlePushSubscribe(w http.ResponseWriter, r *http.Request)
 	}()
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func postSessionAvailable(w http.ResponseWriter, ctx context.Context, status Status, freezing bool) bool {
+	if ctx.Err() != nil || status == Destroyed {
+		http.Error(w, "session closed", http.StatusGone)
+		return false
+	}
+	if status == Frozen || freezing {
+		w.Header().Set("Retry-After", "1")
+		http.Error(w, "session frozen; reconnect before retrying", http.StatusServiceUnavailable)
+		return false
+	}
+	return true
 }

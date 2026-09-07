@@ -64,6 +64,10 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
   var eventSource = null;
   var wsOpened = false;
   var sseOpened = false;
+  var pageSuspended = false;
+  var reconnectTimer = null;
+  var connectAttempt = 0;
+  var pendingNavigation = "";
   var devMode = false;
   var backgroundSync = false;
   var syncRetention = 3600000; // 1 hour default
@@ -242,28 +246,36 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
     // bindings on them apply harmlessly against the still-empty signals.
     reapplySignals(document.documentElement);
 
-    // On page unload, send a beacon so the server can destroy the
-    // session immediately instead of waiting for the disconnect timer.
-    // sendBeacon is fire-and-forget but works for the common case of
-    // clean navigations and tab closes. The sessionStorage handoff
-    // covers the cases where beforeunload doesn't fire (crash, kill).
-    window.addEventListener("beforeunload", function () {
+    // Cached pages keep their session and reconnect on pageshow. A
+    // departing page releases it. Avoid beforeunload, which can prevent
+    // the browser from placing this page in its back/forward cache.
+    window.addEventListener("pagehide", function (e) {
+      pageSuspended = true;
+      connectAttempt++;
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+      flushMessages(true);
       // Close the WebSocket with a normal close code (1000) so
       // Firefox doesn't apply its RFC 6455 reconnection throttle.
       // Without this, Firefox sees the page-unload connection drop
       // as an abnormal termination and delays the next WebSocket
       // connection by up to 60 seconds with exponential backoff.
-      if (ws && ws.readyState === WebSocket.OPEN) {
+      if (ws && ws.readyState <= WebSocket.OPEN) {
         ws.close(1000, "page unload");
       }
       if (eventSource) {
         eventSource.close();
       }
-      if (sessionID) {
+      if (sessionID && !e.persisted) {
         // The session ID travels in the beacon body, not the URL,
         // so it stays out of server access logs.
         navigator.sendBeacon(endpoint + "?tether=destroy", sessionID);
       }
+    });
+    window.addEventListener("pageshow", function (e) {
+      if (!e.persisted) return;
+      pageSuspended = false;
+      connect();
     });
 
     // Dev mode: expose a disconnect helper for integration testing.
@@ -340,6 +352,7 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
   // back to SSE+POST if the initial WebSocket connection fails.
 
   function connect() {
+    if (pageSuspended) return;
     if (connectionMode === "sse") {
       connectSSE();
     } else {
@@ -357,15 +370,21 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
   // along in Tether-Replaces so the server can destroy it immediately
   // instead of waiting out its disconnect timer.
   function requestTicket(cb) {
+    var attempt = ++connectAttempt;
+    var navigation = pendingNavigation;
     var url = location.protocol + "//" + location.host + endpoint + "?tether=ticket";
     var headers = {};
     if (sessionID) headers["Tether-Session"] = sessionID;
+    if (navigation) headers["Tether-Navigate"] = navigation;
     var prev = sessionStorage.getItem(storageKey());
     if (prev && prev !== sessionID) headers["Tether-Replaces"] = prev;
     fetch(url, { method: "POST", headers: headers }).then(function (resp) {
       if (!resp.ok) throw new Error("status " + resp.status);
       return resp.text();
-    }).then(cb).catch(function (err) {
+    }).then(function (ticket) {
+      if (!pageSuspended && attempt === connectAttempt) cb(ticket, navigation);
+    }).catch(function (err) {
+      if (pageSuspended || attempt !== connectAttempt) return;
       reportError("fetch", "connect ticket request failed: " + err, true, "connect-ticket-failed");
       if (root) root.setAttribute("data-tether-state", "disconnected");
       showReconnectBar();
@@ -377,17 +396,19 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
     requestTicket(openWS);
   }
 
-  function openWS(ticket) {
+  function openWS(ticket, navigation) {
     var protocol = location.protocol === "https:" ? "wss:" : "ws:";
     var url = protocol + "//" + location.host + endpoint + "?ticket=" + encodeURIComponent(ticket);
 
-    ws = new WebSocket(url);
+    var socket = new WebSocket(url);
+    ws = socket;
     // Binary frames carry CBOR payloads. ArrayBuffer delivers them
     // synchronously to onmessage (the default Blob would need an
     // async read); Tether.decode handles both strings and buffers.
     ws.binaryType = "arraybuffer";
 
     ws.onopen = function () {
+      if (pageSuspended || ws !== socket) return;
       // On reconnect, sync the current URL with the server in case
       // the user navigated via back/forward while disconnected. The
       // browser's popstate fires even when offline, changing the URL
@@ -401,19 +422,17 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
       // Store the session ID so a page refresh can tell the server
       // to destroy this session immediately via the replaces param.
       if (sessionID) sessionStorage.setItem(storageKey(), sessionID);
-      if (isReconnect) {
-        // Sync the current URL with the server - the user may have
-        // navigated via back/forward while disconnected.
-        sendNavigate(location.pathname + location.search);
-      } else {
+      if (!isReconnect) {
         mountExistingHooks();
       }
+      resumeClientNavigation(navigation);
       flushSendQueue();
       // Re-arm viewport triggers whose send failed while disconnected.
       observeViewportElements(root);
     };
 
     ws.onmessage = function (e) {
+      if (pageSuspended || ws !== socket) return;
       var msg;
       try {
         msg = window.Tether.decode(e.data);
@@ -425,6 +444,7 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
     };
 
     ws.onclose = function () {
+      if (pageSuspended || ws !== socket) return;
       if (root) root.setAttribute("data-tether-state", "disconnected");
       showReconnectBar();
       // Events awaiting an echo will never get one on this
@@ -442,7 +462,7 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
     };
 
     ws.onerror = function () {
-      ws.close();
+      socket.close();
     };
   }
 
@@ -450,12 +470,14 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
     requestTicket(openSSE);
   }
 
-  function openSSE(ticket) {
+  function openSSE(ticket, navigation) {
     var url = location.protocol + "//" + location.host + endpoint + "?ticket=" + encodeURIComponent(ticket);
 
-    eventSource = new EventSource(url);
+    var source = new EventSource(url);
+    eventSource = source;
 
     eventSource.onopen = function () {
+      if (pageSuspended || eventSource !== source) return;
       // On reconnect, sync the current URL with the server in case
       // the user navigated via back/forward while disconnected.
       var isReconnect = sseOpened;
@@ -467,15 +489,16 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
       if (sessionID) sessionStorage.setItem(storageKey(), sessionID);
       if (isReconnect) {
         if (backgroundSync) replayQueuedEvents();
-        sendNavigate(location.pathname + location.search);
       } else {
         mountExistingHooks();
       }
+      resumeClientNavigation(navigation);
       // Re-arm viewport triggers whose send failed while disconnected.
       observeViewportElements(root);
     };
 
     eventSource.onmessage = function (e) {
+      if (pageSuspended || eventSource !== source) return;
       var msg;
       try {
         msg = window.Tether.decode(e.data);
@@ -487,6 +510,7 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
     };
 
     eventSource.onerror = function () {
+      if (pageSuspended || eventSource !== source) return;
       if (root) root.setAttribute("data-tether-state", "disconnected");
       showReconnectBar();
       restoreAllPending();
@@ -508,16 +532,28 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
   }
 
   function scheduleReconnect() {
+    if (pageSuspended || reconnectTimer !== null) return;
     var delay = retryDelay;
     // Jitter spreads reconnection attempts across time to prevent
     // synchronised waves (thundering herd) after a server restart.
     // The delay is multiplied by a random factor in [0.5, 1.0).
     if (jitter) delay = Math.floor(delay * (0.5 + Math.random() * 0.5));
-    setTimeout(function () {
+    reconnectTimer = setTimeout(function () {
+      reconnectTimer = null;
+      if (pageSuspended) return;
       if (root) root.setAttribute("data-tether-state", "connecting");
       retryDelay = Math.min(retryDelay * backoffMultiplier, maxRetryDelay);
       connect();
     }, delay);
+  }
+
+  function resumeClientNavigation(requested) {
+    // The ticket already carried offline navigation into the server's
+    // catch-up. Only a newer popstate, arriving during connection setup,
+    // needs another event; the old URL must never undo a held navigation.
+    var newer = pendingNavigation && pendingNavigation !== requested ? pendingNavigation : "";
+    pendingNavigation = "";
+    if (newer) sendNavigate(newer);
   }
 
   // --- Reconnecting indicator ---
@@ -695,6 +731,20 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
   var EVENT_DB_NAME = "tether-events";
   var EVENT_DB_VERSION = 1;
   var EVENT_STORE = "queue";
+  var eventReplay = null;
+  var eventRetryTimer = null;
+
+  function retryableEventResponse(resp) {
+    return resp.status === 408 || resp.status === 429 || resp.status >= 500;
+  }
+
+  function scheduleEventReplay() {
+    if (eventRetryTimer || pageSuspended) return;
+    eventRetryTimer = setTimeout(function () {
+      eventRetryTimer = null;
+      if (!pageSuspended) replayQueuedEvents();
+    }, 1000);
+  }
 
   function openEventDB() {
     return new Promise(function (resolve, reject) {
@@ -708,14 +758,18 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
     });
   }
 
-  function queueFailedEvent(payload) {
+  function queueFailedEvent(payload, eventSession) {
     openEventDB().then(function (db) {
+      return new Promise(function (resolve, reject) {
       var tx = db.transaction(EVENT_STORE, "readwrite");
       tx.objectStore(EVENT_STORE).add({
-        sessionID: sessionID,
+        sessionID: eventSession,
         endpoint: location.protocol + "//" + location.host + endpoint,
         payload: payload,
         ts: Date.now()
+      });
+      tx.oncomplete = function () { db.close(); resolve(); };
+      tx.onerror = function () { db.close(); reject(tx.error); };
       });
     }).then(function () {
       // Register background sync so the service worker can replay
@@ -725,12 +779,14 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
           reg.sync.register("tether-event-sync");
         });
       }
+      scheduleEventReplay();
     }).catch(function (err) {
       reportError("indexeddb", "failed to queue event: " + err, true, "event-queue-failed");
     });
   }
 
   function replayQueuedEvents() {
+    if (eventReplay) return eventReplay;
     // When a service worker is active, delegate replay to it via
     // Background Sync. The worker replays events for all sessions and
     // is already listening for the sync event. Replaying from both the
@@ -743,7 +799,9 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
     }
 
     // No active worker - replay from the main thread as a fallback.
-    openEventDB().then(function (db) {
+    var replaySession = sessionID;
+    eventReplay = openEventDB().then(function (db) {
+      return new Promise(function (resolve, reject) {
       var tx = db.transaction(EVENT_STORE, "readonly");
       var store = tx.objectStore(EVENT_STORE);
       var allReq = store.getAll();
@@ -753,60 +811,118 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
         var keys = keysReq.result;
         var url = location.protocol + "//" + location.host + endpoint;
         var now = Date.now();
-        for (var i = 0; i < events.length; i++) {
+        var chain = Promise.resolve();
+        events.forEach(function (ev, i) {
           // Discard events older than the retention window.
-          if (now - events[i].ts > syncRetention) {
-            deleteEventFromDB(db, keys[i]);
-            continue;
+          if (now - ev.ts > syncRetention) {
+            chain = chain.then(function () { return deleteEventFromDB(db, keys[i]); });
+            return;
           }
           // Events queued by other tabs (different session ID) are
           // not orphans - the queue is shared across tabs. Leave
           // them for their own tab (or the retention window) rather
           // than deleting another tab's pending work.
-          if (events[i].sessionID !== sessionID) continue;
-          replayAndDeleteEvent(db, keys[i], events[i].payload, url);
-        }
+          if (ev.sessionID !== replaySession) return;
+          chain = chain.then(function () { return replayAndDeleteEvent(db, keys[i], ev.payload, url, replaySession); });
+        });
+        chain.then(resolve, reject);
       };
+      tx.onerror = function () { reject(tx.error); };
+      }).finally(function () { db.close(); });
     }).catch(function (err) {
       reportError("indexeddb", "failed to replay queued events: " + err, true, "event-replay-failed");
-    });
+      scheduleEventReplay();
+    }).finally(function () { eventReplay = null; });
+    return eventReplay;
   }
 
   function deleteEventFromDB(db, key) {
+    return new Promise(function (resolve, reject) {
     var tx = db.transaction(EVENT_STORE, "readwrite");
     tx.objectStore(EVENT_STORE).delete(key);
+    tx.oncomplete = function () { resolve(); };
+    tx.onerror = function () { reject(tx.error); };
+    });
   }
 
-  function replayAndDeleteEvent(db, key, payload, url) {
-    fetch(url, {
+  function replayAndDeleteEvent(db, key, payload, url, replaySession) {
+    return fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Tether-Session": sessionID
+        "Tether-Session": replaySession
       },
       body: payload
     }).then(function (resp) {
-      // Delete on success or permanent client error (4xx). Keep on
-      // server error (5xx) so the next sync attempt can retry.
-      if (resp.ok || (resp.status >= 400 && resp.status < 500)) {
-        deleteEventFromDB(db, key);
+      // A retryable failure stops the ordered replay at this event.
+      if (resp.ok || (resp.status >= 400 && resp.status < 500 && !retryableEventResponse(resp))) {
+        return deleteEventFromDB(db, key);
       }
-    }).catch(function (err) {
-      reportError("fetch", "event replay failed: " + err, true, "event-replay-failed");
+      throw new Error("event replay returned " + resp.status);
     });
   }
 
   // --- Message handling ---
 
+  var messageQueue = [];
+  var messageFrame = null;
+  var activeUpdate = null;
+  var maxQueuedUpdates = 128;
+
+  function flushMessages(force) {
+    if (messageFrame !== null) { cancelAnimationFrame(messageFrame); messageFrame = null; }
+    force = force || document.hidden;
+    if (activeUpdate) {
+      if (!force) return;
+      // Finish a pending transition synchronously before applying newer
+      // updates. Its delayed callback becomes a no-op, preserving order.
+      activeUpdate.finish();
+      activeUpdate.transition.skipTransition();
+      activeUpdate = null;
+    }
+    while (messageQueue.length) {
+      var update = applyUpdate(messageQueue.shift(), !force);
+      if (update) {
+        activeUpdate = update;
+        (function (pending) {
+          function complete() {
+            pending.finish();
+            if (activeUpdate === pending) activeUpdate = null;
+            flushMessages();
+          }
+          pending.transition.updateCallbackDone.then(complete, complete);
+        })(update);
+        return;
+      }
+    }
+  }
+
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden) flushMessages(true);
+  });
+
   function applyMessage(msg) {
     if (msg.type !== "update") return;
 
-    // Batch all DOM mutations into a single animation frame so the
-    // browser coalesces reflows and repaints. Without this, each
-    // patch and morph triggers a separate layout pass. restorePending
-    // runs inside the frame so it is synchronised with the DOM changes
-    // it correlates with.
-    requestAnimationFrame(function () {
+    // Transport identity must be usable by the next POST, even when DOM
+    // painting is suspended. Persist it for refresh handoff immediately.
+    if (msg.session) {
+      sessionID = msg.session;
+      sessionStorage.setItem(storageKey(), sessionID);
+      if (root) root.setAttribute("data-tether-session", sessionID);
+    }
+    messageQueue.push(msg);
+    if (document.hidden || messageQueue.length >= maxQueuedUpdates) {
+      flushMessages(true);
+    } else if (messageFrame === null && !activeUpdate) {
+      messageFrame = requestAnimationFrame(function () { flushMessages(); });
+    }
+  }
+
+  function applyUpdate(msg, allowTransition) {
+      var hasDOMChanges = !!((msg.patches && msg.patches.length) || (msg.morphs && msg.morphs.length));
+      var applied = false;
+      var finished = false;
       restorePending(msg.event_id);
 
       // Stateless auto-fragments: every response carries the complete
@@ -815,20 +931,14 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
         fragmentHashes = msg.hashes;
       }
 
-      // Server reassigned session ID (stale client reconnection).
-      if (msg.session) {
-        sessionID = msg.session;
-        if (root) {
-          root.setAttribute("data-tether-session", sessionID);
-        }
-      }
-
       // The DOM-mutating portion: content patches first, then
       // structural morphs. Isolated into one function so it can run
       // inside a View Transition callback - startViewTransition
       // snapshots the DOM before and after this runs and cross-fades
       // between the two.
       function applyDOM() {
+        if (applied) return;
+        applied = true;
         if (msg.patches) {
           for (var i = 0; i < msg.patches.length; i++) {
             applyPatch(msg.patches[i]);
@@ -906,7 +1016,7 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
         // event binding attribute for the Focus helper). Only runs when
         // the DOM actually changed and the element isn't already focused,
         // so signal-only broadcasts can't steal focus from the user.
-        if (msg.patches || msg.morphs) {
+        if (hasDOMChanges) {
           var focusEl = root.querySelector("[data-tether-autofocus]");
           if (focusEl && focusEl !== document.activeElement) focusEl.focus();
         }
@@ -916,21 +1026,30 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
         // is bound; a type appearing for the first time needs its own
         // listener, exactly like a lazily loaded extension. Only the
         // morphed tree can have changed, so the scan starts at root.
-        discoverEvents(root);
+        if (hasDOMChanges) {
+          discoverEvents(root);
 
         // Lazy-load extension scripts when their marker attributes first
         // appear in the DOM after a morph. This eliminates the need for
         // hidden marker elements on the initial page.
         loadExtensions();
         applyValidation(root);
-        bindEditables(root);
+          bindEditables(root);
+        }
 
         // Notify extensions that the DOM has been updated so they can
         // re-scan for new elements (e.g. hotkeys or timers added by a
         // morph). Both channels fire: registered onUpdate listeners and
         // the tether:update DOM event.
-        notify(updateListeners, root);
-        document.dispatchEvent(new CustomEvent("tether:update", { detail: { root: root } }));
+        notify(updateListeners, root, hasDOMChanges);
+        document.dispatchEvent(new CustomEvent("tether:update", { detail: { root: root, domChanged: hasDOMChanges } }));
+      }
+
+      function finish() {
+        if (finished) return;
+        finished = true;
+        applyDOM();
+        postFlush();
       }
 
       // Opt-in View Transitions: wrap only the DOM mutation, keeping all
@@ -938,18 +1057,16 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
       // disabled, unsupported, when the update mutates no DOM (a
       // signal-only broadcast), or when the user prefers reduced motion -
       // in which case behaviour is byte-for-byte identical to before.
-      var useTransition = viewTransitions &&
-        (msg.patches || msg.morphs) &&
+      var useTransition = allowTransition && viewTransitions && hasDOMChanges &&
         typeof document.startViewTransition === "function" &&
         !(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
       if (useTransition) {
         var transition = document.startViewTransition(applyDOM);
-        transition.updateCallbackDone.then(postFlush, postFlush);
+        return {transition: transition, finish: finish};
       } else {
-        applyDOM();
-        postFlush();
+        finish();
+        return null;
       }
-    });
   }
 
   // Track URLs already hinted to the browser so a repeated Prefetch
@@ -1550,9 +1667,19 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
     recomputeDependents(key);
   }
 
+  var signalBatchDepth = 0;
+  var conditionalsDirty = false;
+
   function applySignals(updates) {
-    for (var key in updates) {
-      setSignal(key, updates[key]);
+    signalBatchDepth++;
+    try {
+      for (var key in updates) setSignal(key, updates[key]);
+    } finally {
+      signalBatchDepth--;
+      if (!signalBatchDepth && conditionalsDirty) {
+        conditionalsDirty = false;
+        applyConditionals(document);
+      }
     }
   }
 
@@ -1610,7 +1737,8 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
     // Conditional bindings (show-when / hide-when / class-when) compile
     // to postfix programs and run through the shared VM. A program may
     // read several signals, so on any signal change re-evaluate them all.
-    applyConditionals(document);
+    if (signalBatchDepth) conditionalsDirty = true;
+    else applyConditionals(document);
   }
 
   // --- Computed signal VM ---
@@ -2001,7 +2129,12 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
     window.addEventListener("keydown", handleFocusTrap);
 
     window.addEventListener("popstate", function () {
-      sendNavigate(location.pathname + location.search);
+      var target = location.pathname + location.search;
+      if (pageSuspended || (connectionMode !== "fetch" && root.getAttribute("data-tether-state") !== "connected")) {
+        pendingNavigation = target;
+      } else {
+        sendNavigate(target);
+      }
     });
   }
 
@@ -2012,6 +2145,7 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
   // navigate event to the server so OnNavigate can update state.
 
   function handleLinks(e) {
+    if (e.defaultPrevented) return;
     var link = e.target.closest("a[data-tether-link]");
     if (!link) return;
 
@@ -2510,21 +2644,25 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
 
     if (connectionMode === "sse") {
       var url = location.protocol + "//" + location.host + endpoint;
+      var postSession = sessionID;
       fetch(url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Tether-Session": sessionID
+          "Tether-Session": postSession
         },
         body: payload
       }).then(function (resp) {
         // Restore loading state on non-2xx responses so the button
         // does not stay permanently disabled.
-        if (!resp.ok) restorePending(id);
+        if (!resp.ok) {
+          restorePending(id);
+          if (backgroundSync && retryableEventResponse(resp)) queueFailedEvent(payload, postSession);
+        }
       }).catch(function (err) {
         reportError("fetch", "event POST failed: " + err, true, "event-post-failed");
         restorePending(id);
-        if (backgroundSync) queueFailedEvent(payload);
+        if (backgroundSync) queueFailedEvent(payload, postSession);
       });
       return id;
     }
@@ -2726,7 +2864,7 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
   //   data-tether-flash-text="Copied!"  - swaps textContent temporarily
   //   data-tether-flash-class="copied"  - adds a CSS class temporarily
   //
-  // Both revert after flashDuration (default 2s). The "tether-flashed"
+  // Both revert after flashDuration (default 5s). The "tether-flashed"
   // class is always added so developers can style any flashed element.
   // Called by handleClipboard and any future client-side action.
 
@@ -2735,7 +2873,6 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
     var flashClass = el.getAttribute("data-tether-flash-class");
     if (!flashText && !flashClass) return;
 
-    var duration = (Tether.config && Tether.config.flashDuration) || 2000;
     var originalText;
 
     if (flashText) {
@@ -2751,7 +2888,7 @@ window.Tether.decode = window.Tether.decode || JSON.parse;
       if (flashText) el.textContent = originalText;
       if (flashClass) el.classList.remove(flashClass);
       el.classList.remove("tether-flashed");
-    }, duration);
+    }, flashDuration);
   }
 
   // --- Clipboard ---

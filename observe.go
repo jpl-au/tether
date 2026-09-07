@@ -27,21 +27,27 @@ import (
 // ordered after the initial value - the session never sees a stale
 // overwrite.
 //
-// The subscription is cleaned up when the session is destroyed.
+// The subscription survives ordinary transport loss and is cleaned up
+// on freeze or destruction. Re-register it on thaw through Watchers or
+// OnRestore (or its OnConnect fallback); the current Value is read again.
 //
 //	tether.Observe(s, onlineCount, func(count int, state State) State {
 //	    state.OnlineUsers = count
 //	    return state
 //	})
 func Observe[V any, S any](s *StatefulSession[S], val *Value[V], fn func(V, S) S) {
+	ctx := s.subscriptionContext()
 	dev.Debug("observe.subscribe", "session", s.ID(), "endpoint", s.endpoint)
 	// Subscribe, read, and apply the current value inside a single
 	// Update so there is no gap between "subscribed" and "initial
 	// value delivered." Any concurrent Store that fires the subscriber
 	// callback enqueues its Update after this one, preserving order.
 	s.Update(func(state S) S {
+		if ctx.Err() != nil {
+			return state
+		}
 		var pending atomic.Bool
-		current := val.observe(s.Context(), func(_ V) {
+		current := val.observe(ctx, func(_ V) {
 			// Coalesce rapid updates: if an Update is already
 			// queued, skip this one. The queued Update reads the
 			// latest value when it runs, so no data is lost.
@@ -49,6 +55,9 @@ func Observe[V any, S any](s *StatefulSession[S], val *Value[V], fn func(V, S) S
 				return
 			}
 			s.Update(func(inner S) S {
+				if ctx.Err() != nil {
+					return inner
+				}
 				// Clear pending BEFORE Load so a change that
 				// arrives during Load triggers a new Update.
 				pending.Store(false)

@@ -290,7 +290,7 @@ func TestDisconnectTimerCallsHandlerSessionTimedOut(t *testing.T) {
 	})
 }
 
-func TestStateCalledDuringHandleWarns(t *testing.T) {
+func TestStateCalledDuringHandleReturnsSnapshot(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		var stateCalledDuringHandle bool
 		mt := &mockTransport{
@@ -301,15 +301,18 @@ func TestStateCalledDuringHandleWarns(t *testing.T) {
 		sess := newTestSession(counterState{Count: 0}, mt)
 		sess.handle = func(s Session, state counterState, ev Event) counterState {
 			if ev.Action == "read-state" {
-				// This should trigger a dev-mode warning.
+				// The snapshot remains readable without a channel hop.
 				live := s.(*StatefulSession[counterState])
-				_ = live.State()
+				state.Count = 99
+				if got := live.State().Count; got != 0 {
+					t.Errorf("snapshot includes uncommitted Handle state: %d", got)
+				}
 				stateCalledDuringHandle = true
 			}
 			return state
 		}
 
-		// Enable dev mode so the warning fires.
+		// Snapshot reads behave identically in dev mode.
 		dev.Enable()
 		defer dev.Reset()
 
@@ -321,11 +324,8 @@ func TestStateCalledDuringHandleWarns(t *testing.T) {
 		if !stateCalledDuringHandle {
 			t.Error("handler should have called State()")
 		}
-		// The warning is emitted via dev.Warn - we verify it
-		// doesn't panic and the handling flag is correctly
-		// managed (cleared after Handle returns).
-		if sess.handling.Load() {
-			t.Error("handling flag should be false after Handle returns")
+		if got := sess.State().Count; got != 99 {
+			t.Errorf("completed snapshot = %d", got)
 		}
 	})
 }

@@ -37,6 +37,11 @@ var form struct {
 ev.Bind(&form)
 ```
 
+`Bind` accepts string, bool, float64, all signed and unsigned integer widths
+except uintptr, and time.Duration. Durations accept strings such as `"5s"`
+or decimal nanosecond counts. Integer values must fit the field's type.
+See [typed data extraction](events.md#typed-data-extraction).
+
 ### Params
 
 ```go

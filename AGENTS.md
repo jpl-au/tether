@@ -185,9 +185,9 @@ where Handle receives S by value and returns a new S.
 `DiffStore` is an interface with three methods: `Save`, `Load`, and `Delete`.
 The framework calls `Save` when a session disconnects (persisting the differ
 snapshot to external storage) and `Delete` when the session reconnects or is
-destroyed. `Load` is included for tooling and debugging but is not called by
-the framework today - reconnecting sessions re-render from state, which
-re-seeds the differ.
+destroyed. Ordinary reattachment uses `Load` to restore the browser's
+previous baseline before diffing. Thaw builds a fresh engine and sends a
+full catch-up render.
 
 Nil by default (opt-in via `StatefulConfig.DiffStore`). The
 [tether-store](https://github.com/jpl-au/tether-store) repository provides
@@ -231,9 +231,10 @@ events bypass mounts.
 `Event.Target` is set by the mount system to the prefix. `Event.WithAction`
 creates event copies with a different action for prefix stripping.
 
-`Mounter` is an optional interface (`Mount(Session) Component`) for one-time
-setup. The framework calls it during session startup for StatefulConfig.Components
-mounts. Components that don't need setup omit it.
+`Mounter` is an optional interface (`Mount(Session) Component`) for runtime
+setup. The framework calls it on initial connection, thaw and crash recovery
+for StatefulConfig.Components mounts. Ordinary reattachment does not mount
+again. Components that don't need setup omit it.
 
 `StatelessConfig.Components` mirrors `StatefulConfig.Components` for stateless pages -
 same `RouteMount` dispatch before Handle, same `Mount` constructor.
@@ -286,11 +287,10 @@ diagnostic kinds and subscription examples.
 
 ### State snapshots
 
-`Session.State()` has three paths:
-1. **Inside Handle** (`handling` is true) - returns an atomic snapshot
-   captured before Handle started. No channel hop, no deadlock.
-2. **Loop not yet started** - returns `s.state` directly.
-3. **Outside Handle** - synchronous read through the command channel.
+`StatefulSession.State()` reads the last completed mutation from an atomic
+snapshot. It never blocks or uses the command channel. During Handle,
+use the supplied state parameter for in-flight changes. Freeze zeroes the
+snapshot after successful persistence; thaw publishes the restored state.
 
 ### Effect buffering
 
@@ -545,11 +545,11 @@ go test ./...
 
 Session IDs are bearer tokens - TLS is a hard requirement. User-Agent
 binding is enabled by default: the framework captures the User-Agent on
-session creation and verifies it on reconnect, rejecting mismatches with
-a `SessionBindingFailed` diagnostic. Origin checking protects against
-browser-based attacks only. Rate limiting is operator responsibility
-(reverse proxy or middleware). See [security](docs/security.md) for the
-full model.
+session creation and verifies it on reconnect, claims and client-requested
+destruction, rejecting mismatches with a `SessionBindingFailed` diagnostic.
+Origin checking protects against browser-based attacks only. Rate limiting is
+operator responsibility (reverse proxy or middleware). See [security](docs/security.md)
+for the full model.
 
 ## Conventions
 

@@ -69,7 +69,8 @@
     target.innerHTML = out;
   }
 
-  function renderAll() {
+  function renderAll(root, domChanged) {
+    if (domChanged === false) return;
     var templates = document.querySelectorAll("[data-tether-template]");
     for (var i = 0; i < templates.length; i++) {
       render(templates[i]);

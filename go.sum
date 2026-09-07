@@ -8,6 +8,8 @@ github.com/fxamacker/cbor/v2 v2.9.2 h1:X4Ksno9+x3cz0TZv69ec1hxP/+tymuR8PXQJyDwfh
 github.com/fxamacker/cbor/v2 v2.9.2/go.mod h1:vM4b+DJCtHn+zz7h3FFp/hDAI9WNWCsZj23V5ytsSxQ=
 github.com/jpl-au/fluent v0.5.0 h1:eQmzU8zixbF6m8FLIRwZKsbVMeCq5GLAoQDcXj10yaM=
 github.com/jpl-au/fluent v0.5.0/go.mod h1:Iptw7Q1CEBYMWKUTo5K9RpWjlpgDltRc3eHdUehPNIE=
+github.com/jpl-au/fluent v0.6.0 h1:3BAKPSGAe8M9opm0/jRye66UNjGUZlJmkm8mH3cp268=
+github.com/jpl-au/fluent v0.6.0/go.mod h1:Iptw7Q1CEBYMWKUTo5K9RpWjlpgDltRc3eHdUehPNIE=
 github.com/jpl-au/fluent-jit v0.5.0 h1:PcJHCEpXlBQVEs8tx+VF8uG38AaMlc+BWbukJOfeQRE=
 github.com/jpl-au/fluent-jit v0.5.0/go.mod h1:nPfNrufJ1zhsFvFU/SfOAqiTIPxO709CVaL0Rjd700c=
 github.com/klauspost/compress v1.19.2 h1:hMRETovs/pu/dVWN7zIT1PGG8t509MwT6bO7XSi26R8=

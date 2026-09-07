@@ -19,9 +19,8 @@ import (
 //
 // Do not call State() inside Handle - the snapshot is stale (it
 // reflects the state before Handle was called). Use the state
-// parameter passed to Handle instead. In dev mode, a warning is
-// emitted if State() is called during Handle to help catch this
-// mistake early.
+// parameter passed to Handle instead. Concurrent readers observe the
+// last completed mutation while Handle is running.
 //
 // The snapshot is stored at session construction and after every
 // mutation, so it is always available while the loop runs and remains
@@ -29,10 +28,6 @@ import (
 // direct field read only happens for sessions constructed without a
 // handler (tests), where no loop exists.
 func (s *StatefulSession[S]) State() S {
-	if s.handling.Load() {
-		dev.Warn("State() called during Handle - the returned value is stale; use the state parameter instead",
-			"session", s.id, "endpoint", s.endpoint)
-	}
 	if v := s.stateSnap.Load(); v != nil {
 		return v.(S)
 	}

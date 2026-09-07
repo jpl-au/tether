@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -122,6 +123,24 @@ func TestClientNoPrecache(t *testing.T) {
 	body := w.Body.String()
 	if !strings.Contains(body, "PRECACHE_EXTRA=[]") {
 		t.Error("worker JS should keep empty PRECACHE_EXTRA when no precache URLs given")
+	}
+}
+
+func TestWorkerPrecacheMatchesRuntimeURLs(t *testing.T) {
+	for _, file := range []string{"tether-worker.js", "dist/tether-worker.js"} {
+		t.Run(file, func(t *testing.T) {
+			template, err := fs.ReadFile(clientFiles(), file)
+			if err != nil {
+				t.Fatal(err)
+			}
+			worker := string(buildWorkerJS(nil, template))
+			for _, script := range []string{"tether.js", "idiomorph.min.js"} {
+				want := "/_tether/" + script + "?v=" + clientVersion()
+				if !strings.Contains(worker, want) {
+					t.Errorf("worker does not precache requested runtime URL %q", want)
+				}
+			}
+		})
 	}
 }
 

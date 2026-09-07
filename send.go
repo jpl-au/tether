@@ -232,6 +232,13 @@ func (s *StatefulSession[S]) send(u wire.Update) {
 		s.holdFx(fxFrom(u))
 		return
 	}
+	if len(u.Patches) > 0 || len(u.Morphs) > 0 {
+		// Patch, SSE events and reconnect commands can advance the DOM
+		// within an Update batch. Its original state no longer describes
+		// that baseline. Record this before encoding: the diff engine
+		// has already advanced even if encoding or delivery fails.
+		s.batchHasDOMUpdate = true
+	}
 	data, err := s.encoder.Encode(u)
 	if err != nil {
 		s.emitDiagnostic(Diagnostic{

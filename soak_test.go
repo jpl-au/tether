@@ -85,7 +85,12 @@ func (c *soakClient) sendEvents(ct *connectedTransport, n int) {
 func (c *soakClient) destroyBeacon(id string) {
 	req := httptest.NewRequest("POST", "/?tether=destroy", strings.NewReader(id))
 	req.Header.Set("Sec-Fetch-Site", "same-origin")
-	c.h.ServeHTTP(httptest.NewRecorder(), req)
+	req.Header.Set("User-Agent", c.ua)
+	w := httptest.NewRecorder()
+	c.h.ServeHTTP(w, req)
+	if w.Code != http.StatusNoContent {
+		c.t.Errorf("destroy beacon status = %d, want %d", w.Code, http.StatusNoContent)
+	}
 }
 
 // awaitDisconnected polls until the server has processed this
@@ -236,27 +241,28 @@ func TestLifecycleStress(t *testing.T) {
 		t.Fatalf("Shutdown: %v", err)
 	}
 
-	// Group membership must match the (now empty) session set, and
-	// its reactive count must agree.
+	// Every goroutine the harness spawned - session loops, transport
+	// readers, HTTP handlers, timers, the pending reaper - must be
+	// gone. Timeout callbacks remove sessions from the pools before
+	// deleting stored state and leaving groups outside the pool mutex.
+	// Wait for that cleanup too: an empty pool alone is not its completion.
+	deadline = time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		if group.Len() == 0 && group.Count().Load() == 0 && runtime.NumGoroutine() <= baseline+2 {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
 	if n := group.Len(); n != 0 {
 		t.Errorf("group.Len() = %d after all sessions destroyed, want 0", n)
 	}
 	if n := group.Count().Load(); n != 0 {
 		t.Errorf("group.Count() = %d after all sessions destroyed, want 0", n)
 	}
-
-	// Every goroutine the harness spawned - session loops, transport
-	// readers, HTTP handlers, timers, the pending reaper - must be
-	// gone. Poll briefly: exits are asynchronous after Shutdown.
-	deadline = time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
-		if runtime.NumGoroutine() <= baseline+2 {
-			return
-		}
-		time.Sleep(10 * time.Millisecond)
+	if runtime.NumGoroutine() > baseline+2 {
+		buf := make([]byte, 1<<20)
+		n := runtime.Stack(buf, true)
+		t.Errorf("goroutine leak: baseline %d, now %d\n%s",
+			baseline, runtime.NumGoroutine(), buf[:n])
 	}
-	buf := make([]byte, 1<<20)
-	n := runtime.Stack(buf, true)
-	t.Errorf("goroutine leak: baseline %d, now %d\n%s",
-		baseline, runtime.NumGoroutine(), buf[:n])
 }

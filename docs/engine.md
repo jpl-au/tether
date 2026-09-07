@@ -19,6 +19,19 @@ changed.
 
 ## Differ (default)
 
+Both engines track nested Dynamic regions. Content changes can patch a
+child; membership changes patch its enclosing Dynamic container. Parent
+patches cover their descendants, so an update never sends overlapping
+parent and child replacements. A move across containers patches their
+shared Dynamic ancestor, or requires a root morph when none exists.
+
+`Patch` updates the enclosing and descendant snapshots too, keeping later
+full diffs consistent. A memoised parent's version governs its whole subtree:
+change that version whenever any child output changes.
+
+Dynamic keys render as DOM IDs. Keep them unique throughout the document,
+including ordinary IDs and elements outside the Tether root.
+
 The Differ is the default engine. It renders every Dynamic region
 on every cycle, compares the output against stored snapshots, and
 produces patches for regions that changed. No configuration, no
@@ -137,6 +150,12 @@ iteration.
 Coalescing applies to `Update` calls only. `Patch` calls send their
 own targeted patches immediately - they do not trigger or participate
 in the coalesced render.
+
+When `Equal` is configured, a batch that returns to its initial state
+can skip rendering. An intervening patch or morph prevents that
+shortcut, so the final render can reconcile the browser with the
+batch's final state. Effects-only messages and unchanged `Patch`
+calls do not prevent the shortcut.
 
 Client events from the transport are not coalesced. Each event gets
 its own render cycle because events carry client correlation IDs.

@@ -26,6 +26,32 @@ func (s *StatefulSession[S]) onTransportClose() {
 	if s.transportCancel != nil {
 		s.transportCancel()
 	}
+	if s.freeze {
+		// Stop HTTP acceptance before draining the commands already
+		// acknowledged to callers. They must be included in the snapshot.
+		s.lifecycleMu.Lock()
+		s.freezing.Store(true)
+		s.lifecycleMu.Unlock()
+		defer s.freezing.Store(false)
+		for range len(s.cmds) {
+			if s.ctx.Err() != nil {
+				break
+			}
+			s.runCmd(<-s.cmds)
+		}
+		fx := &Effects{}
+		s.drainFx(fx)
+		s.sendFx(fx)
+		// A reattachment accepted before freezing may have installed a
+		// new transport while draining. Its loop must remain alive.
+		if s.transport != nil {
+			if s.needsRender && s.ctx.Err() == nil {
+				s.needsRender = false
+				s.coalescedRender()
+			}
+			return
+		}
+	}
 
 	if s.reconnectTimeout > 0 {
 		dev.Debug("disconnect timer started",
@@ -67,10 +93,14 @@ func (s *StatefulSession[S]) onTransportClose() {
 	// the envelope wraps it with metadata, and the store persists the
 	// bytes. TTL matches the reconnect window - if the client never
 	// comes back, the store entry can expire.
-	if s.sessionStore != nil {
-		s.saveSessionState(s.ctx, s.reconnectTimeout)
-	}
+	saved := s.sessionStore != nil && s.saveSessionState(s.ctx, s.reconnectTimeout)
 
+	// Publish Frozen before the disconnected pool entry. A reconnect can
+	// now wait for loopDone before rebuilding fields still owned by this loop.
+	if s.freeze && saved && s.ctx.Err() == nil && s.status.CompareAndSwap(int32(Active), int32(Frozen)) {
+		s.subscriptionContext()
+		s.subscriptions.Load().cancel()
+	}
 	if s.handler != nil {
 		s.handler.sessionDisconnected(s)
 	}
@@ -79,12 +109,12 @@ func (s *StatefulSession[S]) onTransportClose() {
 	// holds everything needed to restore. The loop exits after this
 	// returns (checked by the caller in run). The snapshot is zeroed
 	// too so State() reflects the released state.
-	if s.freeze {
+	if Status(s.status.Load()) == Frozen {
 		var zero S
 		s.state = zero
 		s.stateSnap.Store(zero)
 		s.engine = nil
-		s.transition(Frozen)
+		s.stateReleased = true
 		dev.Debug("session frozen", "session", s.id, "endpoint", s.endpoint)
 	}
 }
@@ -95,7 +125,7 @@ func (s *StatefulSession[S]) onTransportClose() {
 // disconnect), Shutdown passes context.Background() (s.ctx is
 // cancelled after the loop exits). Failures are logged and emitted
 // as diagnostics but are non-fatal.
-func (s *StatefulSession[S]) saveSessionState(ctx context.Context, ttl time.Duration) {
+func (s *StatefulSession[S]) saveSessionState(ctx context.Context, ttl time.Duration) bool {
 	stateBytes, err := s.codec.Marshal(s.state)
 	if err != nil {
 		dev.Warn("session state marshal failed", "session", s.id, "error", err)
@@ -105,7 +135,7 @@ func (s *StatefulSession[S]) saveSessionState(ctx context.Context, ttl time.Dura
 			Err:       err,
 			Detail:    "marshal",
 		})
-		return
+		return false
 	}
 
 	if s.maxStateBytes > 0 && int64(len(stateBytes)) > s.maxStateBytes {
@@ -138,7 +168,7 @@ func (s *StatefulSession[S]) saveSessionState(ctx context.Context, ttl time.Dura
 			Err:       err,
 			Detail:    "envelope",
 		})
-		return
+		return false
 	}
 
 	if err := s.sessionStore.Save(ctx, s.id, data, ttl); err != nil {
@@ -149,7 +179,9 @@ func (s *StatefulSession[S]) saveSessionState(ctx context.Context, ttl time.Dura
 			Err:       err,
 			Detail:    "save",
 		})
+		return false
 	}
+	return true
 }
 
 // cleanup runs when the loop exits. For frozen sessions only the idle
@@ -162,12 +194,8 @@ func (s *StatefulSession[S]) cleanup() {
 		s.idleTimer.Stop()
 	}
 	if Status(s.status.Load()) == Frozen {
-		// A frozen session cannot be holding effects: freeze happens
-		// inside onTransportClose, before the loop processes anything
-		// that could raise one, and enqueueFx discards with a
-		// diagnostic from then on. Reporting here would also race a
-		// concurrent thaw, which rebuilds the very channels the report
-		// reads.
+		// Effects held before freeze can accompany same-process thaw.
+		// Later enqueues are rejected; this loop generation has finished.
 		return
 	}
 	// Nothing will ever deliver what is still buffered: the loop is

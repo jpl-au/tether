@@ -219,18 +219,24 @@ function drainAndReplay() {
         var events = allReq.result;
         var keys = keysReq.result;
         var now = Date.now();
-        var sends = [];
-        for (var i = 0; i < events.length; i++) {
-          if (now - events[i].ts > EVENT_MAX_AGE_MS) {
-            deleteFromEventDB(db, keys[i]);
-            continue;
-          }
-          sends.push(replayEvent(db, keys[i], events[i]));
-        }
-        resolve(Promise.all(sends));
+        var chains = Object.create(null);
+        events.forEach(function (ev, i) {
+          // Preserve order within a session while allowing another tab
+          // to make progress when this session is frozen or unavailable.
+          var stream = JSON.stringify([ev.endpoint, ev.sessionID]);
+          chains[stream] = (chains[stream] || Promise.resolve()).then(function () {
+            if (now - ev.ts > EVENT_MAX_AGE_MS) return deleteFromEventDB(db, keys[i]);
+            return replayEvent(db, keys[i], ev);
+          });
+        });
+        Promise.allSettled(Object.values(chains)).then(function (results) {
+          var failed = results.find(function (r) { return r.status === "rejected"; });
+          if (failed) reject(failed.reason);
+          else resolve();
+        });
       };
       tx.onerror = function () { reject(tx.error); };
-    });
+    }).finally(function () { db.close(); });
   });
 }
 
@@ -243,19 +249,22 @@ function replayEvent(db, key, ev) {
     },
     body: ev.payload
   }).then(function (resp) {
-    // Delete on success or permanent client error (4xx - e.g. session
-    // not found). Keep on server error (5xx) for retry on next sync.
-    if (resp.ok || (resp.status >= 400 && resp.status < 500)) {
-      deleteFromEventDB(db, key);
+    // Reject retryable failures so Background Sync schedules another
+    // attempt, leaving this event and later events in their original order.
+    if (resp.ok || (resp.status >= 400 && resp.status < 500 && resp.status !== 408 && resp.status !== 429)) {
+      return deleteFromEventDB(db, key);
     }
-  }).catch(function () {
-    // Network failure - leave in IndexedDB for the next sync attempt.
+    throw new Error("event replay returned " + resp.status);
   });
 }
 
 function deleteFromEventDB(db, key) {
+  return new Promise(function (resolve, reject) {
   var tx = db.transaction(EVENT_STORE, "readwrite");
   tx.objectStore(EVENT_STORE).delete(key);
+  tx.oncomplete = function () { resolve(); };
+  tx.onerror = function () { reject(tx.error); };
+  });
 }
 
 self.addEventListener("sync", function (e) {

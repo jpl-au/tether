@@ -15,7 +15,7 @@ group.BroadcastOthers(sess, func(t *tether.StatefulSession[State], s State) Stat
 })
 ```
 
-In dev mode, a warning is emitted if `State()` is called during Handle.
+Concurrent `State()` readers see the last completed mutation while Handle runs.
 
 ## Keep Handle fast
 

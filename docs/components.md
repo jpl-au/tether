@@ -79,7 +79,7 @@ func (d Dashboard) Mount(sess tether.Session) tether.Component {
 }
 ```
 
-The framework calls `Mount` once per component during session startup for components registered via `StatefulConfig.Components`. Components that don't need setup simply omit the method.
+The framework calls `Mount` during initial session startup, thaw and crash recovery for components registered via `StatefulConfig.Components`. Ordinary transport reattachment does not mount again. Setup must support restoration from persisted component state. Components that don't need setup simply omit the method.
 
 ---
 

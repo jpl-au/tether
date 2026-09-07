@@ -79,12 +79,15 @@ type Config struct {
 // credentials. Create one at startup with [NewSender] and reuse it
 // for all push calls.
 type Sender struct {
-	cfg Config
+	cfg        Config
+	signingKey *ecdsa.PrivateKey
+	signingErr error
 }
 
 // NewSender creates a Sender from the given configuration.
 func NewSender(cfg Config) *Sender {
-	return &Sender{cfg: cfg}
+	key, err := parseSigningKey(cfg.VAPIDPrivateKey)
+	return &Sender{cfg: cfg, signingKey: key, signingErr: err}
 }
 
 // PublicKey returns the VAPID public key for client-side push
@@ -161,6 +164,9 @@ var ErrSubscriptionExpired = errors.New("push: subscription expired (410 Gone)")
 // HTTP 410 Gone. Other non-2xx responses are returned as errors with
 // the status code in the message.
 func (s *Sender) Send(sub Subscription, n Notification) error {
+	if s.signingErr != nil {
+		return fmt.Errorf("push: create VAPID auth: %w", s.signingErr)
+	}
 	opts := s.cfg
 	payload, err := json.Marshal(n)
 	if err != nil {
@@ -217,7 +223,7 @@ func (s *Sender) Send(sub Subscription, n Notification) error {
 	body := buildAES128GCMBody(salt, ephPub, encrypted)
 
 	// Create the VAPID Authorisation header.
-	authHeader, err := vapidAuth(sub.Endpoint, opts)
+	authHeader, err := signedVAPIDAuth(sub.Endpoint, opts, s.signingKey)
 	if err != nil {
 		return fmt.Errorf("push: create VAPID auth: %w", err)
 	}
@@ -241,6 +247,9 @@ func (s *Sender) Send(sub Subscription, n Notification) error {
 		return fmt.Errorf("push: send request: %w", err)
 	}
 	defer resp.Body.Close()
+	// Consume the response so the HTTP transport can reuse its connection,
+	// including when the push service reports an expired subscription.
+	io.Copy(io.Discard, resp.Body)
 
 	if resp.StatusCode == http.StatusGone {
 		return ErrSubscriptionExpired
@@ -360,21 +369,31 @@ func buildAES128GCMBody(salt, keyID, ciphertext []byte) []byte {
 
 // vapidAuth creates the VAPID Authorisation header value per RFC 8292.
 func vapidAuth(endpoint string, opts Config) (string, error) {
+	key, err := parseSigningKey(opts.VAPIDPrivateKey)
+	if err != nil {
+		return "", err
+	}
+	return signedVAPIDAuth(endpoint, opts, key)
+}
+
+func parseSigningKey(raw string) (*ecdsa.PrivateKey, error) {
+	privBytes, err := decodeBase64URL(raw)
+	if err != nil {
+		return nil, fmt.Errorf("decode VAPID private key: %w", err)
+	}
+	key, err := ecdsa.ParseRawPrivateKey(elliptic.P256(), privBytes)
+	if err != nil {
+		return nil, fmt.Errorf("parse VAPID private key: %w", err)
+	}
+	return key, nil
+}
+
+func signedVAPIDAuth(endpoint string, opts Config, privKey *ecdsa.PrivateKey) (string, error) {
 	u, err := url.Parse(endpoint)
 	if err != nil {
 		return "", fmt.Errorf("parse endpoint: %w", err)
 	}
 	audience := u.Scheme + "://" + u.Host
-
-	// Reconstruct the ECDSA signing key from the raw private key bytes.
-	privBytes, err := decodeBase64URL(opts.VAPIDPrivateKey)
-	if err != nil {
-		return "", fmt.Errorf("decode VAPID private key: %w", err)
-	}
-	privKey, err := ecdsa.ParseRawPrivateKey(elliptic.P256(), privBytes)
-	if err != nil {
-		return "", fmt.Errorf("parse VAPID private key: %w", err)
-	}
 
 	// Build the JWT header and claims.
 	header := base64.RawURLEncoding.EncodeToString([]byte(`{"typ":"JWT","alg":"ES256"}`))

@@ -230,7 +230,7 @@ h.Diagnostics.SubscribeAsync(ctx, func(d tether.Diagnostic) {
 | `HandlerPanic` | Recovered panic inside Handle, Update, or a command callback. By default the session is destroyed because state may be corrupted. Set `OnPanic` to override |
 | `UploadError` | Failure or recovered panic in an upload handler callback |
 | `UploadRejected` | An upload was rejected because its MIME type did not match the `UploadConfig.Accept` list. Detail contains the rejected content type |
-| `SessionBindingFailed` | A reconnect or session claim was rejected because the User-Agent did not match the original |
+| `SessionBindingFailed` | A reconnect, session claim or client-requested destruction was rejected because the User-Agent did not match the original |
 | `StoreError` | Failure saving or deleting differ snapshots from the configured DiffStore. The Detail field indicates the operation ("save" or "delete"). Store failures are non-fatal - the framework falls back to in-memory behaviour |
 | `SessionStoreError` | Failure saving, loading, or deleting session state from the configured SessionStore. The Detail field indicates the operation ("save", "load", "delete", "marshal", "unmarshal", or "envelope"). Non-fatal - the framework continues with in-memory state |
 | `StateSizeExceeded` | Serialised session state exceeded `Limits.MaxStateBytes`. The save proceeds - this is a warning, not a hard limit. Detail contains the size in bytes |
