@@ -61,9 +61,15 @@ func (jsRuntime) writeScripts(buf *bytes.Buffer, content []byte) {
 
 	// Extension scripts are included only when the rendered HTML uses
 	// the corresponding data attributes. This keeps the client payload
-	// small for apps that don't need optional features.
+	// small for apps that don't need optional features. Several markers
+	// can share one script (draggable and sortable both use
+	// tether-drag-and-drop.js), so track what has been written: a
+	// second tag would execute the script again and register its
+	// delegated listeners twice, sending every event to the server twice.
+	seen := make(map[string]bool, len(extensions))
 	for _, ext := range extensions {
-		if bytes.Contains(content, ext.marker) {
+		if bytes.Contains(content, ext.marker) && !seen[ext.script] {
+			seen[ext.script] = true
 			buf.WriteString("<script src=\"/_tether/")
 			buf.WriteString(ext.script)
 			buf.WriteString("?v=")

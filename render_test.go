@@ -70,6 +70,25 @@ func TestExtensionScriptsInjectedByMarker(t *testing.T) {
 		}
 	}
 
+	// Markers that share a script must produce exactly one tag,
+	// otherwise the script runs twice and registers its delegated
+	// listeners twice.
+	shared := []struct {
+		markers string
+		script  string
+	}{
+		{`<div data-tether-draggable></div><ul data-tether-sortable="reorder"></ul>`, "tether-drag-and-drop.js"},
+		{`<div data-tether-swipe="nav"></div><div data-tether-longpress="menu"></div>`, "tether-touch.js"},
+	}
+	for _, tc := range shared {
+		body := &tetherBody{html: []byte(tc.markers), endpoint: "/app", session: "abc"}
+		var buf bytes.Buffer
+		body.RenderBuilder(&buf)
+		if n := strings.Count(buf.String(), "/_tether/"+tc.script); n != 1 {
+			t.Errorf("%s: expected one script tag, got %d", tc.script, n)
+		}
+	}
+
 	// And none of them appear when no marker is present.
 	body := &tetherBody{html: []byte("<p>plain</p>"), endpoint: "/app", session: "abc"}
 	var buf bytes.Buffer
