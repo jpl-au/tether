@@ -1,10 +1,9 @@
 // tether-drag-and-drop.js - drag and drop extension for Tether.
 //
-// Loaded automatically when the initial page render contains any
-// element with data-tether-draggable. Extension scripts are included
-// once during the initial GET - if the first view does not render
-// draggable elements (e.g. a login page), add a hidden marker element
-// with the attribute so the script loads upfront.
+// Loaded automatically when any element renders data-tether-draggable
+// or data-tether-sortable: on the initial GET when the first render
+// contains the marker, otherwise lazily by tether.js when a morph
+// first introduces it.
 //
 // Uses event delegation on the tether root - consistent with the core
 // tether.js architecture. No per-element listeners are attached, so
