@@ -1,7 +1,6 @@
 package tether
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -12,7 +11,7 @@ import (
 )
 
 func TestSessionBindingRejectsReattachWithMismatchedUA(t *testing.T) {
-	h := Stateful(App{}, StatefulConfig[counterState]{
+	h := newStatefulTestHandler(t, App{}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -21,7 +20,7 @@ func TestSessionBindingRejectsReattachWithMismatchedUA(t *testing.T) {
 	})
 
 	// Inject a disconnected session with a known User-Agent.
-	sess := newTestSession(counterState{Count: 42}, &mockTransport{})
+	sess := newTestSessionStub(t, counterState{Count: 42})
 	sess.userAgent = "Mozilla/5.0 OriginalBrowser"
 
 	h.mu.Lock()
@@ -59,7 +58,7 @@ func TestSessionBindingRejectsReattachWithMismatchedUA(t *testing.T) {
 }
 
 func TestSessionBindingRejectsPendingClaimWithMismatchedUA(t *testing.T) {
-	h := Stateful(App{}, StatefulConfig[counterState]{
+	h := newStatefulTestHandler(t, App{}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -103,7 +102,7 @@ func TestSessionBindingRejectsPendingClaimWithMismatchedUA(t *testing.T) {
 
 func TestSessionBindingDisabledAllowsMismatchedUA(t *testing.T) {
 	connected := make(chan struct{}, 1)
-	h := Stateful(App{Security: Security{
+	h := newStatefulTestHandler(t, App{Security: Security{
 		DisableSessionBinding: true,
 	}}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
@@ -143,12 +142,12 @@ func TestSessionBindingDisabledAllowsMismatchedUA(t *testing.T) {
 		t.Fatal("expected OnConnect when binding is disabled, but it was not called")
 	}
 
-	h.Shutdown(context.Background())
+	shutdownTestHandler(t, h)
 }
 
 func TestSessionMatchCustomMatcher(t *testing.T) {
 	connected := make(chan struct{}, 1)
-	h := Stateful(App{Security: Security{
+	h := newStatefulTestHandler(t, App{Security: Security{
 		// Accept any UA that starts with "Mozilla" - simulates
 		// matching on browser family while ignoring version.
 		SessionMatch: func(original, reconnect string) bool {
@@ -191,11 +190,11 @@ func TestSessionMatchCustomMatcher(t *testing.T) {
 		t.Fatal("expected OnConnect with custom SessionMatch, but it was not called")
 	}
 
-	h.Shutdown(context.Background())
+	shutdownTestHandler(t, h)
 }
 
 func TestSessionMatchRejectsNonMatchingUA(t *testing.T) {
-	h := Stateful(App{Security: Security{
+	h := newStatefulTestHandler(t, App{Security: Security{
 		SessionMatch: func(original, reconnect string) bool {
 			return len(original) >= 7 && len(reconnect) >= 7 &&
 				original[:7] == reconnect[:7]
@@ -208,7 +207,7 @@ func TestSessionMatchRejectsNonMatchingUA(t *testing.T) {
 		Handle:       handleCounter,
 	})
 
-	sess := newTestSession(counterState{}, &mockTransport{})
+	sess := newTestSessionStub(t, counterState{})
 	sess.userAgent = "Mozilla/5.0 Chrome/120"
 
 	h.mu.Lock()
@@ -232,7 +231,7 @@ func TestSessionMatchRejectsNonMatchingUA(t *testing.T) {
 }
 
 func TestSessionBindingCapturesUAOnInitialPage(t *testing.T) {
-	h := Stateful(App{}, StatefulConfig[counterState]{
+	h := newStatefulTestHandler(t, App{}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },

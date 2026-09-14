@@ -15,7 +15,7 @@ func TestStatefulDevModeEnvVar(t *testing.T) {
 	t.Setenv("TETHER_DEV", "1")
 	t.Cleanup(dev.Reset)
 
-	Stateful(App{}, StatefulConfig[counterState]{
+	newStatefulTestHandler(t, App{}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -32,7 +32,7 @@ func TestStatefulDevModeBoolOverridesEnv(t *testing.T) {
 	t.Setenv("TETHER_DEV", "")
 	t.Cleanup(dev.Reset)
 
-	Stateful(App{DevMode: true}, StatefulConfig[counterState]{
+	newStatefulTestHandler(t, App{DevMode: true}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -48,7 +48,7 @@ func TestStatefulDevModeBoolOverridesEnv(t *testing.T) {
 func TestStatefulDevModeCacheControl(t *testing.T) {
 	t.Cleanup(dev.Reset)
 
-	handler := Stateful(App{DevMode: true}, StatefulConfig[counterState]{
+	handler := newStatefulTestHandler(t, App{DevMode: true}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -69,7 +69,7 @@ func TestStatefulDevModeCacheControl(t *testing.T) {
 // carry no-store in production too - a shared cache serving one
 // user's page to another would hand over the session.
 func TestStatefulCacheControlInProduction(t *testing.T) {
-	handler := Stateful(App{}, StatefulConfig[counterState]{
+	handler := newStatefulTestHandler(t, App{}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -89,7 +89,7 @@ func TestStatefulCacheControlInProduction(t *testing.T) {
 func TestStatefulDevModeInitialPageHasAttribute(t *testing.T) {
 	t.Cleanup(dev.Reset)
 
-	handler := Stateful(App{DevMode: true}, StatefulConfig[counterState]{
+	handler := newStatefulTestHandler(t, App{DevMode: true}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -107,7 +107,7 @@ func TestStatefulDevModeInitialPageHasAttribute(t *testing.T) {
 }
 
 func TestStatefulInitialPageHasReconnectionAttributes(t *testing.T) {
-	handler := newTestHandler()
+	handler := newTestHandler(t)
 
 	req := httptest.NewRequest("GET", "/app", nil)
 	w := httptest.NewRecorder()
@@ -151,7 +151,7 @@ func (f *failingWriter) WriteHeader(int)           {}
 func TestStatefulFailedPageWriteFreesPendingSlot(t *testing.T) {
 	t.Cleanup(dev.Reset)
 
-	handler := Stateful(App{}, StatefulConfig[counterState]{
+	handler := newStatefulTestHandler(t, App{}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },

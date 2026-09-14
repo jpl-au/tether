@@ -13,7 +13,7 @@ import (
 )
 
 func TestHandleUploadNotConfigured(t *testing.T) {
-	handler := newTestHandler()
+	handler := newTestHandler(t)
 
 	req := httptest.NewRequest("POST", "/app", nil)
 	req.Header.Set("Tether-Upload", "avatar")
@@ -27,7 +27,7 @@ func TestHandleUploadNotConfigured(t *testing.T) {
 }
 
 func TestHandleUploadMissingSession(t *testing.T) {
-	handler := Stateful(App{}, StatefulConfig[counterState]{
+	handler := newStatefulTestHandler(t, App{}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -50,7 +50,7 @@ func TestHandleUploadMissingSession(t *testing.T) {
 }
 
 func TestHandleUploadUnknownSession(t *testing.T) {
-	handler := Stateful(App{}, StatefulConfig[counterState]{
+	handler := newStatefulTestHandler(t, App{}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -77,7 +77,7 @@ func TestHandleUploadSuccess(t *testing.T) {
 	var received Upload
 	done := make(chan struct{})
 
-	handler := Stateful(App{}, StatefulConfig[counterState]{
+	handler := newStatefulTestHandler(t, App{}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -92,8 +92,7 @@ func TestHandleUploadSuccess(t *testing.T) {
 		},
 	})
 
-	mt := &mockTransport{}
-	sess := newTestSession(counterState{}, mt)
+	sess := newTestSessionStub(t, counterState{})
 	sess.id = "upload-session"
 	handler.mu.Lock()
 	handler.active["upload-session"] = sess
@@ -131,7 +130,7 @@ func TestHandleUploadSuccess(t *testing.T) {
 }
 
 func TestHandleUploadMIMEReject(t *testing.T) {
-	handler := Stateful(App{}, StatefulConfig[counterState]{
+	handler := newStatefulTestHandler(t, App{}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -143,8 +142,7 @@ func TestHandleUploadMIMEReject(t *testing.T) {
 		},
 	})
 
-	mt := &mockTransport{}
-	sess := newTestSession(counterState{}, mt)
+	sess := newTestSessionStub(t, counterState{})
 	sess.id = "upload-session"
 	handler.mu.Lock()
 	handler.active["upload-session"] = sess
@@ -168,7 +166,7 @@ func TestHandleUploadMIMEReject(t *testing.T) {
 func TestHandleUploadMIMEAcceptWildcard(t *testing.T) {
 	done := make(chan struct{})
 
-	handler := Stateful(App{}, StatefulConfig[counterState]{
+	handler := newStatefulTestHandler(t, App{}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -183,8 +181,7 @@ func TestHandleUploadMIMEAcceptWildcard(t *testing.T) {
 		},
 	})
 
-	mt := &mockTransport{}
-	sess := newTestSession(counterState{}, mt)
+	sess := newTestSessionStub(t, counterState{})
 	sess.id = "upload-session"
 	handler.mu.Lock()
 	handler.active["upload-session"] = sess

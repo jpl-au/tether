@@ -37,7 +37,7 @@ func TestInternalStopRemovesSessionFromActivePool(t *testing.T) {
 	sessCh := make(chan *StatefulSession[counterState], 1)
 	disconnected := make(chan struct{}, 1)
 
-	h := Stateful(App{}, StatefulConfig[counterState]{
+	h := newStatefulTestHandler(t, App{}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      func(w http.ResponseWriter, r *http.Request) (Transport, error) { return newConnectedTransport(), nil },
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -62,7 +62,11 @@ func TestInternalStopRemovesSessionFromActivePool(t *testing.T) {
 
 	// Destroy from inside the session - not via the transport.
 	sess.stop()
-	<-sess.destroyed
+	select {
+	case <-sess.destroyed:
+	case <-time.After(2 * time.Second):
+		t.Fatal("session destruction did not finish")
+	}
 
 	waitFor(t, "active pool removal", func() bool {
 		h.mu.RLock()
@@ -85,14 +89,14 @@ func TestInternalStopRemovesSessionFromActivePool(t *testing.T) {
 	if err := h.Drain(ctx); err != nil {
 		t.Fatalf("Drain after internal destroy: %v", err)
 	}
-	h.Shutdown(context.Background())
+	shutdownTestHandler(t, h)
 }
 
 // TestInitialGETRedirectsOnNavigate covers the pre-warm effects fix:
 // an auth guard calling Navigate in OnNavigate during the initial GET
 // must produce a real HTTP redirect, not the guarded page's HTML.
 func TestInitialGETRedirectsOnNavigate(t *testing.T) {
-	h := Stateful(App{}, StatefulConfig[counterState]{
+	h := newStatefulTestHandler(t, App{}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -126,7 +130,7 @@ func TestInitialGETRedirectsOnNavigate(t *testing.T) {
 // the first update after the transport connects.
 func TestInitialGETTitleEffectReachesClient(t *testing.T) {
 	ctCh := make(chan *connectedTransport, 1)
-	h := Stateful(App{}, StatefulConfig[counterState]{
+	h := newStatefulTestHandler(t, App{}, StatefulConfig[counterState]{
 		Mode: mode.WebSocket,
 		Upgrade: func(w http.ResponseWriter, r *http.Request) (Transport, error) {
 			ct := newConnectedTransport()
@@ -180,7 +184,7 @@ func TestInitialGETTitleEffectReachesClient(t *testing.T) {
 		}
 		return false
 	})
-	h.Shutdown(context.Background())
+	shutdownTestHandler(t, h)
 }
 
 // TestStaleClientReceivesFullMorph covers the stale-client recovery
@@ -189,7 +193,7 @@ func TestInitialGETTitleEffectReachesClient(t *testing.T) {
 // having to trigger any event.
 func TestStaleClientReceivesFullMorph(t *testing.T) {
 	ctCh := make(chan *connectedTransport, 1)
-	h := Stateful(App{}, StatefulConfig[counterState]{
+	h := newStatefulTestHandler(t, App{}, StatefulConfig[counterState]{
 		Mode: mode.WebSocket,
 		Upgrade: func(w http.ResponseWriter, r *http.Request) (Transport, error) {
 			ct := newConnectedTransport()
@@ -228,13 +232,13 @@ func TestStaleClientReceivesFullMorph(t *testing.T) {
 		}
 		return false
 	})
-	h.Shutdown(context.Background())
+	shutdownTestHandler(t, h)
 }
 
 // TestConnectTicketLifecycle covers the one-time connect ticket:
 // single use, expiry, and User-Agent binding.
 func TestConnectTicketLifecycle(t *testing.T) {
-	h := newTestHandler()
+	h := newTestHandler(t)
 	now := time.Now()
 
 	tok, ok := h.issueTicket("SESSIONIDSESSIONIDSESSIONID", "", "UA/1.0", now)
@@ -268,8 +272,8 @@ func TestConnectTicketLifecycle(t *testing.T) {
 // cross-site GET (e.g. an <img> tag) must not be able to destroy a
 // session, and the ID travels in the body, not the URL.
 func TestDestroyBeaconRequiresPOST(t *testing.T) {
-	h := newTestHandler()
-	sess := newTestSession(counterState{}, &mockTransport{})
+	h := newTestHandler(t)
+	sess := newTestSessionStub(t, counterState{})
 	sess.handler = h
 	h.mu.Lock()
 	h.disconnected[sess.id] = sess
@@ -401,7 +405,7 @@ func TestCBORUsesBinaryFramesWhenSupported(t *testing.T) {
 func TestDebugDashboard(t *testing.T) {
 	t.Run("dev mode serves the dashboard", func(t *testing.T) {
 		t.Cleanup(dev.Reset)
-		h := Stateful(App{DevMode: true}, StatefulConfig[counterState]{
+		h := newStatefulTestHandler(t, App{DevMode: true}, StatefulConfig[counterState]{
 			Mode:         mode.WebSocket,
 			Upgrade:      stubUpgrade,
 			InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -426,7 +430,7 @@ func TestDebugDashboard(t *testing.T) {
 	})
 
 	t.Run("production does not expose it", func(t *testing.T) {
-		h := newTestHandler()
+		h := newTestHandler(t)
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, httptest.NewRequest("GET", "/_tether/debug", nil))
 		if strings.Contains(w.Body.String(), "tether debug") {

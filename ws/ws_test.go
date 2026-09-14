@@ -2,12 +2,14 @@ package ws
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/jpl-au/tether/event"
 	xport "github.com/jpl-au/tether/internal/transport"
@@ -55,6 +57,8 @@ func (tc *testClient) readMessage() ([]byte, error) {
 			return nil, io.EOF
 		}
 		return data, nil
+	case <-time.After(30 * time.Second):
+		return nil, fmt.Errorf("timed out waiting for WebSocket message")
 	case <-tc.closed:
 		if tc.closeErr != nil {
 			return nil, tc.closeErr
@@ -71,48 +75,12 @@ func (tc *testClient) writeClose(code uint16, reason []byte) error {
 	return tc.conn.WriteClose(code, reason)
 }
 
-func (tc *testClient) close() error {
-	tc.once.Do(func() {
-		close(tc.closed)
-	})
-	return tc.conn.WriteClose(1000, nil)
-}
-
 // dial starts an httptest server that upgrades to WebSocket via ws.Upgrade,
 // sends the server-side transport to the caller, and returns a gws
 // client connection for the test to read/write against.
 func dial(t *testing.T) (*transport, *testClient) {
 	t.Helper()
-
-	ready := make(chan *transport, 1)
-
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		upgradeFn := Upgrade()
-		tp, err := upgradeFn(w, r)
-		if err != nil {
-			t.Errorf("upgrade failed: %v", err)
-			return
-		}
-		ready <- tp.(*transport)
-	}))
-	t.Cleanup(srv.Close)
-
-	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http")
-	tc := &testClient{
-		messages: make(chan []byte, 16),
-		closed:   make(chan struct{}),
-	}
-	handler := &testClientHandler{client: tc}
-	conn, _, err := gws.NewClient(handler, &gws.ClientOption{Addr: wsURL})
-	if err != nil {
-		t.Fatalf("dial: %v", err)
-	}
-	tc.conn = conn
-	go conn.ReadLoop()
-	t.Cleanup(func() { tc.close() })
-
-	tp := <-ready
-	return tp, tc
+	return dialWith(t, Options{}, gws.PermessageDeflate{})
 }
 
 func TestSendDeliversJSON(t *testing.T) {
@@ -254,11 +222,43 @@ func dialWith(t *testing.T, opts Options, clientDeflate gws.PermessageDeflate) (
 		t.Fatalf("dial: %v", err)
 	}
 	tc.conn = conn
-	go conn.ReadLoop()
-	t.Cleanup(func() { tc.close() })
+	readDone := make(chan struct{})
+	go func() {
+		defer close(readDone)
+		conn.ReadLoop()
+	}()
+	t.Cleanup(func() {
+		// Close the underlying socket even if a close-frame write failed.
+		tc.once.Do(func() { close(tc.closed) })
+		if err := conn.NetConn().Close(); err != nil {
+			t.Logf("WebSocket socket close: %v", err)
+		}
+		select {
+		case <-readDone:
+		case <-time.After(30 * time.Second):
+			t.Error("WebSocket client read loop did not stop")
+			panic("WebSocket fixture cleanup stalled")
+		}
+	})
+	if err := conn.SetDeadline(time.Now().Add(30 * time.Second)); err != nil {
+		t.Fatalf("client deadline: %v", err)
+	}
 
-	tp := <-ready
-	return tp, tc
+	select {
+	case tp := <-ready:
+		t.Cleanup(func() {
+			if err := tp.Close(); err != nil {
+				t.Logf("WebSocket transport close: %v", err)
+			}
+		})
+		if err := tp.conn.SetDeadline(time.Now().Add(30 * time.Second)); err != nil {
+			t.Fatalf("server deadline: %v", err)
+		}
+		return tp, tc
+	case <-time.After(30 * time.Second):
+		t.Fatal("timed out waiting for WebSocket upgrade")
+		return nil, nil
+	}
 }
 
 func TestCompressedRoundTrip(t *testing.T) {

@@ -789,7 +789,7 @@ func TestStatefulRejectsHTMLWireFormat(t *testing.T) {
 			t.Fatal("Stateful should panic on wire.HTML")
 		}
 	}()
-	Stateful(App{}, StatefulConfig[counterState]{
+	newStatefulTestHandler(t, App{}, StatefulConfig[counterState]{
 		WireFormat:   wire.HTML,
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,

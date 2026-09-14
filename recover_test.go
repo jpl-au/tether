@@ -151,7 +151,7 @@ func TestSessionUpdatePanicCallsOnPanic(t *testing.T) {
 }
 
 func TestServeInitialPagePanicDoesNotCrashProcess(t *testing.T) {
-	handler := Stateful(App{}, StatefulConfig[counterState]{
+	handler := newStatefulTestHandler(t, App{}, StatefulConfig[counterState]{
 		Mode:    mode.WebSocket,
 		Upgrade: stubUpgrade,
 		InitialState: func(r *http.Request) counterState {

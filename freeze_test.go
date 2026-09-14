@@ -232,7 +232,7 @@ func TestFreezeWithRestoreRequiresOnRestore(t *testing.T) {
 		}
 	}()
 
-	Stateful(App{}, StatefulConfig[counterState]{
+	newStatefulTestHandler(t, App{}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -254,7 +254,7 @@ func TestFreezeRequiresSessionStore(t *testing.T) {
 		}
 	}()
 
-	Stateful(App{}, StatefulConfig[counterState]{
+	newStatefulTestHandler(t, App{}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -269,7 +269,7 @@ func TestFreezeRequiresSessionStore(t *testing.T) {
 // FreezeWithConnect does not require OnRestore.
 func TestFreezeWithConnectAllowsNilOnRestore(t *testing.T) {
 	// Should not panic.
-	Stateful(App{}, StatefulConfig[counterState]{
+	newStatefulTestHandler(t, App{}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },

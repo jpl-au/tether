@@ -20,7 +20,7 @@ import (
 )
 
 func TestClientWorkerHeader(t *testing.T) {
-	handler := newTestHandler()
+	handler := newTestHandler(t)
 
 	t.Run("tether-worker.js gets Service-Worker-Allowed header", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/_tether/tether-worker.js", nil)
@@ -89,7 +89,7 @@ func TestClientPrecache(t *testing.T) {
 		Precache: []string{"styles.css", "logo.svg"},
 	}
 
-	handler := Stateful(App{Assets: []*Asset{assets}}, StatefulConfig[counterState]{
+	handler := newStatefulTestHandler(t, App{Assets: []*Asset{assets}}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -114,7 +114,7 @@ func TestClientPrecache(t *testing.T) {
 }
 
 func TestClientNoPrecache(t *testing.T) {
-	handler := newTestHandler()
+	handler := newTestHandler(t)
 
 	req := httptest.NewRequest("GET", "/_tether/tether-worker.js", nil)
 	w := httptest.NewRecorder()
@@ -145,7 +145,7 @@ func TestWorkerPrecacheMatchesRuntimeURLs(t *testing.T) {
 }
 
 func TestClientWorkerOriginCheck(t *testing.T) {
-	handler := newTestHandler()
+	handler := newTestHandler(t)
 
 	t.Run("same-origin request is allowed", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "http://myapp.com/_tether/tether-worker.js", nil)
@@ -176,7 +176,7 @@ func TestHandlePushSubscribe(t *testing.T) {
 	}
 	ch := make(chan result, 1)
 
-	handler := Stateful(App{}, StatefulConfig[counterState]{
+	handler := newStatefulTestHandler(t, App{}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -191,8 +191,7 @@ func TestHandlePushSubscribe(t *testing.T) {
 	})
 
 	// Create an active session so the subscribe handler can find it.
-	mt := &mockTransport{}
-	sess := newTestSession(counterState{}, mt)
+	sess := newTestSessionStub(t, counterState{})
 	sess.id = "test-session"
 	handler.mu.Lock()
 	handler.active["test-session"] = sess
@@ -243,7 +242,7 @@ func TestHandlePushSubscribe(t *testing.T) {
 }
 
 func TestHandlePushSubscribeNoPush(t *testing.T) {
-	handler := Stateful(App{}, StatefulConfig[counterState]{
+	handler := newStatefulTestHandler(t, App{}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -264,7 +263,7 @@ func TestHandlePushSubscribeNoPush(t *testing.T) {
 }
 
 func TestHandlePushSubscribeMissingSession(t *testing.T) {
-	handler := Stateful(App{}, StatefulConfig[counterState]{
+	handler := newStatefulTestHandler(t, App{}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -289,7 +288,7 @@ func TestHandlePushSubscribeMissingSession(t *testing.T) {
 }
 
 func TestHandlePushSubscribeUnknownSession(t *testing.T) {
-	handler := Stateful(App{}, StatefulConfig[counterState]{
+	handler := newStatefulTestHandler(t, App{}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },

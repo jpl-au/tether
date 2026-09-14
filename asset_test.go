@@ -152,7 +152,7 @@ func TestAssetAutoMount(t *testing.T) {
 		Prefix: "/static/",
 	}
 
-	handler := Stateful(App{Assets: []*Asset{assets}}, StatefulConfig[counterState]{
+	handler := newStatefulTestHandler(t, App{Assets: []*Asset{assets}}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -206,7 +206,7 @@ func TestAssetCacheHeadersProduction(t *testing.T) {
 		Prefix: "/static/",
 	}
 
-	handler := Stateful(App{Assets: []*Asset{assets}}, StatefulConfig[counterState]{
+	handler := newStatefulTestHandler(t, App{Assets: []*Asset{assets}}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -238,7 +238,7 @@ func TestAssetCacheHeadersDevMode(t *testing.T) {
 		Prefix: "/static/",
 	}
 
-	handler := Stateful(App{DevMode: true, Assets: []*Asset{assets}}, StatefulConfig[counterState]{
+	handler := newStatefulTestHandler(t, App{DevMode: true, Assets: []*Asset{assets}}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -272,7 +272,7 @@ func TestMultipleAssets(t *testing.T) {
 		Prefix: "/js/",
 	}
 
-	handler := Stateful(App{Assets: []*Asset{css, js}}, StatefulConfig[counterState]{
+	handler := newStatefulTestHandler(t, App{Assets: []*Asset{css, js}}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },

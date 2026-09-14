@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"sync"
+	"testing"
 	"time"
 
 	jit "github.com/jpl-au/fluent-jit"
@@ -164,14 +165,47 @@ func (c *connectedTransport) Close() error {
 
 // newTestHandler creates a stateful Handler with default test
 // configuration. Used across multiple test files.
-func newTestHandler() *Handler[counterState] {
-	return Stateful(App{}, StatefulConfig[counterState]{
+func newTestHandler(t *testing.T) *Handler[counterState] {
+	t.Helper()
+	return newStatefulTestHandler(t, App{}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
 		Render:       renderCounter,
 		Handle:       handleCounter,
 	})
+}
+
+// newStatefulTestHandler owns a handler for this test, including when an
+// assertion stops the test before its normal shutdown path.
+func newStatefulTestHandler[S any](t *testing.T, app App, cfg StatefulConfig[S]) *Handler[S] {
+	t.Helper()
+	h := Stateful(app, cfg)
+	t.Cleanup(func() { shutdownTestHandler(t, h) })
+	return h
+}
+
+func shutdownTestHandler(t *testing.T, h Drainable) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := h.Shutdown(ctx); err != nil {
+		t.Errorf("test handler shutdown: %v", err)
+		// A failed shutdown may leave live sessions. Abort the package so
+		// subsequent tests cannot inherit those resources.
+		panic("test handler did not shut down")
+	}
+}
+
+// newTestSessionStub supplies session metadata for HTTP routing tests that
+// never start a command loop. Mark the absent loop as finished so handler
+// destruction cannot wait forever for it. Do not call run on this stub.
+func newTestSessionStub(t *testing.T, state counterState) *StatefulSession[counterState] {
+	t.Helper()
+	s := newTestSession(state, &mockTransport{})
+	close(s.loopDone)
+	t.Cleanup(s.stop)
+	return s
 }
 
 // stubUpgrade is a no-op upgrade function for tests that don't need

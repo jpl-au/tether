@@ -129,7 +129,7 @@ func TestLifecycleStress(t *testing.T) {
 	var mu sync.Mutex
 	clients := make(map[string]*soakClient, workers)
 
-	h := Stateful(App{}, StatefulConfig[counterState]{
+	h := newStatefulTestHandler(t, App{}, StatefulConfig[counterState]{
 		Mode: mode.WebSocket,
 		Upgrade: func(w http.ResponseWriter, r *http.Request) (Transport, error) {
 			ct := newConnectedTransport()
@@ -214,7 +214,18 @@ func TestLifecycleStress(t *testing.T) {
 			}
 		}(int64(w))
 	}
-	wg.Wait()
+	workersDone := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(workersDone)
+	}()
+	select {
+	case <-workersDone:
+	case <-time.After(2 * time.Minute):
+		t.Error("lifecycle workers did not finish within two minutes")
+		// Do not continue into another test while these workers are live.
+		panic("lifecycle workers stalled")
+	}
 
 	// Abandoned sessions ride the 150ms reconnect timer; poll until
 	// every pool is empty.
@@ -237,9 +248,7 @@ func TestLifecycleStress(t *testing.T) {
 	if err := h.Drain(drainCtx); err != nil {
 		t.Fatalf("Drain with empty pools: %v", err)
 	}
-	if err := h.Shutdown(context.Background()); err != nil {
-		t.Fatalf("Shutdown: %v", err)
-	}
+	shutdownTestHandler(t, h)
 
 	// Every goroutine the harness spawned - session loops, transport
 	// readers, HTTP handlers, timers, the pending reaper - must be

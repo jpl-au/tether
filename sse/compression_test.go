@@ -137,7 +137,12 @@ func (s *sseTestServer) open(t *testing.T, acceptEncoding string) (*http.Respons
 	}
 	// A dedicated client with keep-alives off so closing the body tears
 	// the connection down and unblocks the handler.
-	client := &http.Client{Transport: &http.Transport{DisableKeepAlives: true}}
+	client := &http.Client{
+		Transport: &http.Transport{DisableKeepAlives: true},
+		// Include streaming reads in the deadline: a missing flush must
+		// fail this test instead of waiting for the package timeout.
+		Timeout: 30 * time.Second,
+	}
 	t.Cleanup(client.CloseIdleConnections)
 
 	resp, err := client.Do(req)
@@ -163,6 +168,11 @@ func decodeBody(t *testing.T, resp *http.Response) io.Reader {
 		if err != nil {
 			t.Fatalf("gzip reader: %v", err)
 		}
+		t.Cleanup(func() {
+			if err := gr.Close(); err != nil {
+				t.Errorf("gzip reader close: %v", err)
+			}
+		})
 		return gr
 	case "br":
 		return brotli.NewReader(resp.Body)
@@ -171,6 +181,13 @@ func decodeBody(t *testing.T, resp *http.Response) io.Reader {
 		if err != nil {
 			t.Fatalf("zstd reader: %v", err)
 		}
+		t.Cleanup(func() {
+			// Stop the stream before joining the decoder's read workers.
+			if err := resp.Body.Close(); err != nil {
+				t.Errorf("response body close: %v", err)
+			}
+			zr.Close()
+		})
 		return zr
 	default:
 		t.Fatalf("unexpected Content-Encoding %q", enc)

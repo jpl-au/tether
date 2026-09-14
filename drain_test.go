@@ -12,7 +12,7 @@ import (
 )
 
 func TestDrainRejectsNewPages(t *testing.T) {
-	handler := Stateful(App{}, StatefulConfig[counterState]{
+	handler := newStatefulTestHandler(t, App{}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -32,7 +32,7 @@ func TestDrainRejectsNewPages(t *testing.T) {
 }
 
 func TestDrainAllowsReconnect(t *testing.T) {
-	handler := Stateful(App{}, StatefulConfig[counterState]{
+	handler := newStatefulTestHandler(t, App{}, StatefulConfig[counterState]{
 		Mode:         mode.WebSocket,
 		Upgrade:      stubUpgrade,
 		InitialState: func(r *http.Request) counterState { return counterState{} },
@@ -41,8 +41,7 @@ func TestDrainAllowsReconnect(t *testing.T) {
 	})
 
 	// Inject a disconnected session so reconnect path is available.
-	mt := &mockTransport{events: []Event{}}
-	sess := newTestSession(counterState{Count: 42}, mt)
+	sess := newTestSessionStub(t, counterState{Count: 42})
 
 	handler.mu.Lock()
 	handler.disconnected[sess.id] = sess

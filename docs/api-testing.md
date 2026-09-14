@@ -1,5 +1,23 @@
 # Testing
 
+## Running the library tests
+
+Run packages sequentially, bypass cached results, and bound each package's runtime:
+
+```sh
+go test -p=1 -count=1 -timeout=3m ./...
+```
+
+An individual test runs with its own fixtures:
+
+```sh
+go test -count=1 -timeout=3m -run '^TestLifecycleStress$' .
+```
+
+Use `-v` to see which test is running, or `-json` for per-test timings. Integration tests using `testing/synctest` advance a simulated clock; their timer durations do not represent wall-clock waits. The lifecycle stress test exercises concurrent clients within its own fixture; test cases remain sequential.
+
+The Redis adapter is a separate module and uses a local in-memory Redis fixture. Run the same command from `tetheredis/` to include its tests.
+
 ## tethertest
 
 Test harness for Handle functions:

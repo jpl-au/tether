@@ -1,20 +1,9 @@
 package tether
 
-import (
-	"net/http"
-	"testing"
-
-	"github.com/jpl-au/tether/mode"
-)
+import "testing"
 
 func TestHealthEmpty(t *testing.T) {
-	handler := Stateful(App{}, StatefulConfig[counterState]{
-		Mode:         mode.WebSocket,
-		Upgrade:      stubUpgrade,
-		InitialState: func(r *http.Request) counterState { return counterState{} },
-		Render:       renderCounter,
-		Handle:       handleCounter,
-	})
+	handler := &Handler[counterState]{}
 
 	h := handler.Health()
 	if h.Pending != 0 || h.Active != 0 || h.Disconnected != 0 {
@@ -24,18 +13,9 @@ func TestHealthEmpty(t *testing.T) {
 }
 
 func TestHealthCountsPending(t *testing.T) {
-	handler := Stateful(App{}, StatefulConfig[counterState]{
-		Mode:         mode.WebSocket,
-		Upgrade:      stubUpgrade,
-		InitialState: func(r *http.Request) counterState { return counterState{} },
-		Render:       renderCounter,
-		Handle:       handleCounter,
-	})
-
-	// Inject a pending session directly.
-	handler.mu.Lock()
-	handler.pending["a"] = &pendingSession[counterState]{}
-	handler.mu.Unlock()
+	handler := &Handler[counterState]{
+		pending: map[string]*pendingSession[counterState]{"a": {}},
+	}
 
 	h := handler.Health()
 	if h.Pending != 1 {
@@ -44,18 +24,9 @@ func TestHealthCountsPending(t *testing.T) {
 }
 
 func TestHealthCountsActive(t *testing.T) {
-	handler := Stateful(App{}, StatefulConfig[counterState]{
-		Mode:         mode.WebSocket,
-		Upgrade:      stubUpgrade,
-		InitialState: func(r *http.Request) counterState { return counterState{} },
-		Render:       renderCounter,
-		Handle:       handleCounter,
-	})
-
-	handler.mu.Lock()
-	handler.active["a"] = &StatefulSession[counterState]{}
-	handler.active["b"] = &StatefulSession[counterState]{}
-	handler.mu.Unlock()
+	handler := &Handler[counterState]{
+		active: map[string]*StatefulSession[counterState]{"a": {}, "b": {}},
+	}
 
 	h := handler.Health()
 	if h.Active != 2 {
@@ -64,17 +35,9 @@ func TestHealthCountsActive(t *testing.T) {
 }
 
 func TestHealthCountsDisconnected(t *testing.T) {
-	handler := Stateful(App{}, StatefulConfig[counterState]{
-		Mode:         mode.WebSocket,
-		Upgrade:      stubUpgrade,
-		InitialState: func(r *http.Request) counterState { return counterState{} },
-		Render:       renderCounter,
-		Handle:       handleCounter,
-	})
-
-	handler.mu.Lock()
-	handler.disconnected["a"] = &StatefulSession[counterState]{}
-	handler.mu.Unlock()
+	handler := &Handler[counterState]{
+		disconnected: map[string]*StatefulSession[counterState]{"a": {}},
+	}
 
 	h := handler.Health()
 	if h.Disconnected != 1 {
