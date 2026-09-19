@@ -523,24 +523,6 @@ Subscriptions are cleaned up automatically when the session is destroyed.
 | `drain.go` | Graceful drain - stop accepting new sessions, wait for existing |
 | `health.go` | Health check endpoint |
 
-## Build and test
-
-```bash
-go build ./...   # compilation check (never go build .)
-go test ./...    # all tests
-```
-
-Full tidy sequence before committing:
-
-```bash
-go fix ./...
-goimports -w .
-go fmt ./...
-go vet ./...
-go build ./...
-go test ./...
-```
-
 ## Security
 
 Session IDs are bearer tokens - TLS is a hard requirement. User-Agent
@@ -553,7 +535,6 @@ for the full model.
 
 ## Conventions
 
-- British spelling in comments, docs, and strings
 - Short receiver names (`s` for Session, `b` for Bus, `g` for Group, `h` for Handler/Harness)
 - `atomic.Value` + copy-on-write for lock-free reads on shared collections
 - Effects are buffered during Handle and merged atomically with the diff
